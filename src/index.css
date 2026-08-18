@@ -1,0 +1,170 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --color-primary-blue: #0369A1;
+  --color-secondary-blue: #0284C7;
+  --color-sky-accent: #38BDF8;
+  --color-text-navy: #0C4A6E;
+  --color-success-green: #22C55E;
+  --color-danger-red: #EF4444;
+  --color-page-bg: #F0F9FF;
+  --color-ghost-blue: #E0F2FE;
+  --color-border: #BAE6FD;
+  --color-card-surface: #FFFFFF;
+
+  --bg-gradient: linear-gradient(145deg, #F0F9FF 0%, #EBF8FF 50%, #E0F2FE 100%);
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-card: 14px;
+  --radius-btn: 10px;
+  --radius-full: 50%;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text-navy);
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  color: var(--color-primary-blue);
+}
+
+a {
+  color: var(--color-secondary-blue);
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+/* Base App Layout */
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 500px; /* Mobile-first container */
+  margin: 0 auto;
+  position: relative;
+  background: transparent;
+  box-shadow: none;
+  overflow-x: hidden;
+}
+
+/* Utilities */
+.text-center { text-align: center; }
+.text-mono { font-family: var(--font-mono); }
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--color-primary-blue);
+  color: #FFFFFF;
+  padding: 12px 24px;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  font-size: 1rem;
+  transition: background-color 0.2s, transform 0.1s;
+}
+.btn-primary:hover {
+  background-color: var(--color-secondary-blue);
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background-color: var(--color-ghost-blue);
+  color: var(--color-primary-blue);
+  padding: 12px 24px;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  font-size: 1rem;
+  transition: background-color 0.2s, transform 0.1s;
+}
+.btn-secondary:hover {
+  background-color: var(--color-border);
+}
+
+.btn-outlined {
+  background-color: transparent;
+  color: var(--color-primary-blue);
+  padding: 12px 24px;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  font-size: 1rem;
+  border: 2px solid var(--color-primary-blue);
+  transition: background-color 0.2s, transform 0.1s;
+}
+.btn-outlined:hover {
+  background-color: var(--color-ghost-blue);
+}
+
+/* Cards */
+.surface-card {
+  background-color: var(--color-card-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+
+/* Input Fields */
+.input-field {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  color: var(--color-text-navy);
+  transition: border-color 0.2s;
+  background-color: var(--color-card-surface);
+}
+.input-field:focus {
+  border-color: var(--color-primary-blue);
+  outline: none;
+}
+/* Custom Scrollbar for specific containers */
+.slim-scrollbar::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+.slim-scrollbar::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+.slim-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(3, 105, 161, 0.2); 
+  border-radius: 10px;
+}
+
+.slim-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(3, 105, 161, 0.5); 
+}
