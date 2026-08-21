@@ -30,6 +30,13 @@ export const db = {
     return null;
   },
   
+  remove(table, id) {
+    const data = this.get(table);
+    const filteredData = data.filter(r => r.id !== id);
+    this.set(table, filteredData);
+    return filteredData.length !== data.length;
+  },
+  
   find(table, query) {
     const data = this.get(table);
     return data.filter(record => {

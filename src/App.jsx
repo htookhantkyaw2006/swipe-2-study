@@ -8,6 +8,9 @@ import PhrasesLevel from './pages/PhrasesLevel';
 import PhrasesSwipeSession from './pages/PhrasesSwipeSession';
 import Profile from './pages/Profile';
 import SettingsSubpage from './pages/SettingsSubpage';
+import SavedWords from './pages/SavedWords';
+import Dictionary from './pages/Dictionary';
+import Notifications from './pages/Notifications';
 import './App.css';
 
 function App() {
@@ -20,6 +23,9 @@ function App() {
         <Route path="flashcards" element={<Flashcards />} />
         <Route path="flashcards/level/:levelId" element={<PhrasesLevel />} />
         <Route path="flashcards/session" element={<PhrasesSwipeSession />} />
+        <Route path="saved" element={<SavedWords />} />
+        <Route path="dictionary" element={<Dictionary />} />
+        <Route path="notifications" element={<Notifications />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<SettingsSubpage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -62,7 +62,7 @@ export default function Library() {
         zIndex: 1,
       }}>
         {/* Centered Content */}
-        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 24px 120px 24px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 24px 120px 24px' }}>
           {/* Progress Tracking Section */}
       <div style={{ marginBottom: '40px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
