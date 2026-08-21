@@ -106,7 +106,7 @@ export default function Dictionary() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FFFFFF', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
       
       {/* Header */}
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
@@ -200,8 +200,7 @@ export default function Dictionary() {
                       style={{ 
                         backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '16px', 
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        boxShadow: '0 4px 16px rgba(12, 74, 110, 0.04), 0 1px 3px rgba(12, 74, 110, 0.05)', position: 'relative',
-                        border: '1px solid #F0F9FF'
+                        boxShadow: '0 4px 12px rgba(12, 74, 110, 0.05)', position: 'relative'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>

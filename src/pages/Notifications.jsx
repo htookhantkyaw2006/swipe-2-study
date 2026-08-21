@@ -76,7 +76,7 @@ export default function Notifications() {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FFFFFF', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
       
       {/* Header */}
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
@@ -156,7 +156,7 @@ export default function Notifications() {
                   padding: '20px', 
                   display: 'flex', 
                   gap: '16px',
-                  boxShadow: '0 4px 16px rgba(12, 74, 110, 0.04), 0 1px 3px rgba(12, 74, 110, 0.05)', 
+                  boxShadow: '0 4px 12px rgba(12, 74, 110, 0.05)', 
                   position: 'relative',
                   border: styles.border,
                   opacity: styles.opacity,
