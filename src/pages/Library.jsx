@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, PenLine, Bookmark, Mic, Layers, ArrowLeftRight, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List } from 'lucide-react';
 import { db } from '../lib/db';
@@ -7,10 +7,32 @@ export default function Library() {
   const navigate = useNavigate();
   const [reviewCount, setReviewCount] = useState(0);
   const [isGridView, setIsGridView] = useState(false);
+  const scrollPosRef = useRef(0);
 
   useEffect(() => {
     const reviewCards = db.get('review_cards') || [];
     setReviewCount(reviewCards.length);
+    
+    // Restore scroll position
+    const savedScrollPosition = sessionStorage.getItem('libraryScrollPosition');
+    if (savedScrollPosition) {
+      // Small timeout ensures DOM is fully painted before scrolling
+      setTimeout(() => {
+        window.scrollTo(0, parseInt(savedScrollPosition, 10));
+      }, 10);
+    }
+
+    // Track scroll position
+    const handleScroll = () => {
+      scrollPosRef.current = window.scrollY;
+    };
+    window.addEventListener('scroll', handleScroll);
+
+    // Save scroll position on unmount
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      sessionStorage.setItem('libraryScrollPosition', scrollPosRef.current.toString());
+    };
   }, []);
 
   const learningTools = [
