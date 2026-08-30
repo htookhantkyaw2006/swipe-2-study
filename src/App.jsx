@@ -11,6 +11,7 @@ import SettingsSubpage from './pages/SettingsSubpage';
 import SavedWords from './pages/SavedWords';
 import Dictionary from './pages/Dictionary';
 import Notifications from './pages/Notifications';
+import StudyByInterest from './pages/StudyByInterest';
 import './App.css';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <Route path="flashcards/session" element={<PhrasesSwipeSession />} />
         <Route path="saved" element={<SavedWords />} />
         <Route path="dictionary" element={<Dictionary />} />
+        <Route path="interest" element={<StudyByInterest />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<SettingsSubpage />} />

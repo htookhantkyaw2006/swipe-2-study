@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, GraduationCap } from 'lucide-react';
+import { ChevronLeft, GraduationCap, LayoutGrid, LayoutList } from 'lucide-react';
 
 const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => {
   const radius = (size - strokeWidth) / 2;
@@ -26,6 +26,7 @@ const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => 
 
 export default function LevelPicker() {
   const navigate = useNavigate();
+  const [isGrouped, setIsGrouped] = useState(true);
 
   const levels = [
     { id: 'HSK1', num: 1, name: 'HSK 1', words: 300, mastered: 300, progress: 100, group: 'Foundation', gradientStart: '#7DD3FC', gradientEnd: '#0369A1', btnColor: '#0369A1', shadow: 'rgba(3, 105, 161, 0.4)' },
@@ -48,10 +49,16 @@ export default function LevelPicker() {
   return (
     <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto', paddingBottom: '100px' }}>
       <header className="flex items-center justify-center relative" style={{ marginBottom: '24px' }}>
-        <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px' }}>
+        <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}>
           <ChevronLeft size={24} color="var(--color-text-navy)" />
         </button>
         <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>HSK Courses</h1>
+        <button 
+          onClick={() => setIsGrouped(!isGrouped)} 
+          style={{ position: 'absolute', right: '16px', background: 'var(--color-ghost-blue)', padding: '8px', borderRadius: '12px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary-blue)', zIndex: 10, transition: 'background-color 0.2s' }}
+        >
+          {isGrouped ? <LayoutGrid size={20} /> : <LayoutList size={20} />}
+        </button>
       </header>
 
       {/* Top Banner */}
@@ -82,78 +89,144 @@ export default function LevelPicker() {
       </div>
 
       {/* Levels Grid */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-        {Object.entries(groupedLevels).map(([groupName, groupData]) => (
-          <div key={groupName}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 8px 0' }}>{groupName}</h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', margin: '0 0 16px 0', minHeight: '40px' }}>{groupData.desc}</p>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-              {groupData.levels.map((level) => {
-                const chars = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
-                return (
-                  <div 
-                    key={level.id}
-                    className="surface-card"
-                    onClick={() => navigate(`/learn/level/${level.id}`)}
-                    style={{ 
-                      padding: '16px', borderRadius: '20px', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                      '--gradient-start': level.gradientStart,
-                      '--gradient-end': level.gradientEnd
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)';
-                    }}
-                  >
-                    <div style={{ marginBottom: '12px' }}>
-                      <ProgressRing progress={level.progress} size={56} strokeWidth={4} gradientId={`ring-grad-picker-${level.id}`}>
-                        <div style={{ position: 'relative', width: '32px', height: '38px' }}>
-                          {/* Back Card */}
-                          <div style={{ 
-                            position: 'absolute', top: '4px', left: '6px', width: '24px', height: '30px', 
-                            borderRadius: '4px', backgroundColor: 'var(--color-ghost-blue)', 
-                            transform: 'rotate(12deg)', zIndex: 0,
-                            border: `1px solid ${level.gradientStart}40`
-                          }}></div>
-                          {/* Front Card */}
-                          <div style={{
-                            position: 'absolute', top: '6px', left: '2px', width: '24px', height: '30px', borderRadius: '4px',
-                            background: `linear-gradient(135deg, ${level.gradientStart} 0%, ${level.gradientEnd} 100%)`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: `0 4px 8px ${level.shadow}`,
-                            color: '#FFFFFF', fontWeight: 800, fontSize: '1rem',
-                            zIndex: 1, transform: 'rotate(-6deg)',
-                            border: '1px solid rgba(255,255,255,0.2)'
-                          }}>
-                            {level.num}
+      {isGrouped ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          {Object.entries(groupedLevels).map(([groupName, groupData]) => (
+            <div key={groupName}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 8px 0' }}>{groupName}</h3>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', margin: '0 0 16px 0', minHeight: '40px' }}>{groupData.desc}</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                {groupData.levels.map((level) => {
+                  const chars = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+                  return (
+                    <div 
+                      key={level.id}
+                      className="surface-card"
+                      onClick={() => navigate(`/learn/level/${level.id}`)}
+                      style={{ 
+                        padding: '16px', borderRadius: '20px', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                        '--gradient-start': level.gradientStart,
+                        '--gradient-end': level.gradientEnd
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)';
+                      }}
+                    >
+                      <div style={{ marginBottom: '12px' }}>
+                        <ProgressRing progress={level.progress} size={56} strokeWidth={4} gradientId={`ring-grad-picker-${level.id}`}>
+                          <div style={{ position: 'relative', width: '32px', height: '38px' }}>
+                            {/* Back Card */}
+                            <div style={{ 
+                              position: 'absolute', top: '4px', left: '6px', width: '24px', height: '30px', 
+                              borderRadius: '4px', backgroundColor: 'var(--color-ghost-blue)', 
+                              transform: 'rotate(12deg)', zIndex: 0,
+                              border: `1px solid ${level.gradientStart}40`
+                            }}></div>
+                            {/* Front Card */}
+                            <div style={{
+                              position: 'absolute', top: '6px', left: '2px', width: '24px', height: '30px', borderRadius: '4px',
+                              background: `linear-gradient(135deg, ${level.gradientStart} 0%, ${level.gradientEnd} 100%)`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              boxShadow: `0 4px 8px ${level.shadow}`,
+                              color: '#FFFFFF', fontWeight: 800, fontSize: '1rem',
+                              zIndex: 1, transform: 'rotate(-6deg)',
+                              border: '1px solid rgba(255,255,255,0.2)'
+                            }}>
+                              {level.num}
+                            </div>
                           </div>
-                        </div>
-                      </ProgressRing>
+                        </ProgressRing>
+                      </div>
+                      
+                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0', position: 'relative', zIndex: 1 }}>
+                        {level.name}
+                      </h3>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500, position: 'relative', zIndex: 1 }}>
+                        {level.progress}% completed
+                      </p>
+  
+                      {/* Faint character */}
+                      <div style={{ position: 'absolute', right: '-10px', bottom: '-20px', fontSize: '5rem', color: 'var(--color-ghost-blue)', fontWeight: 800, opacity: 0.5, zIndex: 0, pointerEvents: 'none' }}>
+                        {chars[level.num - 1]}
+                      </div>
                     </div>
-                    
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0', position: 'relative', zIndex: 1 }}>
-                      {level.name}
-                    </h3>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500, position: 'relative', zIndex: 1 }}>
-                      {level.progress}% completed
-                    </p>
-
-                    {/* Faint character */}
-                    <div style={{ position: 'absolute', right: '-10px', bottom: '-20px', fontSize: '5rem', color: 'var(--color-ghost-blue)', fontWeight: 800, opacity: 0.5, zIndex: 0, pointerEvents: 'none' }}>
-                      {chars[level.num - 1]}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+          {levels.map((level) => {
+            const chars = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+            return (
+              <div 
+                key={level.id}
+                className="surface-card"
+                onClick={() => navigate(`/learn/level/${level.id}`)}
+                style={{ 
+                  padding: '16px', borderRadius: '20px', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                  '--gradient-start': level.gradientStart,
+                  '--gradient-end': level.gradientEnd
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)';
+                }}
+              >
+                <div style={{ marginBottom: '12px' }}>
+                  <ProgressRing progress={level.progress} size={56} strokeWidth={4} gradientId={`ring-grad-picker-flat-${level.id}`}>
+                    <div style={{ position: 'relative', width: '32px', height: '38px' }}>
+                      {/* Back Card */}
+                      <div style={{ 
+                        position: 'absolute', top: '4px', left: '6px', width: '24px', height: '30px', 
+                        borderRadius: '4px', backgroundColor: 'var(--color-ghost-blue)', 
+                        transform: 'rotate(12deg)', zIndex: 0,
+                        border: `1px solid ${level.gradientStart}40`
+                      }}></div>
+                      {/* Front Card */}
+                      <div style={{
+                        position: 'absolute', top: '6px', left: '2px', width: '24px', height: '30px', borderRadius: '4px',
+                        background: `linear-gradient(135deg, ${level.gradientStart} 0%, ${level.gradientEnd} 100%)`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: `0 4px 8px ${level.shadow}`,
+                        color: '#FFFFFF', fontWeight: 800, fontSize: '1rem',
+                        zIndex: 1, transform: 'rotate(-6deg)',
+                        border: '1px solid rgba(255,255,255,0.2)'
+                      }}>
+                        {level.num}
+                      </div>
+                    </div>
+                  </ProgressRing>
+                </div>
+                
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0', position: 'relative', zIndex: 1 }}>
+                  {level.name}
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500, position: 'relative', zIndex: 1 }}>
+                  {level.progress}% completed
+                </p>
+
+                {/* Faint character */}
+                <div style={{ position: 'absolute', right: '-10px', bottom: '-20px', fontSize: '5rem', color: 'var(--color-ghost-blue)', fontWeight: 800, opacity: 0.5, zIndex: 0, pointerEvents: 'none' }}>
+                  {chars[level.num - 1]}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       
     </div>
   );

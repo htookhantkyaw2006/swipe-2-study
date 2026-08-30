@@ -193,26 +193,57 @@ export default function LessonPicker() {
               </div>
             </div>
 
-            <div className="surface-card" style={{ borderRadius: '24px', overflow: 'hidden', padding: 0 }}>
+            <div className="surface-card" style={{ borderRadius: '16px', overflow: 'hidden', padding: 0, border: '1px solid var(--color-border)' }}>
+              
+              {/* Table Header */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '80px 1fr 2fr 80px', 
+                backgroundColor: 'var(--color-ghost-blue)', 
+                borderBottom: '2px solid var(--color-border)',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                color: 'var(--color-secondary-blue)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                <div style={{ padding: '12px 16px', borderRight: '1px solid var(--color-border)', textAlign: 'center' }}>Hanzi</div>
+                <div style={{ padding: '12px 16px', borderRight: '1px solid var(--color-border)' }}>Pinyin</div>
+                <div style={{ padding: '12px 16px', borderRight: '1px solid var(--color-border)' }}>Meaning</div>
+                <div style={{ padding: '12px 16px', textAlign: 'center' }}>Status</div>
+              </div>
+
+              {/* Table Body */}
               {words.map((word, idx) => (
-                <div key={word.id} className="flex justify-between items-center" style={{ 
-                  padding: '20px 24px', 
-                  borderBottom: idx !== words.length - 1 ? '1px solid var(--color-border)' : 'none'
-                }}>
-                  <div className="flex items-center" style={{ gap: '24px' }}>
-                    <div style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--color-primary-blue)', width: '60px', textAlign: 'center' }}>
-                      {word.hanzi}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', margin: '0 0 4px 0' }}>{word.pinyin}</p>
-                      <h4 style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--color-text-navy)', margin: 0 }}>{word.translation}</h4>
-                    </div>
+                <div key={word.id} style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: '80px 1fr 2fr 80px',
+                  backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC',
+                  borderBottom: idx !== words.length - 1 ? '1px solid var(--color-border)' : 'none',
+                  transition: 'background-color 0.2s',
+                  cursor: 'pointer'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'}
+                >
+                  <div style={{ padding: '12px 16px', borderRight: '1px solid var(--color-border)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {word.hanzi}
                   </div>
-                  {word.mastered && (
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <CheckCircle size={16} color="#10B981" strokeWidth={3} />
-                    </div>
-                  )}
+                  <div style={{ padding: '12px 16px', borderRight: '1px solid var(--color-border)', fontSize: '0.9rem', color: 'var(--color-secondary-blue)', display: 'flex', alignItems: 'center' }}>
+                    {word.pinyin}
+                  </div>
+                  <div style={{ padding: '12px 16px', borderRight: '1px solid var(--color-border)', fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-navy)', display: 'flex', alignItems: 'center' }}>
+                    {word.translation}
+                  </div>
+                  <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {word.mastered ? (
+                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <CheckCircle size={14} color="#10B981" strokeWidth={3} />
+                      </div>
+                    ) : (
+                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', border: '2px solid var(--color-ghost-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}></div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

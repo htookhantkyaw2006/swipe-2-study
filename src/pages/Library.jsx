@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, PenLine, Bookmark, Mic, Layers, ArrowLeftRight, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List } from 'lucide-react';
 import { db } from '../lib/db';
@@ -7,32 +7,10 @@ export default function Library() {
   const navigate = useNavigate();
   const [reviewCount, setReviewCount] = useState(0);
   const [isGridView, setIsGridView] = useState(false);
-  const scrollPosRef = useRef(0);
 
   useEffect(() => {
     const reviewCards = db.get('review_cards') || [];
     setReviewCount(reviewCards.length);
-    
-    // Restore scroll position
-    const savedScrollPosition = sessionStorage.getItem('libraryScrollPosition');
-    if (savedScrollPosition) {
-      // Small timeout ensures DOM is fully painted before scrolling
-      setTimeout(() => {
-        window.scrollTo(0, parseInt(savedScrollPosition, 10));
-      }, 10);
-    }
-
-    // Track scroll position
-    const handleScroll = () => {
-      scrollPosRef.current = window.scrollY;
-    };
-    window.addEventListener('scroll', handleScroll);
-
-    // Save scroll position on unmount
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      sessionStorage.setItem('libraryScrollPosition', scrollPosRef.current.toString());
-    };
   }, []);
 
   const learningTools = [
@@ -41,7 +19,7 @@ export default function Library() {
     { title: 'Saved Words', subtitle: 'Your bookmarked words', icon: Bookmark, gradient: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)', shadow: 'rgba(22, 163, 74, 0.4)', path: '/saved', char: '藏', charColor: '#DCFCE7' },
     { title: 'Dictionary', subtitle: 'Search all HSK words', icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: '典', charColor: '#FFEDD5' },
     { title: 'Learn Phrases', subtitle: 'Master common expressions', icon: MessageCircle, gradient: 'linear-gradient(135deg, #93C5FD 0%, #2563EB 100%)', shadow: 'rgba(37, 99, 235, 0.4)', path: '/flashcards', char: '句', charColor: '#DBEAFE' },
-    { title: 'Study by Interest', subtitle: 'Food, travel, people, work...', icon: Layers, gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', path: '#', char: '类', charColor: '#F3E8FF' },
+    { title: 'Study by Interest', subtitle: 'Food, travel, people, work...', icon: Layers, gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', path: '/interest', char: '类', charColor: '#F3E8FF' },
     { title: 'Writing & Radicals', subtitle: 'Practise strokes and parts', icon: PenLine, gradient: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)', shadow: 'rgba(15, 118, 110, 0.4)', path: '#', char: '写', charColor: '#CCFBF1' },
     { title: 'Tongue Twisters', subtitle: '20 drills with voice', icon: Mic, gradient: 'linear-gradient(135deg, #FDA4AF 0%, #E11D48 100%)', shadow: 'rgba(225, 29, 72, 0.4)', path: '#', char: '绕', charColor: '#FFE4E6' }
   ];
@@ -146,11 +124,11 @@ export default function Library() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Saved<br/>Words</div>
-              <div style={{ color: '#16A34A', backgroundColor: '#DCFCE7', padding: '6px', borderRadius: '10px' }}>
+              <div style={{ color: '#059669', backgroundColor: '#D1FAE5', padding: '6px', borderRadius: '10px' }}>
                 <Bookmark size={16} strokeWidth={2.5} />
               </div>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>42</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#059669', lineHeight: 1 }}>42</div>
           </div>
 
           {/* Card 3: Learned Phrases */}
