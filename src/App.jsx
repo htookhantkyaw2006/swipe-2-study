@@ -12,6 +12,8 @@ import SavedWords from './pages/SavedWords';
 import Dictionary from './pages/Dictionary';
 import Notifications from './pages/Notifications';
 import StudyByInterest from './pages/StudyByInterest';
+import WritingPractice from './pages/WritingPractice';
+import LearnRadicals from './pages/LearnRadicals';
 import './App.css';
 
 function App() {
@@ -27,6 +29,8 @@ function App() {
         <Route path="saved" element={<SavedWords />} />
         <Route path="dictionary" element={<Dictionary />} />
         <Route path="interest" element={<StudyByInterest />} />
+        <Route path="writing" element={<WritingPractice />} />
+        <Route path="radicals" element={<LearnRadicals />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<SettingsSubpage />} />

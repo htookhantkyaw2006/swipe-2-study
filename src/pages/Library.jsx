@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, PenLine, Bookmark, Mic, Layers, ArrowLeftRight, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List } from 'lucide-react';
+import { Search, PenLine, Bookmark, Mic, Layers, ArrowLeftRight, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List, Blocks, Languages } from 'lucide-react';
 import { db } from '../lib/db';
 
 export default function Library() {
@@ -18,9 +18,11 @@ export default function Library() {
     { title: 'Review', subtitle: `${reviewCount} words due`, icon: RotateCw, gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', shadow: 'rgba(220, 38, 38, 0.4)', path: '/learn/review', char: '复', charColor: '#FEE2E2' },
     { title: 'Saved Words', subtitle: 'Your bookmarked words', icon: Bookmark, gradient: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)', shadow: 'rgba(22, 163, 74, 0.4)', path: '/saved', char: '藏', charColor: '#DCFCE7' },
     { title: 'Dictionary', subtitle: 'Search all HSK words', icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: '典', charColor: '#FFEDD5' },
+    { title: 'Hanzi Dictionary', subtitle: 'Look up any character', icon: Languages, gradient: 'linear-gradient(135deg, #FCD34D 0%, #B45309 100%)', shadow: 'rgba(180, 83, 9, 0.4)', path: '#', char: '汉', charColor: '#FEF3C7' },
+    { title: 'Learn Radicals', subtitle: '氵 water, 木 tree, 心 heart...', icon: Blocks, gradient: 'linear-gradient(135deg, #A5B4FC 0%, #4338CA 100%)', shadow: 'rgba(67, 56, 202, 0.4)', path: '/radicals', char: '部', charColor: '#E0E7FF' },
     { title: 'Learn Phrases', subtitle: 'Master common expressions', icon: MessageCircle, gradient: 'linear-gradient(135deg, #93C5FD 0%, #2563EB 100%)', shadow: 'rgba(37, 99, 235, 0.4)', path: '/flashcards', char: '句', charColor: '#DBEAFE' },
     { title: 'Study by Interest', subtitle: 'Food, travel, people, work...', icon: Layers, gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', path: '/interest', char: '类', charColor: '#F3E8FF' },
-    { title: 'Writing & Radicals', subtitle: 'Practise strokes and parts', icon: PenLine, gradient: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)', shadow: 'rgba(15, 118, 110, 0.4)', path: '#', char: '写', charColor: '#CCFBF1' },
+    { title: 'Practise Writing', subtitle: 'Trace characters by hand', icon: PenLine, gradient: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)', shadow: 'rgba(15, 118, 110, 0.4)', path: '/writing', char: '写', charColor: '#CCFBF1' },
     { title: 'Tongue Twisters', subtitle: '20 drills with voice', icon: Mic, gradient: 'linear-gradient(135deg, #FDA4AF 0%, #E11D48 100%)', shadow: 'rgba(225, 29, 72, 0.4)', path: '#', char: '绕', charColor: '#FFE4E6' }
   ];
 
