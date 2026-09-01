@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Target, Globe, Languages, Shuffle, Volume2, 
-  Bell, Clock, Flame, Moon, ChevronRight 
+  Bell, Clock, Flame, ChevronRight
 } from 'lucide-react';
 
 const ToggleSwitch = ({ checked, onChange, disabled }) => {

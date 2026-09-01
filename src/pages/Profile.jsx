@@ -1,37 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Settings as SettingsIcon, Play, Flame, Trophy, Lock, 
   BookOpen, CheckCircle, Clock, Star, MessageSquare, 
   ShieldCheck, FileText, LogOut, Trash2, ChevronRight, Crown,
-  Moon, Database, RotateCcw
+  Database, RotateCcw
 } from 'lucide-react';
-
-const ToggleSwitch = ({ checked, onChange, disabled }) => {
-  return (
-    <div 
-      onClick={() => { if (!disabled && onChange) onChange(!checked); }}
-      style={{ 
-        width: '52px', height: '28px', borderRadius: '14px',
-        backgroundColor: checked ? '#10B981' : '#E0F2FE',
-        position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'background-color 0.3s',
-        opacity: disabled ? 0.5 : 1,
-        boxShadow: checked ? 'inset 0 2px 4px rgba(0,0,0,0.1)' : 'inset 0 2px 4px rgba(3, 105, 161, 0.1)'
-      }}
-    >
-      <div style={{
-        width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#FFFFFF',
-        position: 'absolute', top: '2px', left: checked ? '26px' : '2px',
-        transition: 'left 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-      }}></div>
-    </div>
-  );
-};
 
 export default function Profile() {
   const navigate = useNavigate();
-  const [darkMode, setDarkMode] = useState(false);
 
   return (
     <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: '100px' }}>
@@ -101,28 +78,6 @@ export default function Profile() {
 
         {/* Big Watermark */}
         <div style={{ position: 'absolute', right: '-20px', bottom: '-40px', fontSize: '12rem', color: 'var(--color-ghost-blue)', fontWeight: 800, opacity: 0.5, zIndex: 0, pointerEvents: 'none', lineHeight: 1 }}>我</div>
-      </div>
-
-      {/* App Preferences */}
-      <div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 16px 0' }}>App Preferences</h2>
-        <div className="surface-card" style={{ padding: '0', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-          
-          {/* Dark Mode */}
-          <div className="flex items-center justify-between" style={{ padding: '24px', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--color-ghost-blue)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'} onClick={() => setDarkMode(!darkMode)}>
-            <div className="flex items-center gap-16">
-              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '20px', boxShadow: '0 4px 10px rgba(49, 46, 129, 0.3)' }}>
-                <Moon size={22} color="#FFFFFF" />
-              </div>
-              <div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0' }}>Dark mode</h3>
-                <p style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', margin: 0 }}>Easier on the eyes</p>
-              </div>
-            </div>
-            <ToggleSwitch checked={darkMode} onChange={setDarkMode} />
-          </div>
-
-        </div>
       </div>
 
       {/* Support & Actions */}
