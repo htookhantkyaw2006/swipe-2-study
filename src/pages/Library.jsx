@@ -3,6 +3,41 @@ import { useNavigate } from 'react-router-dom';
 import { Search, PenLine, Bookmark, Mic, Layers, ArrowLeftRight, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List, Blocks, Languages } from 'lucide-react';
 import { db } from '../lib/db';
 
+/* One tool tile. Extracted so both Library sections render identically. */
+const ToolCard = ({ tool, isGridView, onClick }) => (
+  <div
+    className="surface-card"
+    style={{
+      display: 'flex',
+      flexDirection: isGridView ? 'column' : 'row',
+      alignItems: isGridView ? 'flex-start' : 'center',
+      justifyContent: isGridView ? 'center' : 'space-between',
+      padding: isGridView ? '24px 20px' : '20px 24px',
+      borderRadius: '24px',
+      position: 'relative',
+      overflow: 'hidden',
+      cursor: 'pointer',
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+    }}
+    onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.08)'; }}
+    onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)'; }}
+    onClick={onClick}
+  >
+    <div style={{ display: 'flex', flexDirection: isGridView ? 'column' : 'row', alignItems: isGridView ? 'flex-start' : 'center', gap: isGridView ? '12px' : '16px', zIndex: 1 }}>
+      <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: tool.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: `0 4px 12px ${tool.shadow}` }}>
+        <tool.icon size={24} color="#FFFFFF" />
+      </div>
+      <div>
+        <h3 style={{ fontSize: isGridView ? '1rem' : '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0' }}>{tool.title}</h3>
+        <p style={{ fontSize: isGridView ? '0.75rem' : '0.875rem', color: 'var(--color-secondary-blue)', margin: 0 }}>{tool.subtitle}</p>
+      </div>
+    </div>
+    {!isGridView && <ChevronRight size={24} color="var(--color-secondary-blue)" style={{ zIndex: 1, opacity: 0.5 }} />}
+    <div style={{ position: 'absolute', right: isGridView ? '5px' : '20px', bottom: isGridView ? '-15px' : '-25px', fontSize: isGridView ? '6rem' : '8rem', color: tool.charColor, fontWeight: 800, opacity: isGridView ? 0.3 : 0.6, zIndex: 0, pointerEvents: 'none', transition: 'all 0.3s' }}>{tool.char}</div>
+  </div>
+);
+
 export default function Library() {
   const navigate = useNavigate();
   const [reviewCount, setReviewCount] = useState(0);
@@ -13,14 +48,19 @@ export default function Library() {
     setReviewCount(reviewCards.length);
   }, []);
 
-  const learningTools = [
+  // Your daily vocabulary loop — drill, review, save, look up.
+  const learnAndReviewTools = [
     { title: 'Flashcards', subtitle: 'Daily practice', icon: Layers, gradient: 'linear-gradient(135deg, #7DD3FC 0%, #0284C7 100%)', shadow: 'rgba(2, 132, 199, 0.4)', path: '/learn', char: '卡', charColor: 'var(--color-ghost-blue)' },
     { title: 'Review', subtitle: `${reviewCount} words due`, icon: RotateCw, gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', shadow: 'rgba(220, 38, 38, 0.4)', path: '/learn/review', char: '复', charColor: '#FEE2E2' },
     { title: 'Saved Words', subtitle: 'Your bookmarked words', icon: Bookmark, gradient: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)', shadow: 'rgba(22, 163, 74, 0.4)', path: '/saved', char: '藏', charColor: '#DCFCE7' },
     { title: 'Dictionary', subtitle: 'Search all HSK words', icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: '典', charColor: '#FFEDD5' },
+    { title: 'Learn Phrases', subtitle: 'Master common expressions', icon: MessageCircle, gradient: 'linear-gradient(135deg, #93C5FD 0%, #2563EB 100%)', shadow: 'rgba(37, 99, 235, 0.4)', path: '/flashcards', char: '句', charColor: '#DBEAFE' }
+  ];
+
+  // Characters, themes and speaking — the tools you dip into.
+  const exploreAndPractiseTools = [
     { title: 'Hanzi Dictionary', subtitle: 'Look up any character', icon: Languages, gradient: 'linear-gradient(135deg, #FCD34D 0%, #B45309 100%)', shadow: 'rgba(180, 83, 9, 0.4)', path: '#', char: '汉', charColor: '#FEF3C7' },
     { title: 'Learn Radicals', subtitle: '氵 water, 木 tree, 心 heart...', icon: Blocks, gradient: 'linear-gradient(135deg, #A5B4FC 0%, #4338CA 100%)', shadow: 'rgba(67, 56, 202, 0.4)', path: '/radicals', char: '部', charColor: '#E0E7FF' },
-    { title: 'Learn Phrases', subtitle: 'Master common expressions', icon: MessageCircle, gradient: 'linear-gradient(135deg, #93C5FD 0%, #2563EB 100%)', shadow: 'rgba(37, 99, 235, 0.4)', path: '/flashcards', char: '句', charColor: '#DBEAFE' },
     { title: 'Study by Interest', subtitle: 'Food, travel, people, work...', icon: Layers, gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', path: '/interest', char: '类', charColor: '#F3E8FF' },
     { title: 'Practise Writing', subtitle: 'Trace characters by hand', icon: PenLine, gradient: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)', shadow: 'rgba(15, 118, 110, 0.4)', path: '/writing', char: '写', charColor: '#CCFBF1' },
     { title: 'Tongue Twisters', subtitle: '20 drills with voice', icon: Mic, gradient: 'linear-gradient(135deg, #FDA4AF 0%, #E11D48 100%)', shadow: 'rgba(225, 29, 72, 0.4)', path: '#', char: '绕', charColor: '#FFE4E6' }
@@ -193,52 +233,43 @@ export default function Library() {
 
 
 
-      {/* Learning Tools */}
-      <div style={{ marginBottom: '40px' }}>
+      {/* Learn & Review — the daily loop. Holds the view toggle, which
+          governs both sections. */}
+      <div style={{ marginBottom: '32px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Your learning tools</h2>
-          <button 
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Learn &amp; Review</h2>
+          <button
             onClick={() => setIsGridView(!isGridView)}
             style={{ background: 'var(--color-ghost-blue)', border: 'none', cursor: 'pointer', color: 'var(--color-primary-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', borderRadius: '12px', transition: 'background-color 0.2s' }}
           >
             {isGridView ? <List size={20} strokeWidth={2.5} /> : <LayoutGrid size={20} strokeWidth={2.5} />}
           </button>
         </div>
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: isGridView ? 'repeat(2, 1fr)' : '1fr', gap: '16px' }}>
-          {learningTools.map((tool, idx) => (
-            <div 
+          {learnAndReviewTools.map((tool, idx) => (
+            <ToolCard
               key={idx}
-              className="surface-card" 
-              style={{ 
-                display: 'flex', 
-                flexDirection: isGridView ? 'column' : 'row', 
-                alignItems: isGridView ? 'flex-start' : 'center', 
-                justifyContent: isGridView ? 'center' : 'space-between', 
-                padding: isGridView ? '24px 20px' : '20px 24px', 
-                borderRadius: '24px', 
-                position: 'relative', 
-                overflow: 'hidden', 
-                cursor: 'pointer', 
-                transition: 'transform 0.2s, box-shadow 0.2s', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.03)' 
-              }} 
-              onMouseOver={(e) => {e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.08)'}} 
-              onMouseOut={(e) => {e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)'}} 
-              onClick={() => { if(tool.path !== '#') navigate(tool.path); }}
-            >
-              <div style={{ display: 'flex', flexDirection: isGridView ? 'column' : 'row', alignItems: isGridView ? 'flex-start' : 'center', gap: isGridView ? '12px' : '16px', zIndex: 1 }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: tool.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: `0 4px 12px ${tool.shadow}` }}>
-                  <tool.icon size={24} color="#FFFFFF" />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: isGridView ? '1rem' : '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0' }}>{tool.title}</h3>
-                  <p style={{ fontSize: isGridView ? '0.75rem' : '0.875rem', color: 'var(--color-secondary-blue)', margin: 0 }}>{tool.subtitle}</p>
-                </div>
-              </div>
-              {!isGridView && <ChevronRight size={24} color="var(--color-secondary-blue)" style={{ zIndex: 1, opacity: 0.5 }} />}
-              <div style={{ position: 'absolute', right: isGridView ? '5px' : '20px', bottom: isGridView ? '-15px' : '-25px', fontSize: isGridView ? '6rem' : '8rem', color: tool.charColor, fontWeight: 800, opacity: isGridView ? 0.3 : 0.6, zIndex: 0, pointerEvents: 'none', transition: 'all 0.3s' }}>{tool.char}</div>
-            </div>
+              tool={tool}
+              isGridView={isGridView}
+              onClick={() => { if (tool.path !== '#') navigate(tool.path); }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Explore & Practise — characters, themes and speaking. */}
+      <div style={{ marginBottom: '40px' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 16px 0' }}>Explore &amp; Practise</h2>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isGridView ? 'repeat(2, 1fr)' : '1fr', gap: '16px' }}>
+          {exploreAndPractiseTools.map((tool, idx) => (
+            <ToolCard
+              key={idx}
+              tool={tool}
+              isGridView={isGridView}
+              onClick={() => { if (tool.path !== '#') navigate(tool.path); }}
+            />
           ))}
         </div>
       </div>
