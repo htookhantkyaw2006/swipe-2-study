@@ -37,6 +37,17 @@ const ShuffleDeck = () => {
   );
 };
 
+/* Speak a Chinese sentence aloud. Matches the pattern used in
+   Dictionary and SavedWords. */
+const speakChinese = (text) => {
+  if (!('speechSynthesis' in window)) return;
+  // Cancel anything still playing so rapid taps do not queue up.
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-CN';
+  window.speechSynthesis.speak(utterance);
+};
+
 const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFlipped, hasFlippedOnce, setHasFlippedOnce, shuffleState, dragOffset }) => {
   const [isPresent] = usePresence();
   const x = useMotionValue(0);
@@ -167,7 +178,29 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
             <h3 style={{ fontSize: '14px', color: '#38BDF8', fontWeight: 500, margin: '0 0 12px 0' }}>Examples</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {card.examples.map((ex, idx) => (
-                <div key={idx} style={{ backgroundColor: '#F0F9FF', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div key={idx} style={{ backgroundColor: '#F0F9FF', borderRadius: '12px', padding: '16px', paddingRight: '56px', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}>
+                  <button
+                    // The card is draggable and flips on click, so the tap must
+                    // not reach it: stop the pointer before a drag can start,
+                    // and the click before it flips the card.
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); speakChinese(ex.chinese); }}
+                    title="Play sentence"
+                    aria-label={`Play sentence: ${ex.chinese}`}
+                    style={{
+                      position: 'absolute', top: '10px', right: '10px',
+                      width: '34px', height: '34px', borderRadius: '50%',
+                      backgroundColor: '#FFFFFF', color: 'var(--color-primary-blue)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: 'none', cursor: 'pointer', padding: 0,
+                      boxShadow: '0 2px 6px rgba(3, 105, 161, 0.15)',
+                      transition: 'background-color 0.2s, color 0.2s'
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#E0F2FE'; e.currentTarget.style.color = '#0284C7'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = 'var(--color-primary-blue)'; }}
+                  >
+                    <Volume2 size={16} strokeWidth={2.5} />
+                  </button>
                   <p style={{ fontSize: '16px', color: '#0C4A6E', fontWeight: 500, margin: 0 }}>{ex.chinese}</p>
                   <p style={{ fontSize: '14px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>{ex.pinyin}</p>
                   <p style={{ fontSize: '14px', color: '#0C4A6E', fontWeight: 400, margin: 0 }}>{ex.english}</p>
