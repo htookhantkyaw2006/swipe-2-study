@@ -14,7 +14,7 @@ const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => 
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="rgba(0,0,0,0.04)"
+          stroke="var(--color-ghost-blue)"
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -59,8 +59,8 @@ export default function Flashcards() {
 
   return (
     <div style={{ 
-      minHeight: '100vh', 
-      background: 'linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 25%, #FFFFFF 100%)', // App blue system fading immediately to white
+      minHeight: '100vh',
+      background: 'transparent', // Let the app-wide glacier background show through, matching the other tabs
       padding: '60px 24px 120px 24px', 
       fontFamily: 'Inter, sans-serif',
       position: 'relative',

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon, RotateCw, Search, BookOpen, FileCheck, ChevronRight, Bell, Bookmark, Library as LibraryIcon, Crown, Zap, Layers, Sparkles } from 'lucide-react';
 import LevelCarousel from '../components/ui/LevelCarousel';
+import LanguageSwitcher from '../components/ui/LanguageSwitcher';
+import Avatar from '../components/ui/Avatar';
 
 const PhrasesPromoCard = ({ onClick }) => {
   return (
@@ -130,38 +132,37 @@ export default function Home() {
     <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '100px' }}>
       
       {/* Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px', paddingBottom: '16px', borderBottom: '1px solid var(--color-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <img 
-            src="/profile.jpg" 
-            alt="Profile" 
-            style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
-          />
+          <Avatar size={48} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: 0, fontWeight: 500 }}>Good morning</p>
             <h1 style={{ fontSize: '1.125rem', color: 'var(--color-text-navy)', margin: 0, fontWeight: 700 }}>{currentUser.name}</h1>
           </div>
         </div>
-        <div 
-          onClick={() => navigate('/notifications')}
-          style={{
-            width: '44px', height: '44px', borderRadius: '50%',
-            backgroundColor: '#FFFFFF',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-            cursor: 'pointer',
-            transition: 'transform 0.2s, box-shadow 0.2s'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.08)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
-          }}
-        >
-          <Bell size={20} color="#111827" strokeWidth={2.5} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <LanguageSwitcher />
+          <div
+            onClick={() => navigate('/notifications')}
+            style={{
+              width: '44px', height: '44px', borderRadius: '50%',
+              backgroundColor: '#FFFFFF',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+              cursor: 'pointer',
+              transition: 'transform 0.2s, box-shadow 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.08)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
+            }}
+          >
+            <Bell size={20} color="#111827" strokeWidth={2.5} />
+          </div>
         </div>
       </header>
 
@@ -344,29 +345,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Bottom Wide Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-        <div className="surface-card flex justify-between items-center" style={{ padding: '24px', borderRadius: '20px', cursor: 'pointer' }} onClick={() => navigate('/progress')}>
-          <div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600, margin: '0 0 8px 0' }}>Overall Vocabulary</p>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>363 mastered</h3>
-          </div>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--color-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ChevronRight size={20} color="var(--color-text-navy)" />
-          </div>
-        </div>
-        
-        <div className="surface-card flex justify-between items-center" style={{ padding: '24px', borderRadius: '20px' }}>
-          <div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600, margin: '0 0 8px 0' }}>Study Tools</p>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Keep moving</h3>
-          </div>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--color-page-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ChevronRight size={20} color="var(--color-text-navy)" />
-          </div>
-        </div>
-      </div>
-      
     </div>
   );
 }

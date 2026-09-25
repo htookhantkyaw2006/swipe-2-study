@@ -150,21 +150,32 @@ button {
   border-color: var(--color-primary-blue);
   outline: none;
 }
-/* Custom Scrollbar for specific containers */
+/* iOS-style scrollbar: a thin rounded pill that stays hidden and only
+   appears while scrolling/hovering (on real iOS this maps to the native
+   auto-hiding overlay indicator). */
 .slim-scrollbar::-webkit-scrollbar {
-  width: 2px;
-  height: 2px;
+  width: 6px;
+  height: 6px;
 }
 
 .slim-scrollbar::-webkit-scrollbar-track {
-  background: transparent; 
+  background: transparent;
 }
 
 .slim-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(3, 105, 161, 0.2); 
+  background: transparent;
   border-radius: 10px;
+  transition: background 0.3s ease;
 }
 
-.slim-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(3, 105, 161, 0.5); 
+/* Reveal the pill only when the user is in the scroll area. */
+.slim-scrollbar:hover::-webkit-scrollbar-thumb,
+.slim-scrollbar:active::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 128, 0.4); /* iOS system grey indicator */
+}
+
+/* Firefox */
+.slim-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 120, 128, 0.4) transparent;
 }
