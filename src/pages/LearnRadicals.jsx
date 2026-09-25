@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, X, Lightbulb, PenLine } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Lightbulb, PenLine, Zap, RotateCcw } from 'lucide-react';
 import { radicals, radicalCategories } from '../data/radicals';
 import { writingChars } from '../data/writingChars';
+import RadicalDrill from '../components/RadicalDrill';
+import { readProgress, resetProgress, levelFor, countKnown, LEVELS } from '../lib/radicalProgress';
 
 const RADICAL_GRADIENT = 'linear-gradient(135deg, #A5B4FC 0%, #4338CA 100%)';
 const RADICAL_SHADOW = 'rgba(67, 56, 202, 0.3)';
@@ -137,6 +139,21 @@ export default function LearnRadicals() {
   const navigate = useNavigate();
   const [category, setCategory] = useState('All');
   const [openRadical, setOpenRadical] = useState(null);
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [progress, setProgress] = useState({});
+
+  useEffect(() => { setProgress(readProgress()); }, []);
+
+  const refreshProgress = useCallback(() => setProgress(readProgress()), []);
+
+  const clearProgress = () => {
+    if (!window.confirm('Reset radical progress? Your drill history will be erased.')) return;
+    resetProgress();
+    refreshProgress();
+  };
+
+  const known = countKnown(progress);
+  const started = Object.keys(progress).length > 0;
 
   const visibleRadicals = category === 'All'
     ? radicals
@@ -168,6 +185,71 @@ export default function LearnRadicals() {
             </p>
           </div>
 
+          {/* The drill is the primary action — reading the grid teaches
+              recognition, but only recall proves you can decode. */}
+          <button
+            onClick={() => setDrillOpen(true)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: '16px',
+              padding: '20px', borderRadius: '24px', border: 'none', cursor: 'pointer',
+              background: RADICAL_GRADIENT, boxShadow: `0 10px 20px ${RADICAL_SHADOW}`,
+              textAlign: 'left', marginBottom: '20px',
+              transition: 'transform 0.2s, box-shadow 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = `0 14px 26px ${RADICAL_SHADOW}`;
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = `0 10px 20px ${RADICAL_SHADOW}`;
+            }}
+          >
+            <div style={{
+              width: '52px', height: '52px', flexShrink: 0, borderRadius: '16px',
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Zap size={24} color="#FFFFFF" strokeWidth={2.5} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF' }}>
+                Spot the Radical
+              </h3>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 500 }}>
+                5 questions · read a character you have never studied
+              </p>
+            </div>
+            <ChevronRight size={22} color="#FFFFFF" strokeWidth={2.5} />
+          </button>
+
+          {/* Progress */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}>
+                {known} of {radicals.length} radicals known
+              </span>
+              {started && (
+                <button
+                  onClick={clearProgress}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-secondary-blue)'
+                  }}
+                >
+                  <RotateCcw size={14} strokeWidth={2.5} /> Reset
+                </button>
+              )}
+            </div>
+            <div style={{ height: '6px', borderRadius: '999px', backgroundColor: 'var(--color-ghost-blue)', overflow: 'hidden' }}>
+              <div style={{
+                width: `${(known / radicals.length) * 100}%`, height: '100%',
+                background: RADICAL_GRADIENT, borderRadius: '999px', transition: 'width 0.4s ease'
+              }} />
+            </div>
+          </div>
+
           {/* Category filter */}
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px' }}>
             {['All', ...radicalCategories].map((c) => {
@@ -191,7 +273,9 @@ export default function LearnRadicals() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
-            {visibleRadicals.map((r) => (
+            {visibleRadicals.map((r) => {
+              const level = levelFor(progress[r.radical]);
+              return (
               <div
                 key={r.radical}
                 className="surface-card"
@@ -199,6 +283,7 @@ export default function LearnRadicals() {
                 style={{
                   padding: '16px', borderRadius: '20px', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: '12px',
+                  position: 'relative',
                   transition: 'transform 0.2s, box-shadow 0.2s'
                 }}
                 onMouseOver={(e) => {
@@ -227,8 +312,22 @@ export default function LearnRadicals() {
                     {r.pinyin} · {r.strokes} strokes
                   </p>
                 </div>
+
+                {/* Only learning/known get a dot — a marker on all 32 would
+                    just be noise on a fresh install. */}
+                {level !== 'new' && (
+                  <span
+                    title={LEVELS[level].label}
+                    style={{
+                      position: 'absolute', top: '10px', right: '10px',
+                      width: '8px', height: '8px', borderRadius: '50%',
+                      backgroundColor: LEVELS[level].color
+                    }}
+                  />
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
 
         </div>
@@ -239,6 +338,15 @@ export default function LearnRadicals() {
           radical={openRadical}
           onClose={() => setOpenRadical(null)}
           onPractise={(char) => navigate(`/writing?char=${encodeURIComponent(char)}`)}
+        />
+      )}
+
+      {drillOpen && (
+        <RadicalDrill
+          radicals={radicals}
+          progress={progress}
+          onRecorded={refreshProgress}
+          onClose={() => { setDrillOpen(false); refreshProgress(); }}
         />
       )}
     </div>
