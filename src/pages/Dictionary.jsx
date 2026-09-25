@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Search, Bookmark, BookmarkMinus, Clock, Volume2 } from 'lucide-react';
 import { db } from '../lib/db';
+import { speak } from '../lib/speech';
 
 const dictionaryDatabase = [
   { id: 'd1', phrase: '苹果', pinyin: 'Píngguǒ', english: 'Apple', burmese: 'ပန်းသီး' },
@@ -234,11 +235,7 @@ export default function Dictionary() {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            if ('speechSynthesis' in window) {
-                              const utterance = new SpeechSynthesisUtterance(word.phrase);
-                              utterance.lang = 'zh-CN';
-                              window.speechSynthesis.speak(utterance);
-                            }
+                            speak(word.phrase);
                           }}
                           style={{
                             width: '36px', height: '36px', borderRadius: '50%',

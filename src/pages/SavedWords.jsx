@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Bookmark, BookmarkMinus, Play, Volume2 } from 'lucide-react';
 import { db } from '../lib/db';
+import { speak } from '../lib/speech';
 
 const mockSavedWords = [
   { id: 1, phrase: '你好', pinyin: 'Nǐ hǎo', english: 'Hello', burmese: 'မင်္ဂလာပါ' },
@@ -153,11 +154,7 @@ export default function SavedWords() {
                 <button 
                   onClick={(e) => {
                   e.stopPropagation();
-                  if ('speechSynthesis' in window) {
-                    const utterance = new SpeechSynthesisUtterance(word.phrase);
-                    utterance.lang = 'zh-CN';
-                    window.speechSynthesis.speak(utterance);
-                  }
+                  speak(word.phrase);
                 }}
                 style={{
                   width: '36px', height: '36px', borderRadius: '50%',

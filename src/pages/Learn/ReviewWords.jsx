@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, RotateCw, Play, Volume2 } from 'lucide-react';
+import { speak } from '../../lib/speech';
 
 const mockReviewWords = [
   { id: 1, phrase: '你', pinyin: 'Nǐ', english: 'You', burmese: 'မင်း' },
@@ -122,11 +123,7 @@ export default function ReviewWords() {
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
-                  if ('speechSynthesis' in window) {
-                    const utterance = new SpeechSynthesisUtterance(word.phrase);
-                    utterance.lang = 'zh-CN';
-                    window.speechSynthesis.speak(utterance);
-                  }
+                  speak(word.phrase);
                 }}
                 style={{
                   width: '36px', height: '36px', borderRadius: '50%',

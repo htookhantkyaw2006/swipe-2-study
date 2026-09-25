@@ -4,6 +4,8 @@ import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePres
 import { ChevronLeft, Check, X, Hand, Shuffle, Volume2 } from 'lucide-react';
 import ProgressBar from '../../components/ui/ProgressBar';
 import { db } from '../../lib/db';
+import { speak } from '../../lib/speech';
+import { usePreferences } from '../../lib/preferences';
 
 const ShuffleDeck = () => {
   const baseCardStyle = {
@@ -37,18 +39,8 @@ const ShuffleDeck = () => {
   );
 };
 
-/* Speak a Chinese sentence aloud. Matches the pattern used in
-   Dictionary and SavedWords. */
-const speakChinese = (text) => {
-  if (!('speechSynthesis' in window)) return;
-  // Cancel anything still playing so rapid taps do not queue up.
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  window.speechSynthesis.speak(utterance);
-};
-
 const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFlipped, hasFlippedOnce, setHasFlippedOnce, shuffleState, dragOffset }) => {
+  const { prefs } = usePreferences();
   const [isPresent] = usePresence();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], [-15, 15]);
@@ -115,11 +107,7 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
         <button 
           onClick={(e) => {
             e.stopPropagation();
-            if ('speechSynthesis' in window) {
-              const utterance = new SpeechSynthesisUtterance(card.character);
-              utterance.lang = 'zh-CN';
-              window.speechSynthesis.speak(utterance);
-            }
+            speak(card.character);
           }}
           style={{
             width: '36px', height: '36px', borderRadius: '50%',
@@ -138,7 +126,7 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
       
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: '-20px' }}>
         <h1 style={{ fontSize: '72px', margin: 0, color: '#0C4A6E', fontWeight: 800 }}>{card.character}</h1>
-        <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 0 0' }}>{card.pronunciation}</p>
+        {prefs.showPinyin && <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 0 0' }}>{card.pronunciation}</p>}
       </div>
 
       <div style={{ 
@@ -165,12 +153,12 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
           <h2 style={{ fontSize: '48px', color: '#0C4A6E', fontWeight: 700, margin: 0, lineHeight: 1 }}>{card.character}</h2>
-          <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '4px 0 16px 0' }}>{card.pronunciation}</p>
+          {prefs.showPinyin && <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '4px 0 16px 0' }}>{card.pronunciation}</p>}
           
           <div style={{ width: '100%', height: '1px', backgroundColor: '#BAE6FD', marginBottom: '16px', margin: '0 24px 16px 24px' }}></div>
           
           <p style={{ fontSize: '22px', color: '#0C4A6E', fontWeight: 600, margin: '0 0 4px 0', textAlign: 'center' }}>{card.definition}</p>
-          <p style={{ fontSize: '18px', color: '#0284C7', fontWeight: 400, margin: 0, textAlign: 'center' }}>{card.burmese_definition}</p>
+          {prefs.showBurmese && <p style={{ fontSize: '18px', color: '#0284C7', fontWeight: 400, margin: 0, textAlign: 'center' }}>{card.burmese_definition}</p>}
         </div>
 
         {card.examples && card.examples.length > 0 && (
@@ -184,7 +172,7 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
                     // not reach it: stop the pointer before a drag can start,
                     // and the click before it flips the card.
                     onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); speakChinese(ex.chinese); }}
+                    onClick={(e) => { e.stopPropagation(); speak(ex.chinese); }}
                     title="Play sentence"
                     aria-label={`Play sentence: ${ex.chinese}`}
                     style={{
@@ -202,9 +190,9 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
                     <Volume2 size={16} strokeWidth={2.5} />
                   </button>
                   <p style={{ fontSize: '16px', color: '#0C4A6E', fontWeight: 500, margin: 0 }}>{ex.chinese}</p>
-                  <p style={{ fontSize: '14px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>{ex.pinyin}</p>
+                  {prefs.showPinyin && <p style={{ fontSize: '14px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>{ex.pinyin}</p>}
                   <p style={{ fontSize: '14px', color: '#0C4A6E', fontWeight: 400, margin: 0 }}>{ex.english}</p>
-                  <p style={{ fontSize: '14px', color: '#0284C7', fontWeight: 400, margin: 0 }}>{ex.burmese}</p>
+                  {prefs.showBurmese && <p style={{ fontSize: '14px', color: '#0284C7', fontWeight: 400, margin: 0 }}>{ex.burmese}</p>}
                 </div>
               ))}
             </div>

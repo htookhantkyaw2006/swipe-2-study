@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePresence } from 'framer-motion';
 import { ChevronLeft, Check, X, Hand, Shuffle, Volume2 } from 'lucide-react';
 import ProgressBar from '../components/ui/ProgressBar';
+import { speak } from '../lib/speech';
 
 const dummyPhrases = [
   { id: 1, level: 'HSK 1', phrase: '你好', pinyin: 'Nǐ hǎo', english: 'Hello', burmese: 'မင်္ဂလာပါ' },
@@ -111,11 +112,7 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
         <button 
           onClick={(e) => {
             e.stopPropagation();
-            if ('speechSynthesis' in window) {
-              const utterance = new SpeechSynthesisUtterance(card.phrase);
-              utterance.lang = 'zh-CN';
-              window.speechSynthesis.speak(utterance);
-            }
+            speak(card.phrase);
           }}
           style={{
             width: '36px', height: '36px', borderRadius: '50%',
