@@ -1,27 +1,23 @@
 import zh from './zh';
+import ja from './ja';
 
 /* ---------------------------------------------------------------
    COURSE REGISTRY
    ---------------------------------------------------------------
    Adding a language is: write a course file with the same shape as
-   zh.js and add it here. Every screen reads the active course, so
-   nothing else needs to change.
+   zh.js / ja.js and add it here. Every screen reads the active
+   course, so nothing else needs to change.
 
-   Languages without a course yet stay visible in the switcher as
-   "coming soon" rather than being hidden, so the switcher shows the
-   whole plan without faking empty screens.
+   English is declared but has no course yet, so it stays visible in
+   the switcher as "coming soon" without being selectable.
    --------------------------------------------------------------- */
 
-export const COURSES = { zh };
+export const COURSES = { zh, ja };
 
 const UPCOMING = [
   {
     id: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧',
     levelSystem: 'CEFR', levels: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], status: 'coming-soon'
-  },
-  {
-    id: 'ja', name: 'Japanese', nativeName: '日本語', flag: '🇯🇵',
-    levelSystem: 'JLPT', levels: ['N5', 'N4', 'N3', 'N2', 'N1'], status: 'coming-soon'
   }
 ];
 
