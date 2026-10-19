@@ -7,6 +7,7 @@ import Flashcards from './pages/Flashcards';
 import PhrasesLevel from './pages/PhrasesLevel';
 import PhrasesSwipeSession from './pages/PhrasesSwipeSession';
 import Profile from './pages/Profile';
+import Premium from './pages/Premium';
 import SettingsSubpage from './pages/SettingsSubpage';
 import SavedWords from './pages/SavedWords';
 import Dictionary from './pages/Dictionary';
@@ -33,6 +34,7 @@ function App() {
         <Route path="radicals" element={<LearnRadicals />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="premium" element={<Premium />} />
         <Route path="settings" element={<SettingsSubpage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Settings as SettingsIcon, Flame, BookOpen, MessageSquare,
-  LogOut, Trash2, Languages, Target, Volume2
+  LogOut, Trash2, Languages, Target, Volume2, Crown
 } from 'lucide-react';
 import { SettingsGroup, SettingsRow, ToggleSwitch, OptionSheet } from '../components/ui/SettingsControls';
 import { LanguageSheet } from '../components/ui/LanguageSwitcher';
@@ -88,6 +88,20 @@ export default function Profile() {
 
       {/* Quick settings — the handful worth reaching without a detour.
           Same store as the Settings page, so the two cannot disagree. */}
+      {/* Subscription lives above the settings rows: it is an account
+          matter, not a preference. */}
+      <SettingsGroup title="Subscription">
+        <SettingsRow
+          icon={Crown}
+          iconGradient="linear-gradient(135deg, #38BDF8 0%, #0369A1 100%)"
+          title="S2S Premium"
+          subtitle="All nine HSK levels and unlimited cards"
+          value="Free plan"
+          onClick={() => navigate('/premium')}
+          isLast
+        />
+      </SettingsGroup>
+
       <SettingsGroup title="Quick settings">
         <SettingsRow
           icon={Languages}
