@@ -29,7 +29,11 @@ export const DEFAULTS = {
   // Audio
   autoPlayAudio: false,
   speechRate: 'normal', // slow | normal | fast
-  accent: 'zh-CN' // zh-CN | zh-TW
+
+  // Per language, because accents are language-specific codes: a
+  // Taiwan choice for Chinese must survive a trip to Japanese.
+  // Missing entries fall back to the course's default accent.
+  accentByLanguage: {}
 };
 
 /** Option lists for the pickers, kept next to the defaults they describe. */
@@ -59,28 +63,38 @@ export const OPTIONS = {
     { value: 'slow', label: 'Slow' },
     { value: 'normal', label: 'Normal' },
     { value: 'fast', label: 'Fast' }
-  ],
-  accent: [
-    { value: 'zh-CN', label: 'Mainland (普通话)' },
-    { value: 'zh-TW', label: 'Taiwan (國語)' }
   ]
+  // Accent options live on each course (course.speech.accents).
 };
 
 /** Numeric speechSynthesis rates for the three speed labels. */
 export const SPEECH_RATES = { slow: 0.6, normal: 1, fast: 1.4 };
 
+/* Before languages, the accent was a single `accent` key and could only
+   be Chinese. Carry it into the per-language map so nobody loses it. */
+const upgrade = (stored) => {
+  const { accent, ...rest } = stored;
+  if (accent && !rest.accentByLanguage?.zh) {
+    rest.accentByLanguage = { ...(rest.accentByLanguage || {}), zh: accent };
+  }
+  return rest;
+};
+
 export function readPreferences() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULTS };
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    return { ...DEFAULTS, ...upgrade(JSON.parse(raw)) };
   } catch {
     // Blocked storage or malformed JSON — defaults keep the app usable.
     return { ...DEFAULTS };
   }
 }
 
-const PreferencesContext = createContext(null);
+// Same reasoning as LanguageContext in language.jsx: keep one context
+// object across development hot swaps.
+const PreferencesContext = import.meta.hot?.data.PreferencesContext ?? createContext(null);
+if (import.meta.hot) import.meta.hot.data.PreferencesContext = PreferencesContext;
 
 export function PreferencesProvider({ children }) {
   const [prefs, setPrefs] = useState(readPreferences);
