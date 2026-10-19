@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, GraduationCap } from 'lucide-react';
+import { useCourse } from '../../lib/language';
 
 const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => {
   const radius = (size - strokeWidth) / 2;
@@ -27,17 +28,13 @@ const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => 
 export default function LevelPicker() {
   const navigate = useNavigate();
 
-  const levels = [
-    { id: 'HSK1', num: 1, name: 'HSK 1', words: 300, mastered: 300, progress: 100, group: 'Foundation', gradientStart: '#7DD3FC', gradientEnd: '#0369A1', btnColor: '#0369A1', shadow: 'rgba(3, 105, 161, 0.4)' },
-    { id: 'HSK2', num: 2, name: 'HSK 2', words: 200, mastered: 63, progress: 31, group: 'Foundation', gradientStart: '#FCA5A5', gradientEnd: '#DC2626', btnColor: '#DC2626', shadow: 'rgba(220, 38, 38, 0.4)' },
-    { id: 'HSK3', num: 3, name: 'HSK 3', words: 500, mastered: 0, progress: 0, group: 'Foundation', gradientStart: '#FDBA74', gradientEnd: '#EA580C', btnColor: '#EA580C', shadow: 'rgba(234, 88, 12, 0.4)' },
-    { id: 'HSK4', num: 4, name: 'HSK 4', words: 1000, mastered: 0, progress: 0, group: 'Intermediate', gradientStart: '#FDE047', gradientEnd: '#CA8A04', btnColor: '#CA8A04', shadow: 'rgba(202, 138, 4, 0.4)' },
-    { id: 'HSK5', num: 5, name: 'HSK 5', words: 1600, mastered: 0, progress: 0, group: 'Intermediate', gradientStart: '#86EFAC', gradientEnd: '#15803D', btnColor: '#15803D', shadow: 'rgba(21, 128, 61, 0.4)' },
-    { id: 'HSK6', num: 6, name: 'HSK 6', words: 1800, mastered: 0, progress: 0, group: 'Intermediate', gradientStart: '#67E8F9', gradientEnd: '#0E7490', btnColor: '#0E7490', shadow: 'rgba(14, 116, 144, 0.4)' },
-    { id: 'HSK7', num: 7, name: 'HSK 7', words: 1866, mastered: 0, progress: 0, group: 'Advanced', gradientStart: '#60A5FA', gradientEnd: '#1E3A8A', btnColor: '#1E3A8A', shadow: 'rgba(30, 58, 138, 0.4)' },
-    { id: 'HSK8', num: 8, name: 'HSK 8', words: 1867, mastered: 0, progress: 0, group: 'Advanced', gradientStart: '#C4B5FD', gradientEnd: '#5B21B6', btnColor: '#5B21B6', shadow: 'rgba(91, 33, 182, 0.4)' },
-    { id: 'HSK9', num: 9, name: 'HSK 9', words: 1867, mastered: 0, progress: 0, group: 'Advanced', gradientStart: '#6B7280', gradientEnd: '#171717', btnColor: '#171717', shadow: 'rgba(23, 23, 23, 0.4)' }
-  ];
+  const course = useCourse();
+
+  // floor, not round: 63 of 200 is 31%, and rounding would claim 32.
+  const levels = course.levels.map((l) => ({
+    ...l,
+    progress: Math.floor((l.demo.completed / l.words) * 100)
+  }));
 
   return (
     <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto', paddingBottom: '100px' }}>
@@ -45,7 +42,7 @@ export default function LevelPicker() {
         <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}>
           <ChevronLeft size={24} color="var(--color-text-navy)" />
         </button>
-        <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>HSK Courses</h1>
+        <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>{course.copy.coursesTitle}</h1>
       </header>
 
       {/* Top Banner */}
@@ -55,15 +52,15 @@ export default function LevelPicker() {
       }}>
         <div style={{ position: 'relative', zIndex: 1 }}>
           <span style={{ border: '1px solid rgba(255,255,255,0.5)', padding: '4px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>
-            HSK 1-9 Learning Path
+            {course.copy.pathPill}
           </span>
-          <h2 style={{ fontSize: '2rem', fontWeight: 800, margin: '16px 0 8px 0', lineHeight: 1.1 }}>Choose an HSK level</h2>
-          <p style={{ fontSize: '1rem', opacity: 0.9, maxWidth: '250px', margin: '0 0 32px 0' }}>Flashcards and mock tests are available now.</p>
+          <h2 style={{ fontSize: '2rem', fontWeight: 800, margin: '16px 0 8px 0', lineHeight: 1.1 }}>{course.copy.pickerHeadline}</h2>
+          <p style={{ fontSize: '1rem', opacity: 0.9, maxWidth: '250px', margin: '0 0 32px 0' }}>{course.copy.pickerSubtitle}</p>
           
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.3)', paddingTop: '16px', display: 'flex', gap: '16px', fontSize: '0.875rem' }}>
-            <span style={{ fontWeight: 600 }}>11,000 words</span>
+            <span style={{ fontWeight: 600 }}>{course.copy.totalWords}</span>
             <span style={{ opacity: 0.9 }}>•</span>
-            <span style={{ opacity: 0.9 }}>9 progressive levels</span>
+            <span style={{ opacity: 0.9 }}>{course.copy.levelCount}</span>
           </div>
         </div>
         <div style={{ position: 'absolute', top: '32px', right: '24px', backgroundColor: 'rgba(255,255,255,0.15)', width: '40px', height: '40px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -78,7 +75,6 @@ export default function LevelPicker() {
       {/* Levels Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
         {levels.map((level) => {
-          const chars = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
           return (
             <div 
               key={level.id}
@@ -114,11 +110,11 @@ export default function LevelPicker() {
                       background: `linear-gradient(135deg, ${level.gradientStart} 0%, ${level.gradientEnd} 100%)`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       boxShadow: `0 4px 8px ${level.shadow}`,
-                      color: '#FFFFFF', fontWeight: 800, fontSize: '1rem',
+                      color: '#FFFFFF', fontWeight: 800, fontSize: level.badge.length > 1 ? '0.7rem' : '1rem',
                       zIndex: 1, transform: 'rotate(-6deg)',
                       border: '1px solid rgba(255,255,255,0.2)'
                     }}>
-                      {level.num}
+                      {level.badge}
                     </div>
                   </div>
                 </ProgressRing>
@@ -133,7 +129,7 @@ export default function LevelPicker() {
 
               {/* Faint character */}
               <div style={{ position: 'absolute', right: '-10px', bottom: '-20px', fontSize: '5rem', color: 'var(--color-ghost-blue)', fontWeight: 800, opacity: 0.5, zIndex: 0, pointerEvents: 'none' }}>
-                {chars[level.num - 1]}
+                {level.numeral}
               </div>
             </div>
           );

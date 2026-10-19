@@ -1,22 +1,20 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, RotateCw } from 'lucide-react';
+import { useCourse } from '../../lib/language';
 
-const hskLevels = [
-  { id: 1, tier: 'LEVEL 1', title: 'HSK 1', total: 150, completed: 150, review: 41, gradient: 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)', btnColor: '#0369A1' },
-  { id: 2, tier: 'LEVEL 2', title: 'HSK 2', total: 200, completed: 63, review: 12, gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', btnColor: '#DC2626' },
-  { id: 3, tier: 'LEVEL 3', title: 'HSK 3', total: 500, completed: 0, review: 0, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', btnColor: '#EA580C' },
-  { id: 4, tier: 'LEVEL 4', title: 'HSK 4', total: 1000, completed: 0, review: 0, gradient: 'linear-gradient(135deg, #FDE047 0%, #CA8A04 100%)', btnColor: '#CA8A04' },
-  { id: 5, tier: 'LEVEL 5', title: 'HSK 5', total: 1600, completed: 0, review: 0, gradient: 'linear-gradient(135deg, #86EFAC 0%, #15803D 100%)', btnColor: '#15803D' },
-  { id: 6, tier: 'LEVEL 6', title: 'HSK 6', total: 1800, completed: 0, review: 0, gradient: 'linear-gradient(135deg, #67E8F9 0%, #0E7490 100%)', btnColor: '#0E7490' },
-  { id: 7, tier: 'LEVEL 7', title: 'HSK 7', total: 1866, completed: 0, review: 0, gradient: 'linear-gradient(135deg, #60A5FA 0%, #1E3A8A 100%)', btnColor: '#1E3A8A' },
-  { id: 8, tier: 'LEVEL 8', title: 'HSK 8', total: 1867, completed: 0, review: 0, gradient: 'linear-gradient(135deg, #C4B5FD 0%, #5B21B6 100%)', btnColor: '#5B21B6' },
-  { id: 9, tier: 'LEVEL 9', title: 'HSK 9', total: 1867, completed: 0, review: 0, gradient: 'linear-gradient(135deg, #6B7280 0%, #171717 100%)', btnColor: '#171717' }
-];
+/* Levels come from the active course (src/courses). */
 
 export default function LevelCarousel() {
   const navigate = useNavigate();
+  const course = useCourse();
   const [activeIndex, setActiveIndex] = useState(0);
+
+  const levels = course.levels.map((l) => ({
+    ...l,
+    gradient: `linear-gradient(135deg, ${l.gradientStart} 0%, ${l.gradientEnd} 100%)`,
+    completed: l.demo.completed
+  }));
   const scrollRef = useRef(null);
 
   const handleScroll = (e) => {
@@ -48,7 +46,7 @@ export default function LevelCarousel() {
       >
         <style>{`.no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
         
-        {hskLevels.map((level) => (
+        {levels.map((level) => (
           <div 
             key={level.id}
             style={{
@@ -108,7 +106,7 @@ export default function LevelCarousel() {
                   <rect x="42" y="38" width="36" height="46" rx="4" fill="#FFFFFF" fillOpacity="0.7" transform="rotate(5, 60, 60)" filter="url(#glowBadge)" />
                   <rect x="42" y="40" width="36" height="46" rx="4" fill="#FFFFFF" fillOpacity="1.0" transform="rotate(-5, 60, 60)" filter="url(#glowBadge)" />
                   <text x="60" y="69" fontSize="22" fontWeight="900" fill={level.btnColor} textAnchor="middle" transform="rotate(-5, 60, 60)">
-                    字
+                    {course.copy.flashcardsWatermark}
                   </text>
                   
                   {/* Sparkles */}
@@ -149,11 +147,11 @@ export default function LevelCarousel() {
               {/* Content section */}
               <div style={{ flex: 1, marginBottom: '24px', position: 'relative', zIndex: 1 }}>
                 <div style={{ maxWidth: '55%' }}>
-                  <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '4px' }}>{level.tier}</div>
-                  <div style={{ fontSize: '36px', fontWeight: 'bold', margin: '0 0 8px 0', lineHeight: 1 }}>{level.title}</div>
+                  <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '4px' }}>{level.kicker}</div>
+                  <div style={{ fontSize: '36px', fontWeight: 'bold', margin: '0 0 8px 0', lineHeight: 1 }}>{level.name}</div>
                   
                   <div style={{ fontSize: '13px', opacity: 0.85, marginBottom: '10px' }}>
-                    {level.completed.toLocaleString()} / {level.total.toLocaleString()} completed
+                    {level.completed.toLocaleString()} / {level.words.toLocaleString()} completed
                   </div>
                   
                   <div style={{ 
@@ -162,7 +160,7 @@ export default function LevelCarousel() {
                     borderRadius: '3px', overflow: 'hidden' 
                   }}>
                     <div style={{ 
-                      width: `${(level.completed / level.total) * 100}%`, 
+                      width: `${(level.completed / level.words) * 100}%`, 
                       height: '100%', 
                       backgroundColor: '#FFFFFF' 
                     }}></div>
@@ -212,7 +210,7 @@ export default function LevelCarousel() {
 
       {/* Dot Indicators */}
       <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
-        {hskLevels.map((_, index) => (
+        {levels.map((_, index) => (
           <div 
             key={index}
             style={{

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, RotateCw, Search, BookOpen, FileCheck, ChevronRight, Bell, Bookmark, Library as LibraryIcon, Crown, Zap, Layers, Sparkles } from 'lucide-react';
+import { RotateCw, Search, ChevronRight, Bell, Bookmark, Library as LibraryIcon, Crown, Layers, Sparkles } from 'lucide-react';
 import LevelCarousel from '../components/ui/LevelCarousel';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import Avatar from '../components/ui/Avatar';
+import { useCourse } from '../lib/language';
 
 const PhrasesPromoCard = ({ onClick }) => {
   return (
@@ -118,13 +119,16 @@ const PhrasesPromoCard = ({ onClick }) => {
 export default function Home() {
   const navigate = useNavigate();
   const [currentUser] = useState({ name: 'Htoo Khant Kyaw', initials: 'HK' });
+  const course = useCourse();
   const [reviewCount, setReviewCount] = useState(0);
+  const [savedCount, setSavedCount] = useState(0);
 
   React.useEffect(() => {
     // Dynamic import to avoid top-level dependency issues if any
     import('../lib/db').then(({ db }) => {
       const reviewCards = db.get('review_cards') || [];
       setReviewCount(reviewCards.length);
+      setSavedCount(db.get('saved_words').length);
     });
   }, []);
 
@@ -202,7 +206,7 @@ export default function Home() {
           </div>
           <div>
             <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>
-              12<span style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', fontWeight: 600, marginLeft: '4px' }}>words</span>
+              {course.demo ? course.demo.homeSaved : savedCount}<span style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', fontWeight: 600, marginLeft: '4px' }}>words</span>
             </div>
           </div>
         </div>
@@ -283,7 +287,7 @@ export default function Home() {
               Unlock your<br/>full potential
             </div>
             <div style={{ fontSize: '0.875rem', color: '#E0F2FE', marginBottom: '16px', lineHeight: 1.4, maxWidth: '90%' }}>
-              Unlimited flashcards & mock tests.
+              {course.copy.premium.promo}
             </div>
             <div>
               <button style={{ 

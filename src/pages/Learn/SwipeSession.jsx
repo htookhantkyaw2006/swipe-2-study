@@ -6,6 +6,8 @@ import ProgressBar from '../../components/ui/ProgressBar';
 import { db } from '../../lib/db';
 import { speak } from '../../lib/speech';
 import { usePreferences } from '../../lib/preferences';
+import { useCourse } from '../../lib/language';
+import { readingOf, textOf, sayOf, kanaOf } from '../../lib/entry';
 
 const ShuffleDeck = () => {
   const baseCardStyle = {
@@ -41,6 +43,7 @@ const ShuffleDeck = () => {
 
 const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFlipped, hasFlippedOnce, setHasFlippedOnce, shuffleState, dragOffset }) => {
   const { prefs } = usePreferences();
+  const course = useCourse();
   const [isPresent] = usePresence();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], [-15, 15]);
@@ -102,12 +105,12 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
           borderRadius: '100px', fontSize: '0.75rem', fontWeight: 600,
           fontFamily: 'JetBrains Mono, monospace'
         }}>
-          {card.level || 'HSK 1'}
+          {card.level || course.levels[0].name}
         </div>
         <button 
           onClick={(e) => {
             e.stopPropagation();
-            speak(card.character);
+            speak(sayOf(card));
           }}
           style={{
             width: '36px', height: '36px', borderRadius: '50%',
@@ -125,7 +128,8 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
       </div>
       
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: '-20px' }}>
-        <h1 style={{ fontSize: '72px', margin: 0, color: '#0C4A6E', fontWeight: 800 }}>{card.character}</h1>
+        <h1 style={{ fontSize: card.character.length > 2 ? '56px' : '72px', margin: 0, color: '#0C4A6E', fontWeight: 800, textAlign: 'center', lineHeight: 1.1 }}>{card.character}</h1>
+        {kanaOf(card) && <p style={{ fontSize: '22px', color: '#0284C7', fontWeight: 600, margin: '8px 0 0 0' }}>{kanaOf(card)}</p>}
         {prefs.showPinyin && <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 0 0' }}>{card.pronunciation}</p>}
       </div>
 
@@ -153,6 +157,7 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
           <h2 style={{ fontSize: '48px', color: '#0C4A6E', fontWeight: 700, margin: 0, lineHeight: 1 }}>{card.character}</h2>
+          {kanaOf(card) && <p style={{ fontSize: '18px', color: '#0284C7', fontWeight: 600, margin: '6px 0 0 0' }}>{kanaOf(card)}</p>}
           {prefs.showPinyin && <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '4px 0 16px 0' }}>{card.pronunciation}</p>}
           
           <div style={{ width: '100%', height: '1px', backgroundColor: '#BAE6FD', marginBottom: '16px', margin: '0 24px 16px 24px' }}></div>
@@ -172,9 +177,9 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
                     // not reach it: stop the pointer before a drag can start,
                     // and the click before it flips the card.
                     onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); speak(ex.chinese); }}
+                    onClick={(e) => { e.stopPropagation(); speak(sayOf(ex)); }}
                     title="Play sentence"
-                    aria-label={`Play sentence: ${ex.chinese}`}
+                    aria-label={`Play sentence: ${textOf(ex)}`}
                     style={{
                       position: 'absolute', top: '10px', right: '10px',
                       width: '34px', height: '34px', borderRadius: '50%',
@@ -189,8 +194,8 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
                   >
                     <Volume2 size={16} strokeWidth={2.5} />
                   </button>
-                  <p style={{ fontSize: '16px', color: '#0C4A6E', fontWeight: 500, margin: 0 }}>{ex.chinese}</p>
-                  {prefs.showPinyin && <p style={{ fontSize: '14px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>{ex.pinyin}</p>}
+                  <p style={{ fontSize: '16px', color: '#0C4A6E', fontWeight: 500, margin: 0 }}>{textOf(ex)}</p>
+                  {prefs.showPinyin && <p style={{ fontSize: '14px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>{readingOf(ex)}</p>}
                   <p style={{ fontSize: '14px', color: '#0C4A6E', fontWeight: 400, margin: 0 }}>{ex.english}</p>
                   {prefs.showBurmese && <p style={{ fontSize: '14px', color: '#0284C7', fontWeight: 400, margin: 0 }}>{ex.burmese}</p>}
                 </div>
@@ -303,8 +308,19 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
   );
 };
 
+/* Fisher–Yates: a .sort(() => Math.random() - 0.5) shuffle is biased. */
+const shuffleCards = (list) => {
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
 export default function SwipeSession({ isReview = false }) {
   const navigate = useNavigate();
+  const course = useCourse();
   const [cards, setCards] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -315,14 +331,28 @@ export default function SwipeSession({ isReview = false }) {
   
   const dragOffset = useMotionValue(0);
 
+  const { prefs } = usePreferences();
+
   useEffect(() => {
     if (isReview) {
       setCards(db.get('review_cards') || []);
     } else {
+      // Card order and Cards per session were settings with nothing
+      // reading them; this is where they take effect.
       const allCards = db.get('flashcards');
-      setCards(allCards.slice(0, 5));
+      const ordered = prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards;
+      setCards(ordered.slice(0, prefs.cardsPerSession));
     }
+    // Deliberately once per session: changing settings mid-session must
+    // not reshuffle the deck under the learner.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReview]);
+
+  // Auto-play: speak each card as it comes to the front.
+  useEffect(() => {
+    const card = cards[currentIndex];
+    if (card && prefs.autoPlayAudio) speak(sayOf(card));
+  }, [cards, currentIndex, prefs.autoPlayAudio]);
 
   const triggerSwipe = (direction, velocity = 0, swipedCard = null) => {
     setExitData({ direction, velocity });
@@ -408,7 +438,7 @@ export default function SwipeSession({ isReview = false }) {
         </button>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 16px' }}>
           <h2 style={{ fontSize: '1.25rem', margin: '0 0 12px 0', textAlign: 'center', color: 'var(--color-text-navy)', fontWeight: 800 }}>
-            {isReview ? 'Review Session' : 'Greetings & basics'}
+            {isReview ? 'Review Session' : (cards[0]?.lesson_name ?? course.copy.lessonName)}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '200px' }}>
             <ProgressBar current={currentIndex} total={cards.length} color="var(--color-sky-accent)" />
