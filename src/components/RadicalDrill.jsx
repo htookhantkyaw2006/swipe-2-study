@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { X, Check, Volume2, RotateCcw, ArrowRight } from 'lucide-react';
 import { recordAnswer, levelFor } from '../lib/radicalProgress';
 import { speak } from '../lib/speech';
+import { pronunciationOf, sayOf } from '../lib/entry';
 
 /* ---------------------------------------------------------------
    RADICAL DRILL — "Spot the Radical"
@@ -243,10 +244,10 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
               {picked && question.type === 'decode' && (
                 <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}>
-                    {question.char.pinyin} · {question.char.english}
+                    {pronunciationOf(question.char)} · {question.char.english}
                   </span>
                   <button
-                    onClick={() => speak(question.char.char)}
+                    onClick={() => speak(sayOf(question.char))}
                     aria-label={`Play ${question.char.char}`}
                     style={{
                       width: '34px', height: '34px', borderRadius: '50%', cursor: 'pointer',
@@ -302,14 +303,14 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
                 <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-navy)', lineHeight: 1.5 }}>
                   {question.type === 'decode' ? (
                     <>
-                      <strong>{question.char.char}</strong> {question.char.pinyin} — {question.char.english}.
+                      <strong>{question.char.char}</strong> {pronunciationOf(question.char)} — {question.char.english}.
                       {/* Quoting the meaning keeps this readable for verbs:
                           the “to see” radical, not the to see radical. */}
                       {' '}It carries <strong>{question.radical.radical}</strong> — the “{question.radical.meaning}” radical.
                     </>
                   ) : (
                     <>
-                      <strong>{question.radical.radical}</strong> {question.radical.pinyin} — {question.radical.meaning}.
+                      <strong>{question.radical.radical}</strong> {pronunciationOf(question.radical)} — {question.radical.meaning}.
                       {' '}Look for it in {question.radical.examples.map((e) => e.char).join('、')}.
                     </>
                   )}

@@ -1,25 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, X, Lightbulb, PenLine, Zap, RotateCcw } from 'lucide-react';
-import { radicals, radicalCategories } from '../data/radicals';
-import { writingChars } from '../data/writingChars';
+import { useCourse } from '../lib/language';
+import { pronunciationOf } from '../lib/entry';
 import RadicalDrill from '../components/RadicalDrill';
 import { readProgress, resetProgress, levelFor, countKnown, LEVELS } from '../lib/radicalProgress';
 
 const RADICAL_GRADIENT = 'linear-gradient(135deg, #A5B4FC 0%, #4338CA 100%)';
 const RADICAL_SHADOW = 'rgba(67, 56, 202, 0.3)';
 
-/* The form you would actually practise writing: 氵 is written 水 on its own. */
-const practisableChar = (radical) => {
+/* The form you would actually practise writing: 氵 is written 水 on its own.
+   Null when the course has no writing practice (Japanese, for now). */
+const practisableChar = (radical, writing) => {
+  if (!writing) return null;
   const candidate = radical.standalone || radical.radical;
-  return writingChars.some((w) => w.character === candidate) ? candidate : null;
+  return writing.chars.some((w) => w.character === candidate) ? candidate : null;
 };
 
 /* ---------------------------------------------------------------
    RADICAL DETAIL — shown when a radical card is tapped.
    --------------------------------------------------------------- */
 function RadicalDetail({ radical, onClose, onPractise }) {
-  const practiseChar = practisableChar(radical);
+  const course = useCourse();
+  const practiseChar = practisableChar(radical, course.writing);
 
   return (
     <div
@@ -54,7 +57,7 @@ function RadicalDetail({ radical, onClose, onPractise }) {
                 {radical.meaning}
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
-                {radical.pinyin} · {radical.strokes} strokes
+                <span style={{ whiteSpace: 'nowrap' }}>{pronunciationOf(radical)}</span> · {radical.strokes} strokes
               </p>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--color-secondary-blue)', opacity: 0.85 }}>
                 {radical.burmese}
@@ -101,7 +104,7 @@ function RadicalDetail({ radical, onClose, onPractise }) {
               </span>
               <div>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
-                  {ex.pinyin}
+                  {pronunciationOf(ex)}
                 </p>
                 <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--color-text-navy)', fontWeight: 700 }}>
                   {ex.english}
@@ -137,6 +140,8 @@ function RadicalDetail({ radical, onClose, onPractise }) {
    --------------------------------------------------------------- */
 export default function LearnRadicals() {
   const navigate = useNavigate();
+  const course = useCourse();
+  const { list: radicals, categories: radicalCategories } = course.radicals;
   const [category, setCategory] = useState('All');
   const [openRadical, setOpenRadical] = useState(null);
   const [drillOpen, setDrillOpen] = useState(false);
@@ -309,7 +314,7 @@ export default function LearnRadicals() {
                     {r.meaning}
                   </h3>
                   <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500 }}>
-                    {r.pinyin} · {r.strokes} strokes
+                    <span style={{ whiteSpace: 'nowrap' }}>{pronunciationOf(r)}</span> · {r.strokes} strokes
                   </p>
                 </div>
 

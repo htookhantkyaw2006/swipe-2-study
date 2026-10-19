@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, PenLine, Play, RotateCcw, Eraser, CheckCircle } from 'lucide-react';
 import HanziWriter from 'hanzi-writer';
-import { writingChars } from '../data/writingChars';
 import strokeData from '../data/strokeData.json';
 import { db } from '../lib/db';
+import { useCourse } from '../lib/language';
 
 const WRITER_SIZE = 260;
 
@@ -235,7 +235,7 @@ function PracticePanel({ entry, isMastered, onMastered }) {
 /* ---------------------------------------------------------------
    PAGE
    --------------------------------------------------------------- */
-export default function WritingPractice() {
+function WritingPractice({ writingChars }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -251,7 +251,7 @@ export default function WritingPractice() {
     if (!requested) return;
     const idx = writingChars.findIndex((w) => w.character === requested);
     if (idx > -1) setSelectedIdx(idx);
-  }, [searchParams]);
+  }, [searchParams, writingChars]);
 
   const handleMastered = useCallback((character) => {
     if (db.findOne('written_chars', { character })) return;
@@ -356,6 +356,51 @@ export default function WritingPractice() {
 
 
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------
+   ENTRY — picks the course's character set, or explains why there
+   is none. A wrapper rather than an early return inside
+   WritingPractice, so that component's hooks always run in order.
+   --------------------------------------------------------------- */
+export default function WritingPracticePage() {
+  const navigate = useNavigate();
+  const course = useCourse();
+
+  if (course.writing) return <WritingPractice writingChars={course.writing.chars} />;
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '600px', margin: '0 auto', paddingBottom: '100px' }}>
+      <header className="flex items-center justify-center relative" style={{ marginBottom: '32px' }}>
+        <button
+          onClick={() => navigate(-1)}
+          aria-label="Back"
+          style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
+        >
+          <ChevronLeft size={24} color="var(--color-text-navy)" />
+        </button>
+        <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>Practise Writing</h1>
+      </header>
+
+      <div className="surface-card" style={{ borderRadius: '24px', padding: '32px 24px', textAlign: 'center' }}>
+        <div style={{
+          width: '64px', height: '64px', borderRadius: '20px', margin: '0 auto 16px auto',
+          background: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)',
+          boxShadow: '0 8px 16px rgba(15, 118, 110, 0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <PenLine size={28} color="#FFFFFF" strokeWidth={2.5} />
+        </div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 8px 0' }}>
+          Not available for {course.name} yet
+        </h2>
+        <p style={{ fontSize: '0.95rem', lineHeight: 1.5, color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500 }}>
+          Writing practice needs stroke-order data for {course.name}. The data this app
+          uses is Chinese, and would teach the wrong stroke order for some characters.
+        </p>
       </div>
     </div>
   );
