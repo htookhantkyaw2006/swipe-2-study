@@ -4,14 +4,11 @@ import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePres
 import { ChevronLeft, Check, X, Hand, Shuffle, Volume2 } from 'lucide-react';
 import ProgressBar from '../components/ui/ProgressBar';
 import { speak } from '../lib/speech';
+import { useCourse } from '../lib/language';
+import { usePreferences } from '../lib/preferences';
+import { readingOf, sayOf, kanaOf } from '../lib/entry';
 
-const dummyPhrases = [
-  { id: 1, level: 'HSK 1', phrase: '你好', pinyin: 'Nǐ hǎo', english: 'Hello', burmese: 'မင်္ဂလာပါ' },
-  { id: 2, level: 'HSK 1', phrase: '谢谢', pinyin: 'Xièxiè', english: 'Thank you', burmese: 'ကျေးဇူးတင်ပါတယ်' },
-  { id: 3, level: 'HSK 1', phrase: '再见', pinyin: 'Zàijiàn', english: 'Goodbye', burmese: 'တာ့တာ' },
-  { id: 4, level: 'HSK 1', phrase: '对不起', pinyin: 'Duìbùqǐ', english: 'Sorry', burmese: 'တောင်းပန်ပါတယ်' },
-  { id: 5, level: 'HSK 1', phrase: '没关系', pinyin: 'Méiguānxi', english: 'It\'s ok', burmese: 'ရပါတယ်' },
-];
+/* Phrases come from the active course (src/courses). */
 
 const ShuffleDeck = () => {
   const baseCardStyle = {
@@ -46,6 +43,7 @@ const ShuffleDeck = () => {
 };
 
 const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFlipped, hasFlippedOnce, setHasFlippedOnce, shuffleState, dragOffset }) => {
+  const course = useCourse();
   const [isPresent] = usePresence();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], [-15, 15]);
@@ -107,12 +105,12 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
           borderRadius: '100px', fontSize: '0.75rem', fontWeight: 600,
           fontFamily: 'JetBrains Mono, monospace'
         }}>
-          {card.level || 'HSK 1 Phrase'}
+          {card.level || `${course.levels[0].name} Phrase`}
         </div>
         <button 
           onClick={(e) => {
             e.stopPropagation();
-            speak(card.phrase);
+            speak(sayOf(card));
           }}
           style={{
             width: '36px', height: '36px', borderRadius: '50%',
@@ -131,7 +129,8 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
       
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: '-20px' }}>
         <h1 style={{ fontSize: '48px', margin: 0, color: '#0C4A6E', fontWeight: 800, textAlign: 'center', lineHeight: 1.2 }}>{card.phrase}</h1>
-        <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '16px 0 0 0' }}>{card.pinyin}</p>
+        {kanaOf(card) && <p style={{ fontSize: '20px', color: '#0284C7', fontWeight: 600, margin: '10px 0 0 0' }}>{kanaOf(card)}</p>}
+        <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: kanaOf(card) ? '6px 0 0 0' : '16px 0 0 0' }}>{readingOf(card)}</p>
       </div>
 
       <div style={{ 
@@ -158,7 +157,8 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
           <h2 style={{ fontSize: '36px', color: '#0C4A6E', fontWeight: 700, margin: 0, lineHeight: 1.2, textAlign: 'center' }}>{card.phrase}</h2>
-          <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 24px 0' }}>{card.pinyin}</p>
+          {kanaOf(card) && <p style={{ fontSize: '17px', color: '#0284C7', fontWeight: 600, margin: '8px 0 0 0' }}>{kanaOf(card)}</p>}
+          <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 24px 0' }}>{readingOf(card)}</p>
           
           <div style={{ width: '100%', height: '1px', backgroundColor: '#BAE6FD', marginBottom: '24px', margin: '0 24px 24px 24px' }}></div>
           
@@ -272,6 +272,8 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
 
 export default function PhrasesSwipeSession() {
   const navigate = useNavigate();
+  const course = useCourse();
+  const { prefs } = usePreferences();
   const [cards, setCards] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -283,8 +285,14 @@ export default function PhrasesSwipeSession() {
   const dragOffset = useMotionValue(0);
 
   useEffect(() => {
-    setCards(dummyPhrases);
-  }, []);
+    setCards(course.phrases);
+  }, [course]);
+
+  // Auto-play: speak each phrase as it comes to the front.
+  useEffect(() => {
+    const card = cards[currentIndex];
+    if (card && prefs.autoPlayAudio) speak(sayOf(card));
+  }, [cards, currentIndex, prefs.autoPlayAudio]);
 
   const triggerSwipe = (direction, velocity = 0) => {
     setExitData({ direction, velocity });

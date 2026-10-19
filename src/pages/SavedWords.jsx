@@ -3,33 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Bookmark, BookmarkMinus, Play, Volume2 } from 'lucide-react';
 import { db } from '../lib/db';
 import { speak } from '../lib/speech';
+import { useCourse } from '../lib/language';
+import { readingOf, sayOf, kanaOf } from '../lib/entry';
 
-const mockSavedWords = [
-  { id: 1, phrase: '你好', pinyin: 'Nǐ hǎo', english: 'Hello', burmese: 'မင်္ဂလာပါ' },
-  { id: 2, phrase: '谢谢', pinyin: 'Xièxiè', english: 'Thank you', burmese: 'ကျေးဇူးတင်ပါတယ်' },
-  { id: 3, phrase: '再见', pinyin: 'Zàijiàn', english: 'Goodbye', burmese: 'တာ့တာ' },
-  { id: 4, phrase: '对不起', pinyin: 'Duìbùqǐ', english: 'Sorry', burmese: 'တောင်းပန်ပါတယ်' },
-  { id: 5, phrase: '没关系', pinyin: 'Méiguānxi', english: 'It\'s ok', burmese: 'ရပါတယ်' },
-  { id: 6, phrase: '我是缅甸人', pinyin: 'Wǒ shì Miǎndiàn rén', english: 'I am Burmese', burmese: 'ကျွန်တော်ကမြန်မာလူမျိုးပါ' },
-  { id: 7, phrase: '太贵了', pinyin: 'Tài guì le', english: 'Too expensive', burmese: 'အရမ်းဈေးကြီးတယ်' },
-];
+/* Sample words come from the active course; a new language has none. */
 
 export default function SavedWords() {
   const navigate = useNavigate();
+  const course = useCourse();
   const [savedWords, setSavedWords] = useState([]);
 
   useEffect(() => {
     // Fetch from db
     let words = db.get('saved_words');
     
-    // Seed with mock data if completely empty (for demo purposes)
-    if (words.length === 0) {
-      mockSavedWords.forEach(word => db.insert('saved_words', word));
+    // Seed with the course's sample words if completely empty (for demo
+    // purposes). A course with no samples starts genuinely empty.
+    if (words.length === 0 && course.sampleSaved.length > 0) {
+      course.sampleSaved.forEach(word => db.insert('saved_words', word));
       words = db.get('saved_words');
     }
     
     setSavedWords(words);
-  }, []);
+  }, [course]);
+
+  const empty = savedWords.length === 0;
 
   const handleUnsave = (id, e) => {
     e.stopPropagation();
@@ -60,7 +58,7 @@ export default function SavedWords() {
         }}>
           {/* Decorative background element */}
           <div style={{ position: 'absolute', right: '-10%', top: '-10%', fontSize: '10rem', color: '#DCFCE7', opacity: 0.1, fontWeight: 900, zIndex: 0, pointerEvents: 'none' }}>
-            藏
+            {course.toolChars.saved}
           </div>
 
           <div style={{ position: 'relative', zIndex: 1 }}>
@@ -69,14 +67,14 @@ export default function SavedWords() {
             </div>
             
             <h2 style={{ fontSize: '2.5rem', fontWeight: 900, margin: '0 0 8px 0', lineHeight: 1, color: '#FFFFFF' }}>
-              {savedWords.length} Words
+              {savedWords.length} Word{savedWords.length === 1 ? '' : 's'}
             </h2>
             <p style={{ fontSize: '1rem', margin: '0 0 24px 0', opacity: 0.9 }}>
-              Ready for review
+              {empty ? 'Bookmark words in the dictionary to collect them here' : 'Ready for review'}
             </p>
             
             <button 
-              onClick={() => navigate('/flashcards/session')}
+              onClick={() => navigate(empty ? '/dictionary' : '/flashcards/session')}
               style={{
                 backgroundColor: '#FFFFFF',
                 color: '#16A34A',
@@ -97,7 +95,7 @@ export default function SavedWords() {
               onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
             >
               <Play size={20} fill="currentColor" />
-              Study Now
+              {empty ? 'Find words' : 'Study Now'}
             </button>
           </div>
         </div>
@@ -124,12 +122,13 @@ export default function SavedWords() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '1.25rem', fontWeight: 900
                 }}>
-                  {word.phrase.charAt(0)}
+                  {[...word.phrase][0]}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                     <h4 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{word.phrase}</h4>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>{word.pinyin}</span>
+                    {kanaOf(word) && <span style={{ fontSize: '0.8rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>{kanaOf(word)}</span>}
+                    <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>{readingOf(word)}</span>
                   </div>
                   <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
                     {word.english} <span style={{ opacity: 0.5 }}>•</span> {word.burmese}
@@ -154,7 +153,7 @@ export default function SavedWords() {
                 <button 
                   onClick={(e) => {
                   e.stopPropagation();
-                  speak(word.phrase);
+                  speak(sayOf(word));
                 }}
                 style={{
                   width: '36px', height: '36px', borderRadius: '50%',

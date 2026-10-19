@@ -3,22 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Search, Bookmark, BookmarkMinus, Clock, Volume2 } from 'lucide-react';
 import { db } from '../lib/db';
 import { speak } from '../lib/speech';
+import { useCourse } from '../lib/language';
+import { readingOf, sayOf, kanaOf, matchesQuery } from '../lib/entry';
 
-const dictionaryDatabase = [
-  { id: 'd1', phrase: '苹果', pinyin: 'Píngguǒ', english: 'Apple', burmese: 'ပန်းသီး' },
-  { id: 'd2', phrase: '水', pinyin: 'Shuǐ', english: 'Water', burmese: 'ရေ' },
-  { id: 'd3', phrase: '朋友', pinyin: 'Péngyǒu', english: 'Friend', burmese: 'သူငယ်ချင်း' },
-  { id: 'd4', phrase: '爱', pinyin: 'Ài', english: 'Love', burmese: 'အချစ်' },
-  { id: 'd5', phrase: '家', pinyin: 'Jiā', english: 'Home / Family', burmese: 'အိမ် / မိသားစု' },
-  { id: 'd6', phrase: '学校', pinyin: 'Xuéxiào', english: 'School', burmese: 'ကျောင်း' },
-  { id: 'd7', phrase: '医生', pinyin: 'Yīshēng', english: 'Doctor', burmese: 'ဆရာဝန်' },
-  { id: 'd8', phrase: '猫', pinyin: 'Māo', english: 'Cat', burmese: 'ကြောင်' },
-  { id: 'd9', phrase: '狗', pinyin: 'Gǒu', english: 'Dog', burmese: 'ခွေး' },
-  { id: 'd10', phrase: '快乐', pinyin: 'Kuàilè', english: 'Happy', burmese: 'ပျော်ရွှင်သော' },
-];
+/* Dictionary entries come from the active course (src/courses). */
 
 export default function Dictionary() {
   const navigate = useNavigate();
+  const course = useCourse();
+  const dictionaryDatabase = course.dictionary;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [history, setHistory] = useState([]);
@@ -45,13 +38,9 @@ export default function Dictionary() {
       return;
     }
 
-    const lowerText = text.toLowerCase();
-    const filtered = dictionaryDatabase.filter(word => 
-      word.phrase.includes(lowerText) ||
-      word.pinyin.toLowerCase().includes(lowerText) ||
-      word.english.toLowerCase().includes(lowerText)
-    );
-    setResults(filtered);
+    // Matches the word, its kana, its romanisation ignoring tone marks
+    // and macrons ("ni" finds "Nǐ", "kyou" finds "kyō"), English or Burmese.
+    setResults(dictionaryDatabase.filter((word) => matchesQuery(word, text)));
   };
 
   const handleSearchSubmit = (e) => {
@@ -94,7 +83,8 @@ export default function Dictionary() {
       // Save
       const savedWord = db.insert('saved_words', {
         phrase: word.phrase,
-        pinyin: word.pinyin,
+        ...(word.kana ? { kana: word.kana } : {}),
+        reading: readingOf(word),
         english: word.english,
         burmese: word.burmese
       });
@@ -129,7 +119,7 @@ export default function Dictionary() {
           <Search size={20} color="var(--color-primary-blue)" strokeWidth={2.5} />
           <input 
             type="text" 
-            placeholder="Search Chinese, Pinyin, or English..."
+            placeholder={course.copy.searchPlaceholder}
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
             onKeyDown={handleSearchSubmit}
@@ -206,9 +196,10 @@ export default function Dictionary() {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                             <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{word.phrase}</h4>
-                            <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>{word.pinyin}</span>
+                            {kanaOf(word) && <span style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>{kanaOf(word)}</span>}
+                            <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>{readingOf(word)}</span>
                           </div>
                           <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
                             {word.english} <span style={{ opacity: 0.5 }}>•</span> {word.burmese}
@@ -235,7 +226,7 @@ export default function Dictionary() {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            speak(word.phrase);
+                            speak(sayOf(word));
                           }}
                           style={{
                             width: '36px', height: '36px', borderRadius: '50%',

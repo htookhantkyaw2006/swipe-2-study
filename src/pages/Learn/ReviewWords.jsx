@@ -2,23 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, RotateCw, Play, Volume2 } from 'lucide-react';
 import { speak } from '../../lib/speech';
+import { db } from '../../lib/db';
+import { useCourse } from '../../lib/language';
+import { readingOf, sayOf, kanaOf } from '../../lib/entry';
 
-const mockReviewWords = [
-  { id: 1, phrase: '你', pinyin: 'Nǐ', english: 'You', burmese: 'မင်း' },
-  { id: 2, phrase: '好', pinyin: 'hǎo', english: 'Good', burmese: 'ကောင်းသော' },
-  { id: 3, phrase: '再见', pinyin: 'Zàijiàn', english: 'Goodbye', burmese: 'တာ့တာ' },
-  { id: 8, phrase: '对', pinyin: 'Duì', english: 'Correct / Right', burmese: 'မှန်တယ်' },
-];
+/* A review card is a flashcard row; the list renders word-list rows. */
+const toListRow = (card) => ({
+  id: card.id,
+  phrase: card.character,
+  kana: card.kana,
+  reading: card.pronunciation,
+  english: card.definition,
+  burmese: card.burmese_definition
+});
+
+/* Sample words come from the active course (src/courses). */
 
 export default function ReviewWords() {
   const navigate = useNavigate();
+  const course = useCourse();
   const [reviewWords, setReviewWords] = useState([]);
 
   useEffect(() => {
-    // In a real app, we would fetch from db.js here. 
-    // Using mock data for now to match the user's request for a list view.
-    setReviewWords(mockReviewWords);
-  }, []);
+    // Chinese keeps its sample list. A course without samples shows the
+    // real review queue — the cards actually swiped left.
+    setReviewWords(
+      course.sampleReview.length > 0
+        ? course.sampleReview
+        : (db.get('review_cards') || []).map(toListRow)
+    );
+  }, [course]);
+
+  const empty = reviewWords.length === 0;
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
@@ -43,7 +58,7 @@ export default function ReviewWords() {
         }}>
           {/* Decorative background element */}
           <div style={{ position: 'absolute', right: '-10%', top: '-10%', fontSize: '10rem', color: '#FECACA', opacity: 0.15, fontWeight: 900, zIndex: 0, pointerEvents: 'none' }}>
-            习
+            {course.copy.reviewWatermark}
           </div>
 
           <div style={{ position: 'relative', zIndex: 1 }}>
@@ -55,11 +70,11 @@ export default function ReviewWords() {
               {reviewWords.length} Due
             </h2>
             <p style={{ fontSize: '1rem', margin: '0 0 24px 0', opacity: 0.9 }}>
-              Ready for review
+              {empty ? 'Swipe left on a card to send it here' : 'Ready for review'}
             </p>
             
             <button 
-              onClick={() => navigate('/learn/review/session')}
+              onClick={() => navigate(empty ? '/learn/session' : '/learn/review/session')}
               style={{
                 backgroundColor: '#FFFFFF',
                 color: '#EF4444',
@@ -80,7 +95,7 @@ export default function ReviewWords() {
               onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
             >
               <Play size={20} fill="currentColor" />
-              Start Review
+              {empty ? 'Start swiping' : 'Start Review'}
             </button>
           </div>
         </div>
@@ -107,12 +122,13 @@ export default function ReviewWords() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '1.25rem', fontWeight: 900
                 }}>
-                  {word.phrase.charAt(0)}
+                  {[...word.phrase][0]}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                     <h4 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{word.phrase}</h4>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>{word.pinyin}</span>
+                    {kanaOf(word) && <span style={{ fontSize: '0.8rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>{kanaOf(word)}</span>}
+                    <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>{readingOf(word)}</span>
                   </div>
                   <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
                     {word.english} <span style={{ opacity: 0.5 }}>•</span> {word.burmese}
@@ -123,7 +139,7 @@ export default function ReviewWords() {
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
-                  speak(word.phrase);
+                  speak(sayOf(word));
                 }}
                 style={{
                   width: '36px', height: '36px', borderRadius: '50%',

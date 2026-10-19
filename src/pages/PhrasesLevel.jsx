@@ -1,23 +1,23 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Layers, Compass, RotateCw, CheckCircle, Bookmark, ChevronRight } from 'lucide-react';
+import { useCourse } from '../lib/language';
 
-const hskLevels = [
-  { num: 1, name: 'HSK 1', words: 300, mastered: 300, progress: 100, group: 'BEGINNER', gradientStart: '#7DD3FC', gradientEnd: '#0369A1' },
-  { num: 2, name: 'HSK 2', words: 200, mastered: 62, progress: 31, group: 'BEGINNER', gradientStart: '#FCA5A5', gradientEnd: '#DC2626' },
-  { num: 3, name: 'HSK 3', words: 500, mastered: 0, progress: 0, group: 'BEGINNER', gradientStart: '#FDBA74', gradientEnd: '#EA580C' },
-  { num: 4, name: 'HSK 4', words: 1000, mastered: 0, progress: 0, group: 'INTERMEDIATE', gradientStart: '#FDE047', gradientEnd: '#CA8A04' },
-  { num: 5, name: 'HSK 5', words: 1600, mastered: 0, progress: 0, group: 'INTERMEDIATE', gradientStart: '#86EFAC', gradientEnd: '#15803D' },
-  { num: 6, name: 'HSK 6', words: 1800, mastered: 0, progress: 0, group: 'INTERMEDIATE', gradientStart: '#67E8F9', gradientEnd: '#0E7490' },
-  { num: 7, name: 'HSK 7', words: 1866, mastered: 0, progress: 0, group: 'ADVANCED', gradientStart: '#60A5FA', gradientEnd: '#1E3A8A' },
-  { num: 8, name: 'HSK 8', words: 1867, mastered: 0, progress: 0, group: 'ADVANCED', gradientStart: '#C4B5FD', gradientEnd: '#5B21B6' },
-  { num: 9, name: 'HSK 9', words: 1867, mastered: 0, progress: 0, group: 'ADVANCED', gradientStart: '#6B7280', gradientEnd: '#171717' },
-];
+/* Levels come from the active course (src/courses). */
 
 export default function PhrasesLevel() {
   const { levelId } = useParams();
   const navigate = useNavigate();
-  const level = hskLevels.find(l => l.num === parseInt(levelId)) || hskLevels[0];
+  const course = useCourse();
+
+  // The Phrases tab list and this page used to carry separate progress
+  // numbers (HSK 2: 85% there, 31% here). One source now.
+  const base =
+    course.levels.find((l) => l.id === levelId) ||
+    course.levels.find((l) => String(l.num) === String(levelId).replace(/\D/g, '')) ||
+    course.levels[0];
+  const progress = base.demo.phraseProgress;
+  const level = { ...base, progress, mastered: Math.round((base.phrases * progress) / 100) };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-page-bg)', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
@@ -27,7 +27,7 @@ export default function PhrasesLevel() {
         <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
           <ChevronLeft size={24} color="var(--color-text-navy)" strokeWidth={2.5} />
         </button>
-        <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>HSK {level.num}</h1>
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{level.name}</h1>
       </header>
 
       <div style={{ padding: '0 24px' }}>
@@ -39,26 +39,26 @@ export default function PhrasesLevel() {
           boxShadow: '0 12px 24px rgba(0,0,0,0.1)', marginBottom: '32px'
         }}>
           <p style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', margin: '0 0 8px 0', opacity: 0.9 }}>
-            {level.group}
+            {level.tier}
           </p>
           <h2 style={{ fontSize: '3rem', fontWeight: 900, margin: '0 0 16px 0', lineHeight: 1, color: '#FFFFFF' }}>
-            HSK {level.num}
+            {level.name}
           </h2>
           <p style={{ fontSize: '1rem', margin: '0 0 24px 0', opacity: 0.9 }}>
-            {level.words} phrases
+            {level.phrases.toLocaleString()} phrases
           </p>
           
           <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '100px', marginBottom: '8px' }}>
             <div style={{ width: `${level.progress}%`, height: '100%', backgroundColor: '#FFFFFF', borderRadius: '100px' }}></div>
           </div>
           <p style={{ fontSize: '0.875rem', margin: 0, opacity: 0.9 }}>
-            {level.mastered} mastered
+            {level.mastered.toLocaleString()} mastered
           </p>
         </div>
 
         {/* Course Modules */}
         <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 16px 0' }}>
-          HSK {level.num} course modules
+          {level.name} course modules
         </h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
@@ -78,7 +78,7 @@ export default function PhrasesLevel() {
               <div>
                 <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0' }}>Phrases</h4>
                 <p style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', margin: 0 }}>
-                  {level.mastered} of {level.words} phrases mastered
+                  {level.mastered.toLocaleString()} of {level.phrases.toLocaleString()} phrases mastered
                 </p>
               </div>
             </div>
@@ -86,7 +86,7 @@ export default function PhrasesLevel() {
               {level.progress}% <ChevronRight size={18} strokeWidth={3} />
             </div>
             <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '6rem', color: 'var(--color-page-bg)', fontWeight: 900, zIndex: 0, pointerEvents: 'none' }}>
-              字
+              {course.copy.flashcardsWatermark}
             </div>
           </div>
 
@@ -113,7 +113,7 @@ export default function PhrasesLevel() {
               <ChevronRight size={20} strokeWidth={2.5} />
             </div>
             <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '6rem', color: 'var(--color-page-bg)', fontWeight: 900, zIndex: 0, pointerEvents: 'none' }}>
-              课
+              {course.copy.exploreWatermark}
             </div>
           </div>
         </div>

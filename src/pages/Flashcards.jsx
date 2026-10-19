@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layers, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useCourse } from '../lib/language';
 
 const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => {
   const radius = (size - strokeWidth) / 2;
@@ -45,17 +46,8 @@ const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => 
 export default function Flashcards() {
   const navigate = useNavigate();
   
-  const hskLevels = [
-    { num: 1, name: 'HSK 1', progress: 100, gradientStart: '#7DD3FC', gradientEnd: '#0369A1', shadow: 'rgba(3, 105, 161, 0.4)' },
-    { num: 2, name: 'HSK 2', progress: 85, gradientStart: '#FCA5A5', gradientEnd: '#DC2626', shadow: 'rgba(220, 38, 38, 0.4)' },
-    { num: 3, name: 'HSK 3', progress: 42, gradientStart: '#FDBA74', gradientEnd: '#EA580C', shadow: 'rgba(234, 88, 12, 0.4)' },
-    { num: 4, name: 'HSK 4', progress: 12, gradientStart: '#FDE047', gradientEnd: '#CA8A04', shadow: 'rgba(202, 138, 4, 0.4)' },
-    { num: 5, name: 'HSK 5', progress: 0, gradientStart: '#86EFAC', gradientEnd: '#15803D', shadow: 'rgba(21, 128, 61, 0.4)' },
-    { num: 6, name: 'HSK 6', progress: 0, gradientStart: '#67E8F9', gradientEnd: '#0E7490', shadow: 'rgba(14, 116, 144, 0.4)' },
-    { num: 7, name: 'HSK 7', progress: 0, gradientStart: '#60A5FA', gradientEnd: '#1E3A8A', shadow: 'rgba(30, 58, 138, 0.4)' },
-    { num: 8, name: 'HSK 8', progress: 0, gradientStart: '#C4B5FD', gradientEnd: '#5B21B6', shadow: 'rgba(91, 33, 182, 0.4)' },
-    { num: 9, name: 'HSK 9', progress: 0, gradientStart: '#6B7280', gradientEnd: '#171717', shadow: 'rgba(23, 23, 23, 0.4)' },
-  ];
+  const course = useCourse();
+  const levels = course.levels.map((l) => ({ ...l, progress: l.demo.phraseProgress }));
 
   return (
     <div style={{ 
@@ -93,18 +85,17 @@ export default function Flashcards() {
 
         {/* Your Flashcards Section */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-navy)', margin: 0 }}>All HSK Levels</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-text-navy)', margin: 0 }}>{course.copy.allLevels}</h2>
         </div>
 
         {/* Cards Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-          {hskLevels.map((level, index) => {
-            const chars = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+          {levels.map((level, index) => {
             return (
               <div 
                 key={index}
                 className="surface-card"
-                onClick={() => navigate(`/flashcards/level/${level.num}`)}
+                onClick={() => navigate(`/flashcards/level/${level.id}`)}
                 style={{ 
                   padding: '16px', borderRadius: '20px', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                   '--gradient-start': level.gradientStart,
@@ -134,10 +125,10 @@ export default function Flashcards() {
                         background: '#FFFFFF', color: level.gradientEnd,
                         borderRadius: '50%', width: '18px', height: '18px',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.7rem', fontWeight: 900, boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                        fontSize: level.badge.length > 1 ? '0.5rem' : '0.7rem', fontWeight: 900, boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                         border: `1px solid ${level.gradientStart}40`
                       }}>
-                        {level.num}
+                        {level.badge}
                       </div>
                     </div>
                   </ProgressRing>
@@ -152,7 +143,7 @@ export default function Flashcards() {
 
                 {/* Faint character */}
                 <div style={{ position: 'absolute', right: '-10px', bottom: '-20px', fontSize: '5rem', color: 'var(--color-ghost-blue)', fontWeight: 800, opacity: 0.5, zIndex: 0, pointerEvents: 'none' }}>
-                  {chars[index]}
+                  {level.numeral}
                 </div>
               </div>
             );
