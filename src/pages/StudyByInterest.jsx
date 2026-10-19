@@ -1,9 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCourse } from '../lib/language';
 import { ChevronLeft, Utensils, Plane, Users, Briefcase, Laptop, Heart, GraduationCap, ShoppingBag, House, Cloud, Dumbbell, Music, Film, Palette, Landmark, Sprout, Dog, Banknote, Shirt, Car, Calendar, Smile } from 'lucide-react';
 
 export default function StudyByInterest() {
   const navigate = useNavigate();
+  const course = useCourse();
 
   const categories = [
     { id: 'food', title: 'Food & Drinks', subtitle: 'Ordering, ingredients, dining out', icon: Utensils, gradientStart: '#FDBA74', gradientEnd: '#EA580C', shadow: 'rgba(234, 88, 12, 0.4)', char: '食' },
@@ -100,7 +102,7 @@ export default function StudyByInterest() {
                   fontWeight: 800, opacity: 0.6, zIndex: 0, pointerEvents: 'none',
                   lineHeight: 1
                 }}>
-                  {cat.char}
+                  {course.interestChars[cat.id] ?? cat.char}
                 </div>
               </div>
             ))}

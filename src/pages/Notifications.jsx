@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCourse } from '../lib/language';
 import { ChevronLeft, Bell, Megaphone, ShieldAlert, MessageSquare, CheckCircle } from 'lucide-react';
 
-const mockNotifications = [
+const mockNotifications = (deckLevel) => [
   {
     id: 1,
     type: 'OFFICIAL',
@@ -30,8 +31,8 @@ const mockNotifications = [
   {
     id: 4,
     type: 'OFFICIAL',
-    title: 'New HSK 4 Deck Available',
-    message: 'We just dropped the highly requested HSK 4 vocabulary deck. Head over to the Library to unlock it now.',
+    title: `New ${deckLevel} Deck Available`,
+    message: `We just dropped the highly requested ${deckLevel} vocabulary deck. Head over to the Library to unlock it now.`,
     timestamp: '5 days ago',
     isRead: true
   }
@@ -67,7 +68,8 @@ const getNotificationStyles = (type, isRead) => {
 
 export default function Notifications() {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const course = useCourse();
+  const [notifications, setNotifications] = useState(() => mockNotifications(course.copy.newDeckLevel));
 
   const markAllAsRead = () => {
     setNotifications(notifications.map(n => ({ ...n, isRead: true })));

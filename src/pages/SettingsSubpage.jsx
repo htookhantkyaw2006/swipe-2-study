@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Target, Languages, Shuffle, Layers, Volume2, Gauge, Mic,
-  Type, Bell, Flame, Database, Trash2, Download, RotateCcw, HardDrive,
+  Type, Bell, Flame, Trash2, Download, RotateCcw, HardDrive,
   FileText, ShieldCheck, Star, MessageSquare, Info, BookOpen
 } from 'lucide-react';
 import {
@@ -10,7 +10,8 @@ import {
 } from '../components/ui/SettingsControls';
 import { LanguageSheet } from '../components/ui/LanguageSwitcher';
 import { usePreferences, OPTIONS } from '../lib/preferences';
-import { useLanguage } from '../lib/language';
+import { useLanguage, useCourse } from '../lib/language';
+import { COURSES } from '../courses';
 import { db } from '../lib/db';
 
 const GRADIENTS = {
@@ -24,13 +25,18 @@ const GRADIENTS = {
   slate: 'linear-gradient(135deg, #94A3B8 0%, #334155 100%)'
 };
 
-/* Tables the Data group can clear, with a human label. */
+/* Tables the Data group can clear, with a human label. These act on the
+   language currently being learned — each language has its own. */
 const DATA_TABLES = [
   { table: 'search_history', label: 'search history' },
   { table: 'written_chars', label: 'writing progress' },
   { table: 'review_cards', label: 'review queue' },
   { table: 'saved_words', label: 'saved words' }
 ];
+
+/* Everything "Reset everything" wipes, in every language. Includes the
+   drill progress tables, which the reset used to leave behind. */
+const RESET_TABLES = [...DATA_TABLES.map((d) => d.table), 'learned_radicals', 'learned_kana'];
 
 /** Rough size of everything we store, for the storage row. */
 const storageUsed = () => {
@@ -56,6 +62,7 @@ export default function SettingsSubpage() {
   const navigate = useNavigate();
   const { prefs, setPref, resetPrefs } = usePreferences();
   const { language } = useLanguage();
+  const course = useCourse();
 
   const [sheet, setSheet] = useState(null); // preference key, or 'language'
   const [notice, setNotice] = useState('');
@@ -81,11 +88,15 @@ export default function SettingsSubpage() {
   };
 
   const exportData = () => {
+    // Every language, not just the one on screen — it is "my data".
     const payload = {
       exportedAt: new Date().toISOString(),
       preferences: prefs,
-      language: language.id,
-      data: DATA_TABLES.reduce((acc, { table }) => ({ ...acc, [table]: db.get(table) }), {})
+      activeLanguage: language.id,
+      data: Object.keys(COURSES).reduce((acc, lang) => ({
+        ...acc,
+        [lang]: RESET_TABLES.reduce((tables, table) => ({ ...tables, [table]: db.getFor(lang, table) }), {})
+      }), {})
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -100,8 +111,8 @@ export default function SettingsSubpage() {
   };
 
   const resetEverything = () => {
-    if (!window.confirm('Reset everything? All progress, saved words, history and settings will be erased. This cannot be undone.')) return;
-    DATA_TABLES.forEach(({ table }) => db.set(table, []));
+    if (!window.confirm('Reset everything? All progress, saved words, history and settings will be erased in every language. This cannot be undone.')) return;
+    Object.keys(COURSES).forEach((lang) => RESET_TABLES.forEach((table) => db.setFor(lang, table, [])));
     resetPrefs();
     refreshUsage();
     flash('Everything has been reset.');
@@ -109,6 +120,12 @@ export default function SettingsSubpage() {
 
   const optionLabel = (key) =>
     OPTIONS[key]?.find((o) => o.value === prefs[key])?.label ?? String(prefs[key]);
+
+  const accentValue = prefs.accentByLanguage?.[course.id] ?? course.speech.defaultAccent;
+  const accentLabel = course.speech.accents.find((a) => a.value === accentValue)?.label
+    ?? course.speech.accents[0].label;
+  const chooseAccent = (value) =>
+    setPref('accentByLanguage', { ...(prefs.accentByLanguage || {}), [course.id]: value });
 
   return (
     <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: '100px' }}>
@@ -171,7 +188,7 @@ export default function SettingsSubpage() {
       <SettingsGroup title="Display">
         <SettingsRow
           icon={BookOpen} iconGradient={GRADIENTS.blue}
-          title="Show pinyin"
+          title={`Show ${course.script.romanization}`}
           subtitle="Romanisation on cards"
           control={<ToggleSwitch checked={prefs.showPinyin} onChange={(v) => setPref('showPinyin', v)} />}
         />
@@ -193,14 +210,17 @@ export default function SettingsSubpage() {
           title="Text size"
           subtitle="Needs the app's fixed sizes made scalable first"
           comingSoon
+          isLast={!course.script.hasScriptVariants}
         />
-        <SettingsRow
-          icon={Languages} iconGradient={GRADIENTS.orange}
-          title="Simplified / Traditional"
-          subtitle="Requires a traditional character dataset"
-          comingSoon
-          isLast
-        />
+        {course.script.hasScriptVariants && (
+          <SettingsRow
+            icon={Languages} iconGradient={GRADIENTS.orange}
+            title="Simplified / Traditional"
+            subtitle="Requires a traditional character dataset"
+            comingSoon
+            isLast
+          />
+        )}
       </SettingsGroup>
 
       {/* ---------------- Audio ---------------- */}
@@ -222,7 +242,7 @@ export default function SettingsSubpage() {
           icon={Mic} iconGradient={GRADIENTS.red}
           title="Accent"
           subtitle="Pronunciation variant"
-          value={optionLabel('accent')}
+          value={accentLabel}
           onClick={() => setSheet('accent')}
           isLast
         />
@@ -258,20 +278,20 @@ export default function SettingsSubpage() {
             key={entry.table}
             icon={Trash2} iconGradient={GRADIENTS.orange}
             title={`Clear ${entry.label}`}
-            subtitle={`${db.get(entry.table).length} item${db.get(entry.table).length === 1 ? '' : 's'} stored`}
+            subtitle={`${db.get(entry.table).length} item${db.get(entry.table).length === 1 ? '' : 's'} stored · ${course.name} only`}
             onClick={() => clearTable(entry)}
           />
         ))}
         <SettingsRow
           icon={Download} iconGradient={GRADIENTS.green}
           title="Export my data"
-          subtitle="Download everything as JSON"
+          subtitle="Every language, as JSON"
           onClick={exportData}
         />
         <SettingsRow
           icon={RotateCcw} iconGradient={GRADIENTS.red}
           title="Reset everything"
-          subtitle="Erase all progress and settings"
+          subtitle="Erase all progress and settings, every language"
           onClick={resetEverything}
           danger
           isLast
@@ -289,7 +309,16 @@ export default function SettingsSubpage() {
 
       {/* Sheets */}
       {sheet === 'language' && <LanguageSheet onClose={() => setSheet(null)} />}
-      {sheet && sheet !== 'language' && OPTIONS[sheet] && (
+      {sheet === 'accent' && (
+        <OptionSheet
+          title="Accent"
+          options={course.speech.accents}
+          selected={accentValue}
+          onSelect={chooseAccent}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet && sheet !== 'language' && sheet !== 'accent' && OPTIONS[sheet] && (
         <OptionSheet
           title={{
             dailyGoal: 'Daily goal',

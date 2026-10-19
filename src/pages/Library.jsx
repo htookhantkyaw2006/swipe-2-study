@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, PenLine, Bookmark, Mic, Layers, ArrowLeftRight, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List, Blocks, Languages } from 'lucide-react';
+import { Search, PenLine, Bookmark, Mic, Layers, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List, Blocks, Languages, Type } from 'lucide-react';
 import { db } from '../lib/db';
+import { useCourse } from '../lib/language';
 
 /* One tool tile. Extracted so both Library sections render identically. */
 const ToolCard = ({ tool, isGridView, onClick }) => (
@@ -16,11 +17,11 @@ const ToolCard = ({ tool, isGridView, onClick }) => (
       borderRadius: '24px',
       position: 'relative',
       overflow: 'hidden',
-      cursor: 'pointer',
+      cursor: tool.path === '#' ? 'default' : 'pointer',
       transition: 'transform 0.2s, box-shadow 0.2s',
       boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
     }}
-    onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.08)'; }}
+    onMouseOver={(e) => { if (tool.path === '#') return; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.08)'; }}
     onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)'; }}
     onClick={onClick}
   >
@@ -29,42 +30,68 @@ const ToolCard = ({ tool, isGridView, onClick }) => (
         <tool.icon size={24} color="#FFFFFF" />
       </div>
       <div>
-        <h3 style={{ fontSize: isGridView ? '1rem' : '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0' }}>{tool.title}</h3>
+        <h3 style={{ fontSize: isGridView ? '1rem' : '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {tool.title}
+          {/* Tiles with nowhere to go used to look tappable and do nothing. */}
+          {tool.path === '#' && (
+            <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)', backgroundColor: 'var(--color-ghost-blue)', padding: '2px 8px', borderRadius: '999px' }}>
+              Soon
+            </span>
+          )}
+        </h3>
         <p style={{ fontSize: isGridView ? '0.75rem' : '0.875rem', color: 'var(--color-secondary-blue)', margin: 0 }}>{tool.subtitle}</p>
       </div>
     </div>
-    {!isGridView && <ChevronRight size={24} color="var(--color-secondary-blue)" style={{ zIndex: 1, opacity: 0.5 }} />}
+    {!isGridView && tool.path !== '#' && <ChevronRight size={24} color="var(--color-secondary-blue)" style={{ zIndex: 1, opacity: 0.5 }} />}
     <div style={{ position: 'absolute', right: isGridView ? '5px' : '20px', bottom: isGridView ? '-15px' : '-25px', fontSize: isGridView ? '6rem' : '8rem', color: tool.charColor, fontWeight: 800, opacity: isGridView ? 0.3 : 0.6, zIndex: 0, pointerEvents: 'none', transition: 'all 0.3s' }}>{tool.char}</div>
   </div>
 );
 
+/* How each Explore & Practise tool looks. The course decides which tools
+   exist, their titles and where they go; this decides colour and icon. */
+const EXPLORE_STYLE = {
+  scriptDictionary: { icon: Languages, gradient: 'linear-gradient(135deg, #FCD34D 0%, #B45309 100%)', shadow: 'rgba(180, 83, 9, 0.4)', charColor: '#FEF3C7' },
+  kana:             { icon: Type,      gradient: 'linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)', shadow: 'rgba(219, 39, 119, 0.4)', charColor: '#FCE7F3' },
+  radicals:         { icon: Blocks,    gradient: 'linear-gradient(135deg, #A5B4FC 0%, #4338CA 100%)', shadow: 'rgba(67, 56, 202, 0.4)', charColor: '#E0E7FF' },
+  interest:         { icon: Layers,    gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', charColor: '#F3E8FF' },
+  writing:          { icon: PenLine,   gradient: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)', shadow: 'rgba(15, 118, 110, 0.4)', charColor: '#CCFBF1' },
+  twisters:         { icon: Mic,       gradient: 'linear-gradient(135deg, #FDA4AF 0%, #E11D48 100%)', shadow: 'rgba(225, 29, 72, 0.4)', charColor: '#FFE4E6' }
+};
+
 export default function Library() {
   const navigate = useNavigate();
+  const course = useCourse();
+  const chars = course.toolChars;
+  const [savedCount, setSavedCount] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
   const [isGridView, setIsGridView] = useState(false);
 
   useEffect(() => {
     const reviewCards = db.get('review_cards') || [];
     setReviewCount(reviewCards.length);
+    setSavedCount(db.get('saved_words').length);
   }, []);
+
+  // Chinese keeps its placeholder numbers; other courses show real ones.
+  const stats = course.demo
+    ? { swiped: course.demo.librarySwiped, saved: course.demo.librarySaved, phrases: course.demo.libraryPhrases }
+    : { swiped: 0, saved: savedCount, phrases: 0 };
 
   // Your daily vocabulary loop — drill, review, save, look up.
   const learnAndReviewTools = [
-    { title: 'Flashcards', subtitle: 'Daily practice', icon: Layers, gradient: 'linear-gradient(135deg, #7DD3FC 0%, #0284C7 100%)', shadow: 'rgba(2, 132, 199, 0.4)', path: '/learn', char: '卡', charColor: 'var(--color-ghost-blue)' },
-    { title: 'Review', subtitle: `${reviewCount} words due`, icon: RotateCw, gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', shadow: 'rgba(220, 38, 38, 0.4)', path: '/learn/review', char: '复', charColor: '#FEE2E2' },
-    { title: 'Saved Words', subtitle: 'Your bookmarked words', icon: Bookmark, gradient: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)', shadow: 'rgba(22, 163, 74, 0.4)', path: '/saved', char: '藏', charColor: '#DCFCE7' },
-    { title: 'Dictionary', subtitle: 'Search all HSK words', icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: '典', charColor: '#FFEDD5' },
-    { title: 'Learn Phrases', subtitle: 'Master common expressions', icon: MessageCircle, gradient: 'linear-gradient(135deg, #93C5FD 0%, #2563EB 100%)', shadow: 'rgba(37, 99, 235, 0.4)', path: '/flashcards', char: '句', charColor: '#DBEAFE' }
+    { title: 'Flashcards', subtitle: 'Daily practice', icon: Layers, gradient: 'linear-gradient(135deg, #7DD3FC 0%, #0284C7 100%)', shadow: 'rgba(2, 132, 199, 0.4)', path: '/learn', char: chars.flashcards, charColor: 'var(--color-ghost-blue)' },
+    { title: 'Review', subtitle: `${reviewCount} words due`, icon: RotateCw, gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', shadow: 'rgba(220, 38, 38, 0.4)', path: '/learn/review', char: chars.review, charColor: '#FEE2E2' },
+    { title: 'Saved Words', subtitle: 'Your bookmarked words', icon: Bookmark, gradient: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)', shadow: 'rgba(22, 163, 74, 0.4)', path: '/saved', char: chars.saved, charColor: '#DCFCE7' },
+    { title: 'Dictionary', subtitle: course.copy.dictionarySubtitle, icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: chars.dictionary, charColor: '#FFEDD5' },
+    { title: 'Learn Phrases', subtitle: 'Master common expressions', icon: MessageCircle, gradient: 'linear-gradient(135deg, #93C5FD 0%, #2563EB 100%)', shadow: 'rgba(37, 99, 235, 0.4)', path: '/flashcards', char: chars.phrases, charColor: '#DBEAFE' }
   ];
 
   // Characters, themes and speaking — the tools you dip into.
-  const exploreAndPractiseTools = [
-    { title: 'Hanzi Dictionary', subtitle: 'Look up any character', icon: Languages, gradient: 'linear-gradient(135deg, #FCD34D 0%, #B45309 100%)', shadow: 'rgba(180, 83, 9, 0.4)', path: '#', char: '汉', charColor: '#FEF3C7' },
-    { title: 'Learn Radicals', subtitle: '氵 water, 木 tree, 心 heart...', icon: Blocks, gradient: 'linear-gradient(135deg, #A5B4FC 0%, #4338CA 100%)', shadow: 'rgba(67, 56, 202, 0.4)', path: '/radicals', char: '部', charColor: '#E0E7FF' },
-    { title: 'Study by Interest', subtitle: 'Food, travel, people, work...', icon: Layers, gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', path: '/interest', char: '类', charColor: '#F3E8FF' },
-    { title: 'Practise Writing', subtitle: 'Trace characters by hand', icon: PenLine, gradient: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)', shadow: 'rgba(15, 118, 110, 0.4)', path: '/writing', char: '写', charColor: '#CCFBF1' },
-    { title: 'Tongue Twisters', subtitle: '20 drills with voice', icon: Mic, gradient: 'linear-gradient(135deg, #FDA4AF 0%, #E11D48 100%)', shadow: 'rgba(225, 29, 72, 0.4)', path: '#', char: '绕', charColor: '#FFE4E6' }
-  ];
+  const exploreAndPractiseTools = course.exploreTools.map((tool) => ({
+    ...EXPLORE_STYLE[tool.key],
+    ...tool,
+    path: tool.path || '#'
+  }));
 
   return (
     <div style={{ background: 'transparent', width: '100%', minHeight: '100vh', position: 'relative' }}>
@@ -156,7 +183,7 @@ export default function Library() {
                 <Layers size={16} strokeWidth={2.5} />
               </div>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>1,248</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>{stats.swiped}</div>
           </div>
           
           {/* Card 2: Saved Words */}
@@ -170,7 +197,7 @@ export default function Library() {
                 <Bookmark size={16} strokeWidth={2.5} />
               </div>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#059669', lineHeight: 1 }}>42</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#059669', lineHeight: 1 }}>{stats.saved}</div>
           </div>
 
           {/* Card 3: Learned Phrases */}
@@ -184,7 +211,7 @@ export default function Library() {
                 <MessageCircle size={16} strokeWidth={2.5} />
               </div>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>86</div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>{stats.phrases}</div>
           </div>
 
           {/* Card 4: Review Due */}
@@ -209,7 +236,7 @@ export default function Library() {
           <Search size={22} color="var(--color-primary-blue)" style={{ position: 'absolute', left: '24px', top: '50%', transform: 'translateY(-50%)', zIndex: 1 }} />
           <input 
             type="text" 
-            placeholder="Search Chinese, pinyin, English..." 
+            placeholder={course.copy.searchPlaceholder} 
             className="input-field"
             style={{ 
               width: '100%',

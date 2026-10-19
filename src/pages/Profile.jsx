@@ -7,12 +7,13 @@ import {
 import { SettingsGroup, SettingsRow, ToggleSwitch, OptionSheet } from '../components/ui/SettingsControls';
 import { LanguageSheet } from '../components/ui/LanguageSwitcher';
 import { usePreferences, OPTIONS } from '../lib/preferences';
-import { useLanguage } from '../lib/language';
+import { useLanguage, useCourse } from '../lib/language';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { prefs, setPref } = usePreferences();
   const { language } = useLanguage();
+  const course = useCourse();
   const [languageSheet, setLanguageSheet] = useState(false);
   const [goalSheet, setGoalSheet] = useState(false);
 
@@ -76,7 +77,7 @@ export default function Profile() {
               <span style={{ fontSize: '0.7rem', color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Swiped</span>
             </div>
             <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-              363 <span style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>cards</span>
+              {course.demo ? course.demo.profileSwiped : 0} <span style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>cards</span>
             </div>
           </div>
 
@@ -95,7 +96,7 @@ export default function Profile() {
           icon={Crown}
           iconGradient="linear-gradient(135deg, #38BDF8 0%, #0369A1 100%)"
           title="S2S Premium"
-          subtitle="All nine HSK levels and unlimited cards"
+          subtitle={course.copy.premium.planSubtitle}
           value="Free plan"
           onClick={() => navigate('/premium')}
           isLast

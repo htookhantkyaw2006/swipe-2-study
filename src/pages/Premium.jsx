@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Crown, Check, Minus, X, Sparkles, ShieldCheck } from 'lucide-react';
+import { useCourse } from '../lib/language';
 
 /* ---------------------------------------------------------------
    S2S PREMIUM — plans and comparison
@@ -30,19 +31,25 @@ const money = (amount) => `${CURRENCY.symbol} ${amount.toLocaleString(CURRENCY.l
 const cadence = (months) => (months === 1 ? 'monthly' : months === 12 ? 'yearly' : `every ${months} months`);
 const savingsPct = (plan) => Math.round((1 - plan.perMonth / BASELINE) * 100);
 
-/* Only features that actually exist in the app today.
+/* Only features that actually exist in the active course today.
    Mock tests are deliberately absent — nothing in the codebase
-   implements them, and a pricing page is a promise. */
-const COMPARISON = [
-  { feature: 'HSK 1 flashcards',        free: true,       premium: true },
-  { feature: 'HSK 2–9 levels',          free: false,      premium: true },
-  { feature: 'Dictionary & saved words', free: true,      premium: true },
-  { feature: 'Daily review',            free: true,       premium: true },
-  { feature: 'Cards per day',           free: '20',       premium: 'Unlimited' },
-  { feature: 'Practise Writing',        free: 'HSK 1',    premium: 'All levels' },
-  { feature: 'Spot the Radical drill',  free: false,      premium: true },
-  { feature: 'Study by Interest',       free: false,      premium: true }
-];
+   implements them, and a pricing page is a promise. Rows for tools a
+   course does not have (Japanese writing) are left out, not ticked. */
+const comparisonFor = (course) => {
+  const p = course.copy.premium;
+  const has = (key) => course.exploreTools.some((t) => t.key === key && t.path);
+  return [
+    { feature: `${p.firstLevel} flashcards`, free: true, premium: true },
+    { feature: p.laterLevels, free: false, premium: true },
+    { feature: 'Dictionary & saved words', free: true, premium: true },
+    { feature: 'Daily review', free: true, premium: true },
+    { feature: 'Cards per day', free: '20', premium: 'Unlimited' },
+    ...(has('kana') ? [{ feature: 'Learn Kana & quiz', free: true, premium: true }] : []),
+    ...(has('writing') ? [{ feature: 'Practise Writing', free: p.firstLevel, premium: 'All levels' }] : []),
+    ...(has('radicals') ? [{ feature: 'Spot the Radical drill', free: false, premium: true }] : []),
+    { feature: 'Study by Interest', free: false, premium: true }
+  ];
+};
 
 const GRADIENT = 'linear-gradient(135deg, #38BDF8 0%, #0369A1 100%)';
 
@@ -139,6 +146,8 @@ function NotConnectedSheet({ plan, onClose }) {
 
 export default function Premium() {
   const navigate = useNavigate();
+  const course = useCourse();
+  const COMPARISON = comparisonFor(course);
   const [selected, setSelected] = useState(PLANS[0].id);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -181,10 +190,10 @@ export default function Premium() {
             </span>
           </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0 0 8px 0', lineHeight: 1.1, letterSpacing: '-0.5px' }}>
-            All nine levels.<br />One subscription.
+            {course.copy.premium.headline[0]}<br />{course.copy.premium.headline[1]}
           </h2>
           <p style={{ fontSize: '0.95rem', color: '#E0F2FE', margin: 0, lineHeight: 1.45, maxWidth: '300px' }}>
-            11,000 words, every one explained in Burmese and English.
+            {course.copy.premium.subhead}
           </p>
         </div>
       </div>
