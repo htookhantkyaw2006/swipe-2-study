@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RotateCw, Search, ChevronRight, Bell, Bookmark, Library as LibraryIcon, Crown, Layers, Sparkles } from 'lucide-react';
+import { RotateCw, Search, ChevronRight, Bookmark, Library as LibraryIcon, Crown, Layers, Sparkles } from 'lucide-react';
 import LevelCarousel from '../components/ui/LevelCarousel';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import Avatar from '../components/ui/Avatar';
@@ -144,30 +144,7 @@ export default function Home() {
             <h1 style={{ fontSize: '1.125rem', color: 'var(--color-text-navy)', margin: 0, fontWeight: 700 }}>{currentUser.name}</h1>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <LanguageSwitcher />
-          <div
-            onClick={() => navigate('/notifications')}
-            style={{
-              width: '44px', height: '44px', borderRadius: '50%',
-              backgroundColor: '#FFFFFF',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-              cursor: 'pointer',
-              transition: 'transform 0.2s, box-shadow 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.08)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)';
-            }}
-          >
-            <Bell size={20} color="#111827" strokeWidth={2.5} />
-          </div>
-        </div>
+        <LanguageSwitcher />
       </header>
 
       {/* Top Section: Carousel */}
