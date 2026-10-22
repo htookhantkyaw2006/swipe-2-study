@@ -36,7 +36,7 @@ const DATA_TABLES = [
 
 /* Everything "Reset everything" wipes, in every language. Includes the
    drill progress tables, which the reset used to leave behind. */
-const RESET_TABLES = [...DATA_TABLES.map((d) => d.table), 'learned_radicals', 'learned_kana'];
+const RESET_TABLES = [...DATA_TABLES.map((d) => d.table), 'learned_radicals', 'learned_kana', 'learned_sounds'];
 
 /** Rough size of everything we store, for the storage row. */
 const storageUsed = () => {

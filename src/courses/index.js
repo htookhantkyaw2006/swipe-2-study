@@ -1,5 +1,6 @@
 import zh from './zh';
 import ja from './ja';
+import en from './en';
 
 /* ---------------------------------------------------------------
    COURSE REGISTRY
@@ -8,18 +9,15 @@ import ja from './ja';
    zh.js / ja.js and add it here. Every screen reads the active
    course, so nothing else needs to change.
 
-   English is declared but has no course yet, so it stays visible in
-   the switcher as "coming soon" without being selectable.
+   Chinese (HSK), Japanese (JLPT) and English (CEFR) are live.
    --------------------------------------------------------------- */
 
-export const COURSES = { zh, ja };
+export const COURSES = { zh, ja, en };
 
-const UPCOMING = [
-  {
-    id: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧',
-    levelSystem: 'CEFR', levels: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], status: 'coming-soon'
-  }
-];
+/* Languages announced in the switcher before they have a course.
+   Empty while every planned language is live; add one here to show it
+   as "coming soon". */
+const UPCOMING = [];
 
 /** Summary of every language for the switcher, in display order. */
 export const LANGUAGES = [

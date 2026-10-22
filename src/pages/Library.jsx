@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, PenLine, Bookmark, Mic, Layers, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List, Blocks, Languages, Type } from 'lucide-react';
+import { Search, PenLine, Bookmark, Mic, Layers, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List, Blocks, Languages, Type, AudioLines } from 'lucide-react';
 import { db } from '../lib/db';
 import { useCourse } from '../lib/language';
 
@@ -51,6 +51,7 @@ const ToolCard = ({ tool, isGridView, onClick }) => (
    exist, their titles and where they go; this decides colour and icon. */
 const EXPLORE_STYLE = {
   scriptDictionary: { icon: Languages, gradient: 'linear-gradient(135deg, #FCD34D 0%, #B45309 100%)', shadow: 'rgba(180, 83, 9, 0.4)', charColor: '#FEF3C7' },
+  sounds:           { icon: AudioLines, gradient: 'linear-gradient(135deg, #67E8F9 0%, #0891B2 100%)', shadow: 'rgba(8, 145, 178, 0.4)', charColor: '#CFFAFE' },
   kana:             { icon: Type,      gradient: 'linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)', shadow: 'rgba(219, 39, 119, 0.4)', charColor: '#FCE7F3' },
   radicals:         { icon: Blocks,    gradient: 'linear-gradient(135deg, #A5B4FC 0%, #4338CA 100%)', shadow: 'rgba(67, 56, 202, 0.4)', charColor: '#E0E7FF' },
   interest:         { icon: Layers,    gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', charColor: '#F3E8FF' },

@@ -45,6 +45,7 @@ const comparisonFor = (course) => {
     { feature: 'Daily review', free: true, premium: true },
     { feature: 'Cards per day', free: '20', premium: 'Unlimited' },
     ...(has('kana') ? [{ feature: 'Learn Kana & quiz', free: true, premium: true }] : []),
+    ...(has('sounds') ? [{ feature: 'Sounds of English & quiz', free: true, premium: true }] : []),
     ...(has('writing') ? [{ feature: 'Practise Writing', free: p.firstLevel, premium: 'All levels' }] : []),
     ...(has('radicals') ? [{ feature: `${course.radicals.copy.drillTitle} drill`, free: false, premium: true }] : []),
     { feature: 'Study by Interest', free: false, premium: true }

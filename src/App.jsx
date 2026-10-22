@@ -16,6 +16,7 @@ import StudyByInterest from './pages/StudyByInterest';
 import WritingPractice from './pages/WritingPractice';
 import LearnRadicals from './pages/LearnRadicals';
 import LearnKana from './pages/LearnKana';
+import LearnSounds from './pages/LearnSounds';
 import './App.css';
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
         <Route path="writing" element={<WritingPractice />} />
         <Route path="radicals" element={<LearnRadicals />} />
         <Route path="kana" element={<LearnKana />} />
+        <Route path="sounds" element={<LearnSounds />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="profile" element={<Profile />} />
         <Route path="premium" element={<Premium />} />
