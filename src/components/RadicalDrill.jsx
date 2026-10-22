@@ -2,7 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { X, Check, Volume2, RotateCcw, ArrowRight } from 'lucide-react';
 import { recordAnswer, levelFor } from '../lib/radicalProgress';
 import { speak } from '../lib/speech';
-import { pronunciationOf, sayOf } from '../lib/entry';
+import { pronunciationOf, sayOf, fitFontPx, fitFontCss } from '../lib/entry';
+import { useCourse } from '../lib/language';
+import PartWord from './ui/PartWord';
 
 /* ---------------------------------------------------------------
    RADICAL DRILL — "Spot the Radical"
@@ -65,6 +67,7 @@ function buildRound(all, progress) {
 }
 
 export default function RadicalDrill({ radicals, progress, onClose, onRecorded }) {
+  const { copy } = useCourse().radicals;
   const [questions, setQuestions] = useState(() => buildRound(radicals, progress));
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState(null);
@@ -153,7 +156,7 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
                 {score === results.length ? 'Every one right' : score >= results.length - 1 ? 'Almost perfect' : 'Good practice'}
               </h2>
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-secondary-blue)', fontWeight: 500 }}>
-                Three clean answers in a row marks a radical as known.
+                Three clean answers in a row marks a {copy.unit} as known.
               </p>
             </div>
 
@@ -170,7 +173,7 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
                 >
                   <span style={{
                     width: '38px', height: '38px', flexShrink: 0, borderRadius: '12px',
-                    background: GRADIENT, color: '#FFFFFF', fontSize: '1.2rem', fontWeight: 800,
+                    background: GRADIENT, color: '#FFFFFF', fontSize: `${fitFontPx(r.radical.radical, 19.2, 32)}px`, fontWeight: 800,
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
                     {r.radical.radical}
@@ -216,7 +219,7 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
               margin: '0 0 16px 0', fontSize: '0.75rem', fontWeight: 800,
               textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)'
             }}>
-              {question.type === 'decode' ? 'You have not studied this character' : 'Name the radical'}
+              {question.type === 'decode' ? copy.decodeLabel : copy.identifyLabel}
             </p>
 
             <h2 style={{
@@ -224,19 +227,24 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
               color: 'var(--color-text-navy)', lineHeight: 1.25
             }}>
               {question.type === 'decode'
-                ? 'What is this character about?'
-                : 'What does this radical mean?'}
+                ? copy.decodeQuestion
+                : copy.identifyQuestion}
             </h2>
 
             {/* The glyph */}
             <div className="surface-card" style={{
               borderRadius: '24px', padding: '32px 24px', textAlign: 'center', marginBottom: '20px'
-            }}>
+            , containerType: 'inline-size'}}>
               <div style={{
-                fontSize: '5rem', lineHeight: 1, fontWeight: 800,
+                // Sized to the card's real width: on a phone it is ~280px, and a
+                // fixed guess let "peaceful" spill out of it.
+                fontSize: fitFontCss(question.type === 'decode' ? question.char.char : question.radical.radical, 80),
+                lineHeight: 1.1, fontWeight: 800, whiteSpace: 'nowrap',
                 color: 'var(--color-text-navy)'
               }}>
-                {question.type === 'decode' ? question.char.char : question.radical.radical}
+                {question.type === 'decode'
+                  ? <PartWord word={question.char.char} radical={question.radical} />
+                  : question.radical.radical}
               </div>
 
               {/* Pinyin is only revealed after answering — it would give
@@ -244,7 +252,7 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
               {picked && question.type === 'decode' && (
                 <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}>
-                    {pronunciationOf(question.char)} · {question.char.english}
+                    {[pronunciationOf(question.char), question.char.english].filter(Boolean).join(' · ')}
                   </span>
                   <button
                     onClick={() => speak(sayOf(question.char))}
@@ -303,15 +311,15 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
                 <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-navy)', lineHeight: 1.5 }}>
                   {question.type === 'decode' ? (
                     <>
-                      <strong>{question.char.char}</strong> {pronunciationOf(question.char)} — {question.char.english}.
+                      <strong>{question.char.char}</strong>{pronunciationOf(question.char) && ` ${pronunciationOf(question.char)}`} — {question.char.english}.
                       {/* Quoting the meaning keeps this readable for verbs:
                           the “to see” radical, not the to see radical. */}
-                      {' '}It carries <strong>{question.radical.radical}</strong> — the “{question.radical.meaning}” radical.
+                      {' '}It carries <strong>{question.radical.radical}</strong> — the “{question.radical.meaning}” {copy.unit}.
                     </>
                   ) : (
                     <>
-                      <strong>{question.radical.radical}</strong> {pronunciationOf(question.radical)} — {question.radical.meaning}.
-                      {' '}Look for it in {question.radical.examples.map((e) => e.char).join('、')}.
+                      <strong>{question.radical.radical}</strong>{pronunciationOf(question.radical) && ` ${pronunciationOf(question.radical)}`} — {question.radical.meaning}.
+                      {' '}Look for it in {question.radical.examples.map((e) => e.char).join(copy.joiner)}.
                     </>
                   )}
                 </p>

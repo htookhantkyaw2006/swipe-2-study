@@ -398,8 +398,7 @@ export default function WritingPracticePage() {
           Not available for {course.name} yet
         </h2>
         <p style={{ fontSize: '0.95rem', lineHeight: 1.5, color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500 }}>
-          Writing practice needs stroke-order data for {course.name}. The data this app
-          uses is Chinese, and would teach the wrong stroke order for some characters.
+          {course.copy.writingNote}
         </p>
       </div>
     </div>

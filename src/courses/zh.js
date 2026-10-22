@@ -142,6 +142,7 @@ export default {
   /* Labels that differ by script. */
   script: {
     romanization: 'pinyin',        // "Show pinyin"
+    romanizationHint: 'Romanisation on cards',
     writtenForm: 'Hanzi',
     character: 'character',
     hasScriptVariants: true        // Simplified / Traditional row in Settings
@@ -157,6 +158,7 @@ export default {
     allLevels: 'All HSK Levels',
     searchPlaceholder: 'Search Chinese, pinyin, English...',
     dictionarySubtitle: 'Search all HSK words',
+    heroWatermark: '学',          // course banner, Premium hero, Home premium card
     flashcardsWatermark: '字',
     exploreWatermark: '课',
     reviewWatermark: '习',
@@ -198,7 +200,25 @@ export default {
   sampleSaved,
   sampleReview,
 
-  radicals: { list: radicals, categories: radicalCategories, nameLabel: 'pinyin' },
+  radicals: {
+    list: radicals,
+    categories: radicalCategories,
+    copy: {
+      title: 'Learn Radicals',
+      headline: ['The parts', 'characters are made of'],
+      intro: 'Spot 氵 and you already know the word is about water.',
+      drillTitle: 'Spot the Radical',
+      drillSubtitle: '5 questions · read a character you have never studied',
+      unit: 'radical',
+      units: 'radicals',
+      examplesTitle: 'Characters using it',
+      decodeLabel: 'You have not studied this character',
+      decodeQuestion: 'What is this character about?',
+      identifyLabel: 'Name the radical',
+      identifyQuestion: 'What does this radical mean?',
+      joiner: '、'
+    }
+  },
   writing: { chars: writingChars },
 
   demo: { librarySwiped: '1,248', librarySaved: 42, libraryPhrases: 86, profileSwiped: 363, homeSaved: 12 }

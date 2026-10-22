@@ -2,7 +2,22 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, X, Lightbulb, PenLine, Zap, RotateCcw } from 'lucide-react';
 import { useCourse } from '../lib/language';
-import { pronunciationOf } from '../lib/entry';
+import { pronunciationOf, fitFontPx } from '../lib/entry';
+import PartWord from '../components/ui/PartWord';
+
+/* "shuǐ · 3 strokes", "さんずい · 3 strokes", or just "prefix" for an
+   English word part, which has neither a reading nor strokes. */
+const RadicalMeta = ({ radical }) => {
+  const reading = pronunciationOf(radical);
+  const detail = radical.strokes ? `${radical.strokes} strokes` : radical.kind;
+  return (
+    <>
+      {reading && <span style={{ whiteSpace: 'nowrap' }}>{reading}</span>}
+      {reading && detail && ' · '}
+      {detail}
+    </>
+  );
+};
 import RadicalDrill from '../components/RadicalDrill';
 import { readProgress, resetProgress, levelFor, countKnown, LEVELS } from '../lib/radicalProgress';
 
@@ -48,7 +63,7 @@ function RadicalDetail({ radical, onClose, onPractise }) {
               background: RADICAL_GRADIENT,
               boxShadow: `0 8px 16px ${RADICAL_SHADOW}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '2rem', fontWeight: 800, color: '#FFFFFF'
+              fontSize: `${fitFontPx(radical.radical, 32, 52)}px`, fontWeight: 800, color: '#FFFFFF'
             }}>
               {radical.radical}
             </div>
@@ -57,7 +72,7 @@ function RadicalDetail({ radical, onClose, onPractise }) {
                 {radical.meaning}
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
-                <span style={{ whiteSpace: 'nowrap' }}>{pronunciationOf(radical)}</span> · {radical.strokes} strokes
+                <RadicalMeta radical={radical} />
               </p>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--color-secondary-blue)', opacity: 0.85 }}>
                 {radical.burmese}
@@ -89,7 +104,7 @@ function RadicalDetail({ radical, onClose, onPractise }) {
           fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase',
           letterSpacing: '0.5px', color: 'var(--color-secondary-blue)', margin: '0 0 12px 0'
         }}>
-          Characters using it
+          {course.radicals.copy.examplesTitle}
         </h4>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -99,13 +114,15 @@ function RadicalDetail({ radical, onClose, onPractise }) {
               padding: '12px 16px', borderRadius: '14px',
               backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)'
             }}>
-              <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-primary-blue)', minWidth: '40px', textAlign: 'center' }}>
-                {ex.char}
+              <span style={{ fontSize: `${fitFontPx(ex.char, 28, 150)}px`, fontWeight: 800, color: 'var(--color-primary-blue)', minWidth: '40px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                <PartWord word={ex.char} radical={radical} />
               </span>
               <div>
+                {pronunciationOf(ex) && (
                 <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
                   {pronunciationOf(ex)}
                 </p>
+                )}
                 <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--color-text-navy)', fontWeight: 700 }}>
                   {ex.english}
                 </p>
@@ -141,7 +158,7 @@ function RadicalDetail({ radical, onClose, onPractise }) {
 export default function LearnRadicals() {
   const navigate = useNavigate();
   const course = useCourse();
-  const { list: radicals, categories: radicalCategories } = course.radicals;
+  const { list: radicals, categories: radicalCategories, copy } = course.radicals;
   const [category, setCategory] = useState('All');
   const [openRadical, setOpenRadical] = useState(null);
   const [drillOpen, setDrillOpen] = useState(false);
@@ -152,7 +169,7 @@ export default function LearnRadicals() {
   const refreshProgress = useCallback(() => setProgress(readProgress()), []);
 
   const clearProgress = () => {
-    if (!window.confirm('Reset radical progress? Your drill history will be erased.')) return;
+    if (!window.confirm(`Reset ${copy.unit} progress? Your drill history will be erased.`)) return;
     resetProgress();
     refreshProgress();
   };
@@ -177,16 +194,16 @@ export default function LearnRadicals() {
               <ChevronLeft size={24} color="var(--color-text-navy)" />
             </button>
             <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>
-              Learn Radicals
+              {copy.title}
             </h1>
           </header>
 
           <div style={{ marginBottom: '24px' }}>
             <h2 style={{ fontSize: '2rem', color: 'var(--color-text-navy)', margin: '0 0 8px 0', fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.1 }}>
-              The parts<br />characters are made of
+              {copy.headline[0]}<br />{copy.headline[1]}
             </h2>
             <p style={{ color: 'var(--color-secondary-blue)', fontSize: '1rem', margin: 0, fontWeight: 500 }}>
-              Spot 氵 and you already know the word is about water.
+              {copy.intro}
             </p>
           </div>
 
@@ -219,10 +236,10 @@ export default function LearnRadicals() {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF' }}>
-                Spot the Radical
+                {copy.drillTitle}
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 500 }}>
-                5 questions · read a character you have never studied
+                {copy.drillSubtitle}
               </p>
             </div>
             <ChevronRight size={22} color="#FFFFFF" strokeWidth={2.5} />
@@ -232,7 +249,7 @@ export default function LearnRadicals() {
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}>
-                {known} of {radicals.length} radicals known
+                {known} of {radicals.length} {copy.units} known
               </span>
               {started && (
                 <button
@@ -305,7 +322,7 @@ export default function LearnRadicals() {
                   background: RADICAL_GRADIENT,
                   boxShadow: `0 6px 12px ${RADICAL_SHADOW}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '1.4rem', fontWeight: 800, color: '#FFFFFF'
+                  fontSize: `${fitFontPx(r.radical, 22.4, 38)}px`, fontWeight: 800, color: '#FFFFFF'
                 }}>
                   {r.radical}
                 </div>
@@ -314,7 +331,7 @@ export default function LearnRadicals() {
                     {r.meaning}
                   </h3>
                   <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500 }}>
-                    <span style={{ whiteSpace: 'nowrap' }}>{pronunciationOf(r)}</span> · {r.strokes} strokes
+                    <RadicalMeta radical={r} />
                   </p>
                 </div>
 

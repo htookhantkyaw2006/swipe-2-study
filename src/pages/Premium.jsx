@@ -46,7 +46,7 @@ const comparisonFor = (course) => {
     { feature: 'Cards per day', free: '20', premium: 'Unlimited' },
     ...(has('kana') ? [{ feature: 'Learn Kana & quiz', free: true, premium: true }] : []),
     ...(has('writing') ? [{ feature: 'Practise Writing', free: p.firstLevel, premium: 'All levels' }] : []),
-    ...(has('radicals') ? [{ feature: 'Spot the Radical drill', free: false, premium: true }] : []),
+    ...(has('radicals') ? [{ feature: `${course.radicals.copy.drillTitle} drill`, free: false, premium: true }] : []),
     { feature: 'Study by Interest', free: false, premium: true }
   ];
 };
@@ -179,7 +179,7 @@ export default function Premium() {
         <div style={{ position: 'absolute', top: '-30px', left: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
         <div style={{ position: 'absolute', bottom: '-50px', left: '45%', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
         <div style={{ position: 'absolute', right: '-16px', bottom: '-44px', fontSize: '9rem', fontWeight: 800, color: 'rgba(255,255,255,0.12)', lineHeight: 1, pointerEvents: 'none' }}>
-          学
+          {course.copy.heroWatermark}
         </div>
 
         <div style={{ position: 'relative', zIndex: 1 }}>

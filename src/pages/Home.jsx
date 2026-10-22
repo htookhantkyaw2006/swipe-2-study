@@ -331,7 +331,7 @@ export default function Home() {
                 border: '2px solid #E0F2FE'
               }}>
                 <div style={{ fontSize: '3rem', fontWeight: 900, background: 'linear-gradient(135deg, #38BDF8 0%, #0369A1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginTop: '-4px' }}>
-                  学
+                  {course.copy.heroWatermark}
                 </div>
               </div>
               

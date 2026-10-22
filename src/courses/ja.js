@@ -244,6 +244,7 @@ export default {
 
   script: {
     romanization: 'romaji',
+    romanizationHint: 'Romanisation on cards',
     writtenForm: 'Word',
     character: 'word',
     hasScriptVariants: false
@@ -259,11 +260,13 @@ export default {
     allLevels: 'All JLPT Levels',
     searchPlaceholder: 'Search Japanese, romaji, English...',
     dictionarySubtitle: 'Search all JLPT words',
+    heroWatermark: '学',          // course banner, Premium hero, Home premium card
     flashcardsWatermark: '字',
     exploreWatermark: '課',
     reviewWatermark: '習',
     lessonName: 'Basics',
     newDeckLevel: 'N4',
+    writingNote: 'Writing practice needs stroke-order data for Japanese. The data this app uses is Chinese, and would teach the wrong stroke order for some characters.',
     premium: {
       planSubtitle: 'All five JLPT levels and unlimited cards',
       headline: ['All five levels.', 'One subscription.'],
@@ -298,7 +301,25 @@ export default {
   sampleSaved: [],
   sampleReview: [],
 
-  radicals: { list: radicals, categories: radicalCategories, nameLabel: 'kana' },
+  radicals: {
+    list: radicals,
+    categories: radicalCategories,
+    copy: {
+      title: 'Learn Radicals',
+      headline: ['The parts', 'characters are made of'],
+      intro: 'Spot 氵 and you already know the word is about water.',
+      drillTitle: 'Spot the Radical',
+      drillSubtitle: '5 questions · read a character you have never studied',
+      unit: 'radical',
+      units: 'radicals',
+      examplesTitle: 'Characters using it',
+      decodeLabel: 'You have not studied this character',
+      decodeQuestion: 'What is this character about?',
+      identifyLabel: 'Name the radical',
+      identifyQuestion: 'What does this radical mean?',
+      joiner: '、'
+    }
+  },
 
   /* No stroke data: hanzi-writer-data has no kana and teaches Chinese
      stroke order, which differs from Japanese for some kanji (右, 必).

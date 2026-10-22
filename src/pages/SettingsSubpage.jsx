@@ -189,7 +189,7 @@ export default function SettingsSubpage() {
         <SettingsRow
           icon={BookOpen} iconGradient={GRADIENTS.blue}
           title={`Show ${course.script.romanization}`}
-          subtitle="Romanisation on cards"
+          subtitle={course.script.romanizationHint}
           control={<ToggleSwitch checked={prefs.showPinyin} onChange={(v) => setPref('showPinyin', v)} />}
         />
         <SettingsRow

@@ -68,7 +68,7 @@ export default function LevelPicker() {
         </div>
         {/* Large faint background character */}
         <div style={{ position: 'absolute', right: '-20px', bottom: '-40px', fontSize: '12rem', color: 'rgba(255,255,255,0.1)', fontWeight: 800, lineHeight: 1 }}>
-          学
+          {course.copy.heroWatermark}
         </div>
       </div>
 
