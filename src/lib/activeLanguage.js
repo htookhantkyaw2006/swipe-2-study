@@ -23,13 +23,26 @@ const readStored = () => {
   return DEFAULT_COURSE_ID;
 };
 
+/* Mirror the course onto <html data-course="..."> so CSS can style by
+   language (see --font-reading in index.css). Set here, synchronously,
+   rather than in an effect, so the first paint is already right. */
+const reflect = (id) => {
+  try {
+    document.documentElement.dataset.course = id;
+  } catch {
+    // No document (tests, SSR) — nothing to style.
+  }
+};
+
 let current = readStored();
+reflect(current);
 
 export const getActiveLanguageId = () => current;
 
 export function setActiveLanguageId(id) {
   if (!isActiveCourse(id)) return false;
   current = id;
+  reflect(id);
   try {
     localStorage.setItem(LANGUAGE_KEY, id);
   } catch {

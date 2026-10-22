@@ -30,6 +30,13 @@ export default function LessonPicker() {
   // shown under every level, which is what this table used to be.
   const [hoverRow, setHoverRow] = useState(null);
 
+  // English puts the IPA under the word instead of in its own column,
+  // which on a phone left the meaning about 60px wide.
+  const stack = Boolean(course.script.stackReading);
+  const headers = stack
+    ? [course.script.writtenForm, 'Meaning', 'Status']
+    : [course.script.writtenForm, course.script.romanization, 'Meaning', 'Status'];
+
   const words = useMemo(
     () => db.get('flashcards').filter((c) => c.level === level.id),
     [level.id]
@@ -200,17 +207,17 @@ export default function LessonPicker() {
                 each row was its own grid, columns sized to that row alone and
                 drifted out of line. */}
             <div className="surface-card" style={{ borderRadius: '16px', overflow: 'hidden', padding: 0, border: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto auto minmax(0, 1fr) auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: stack ? 'auto minmax(0, 1fr) auto' : 'auto auto minmax(0, 1fr) auto' }}>
 
                 {/* Header */}
-                {[course.script.writtenForm, course.script.romanization, 'Meaning', 'Status'].map((label, i) => (
+                {headers.map((label, i) => (
                   <div
                     key={label}
                     style={{
                       padding: '12px 10px', backgroundColor: 'var(--color-ghost-blue)',
                       borderBottom: '2px solid var(--color-border)',
-                      borderRight: i < 3 ? '1px solid var(--color-border)' : 'none',
-                      textAlign: i === 0 || i === 3 ? 'center' : 'left',
+                      borderRight: i < headers.length - 1 ? '1px solid var(--color-border)' : 'none',
+                      textAlign: i === 0 || i === headers.length - 1 ? 'center' : 'left',
                       fontWeight: 700, fontSize: '0.7rem', color: 'var(--color-secondary-blue)',
                       textTransform: 'uppercase', letterSpacing: '0.3px'
                     }}
@@ -242,16 +249,21 @@ export default function LessonPicker() {
                       onMouseOut={() => setHoverRow(null)}
                     >
                       <div style={cell({ borderRight: '1px solid var(--color-border)', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', fontWeight: 800, color: 'var(--color-primary-blue)' })}>
-                        <span style={{ fontSize: word.character.length > 2 ? '1.15rem' : '1.5rem', lineHeight: 1.2, whiteSpace: 'nowrap' }}>{word.character}</span>
+                        <span style={{ fontSize: stack ? '1.05rem' : word.character.length > 2 ? '1.15rem' : '1.5rem', lineHeight: 1.2, whiteSpace: 'nowrap' }}>{word.character}</span>
                         {kanaOf(word) && (
                           <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-secondary-blue)', marginTop: '2px', whiteSpace: 'nowrap' }}>{kanaOf(word)}</span>
                         )}
+                        {stack && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-secondary-blue)', marginTop: '2px', whiteSpace: 'nowrap' }}>{word.pronunciation ?? readingOf(word)}</span>
+                        )}
                       </div>
-                      <div style={cell({ borderRight: '1px solid var(--color-border)', fontSize: '0.85rem', color: 'var(--color-secondary-blue)', whiteSpace: 'nowrap' })}>
-                        {word.pronunciation ?? readingOf(word)}
-                      </div>
+                      {!stack && (
+                        <div style={cell({ borderRight: '1px solid var(--color-border)', fontSize: '0.85rem', color: 'var(--color-secondary-blue)', whiteSpace: 'nowrap' })}>
+                          {word.pronunciation ?? readingOf(word)}
+                        </div>
+                      )}
                       <div style={cell({ borderRight: '1px solid var(--color-border)', fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-navy)', overflowWrap: 'break-word', minWidth: 0 })}>
-                        {word.definition}
+                        {course.script.listMeaning === 'burmese' ? word.burmese_definition : word.definition}
                       </div>
                       <div style={cell({ justifyContent: 'center' })}>
                         {levelDone ? (

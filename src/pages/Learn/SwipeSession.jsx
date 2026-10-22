@@ -7,7 +7,7 @@ import { db } from '../../lib/db';
 import { speak } from '../../lib/speech';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
-import { readingOf, textOf, sayOf, kanaOf } from '../../lib/entry';
+import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
 
 const ShuffleDeck = () => {
   const baseCardStyle = {
@@ -45,6 +45,14 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
   const { prefs } = usePreferences();
   const course = useCourse();
   const [isPresent] = usePresence();
+
+  // Translation language (English / Burmese / Both) had no reader; it
+  // takes effect here, alongside Show Burmese. A card is never left with
+  // no meaning at all if the two settings contradict each other.
+  const wantEnglish = prefs.translationLanguage !== 'burmese';
+  const wantBurmese = prefs.translationLanguage !== 'english' && prefs.showBurmese;
+  const showEnglish = wantEnglish || !wantBurmese;
+  const showBurmese = wantBurmese;
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], [-15, 15]);
   const backgroundColor = useTransform(x, [-100, 0, 100], ['#FEE2E2', '#FFFFFF', '#DCFCE7']);
@@ -127,10 +135,10 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
         </button>
       </div>
       
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: '-20px' }}>
-        <h1 style={{ fontSize: card.character.length > 2 ? '56px' : '72px', margin: 0, color: '#0C4A6E', fontWeight: 800, textAlign: 'center', lineHeight: 1.1 }}>{card.character}</h1>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: '-20px', alignSelf: 'stretch', containerType: 'inline-size' }}>
+        <h1 style={{ fontSize: fitFontCss(card.character, 72), margin: 0, color: '#0C4A6E', fontWeight: 800, textAlign: 'center', lineHeight: 1.1, whiteSpace: 'nowrap' }}>{card.character}</h1>
         {kanaOf(card) && <p style={{ fontSize: '22px', color: '#0284C7', fontWeight: 600, margin: '8px 0 0 0' }}>{kanaOf(card)}</p>}
-        {prefs.showPinyin && <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 0 0' }}>{card.pronunciation}</p>}
+        {prefs.showPinyin && <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'var(--font-reading)', margin: '8px 0 0 0' }}>{card.pronunciation}</p>}
       </div>
 
       <div style={{ 
@@ -155,15 +163,15 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
       boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)', overflow: 'hidden'
     }}>
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-          <h2 style={{ fontSize: '48px', color: '#0C4A6E', fontWeight: 700, margin: 0, lineHeight: 1 }}>{card.character}</h2>
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, containerType: 'inline-size' }}>
+          <h2 style={{ fontSize: fitFontCss(card.character, 48), color: '#0C4A6E', fontWeight: 700, margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{card.character}</h2>
           {kanaOf(card) && <p style={{ fontSize: '18px', color: '#0284C7', fontWeight: 600, margin: '6px 0 0 0' }}>{kanaOf(card)}</p>}
-          {prefs.showPinyin && <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '4px 0 16px 0' }}>{card.pronunciation}</p>}
+          {prefs.showPinyin && <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'var(--font-reading)', margin: '4px 0 16px 0' }}>{card.pronunciation}</p>}
           
           <div style={{ width: '100%', height: '1px', backgroundColor: '#BAE6FD', marginBottom: '16px', margin: '0 24px 16px 24px' }}></div>
           
-          <p style={{ fontSize: '22px', color: '#0C4A6E', fontWeight: 600, margin: '0 0 4px 0', textAlign: 'center' }}>{card.definition}</p>
-          {prefs.showBurmese && <p style={{ fontSize: '18px', color: '#0284C7', fontWeight: 400, margin: 0, textAlign: 'center' }}>{card.burmese_definition}</p>}
+          {showEnglish && <p style={{ fontSize: '22px', color: '#0C4A6E', fontWeight: 600, margin: '0 0 4px 0', textAlign: 'center' }}>{card.definition}</p>}
+          {showBurmese && <p style={{ fontSize: '18px', color: '#0284C7', fontWeight: 400, margin: 0, textAlign: 'center' }}>{card.burmese_definition}</p>}
         </div>
 
         {card.examples && card.examples.length > 0 && (
@@ -195,9 +203,11 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
                     <Volume2 size={16} strokeWidth={2.5} />
                   </button>
                   <p style={{ fontSize: '16px', color: '#0C4A6E', fontWeight: 500, margin: 0 }}>{textOf(ex)}</p>
-                  {prefs.showPinyin && <p style={{ fontSize: '14px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: 0 }}>{readingOf(ex)}</p>}
-                  <p style={{ fontSize: '14px', color: '#0C4A6E', fontWeight: 400, margin: 0 }}>{ex.english}</p>
-                  {prefs.showBurmese && <p style={{ fontSize: '14px', color: '#0284C7', fontWeight: 400, margin: 0 }}>{ex.burmese}</p>}
+                  {/* Each line only when it exists: an English sentence has no
+                      romanisation and no English translation. */}
+                  {prefs.showPinyin && readingOf(ex) && <p style={{ fontSize: '14px', color: '#38BDF8', fontFamily: 'var(--font-reading)', margin: 0 }}>{readingOf(ex)}</p>}
+                  {showEnglish && ex.english && <p style={{ fontSize: '14px', color: '#0C4A6E', fontWeight: 400, margin: 0 }}>{ex.english}</p>}
+                  {showBurmese && ex.burmese && <p style={{ fontSize: '14px', color: '#0284C7', fontWeight: 400, margin: 0 }}>{ex.burmese}</p>}
                 </div>
               ))}
             </div>

@@ -130,7 +130,7 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: '-20px' }}>
         <h1 style={{ fontSize: '48px', margin: 0, color: '#0C4A6E', fontWeight: 800, textAlign: 'center', lineHeight: 1.2 }}>{card.phrase}</h1>
         {kanaOf(card) && <p style={{ fontSize: '20px', color: '#0284C7', fontWeight: 600, margin: '10px 0 0 0' }}>{kanaOf(card)}</p>}
-        <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: kanaOf(card) ? '6px 0 0 0' : '16px 0 0 0' }}>{readingOf(card)}</p>
+        <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'var(--font-reading)', margin: kanaOf(card) ? '6px 0 0 0' : '16px 0 0 0' }}>{readingOf(card)}</p>
       </div>
 
       <div style={{ 
@@ -158,7 +158,7 @@ const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFli
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
           <h2 style={{ fontSize: '36px', color: '#0C4A6E', fontWeight: 700, margin: 0, lineHeight: 1.2, textAlign: 'center' }}>{card.phrase}</h2>
           {kanaOf(card) && <p style={{ fontSize: '17px', color: '#0284C7', fontWeight: 600, margin: '8px 0 0 0' }}>{kanaOf(card)}</p>}
-          <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'JetBrains Mono, monospace', margin: '8px 0 24px 0' }}>{readingOf(card)}</p>
+          <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'var(--font-reading)', margin: '8px 0 24px 0' }}>{readingOf(card)}</p>
           
           <div style={{ width: '100%', height: '1px', backgroundColor: '#BAE6FD', marginBottom: '24px', margin: '0 24px 24px 24px' }}></div>
           

@@ -51,7 +51,9 @@ export function matchesQuery(entry, query) {
   if (!q) return false;
   const lower = q.toLowerCase();
   return (
-    wordOf(entry).includes(q) ||
+    // Case-insensitive: matters for Latin script ("Apple" vs "apple"),
+    // a no-op for Chinese and Japanese.
+    wordOf(entry).toLowerCase().includes(lower) ||
     (entry.kana || '').includes(q) ||
     fold(readingOf(entry)).includes(fold(q)) ||
     (entry.english || '').toLowerCase().includes(lower) ||
@@ -65,3 +67,27 @@ export function matchesQuery(entry, query) {
  * the romanisation.
  */
 export const pronunciationOf = (x) => x?.kana || readingOf(x);
+
+/* Rough width of text in ems: a CJK character or kana is about one em
+   wide, a Latin letter about 0.6. */
+const CJK = /[\u3000-\u30ff\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+const emWidth = (text) => [...(text || '')].reduce((w, ch) => w + (CJK.test(ch) ? 1 : 0.6), 0);
+
+/**
+ * Font size, in px, that fits `text` on one line in `availPx`, capped at
+ * `maxPx`. Boxes were sized for one Chinese character; an English word
+ * like "tomorrow" or "-tion" would overflow them at the same size. A
+ * single character still gets the full `maxPx`, so Chinese and Japanese
+ * render exactly as before.
+ */
+export const fitFontPx = (text, maxPx, availPx) =>
+  Math.max(10, Math.min(maxPx, Math.floor(availPx / Math.max(emWidth(text), 1))));
+
+/**
+ * Like fitFontPx, but against the real width of the box the text sits
+ * in, for boxes whose width depends on the screen. Returns a CSS value;
+ * the parent must set `containerType: 'inline-size'` so 100cqw is its
+ * width. 1.1 leaves room for wide bold letters such as m and w.
+ */
+export const fitFontCss = (text, maxPx) =>
+  `min(${maxPx}px, calc(100cqw / ${(Math.max(emWidth(text), 1) * 1.1).toFixed(2)}))`;

@@ -17,9 +17,19 @@
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
+  /* The reading line under a word: pinyin, romaji or IPA. Monospace
+     suits pinyin and romaji. IPA in monospace gives every mark a full
+     cell, leaving gaps around ˈ and ː, so English uses proportional
+     type — as printed dictionaries do. */
+  --font-reading: 'JetBrains Mono', monospace;
+
   --radius-card: 14px;
   --radius-btn: 10px;
   --radius-full: 50%;
+}
+
+:root[data-course="en"] {
+  --font-reading: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 * {

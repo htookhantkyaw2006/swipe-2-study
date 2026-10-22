@@ -74,7 +74,9 @@ export function LanguageSheet({ onClose }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>{lang.name}</span>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--color-secondary-blue)', fontWeight: 500 }}>{lang.nativeName}</span>
+                    {lang.nativeName !== lang.name && (
+                      <span style={{ fontSize: '0.85rem', color: 'var(--color-secondary-blue)', fontWeight: 500 }}>{lang.nativeName}</span>
+                    )}
                   </div>
                   <p style={{ fontSize: '0.8rem', color: 'var(--color-secondary-blue)', margin: '2px 0 0 0', fontWeight: 500 }}>
                     {comingSoon

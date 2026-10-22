@@ -122,13 +122,13 @@ export default function SavedWords() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '1.25rem', fontWeight: 900
                 }}>
-                  {[...word.phrase][0]}
+                  {[...word.phrase][0].toUpperCase()}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                     <h4 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{word.phrase}</h4>
                     {kanaOf(word) && <span style={{ fontSize: '0.8rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>{kanaOf(word)}</span>}
-                    <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>{readingOf(word)}</span>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'var(--font-reading)' }}>{readingOf(word)}</span>
                   </div>
                   <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
                     {word.english} <span style={{ opacity: 0.5 }}>•</span> {word.burmese}
