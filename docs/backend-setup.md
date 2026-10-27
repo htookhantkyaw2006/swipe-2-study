@@ -9,6 +9,11 @@ admin@swipe2study.com. DNS, mailbox and SMTP access are not verified here.
 This workspace has no project connection or credentials configured. No migration
 has been applied to the client's hosted database. The app remains local-only.
 
+Local storage ownership is now implemented (see development-log.md). Guest keys
+stay unchanged; a future verified Auth session can select an isolated user cache.
+There is no Auth coordinator or guest import yet, so the running app is still a
+guest. This does not demonstrate cloud sync or a completed account feature.
+
 The first migration defines profiles, preferences, trusted content tables and a
 private avatar bucket. Server-owned account_state reserves deleting/reset_version;
 sync/reset RPCs and the deletion Edge Function are separate implementation steps.
@@ -71,6 +76,8 @@ Obtain staging's link/reference and place the project URL/publishable key in loc
 env. Keep privileged credentials out of chat. Confirm the client content/audio
 folder, DNS/mailbox access, Google OAuth, SMTP and production hosting access.
 
-Auth must live above CourseShell. Owner-separated caches and safe guest import
-must ship before account UI reads private learning state. Keep db.js synchronous
+Auth must live above StorageOwnerBoundary (and therefore above CourseShell).
+Only select a private cache after restoring/verifying the actual account; block
+private page rendering during that transition. Wire safe guest import separately
+before claiming guest preservation in cloud accounts. Keep db.js synchronous
 and add online background sync; do not claim existing guest progress is synced.

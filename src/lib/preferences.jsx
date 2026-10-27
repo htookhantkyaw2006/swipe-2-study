@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
+import { storageOwner } from './storageOwner.js';
 
 /* ---------------------------------------------------------------
    PREFERENCES
@@ -12,8 +13,6 @@ import { createContext, useContext, useState, useCallback } from 'react';
    `readPreferences()` is a non-hook escape hatch for plain modules
    that run outside React (see lib/speech.js).
    --------------------------------------------------------------- */
-
-const STORAGE_KEY = 's2s_preferences';
 
 export const DEFAULTS = {
   // Learning
@@ -82,7 +81,7 @@ const upgrade = (stored) => {
 
 export function readPreferences() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageOwner.scope().getItem('preferences');
     if (!raw) return { ...DEFAULTS };
     return { ...DEFAULTS, ...upgrade(JSON.parse(raw)) };
   } catch {
@@ -98,14 +97,16 @@ if (import.meta.hot) import.meta.hot.data.PreferencesContext = PreferencesContex
 
 export function PreferencesProvider({ children }) {
   const [prefs, setPrefs] = useState(readPreferences);
+  // Pin delayed callbacks to the owner whose provider created them.
+  const [scope] = useState(() => storageOwner.scope());
 
-  const persist = (next) => {
+  const persist = useCallback((next) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      scope.setItem('preferences', JSON.stringify(next));
     } catch {
       // Persisting is best-effort; the in-memory value still applies.
     }
-  };
+  }, [scope]);
 
   const setPref = useCallback((key, value) => {
     setPrefs((prev) => {
@@ -113,12 +114,12 @@ export function PreferencesProvider({ children }) {
       persist(next);
       return next;
     });
-  }, []);
+  }, [persist]);
 
   const resetPrefs = useCallback(() => {
     setPrefs({ ...DEFAULTS });
     persist({ ...DEFAULTS });
-  }, []);
+  }, [persist]);
 
   return (
     <PreferencesContext.Provider value={{ prefs, setPref, resetPrefs }}>

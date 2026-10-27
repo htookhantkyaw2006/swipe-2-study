@@ -13,6 +13,7 @@ import { usePreferences, OPTIONS } from '../lib/preferences';
 import { useLanguage, useCourse } from '../lib/language';
 import { COURSES } from '../courses';
 import { db } from '../lib/db';
+import { storageOwner } from '../lib/storageOwner.js';
 
 const GRADIENTS = {
   blue: 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)',
@@ -38,18 +39,13 @@ const DATA_TABLES = [
    drill progress tables, which the reset used to leave behind. */
 const RESET_TABLES = [...DATA_TABLES.map((d) => d.table), 'learned_radicals', 'learned_kana', 'learned_sounds'];
 
-/** Rough size of everything we store, for the storage row. */
+/** Approximate UTF-16 size of the current owner's learning/settings cache. */
 const storageUsed = () => {
-  let bytes = 0;
   try {
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('s2s_')) bytes += key.length + (localStorage.getItem(key) || '').length;
-    }
+    return storageOwner.scope().entries().reduce((bytes, [key, value]) => bytes + 2 * (key.length + value.length), 0);
   } catch {
     return null;
   }
-  return bytes;
 };
 
 const formatBytes = (bytes) => {

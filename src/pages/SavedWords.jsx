@@ -5,6 +5,7 @@ import { db } from '../lib/db';
 import { speak } from '../lib/speech';
 import { useCourse } from '../lib/language';
 import { readingOf, sayOf, kanaOf } from '../lib/entry';
+import { storageOwner } from '../lib/storageOwner.js';
 
 /* Sample words come from the active course; a new language has none. */
 
@@ -19,7 +20,7 @@ export default function SavedWords() {
     
     // Seed with the course's sample words if completely empty (for demo
     // purposes). A course with no samples starts genuinely empty.
-    if (words.length === 0 && course.sampleSaved.length > 0) {
+    if (storageOwner.getOwner() === null && words.length === 0 && course.sampleSaved.length > 0) {
       course.sampleSaved.forEach(word => db.insert('saved_words', word));
       words = db.get('saved_words');
     }

@@ -29,7 +29,12 @@ const LanguageContext = import.meta.hot?.data.LanguageContext ?? createContext(n
 if (import.meta.hot) import.meta.hot.data.LanguageContext = LanguageContext;
 
 export function LanguageProvider({ children }) {
-  const [languageId, setLanguageId] = useState(getActiveLanguageId);
+  const [languageId, setLanguageId] = useState(() => {
+    const id = getActiveLanguageId();
+    // Each newly selected account starts with its own course cache.
+    seedCourse(id);
+    return id;
+  });
 
   const setLanguage = useCallback((id) => {
     if (!isActiveCourse(id)) return false;

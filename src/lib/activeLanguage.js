@@ -1,4 +1,5 @@
 import { isActiveCourse, DEFAULT_COURSE_ID } from '../courses';
+import { storageOwner } from './storageOwner.js';
 
 /* ---------------------------------------------------------------
    ACTIVE LANGUAGE (outside React)
@@ -11,11 +12,9 @@ import { isActiveCourse, DEFAULT_COURSE_ID } from '../courses';
    return the default and quietly send Japanese writes into Chinese.
    --------------------------------------------------------------- */
 
-export const LANGUAGE_KEY = 's2s_language';
-
 const readStored = () => {
   try {
-    const saved = localStorage.getItem(LANGUAGE_KEY);
+    const saved = storageOwner.scope().getItem('language');
     if (saved && isActiveCourse(saved)) return saved;
   } catch {
     // Storage blocked — fall through to the default.
@@ -35,16 +34,25 @@ const reflect = (id) => {
 };
 
 let current = readStored();
+let currentOwner = storageOwner.getOwner();
 reflect(current);
 
-export const getActiveLanguageId = () => current;
+export function getActiveLanguageId() {
+  if (currentOwner !== storageOwner.getOwner()) {
+    currentOwner = storageOwner.getOwner();
+    current = readStored();
+    reflect(current);
+  }
+  return current;
+}
 
 export function setActiveLanguageId(id) {
   if (!isActiveCourse(id)) return false;
+  getActiveLanguageId();
   current = id;
   reflect(id);
   try {
-    localStorage.setItem(LANGUAGE_KEY, id);
+    storageOwner.scope().setItem('language', id);
   } catch {
     // Persisting is best-effort; the in-memory choice still applies.
   }
