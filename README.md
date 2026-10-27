@@ -1,16 +1,35 @@
-# React + Vite
+# Swipe 2 Study
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React/Vite language-learning frontend. The agreed release focuses on HSK 1 and
+JLPT N5, using the client-owned UI and supplied vocabulary/audio.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Use Node 22.12+ or a supported newer LTS release.
 
-## React Compiler
+```sh
+npm ci
+npm run dev -- --host 127.0.0.1
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The current frontend still uses guest localStorage. This foundation change does
+not yet connect login, cloud progress sync, content imports or account deletion.
 
-## Expanding the Oxlint configuration
+## Checks
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```sh
+npm run lint
+npm test
+npm run build
+```
+
+PostgreSQL policy tests use PGlite with simplified Supabase Auth/Storage schemas.
+They test RLS and migration behavior, not hosted Auth or actual file uploads.
+PGlite is a test-only dependency; it is not part of the web bundle.
+
+## Backend
+
+Follow [the staging setup instructions](docs/backend-setup.md). Never apply a
+migration or reset to production as a test. Credentials stay outside Git.
+Use development branches: the existing main branch may auto-deploy the demo.
+Promote tested releases to the separate client-owned production repository.
