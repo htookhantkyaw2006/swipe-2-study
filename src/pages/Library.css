@@ -1,0 +1,54 @@
+.library-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+.library-header > div { min-width: 0; }
+.library-header p { font-size: 0.875rem; color: var(--color-primary-blue); }
+.library-header h1 { font-size: clamp(1.75rem, 4vw, 2rem); line-height: 1.4; color: var(--color-text-navy); }
+.library-intro { display: flex; align-items: center; gap: 24px; padding: 24px; background: var(--color-text-navy); border-radius: 24px; color: white; box-shadow: var(--shadow-raised); }
+.library-intro > div { flex: 1; min-width: 0; }
+.library-intro > svg { flex-shrink: 0; display: none; }
+.library-intro h2 { color: white; font-size: clamp(1.375rem, 3vw, 1.75rem); line-height: 1.4; margin: 6px 0 8px; }
+.library-intro > div > p:last-child { font-size: 0.9375rem; line-height: 1.7; }
+.library-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0 24px; }
+.library-counts > a { display: flex; flex-direction: column; align-items: flex-start; padding: 16px 12px; gap: 5px; border: 1px solid var(--color-border); border-radius: 18px; background: white; color: var(--color-primary-blue); box-shadow: var(--shadow-soft); min-width: 0; }
+.library-counts strong { font-size: 1.625rem; font-weight: 750; line-height: 1.4; color: var(--color-text-navy); }
+.library-counts span { font-size: 0.75rem; line-height: 1.6; overflow-wrap: anywhere; }
+.library-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.library-toolbar > .study-search { width: 100%; flex: 1; }
+.library-view { display: flex; flex-shrink: 0; gap: 4px; }
+.library-view button[aria-pressed="true"] { background: var(--color-text-navy); color: white; border-color: var(--color-text-navy); }
+.library-results { margin-bottom: 20px; color: var(--color-primary-blue); font-size: 0.875rem; }
+.library-section { margin-bottom: 28px; }
+.library-section > h2 { font-size: 1.125rem; color: var(--color-text-navy); margin-bottom: 16px; }
+.library-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.library-tool { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; min-width: 0; padding: 18px 16px; border: 1px solid var(--color-border); border-radius: 20px; background: white; box-shadow: var(--shadow-soft); color: var(--color-text-navy); transition: background-color 0.16s, transform 0.16s; }
+.library-tool__icon { width: 44px; height: 44px; border-radius: 13px; display: flex; align-items: center; justify-content: center; background: var(--color-ghost-blue); color: var(--color-primary-blue); flex-shrink: 0; }
+.library-tool__copy { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.library-tool__title { font-weight: 700; font-size: 1rem; line-height: 1.5; }
+.library-tool__subtitle { font-size: 0.8125rem; line-height: 1.7; color: var(--color-primary-blue); }
+.library-tool__arrow { display: none; flex-shrink: 0; color: var(--color-primary-blue); }
+.library-tool__soon { display: inline-block; border-radius: 6px; background: var(--color-ghost-blue); color: var(--color-primary-blue); font-size: 0.6875rem; font-weight: 650; line-height: 1.5; padding: 3px 8px; }
+.library-tool--soon { box-shadow: none; }
+.library-page--list .library-tools { grid-template-columns: minmax(0, 1fr); }
+.library-page--list .library-tool { flex-direction: row; align-items: center; }
+.library-page--list .library-tool__arrow { display: block; }
+.library-page--list .library-tool__soon { flex-shrink: 0; }
+@media (hover: hover) {
+  a.library-tool:hover, .library-counts > a:hover { background: var(--color-ghost-blue); }
+}
+@media (min-width: 640px) {
+  .library-intro { padding: 28px; }
+  .library-intro > svg { display: block; }
+  .library-counts { gap: 16px; }
+  .library-counts > a { padding: 20px; }
+  .library-counts span { font-size: 0.8125rem; }
+  .library-tools { gap: 16px; }
+  .library-tool { padding: 22px; }
+}
+@media (min-width: 1280px) {
+  .library-page--grid .library-tools { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .library-page--list .library-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 359px) {
+  .library-toolbar { flex-wrap: wrap; }
+  .library-toolbar > .study-search { flex-basis: 100%; }
+  .library-view { margin-left: auto; }
+}

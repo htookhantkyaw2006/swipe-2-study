@@ -64,3 +64,11 @@ Review displays the real queue; opening Saved does not seed demo bookmarks. Exis
 Verification: **64 tests pass**, lint **0 errors / 10 warnings**, production build/whitespace checks pass. Chromium production checks covered 49 language/screen/width/empty/long-text combinations with no horizontal or measured text overflow. Search, audio-button state, saved practice/preservation/keyboard removal/reload, review completion, legacy level links and empty higher levels were exercised. See the development log for exact coverage. The existing vocabulary gesture checks are separate from these new Node tests.
 
 Next UI checkpoints: Library and Profile. Safari/physical-device, Vercel staging and hosted Supabase verification remain pending. `main` and deployment are unchanged.
+
+## Follow-up: Library and Profile
+
+Library/Profile now share the blue visual direction and responsive study frame. Library has a working tool search, keyboard grid/list controls, real current-course collection counts and clear unavailable-tool labels. Profile uses real saved/review counts, wrapping account identity, native language/goal selectors and a keyboard auto-play switch. The existing Auth/Profile hooks and language/preferences persistence remain authoritative. Pending features are marked Soon; guest text does not promise learning-data sync.
+
+Verification: 46 Chromium production layout combinations across three languages, grid/list/Profile, five widths and one injected long-name/email case, with no measured overflow. Search, keyboard controls, goal/audio persistence and Settings agreement, language switching, guest Auth links, navigation clearance and reduced motion passed. Server rendering simulated connected/error/pending identity views without effects; hosted Auth/profile/logout are unverified. Existing tests: **64 pass**; lint **0 errors / 10 warnings**; build/whitespace checks pass.
+
+The requested core-screen sequence is complete through Library/Profile. This is not a claim that every helper, phrase or Settings screen has received a full responsive refinement. Staging configuration/preview, hosted account checks, Safari and physical-device review remain pending. Main and production deployment are unchanged.
