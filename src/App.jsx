@@ -10,6 +10,7 @@ import Profile from './pages/Profile';
 import Premium from './pages/Premium';
 import SettingsSubpage from './pages/SettingsSubpage';
 import SavedWords from './pages/SavedWords';
+import SwipeSession from './pages/Learn/SwipeSession';
 import Dictionary from './pages/Dictionary';
 import Notifications from './pages/Notifications';
 import StudyByInterest from './pages/StudyByInterest';
@@ -41,6 +42,7 @@ function App() {
         <Route path="flashcards/level/:levelId" element={<PhrasesLevel />} />
         <Route path="flashcards/session" element={<PhrasesSwipeSession />} />
         <Route path="saved" element={<SavedWords />} />
+        <Route path="saved/session" element={<SwipeSession key="saved-session" isSaved />} />
         <Route path="dictionary" element={<Dictionary />} />
         <Route path="interest" element={<StudyByInterest />} />
         <Route path="writing" element={<WritingPractice />} />

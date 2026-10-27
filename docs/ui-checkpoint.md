@@ -54,3 +54,13 @@ The page-specific responsive pass now includes `/learn/session` and `/learn/revi
 Production Chromium checks at 320/375/768/1024/1440px, plus 667×375 landscape, passed without horizontal overflow. Japanese/English at phone and desktop widths, long words and multilingual answers were also inspected. Desktop mouse drag and emulated-phone touch drag advance cards; review insertion/removal, shuffle, keyboard reveal and display preferences pass. Local guest mode works without backend credentials. Tests: 57 pass; lint: zero errors, 10 warnings; build and whitespace checks pass. See the development log for precise coverage and limits.
 
 This does not complete responsiveness for the rest of the app. Next: LessonPicker, SavedWords, ReviewWords, Library and Profile. Physical devices, Safari, staging/Vercel preview and hosted Supabase verification remain outstanding. `main` and deployment were not changed.
+
+## Follow-up: lessons and word collections
+
+LessonPicker, SavedWords and ReviewWords now use the same blue visual direction and class-based layout. Lesson overview/modules adapt from a phone stack to a desktop course column, and vocabulary rows show readable readings/meanings with audio controls. Saved/Review have consistent word cards, search, true counts and explicit empty states.
+
+Review displays the real queue; opening Saved does not seed demo bookmarks. Existing bookmarks remain. Saved practice uses its own actual records through the responsive session, and selected-level practice cannot silently substitute another level. Course completion samples remain visibly labelled; the unsupported offline badge was removed. Seven Node tests cover the row adapter, session-source/level isolation and search. No dependencies, assets, hosted configuration or Auth lifecycle changed.
+
+Verification: **64 tests pass**, lint **0 errors / 10 warnings**, production build/whitespace checks pass. Chromium production checks covered 49 language/screen/width/empty/long-text combinations with no horizontal or measured text overflow. Search, audio-button state, saved practice/preservation/keyboard removal/reload, review completion, legacy level links and empty higher levels were exercised. See the development log for exact coverage. The existing vocabulary gesture checks are separate from these new Node tests.
+
+Next UI checkpoints: Library and Profile. Safari/physical-device, Vercel staging and hosted Supabase verification remain pending. `main` and deployment are unchanged.
