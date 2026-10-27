@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, BookOpen, ChevronRight, Layers } from 'lucide-react';
+import { ArrowRight, ArrowLeft, ChevronRight, Layers } from 'lucide-react';
 import { useCourse } from '../../lib/language';
 
 export default function LevelCarousel() {
@@ -47,7 +47,7 @@ export default function LevelCarousel() {
           <div className="course-progress-track" aria-hidden="true"><span style={{ width: `${percent}%` }} /></div>
         </div>
         <div className="course-card-actions">
-          <button className="course-study-button" onClick={() => navigate(`/learn/level/${level.id}`)}><BookOpen size={18} aria-hidden="true" /> Open level <ArrowRight size={17} aria-hidden="true" /></button>
+          <button className="course-study-button" onClick={() => navigate(`/learn/level/${level.id}`)}>Open level <ArrowRight size={17} aria-hidden="true" /></button>
           <button className="course-all-button" onClick={() => navigate('/learn')}>All levels <ChevronRight size={17} aria-hidden="true" /></button>
         </div>
       </article>

@@ -40,3 +40,9 @@ Production build tested with headless Chromium 153 through Playwright, using a c
 PT should review Home on the staging-configured laptop and agree on the visual direction before we refine the remaining screens. Course/session/review/library/profile/settings page-specific layouts are subsequent checkpoints; loading those routes here is a smoke check, not a full redesign or full feature test.
 
 No Auth lifecycle, hosted schema, security policies, environment credentials, content source files, or payment integrations were changed. Existing other languages/levels and helper routes remain present in the source; this checkpoint does not expand the agreed HSK 1 / N5 delivery scope. Physical iPhone/iPad/Android, Safari/Firefox, hosted authenticated UI, and complete accessibility audits were not tested in this environment.
+
+## Follow-up: compact featured level card
+
+PT requested a smaller HSK flashcard widget. Reduced card padding, body spacing, title size and decorative card art. Primary/secondary actions remain readable and at least 44px high; desktop actions no longer stretch across the entire card. The redundant leading icon on Open level was removed so both actions fit on one row at 320px.
+
+Production Chromium measurements after the change: card heights approximately 276px at 320px, 282px at 375px, 298px at 768px, 290px at 1024px, and 300px at 1440px. Home/main horizontal overflow and page errors remain zero. Selected-level navigation, Japanese switching, existing-route smoke checks and the long multilingual-name check still pass. Build, lint (zero errors / 12 existing warnings), and whitespace checks pass. The 57-test suite result above belongs to the preceding checkpoint; it was not rerun for this presentation-only adjustment.

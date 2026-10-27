@@ -203,3 +203,10 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
 - Validation: 57 tests passed; lint zero errors / 12 existing warnings; build passed; whitespace clean. Existing large bundle warning remains. The previous Home ineffective dynamic-import warning is resolved.
 - Full scope, evidence and remaining screen refinements: `docs/ui-checkpoint.md`. This is the Home/shared-frame checkpoint, not completion of all responsive page refinements.
 - Delivery uses the existing Git-bundle workflow because the integration write endpoint previously returned 403. No production merge or deployment was performed.
+
+## 28 October 2026 — Compact featured flashcard widget
+
+- Following PT's feedback, reduced Home's featured HSK/JLPT card height by trimming padding, vertical spacing, heading size and decorative art. Desktop actions are compact; phone actions retain 44px minimum height and fit side by side at 320px.
+- Production browser checks: no Home/main overflow at 320/375/768/1024/1440; card heights approximately 276/282/298/290/300px. Navigation, language switching, route smoke checks and long-name layout still pass; zero page errors.
+- Build, lint (zero errors, 12 existing warnings), and whitespace checks passed. No Auth/data behavior changed and no new unit tests were added or run for this styling adjustment.
+- The replacement transfer bundle includes both this follow-up and the initial responsive Home checkpoint, based on `f319d91`.
