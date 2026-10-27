@@ -1,15 +1,24 @@
 import { Outlet, useLocation } from 'react-router-dom';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import BottomNav from './BottomNav';
 
 export default function Layout() {
   const location = useLocation();
   const mainRef = useRef(null);
 
+  const readScrollCache = () => {
+    try {
+      const cache = JSON.parse(sessionStorage.getItem('scrollCache') || '{}');
+      return cache && typeof cache === 'object' && !Array.isArray(cache) ? cache : {};
+    } catch {
+      return {};
+    }
+  };
+
   // Restore scroll position when route changes (synchronously before paint to prevent flicker)
   useLayoutEffect(() => {
     if (mainRef.current) {
-      const cache = JSON.parse(sessionStorage.getItem('scrollCache') || '{}');
+      const cache = readScrollCache();
       const savedPos = cache[location.pathname] || 0;
       mainRef.current.scrollTo(0, savedPos);
     }
@@ -18,25 +27,31 @@ export default function Layout() {
   // Track scroll position
   const handleScroll = () => {
     if (mainRef.current) {
-      const cache = JSON.parse(sessionStorage.getItem('scrollCache') || '{}');
+      const cache = readScrollCache();
       cache[location.pathname] = mainRef.current.scrollTop;
-      sessionStorage.setItem('scrollCache', JSON.stringify(cache));
+      try {
+        sessionStorage.setItem('scrollCache', JSON.stringify(cache));
+      } catch {
+        // Scrolling still works when browser storage is unavailable.
+      }
     }
   };
 
   const isSessionActive = location.pathname.endsWith('/session');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%' }}>
+    <div className={`app-shell${isSessionActive ? ' app-shell--session' : ''}`}>
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      {!isSessionActive && <BottomNav />}
       <main 
+        id="main-content"
+        tabIndex={-1}
         ref={mainRef} 
         onScroll={handleScroll}
-        className="slim-scrollbar" 
-        style={{ flex: 1, overflowY: 'auto', paddingBottom: isSessionActive ? '0' : '70px' }}
+        className="app-main slim-scrollbar"
       >
         <Outlet />
       </main>
-      {!isSessionActive && <BottomNav />}
     </div>
   );
 }

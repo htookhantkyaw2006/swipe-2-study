@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, Check, X } from 'lucide-react';
 import { useLanguage } from '../../lib/language';
+import LanguageFlag from './LanguageFlag';
 
 /* ---------------------------------------------------------------
    LANGUAGE SWITCHER
@@ -70,7 +71,7 @@ export function LanguageSheet({ onClose }) {
                   transition: 'border-color 0.2s, background-color 0.2s'
                 }}
               >
-                <span style={{ fontSize: '2rem', lineHeight: 1, flexShrink: 0 }}>{lang.flag}</span>
+                <LanguageFlag id={lang.id} size={32} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>{lang.name}</span>
@@ -127,7 +128,7 @@ export default function LanguageSwitcher() {
         onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.08)'; }}
         onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)'; }}
       >
-        <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{language.flag}</span>
+        <LanguageFlag id={language.id} size={22} />
         <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-navy)' }}>{language.name}</span>
         <ChevronDown size={16} color="var(--color-secondary-blue)" strokeWidth={2.5} />
       </button>

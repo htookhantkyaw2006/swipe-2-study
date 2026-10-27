@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLanguage } from '../lib/language';
 import App from '../App';
+import LanguageFlag from './ui/LanguageFlag';
 
 /* ---------------------------------------------------------------
    COURSE SHELL
@@ -48,7 +49,7 @@ function SwitchSplash({ language }) {
           fontSize: '3rem', lineHeight: 1, marginBottom: '8px'
         }}
       >
-        {language.flag}
+        <LanguageFlag id={language.id} size={52} />
       </motion.div>
       <motion.div
         initial={{ y: 8, opacity: 0 }}

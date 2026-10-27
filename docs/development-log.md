@@ -192,3 +192,14 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
 - `npm run build` and `git diff --check`: passed. Existing bundle/dynamic-import and Vite test-server port warnings remain.
 - These are SDK simulations, not a real browser or hosted email callback test. A fresh signup/confirmation in the same browser profile at exactly `http://127.0.0.1:5173` remains to be tested by PT. Real hosted RLS isolation is still pending.
 - No hosted configuration, dependencies, account data, or production deployment changed. Integration write access remains blocked by the previously observed 403, so this checkpoint is transferred by Git bundle.
+
+## 28 October 2026 — Home refinement and responsive frame
+
+- Retained the client's existing blue palette while refining Home, course-card art, shortcuts, typography and shadows.
+- Replaced the 500px app-wide constraint with a responsive shared frame: desktop sidebar at 1024px+, floating navigation below that, focused sessions without main navigation.
+- Home uses device review/saved counts and labels existing level completion as sample progress. Opening a selected level preserves its route ID.
+- Added self-hosted licensed variable fonts for English/readings, Burmese, Chinese and Japanese, with Unicode-subset loading and course-specific CJK preference; added vector language flags. Font packages are pinned and documented in `public/fonts/README.md`.
+- Production browser checks passed at Home widths 320/375/768/1024/1440, plus selected-level navigation, language switching, keyboard skip link, long multilingual names, and smoke checks on eight existing routes at phone/desktop widths. Browser page errors: zero. Physical devices and live hosted Auth were not retested here.
+- Validation: 57 tests passed; lint zero errors / 12 existing warnings; build passed; whitespace clean. Existing large bundle warning remains. The previous Home ineffective dynamic-import warning is resolved.
+- Full scope, evidence and remaining screen refinements: `docs/ui-checkpoint.md`. This is the Home/shared-frame checkpoint, not completion of all responsive page refinements.
+- Delivery uses the existing Git-bundle workflow because the integration write endpoint previously returned 403. No production merge or deployment was performed.
