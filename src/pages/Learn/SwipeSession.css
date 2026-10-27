@@ -1,0 +1,123 @@
+/* Focused study surface: content stays readable at a capped size on desktop,
+   and short screens scroll instead of cropping the card or its controls. */
+.swipe-session {
+  min-height: 100%;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  isolation: isolate;
+  overflow-x: clip;
+}
+.swipe-session__header {
+  width: min(100%, 760px);
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.swipe-session__icon, .swipe-audio {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  color: var(--color-primary-blue);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 0.16s, transform 0.16s;
+}
+.swipe-session__heading { text-align: center; min-width: 0; }
+.swipe-session__eyebrow { font-size: 0.75rem; color: var(--color-primary-blue); font-weight: 600; }
+.swipe-session__heading h1 { font-size: clamp(1rem, 2.5vw, 1.375rem); line-height: 1.4; color: var(--color-text-navy); overflow-wrap: anywhere; }
+.swipe-session__progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+.swipe-session__progress progress { flex: 1; min-width: 0; width: 100%; height: 6px; border: 0; border-radius: 99px; overflow: hidden; background: var(--color-ghost-blue); appearance: none; }
+.swipe-session__progress progress::-webkit-progress-bar { background: var(--color-ghost-blue); border-radius: 99px; }
+.swipe-session__progress progress::-webkit-progress-value { background: var(--color-primary-blue); border-radius: 99px; transition: width 0.2s; }
+.swipe-session__progress progress::-moz-progress-bar { background: var(--color-primary-blue); border-radius: 99px; }
+.swipe-session__progress span { flex-shrink: 0; font-size: 0.75rem; font-weight: 600; color: var(--color-primary-blue); font-variant-numeric: tabular-nums; }
+.swipe-session__stage {
+  position: relative;
+  width: min(100%, 600px);
+  flex: 1;
+  min-height: 300px;
+  max-height: 480px;
+  margin-block: auto;
+}
+.swipe-card {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(calc(100% - 16px), 400px);
+  height: 100%;
+  border-radius: 24px;
+  perspective: 1200px;
+}
+.swipe-card--active { cursor: grab; touch-action: pan-y; }
+.swipe-card--active:active { cursor: grabbing; }
+.swipe-card__turn { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; }
+.swipe-card__face { position: absolute; inset: 0; width: 100%; height: 100%; border: 1px solid var(--color-border); box-shadow: var(--shadow-raised); backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 24px; }
+.swipe-card__front { transform: rotateY(0deg); display: flex; flex-direction: column; padding: 20px; }
+.swipe-card__back { transform: rotateY(180deg); overflow: hidden; }
+.swipe-card__topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.swipe-card__level { display: inline-block; max-width: calc(100% - 56px); padding: 5px 12px; border-radius: 8px; background: var(--color-ghost-blue); font-family: var(--font-mono); font-weight: 600; font-size: 0.75rem; line-height: 1.5; overflow-wrap: anywhere; }
+.swipe-audio { background: var(--color-text-navy); color: white; border: 0; border-radius: 50%; box-shadow: none; }
+.swipe-card__word { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; container-type: inline-size; text-align: center; padding-block: 12px; }
+.swipe-card__character { max-width: 100%; font-size: var(--word-size, 4rem); font-weight: 750; line-height: 1.3; color: var(--color-text-navy); white-space: nowrap; }
+.swipe-card__kana { font-size: 1.125rem; line-height: 1.7; font-weight: 600; color: var(--color-primary-blue); overflow-wrap: anywhere; margin-top: 6px; }
+.swipe-card__reading { font-family: var(--font-reading); font-size: 1rem; line-height: 1.7; color: var(--color-primary-blue); overflow-wrap: anywhere; margin-top: 6px; }
+.swipe-card__tap { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--color-primary-blue); font-size: 0.8125rem; line-height: 1.5; flex-shrink: 0; }
+.swipe-card__tap--hidden { visibility: hidden; }
+.swipe-card__answer { height: 100%; overflow-y: auto; overscroll-behavior-y: contain; padding: 20px; cursor: auto; }
+.swipe-card__answer:focus-visible { outline-offset: -5px; }
+.swipe-card__meaning { container-type: inline-size; text-align: center; margin-top: 8px; }
+.swipe-card__definitions { border-top: 1px solid var(--color-border); margin-top: 16px; padding-top: 16px; overflow-wrap: anywhere; }
+.swipe-card__english { font-size: 1.25rem; line-height: 1.5; font-weight: 600; }
+.swipe-card__burmese { margin-top: 8px; font-size: 1.0625rem; line-height: 1.9; color: var(--color-primary-blue); }
+.swipe-card__examples { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+.swipe-card__examples h3 { color: var(--color-text-navy); font-size: 0.875rem; font-weight: 650; }
+.swipe-example { padding: 14px; border-radius: 14px; background: var(--color-page-bg); font-size: 1rem; line-height: 1.7; overflow-wrap: anywhere; }
+.swipe-example > p { margin-top: 6px; }
+.swipe-example__topline { display: flex; align-items: flex-start; gap: 8px; }
+.swipe-example__text { flex: 1; min-width: 0; font-weight: 600; }
+.swipe-audio--example { background: white; border: 1px solid var(--color-border); color: var(--color-primary-blue); }
+.swipe-example__reading { font-family: var(--font-reading); color: var(--color-primary-blue); font-size: 0.9375rem; }
+.swipe-example__burmese { color: var(--color-primary-blue); line-height: 1.9; }
+.swipe-session__footer { width: min(100%, 440px); flex-shrink: 0; }
+.swipe-session__actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.swipe-action { min-height: 72px; padding: 10px 4px; border: 1px solid var(--color-border); border-radius: 18px; background: white; box-shadow: var(--shadow-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--color-text-navy); font-size: 0.8125rem; font-weight: 650; transition: background-color 0.16s, transform 0.16s; }
+.swipe-action--review svg { color: #B91C1C; }
+.swipe-action--learned svg { color: #15803D; }
+.swipe-action--flip { background: var(--color-text-navy); color: white; border-color: var(--color-text-navy); }
+.swipe-session__hint { text-align: center; font-size: 0.75rem; color: var(--color-primary-blue); line-height: 1.5; margin-top: 12px; }
+.swipe-session button:disabled { opacity: 0.5; cursor: default; }
+.swipe-session button:active:not(:disabled) { transform: scale(0.96); }
+.swipe-shuffle { position: absolute; inset: 0; pointer-events: none; }
+.swipe-shuffle__card { background: white; border: 1px solid var(--color-border); box-shadow: var(--shadow-soft); }
+.swipe-session--empty { justify-content: center; }
+.swipe-empty { width: min(100%, 440px); padding: 32px 20px; border: 1px solid var(--color-border); border-radius: 24px; background: white; box-shadow: var(--shadow-soft); text-align: center; }
+.swipe-empty > svg { color: var(--color-primary-blue); margin-bottom: 16px; }
+.swipe-empty h1 { color: var(--color-text-navy); font-size: 1.5rem; margin-bottom: 8px; }
+.swipe-empty p { color: var(--color-primary-blue); margin-bottom: 24px; }
+@media (hover: hover) {
+  .swipe-session__icon:hover:not(:disabled), .swipe-action:not(.swipe-action--flip):hover:not(:disabled), .swipe-audio--example:hover { background: var(--color-ghost-blue); }
+  .swipe-action--flip:hover:not(:disabled), .swipe-audio:not(.swipe-audio--example):hover { background: var(--color-primary-blue); }
+}
+@media (min-width: 640px) {
+  .swipe-session { padding: max(24px, env(safe-area-inset-top, 0px)) max(32px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(32px, env(safe-area-inset-left, 0px)); gap: 24px; }
+  .swipe-card__front, .swipe-card__answer { padding: 24px; }
+  .swipe-card__reading { font-size: 1.125rem; }
+  .swipe-action { min-height: 78px; font-size: 0.875rem; }
+}
+@media (max-height: 640px) {
+  .swipe-session { gap: 12px; }
+  .swipe-session__hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .swipe-session *, .swipe-session *::before, .swipe-session *::after { transition: none !important; }
+}

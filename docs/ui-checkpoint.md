@@ -46,3 +46,11 @@ No Auth lifecycle, hosted schema, security policies, environment credentials, co
 PT requested a smaller HSK flashcard widget. Reduced card padding, body spacing, title size and decorative card art. Primary/secondary actions remain readable and at least 44px high; desktop actions no longer stretch across the entire card. The redundant leading icon on Open level was removed so both actions fit on one row at 320px.
 
 Production Chromium measurements after the change: card heights approximately 276px at 320px, 282px at 375px, 298px at 768px, 290px at 1024px, and 300px at 1440px. Home/main horizontal overflow and page errors remain zero. Selected-level navigation, Japanese switching, existing-route smoke checks and the long multilingual-name check still pass. Build, lint (zero errors / 12 existing warnings), and whitespace checks pass. The 57-test suite result above belongs to the preceding checkpoint; it was not rerun for this presentation-only adjustment.
+
+## Follow-up: vocabulary SwipeSession
+
+The page-specific responsive pass now includes `/learn/session` and `/learn/review/session`. It retains the original blue palette, introduces class-based layout, readable answer/example typography, a capped 400×480px desktop card, flexible phone sizing, scrollable answers, safe-area padding and short-screen scrolling. Reveal/Show word provides a keyboard alternative to tapping the card; motion reduction and inactive-face accessibility are handled in the session.
+
+Production Chromium checks at 320/375/768/1024/1440px, plus 667×375 landscape, passed without horizontal overflow. Japanese/English at phone and desktop widths, long words and multilingual answers were also inspected. Desktop mouse drag and emulated-phone touch drag advance cards; review insertion/removal, shuffle, keyboard reveal and display preferences pass. Local guest mode works without backend credentials. Tests: 57 pass; lint: zero errors, 10 warnings; build and whitespace checks pass. See the development log for precise coverage and limits.
+
+This does not complete responsiveness for the rest of the app. Next: LessonPicker, SavedWords, ReviewWords, Library and Profile. Physical devices, Safari, staging/Vercel preview and hosted Supabase verification remain outstanding. `main` and deployment were not changed.

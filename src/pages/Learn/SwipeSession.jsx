@@ -1,324 +1,169 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePresence } from 'framer-motion';
-import { ChevronLeft, Check, X, Hand, Shuffle, Volume2 } from 'lucide-react';
-import ProgressBar from '../../components/ui/ProgressBar';
+import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePresence, useReducedMotion } from 'framer-motion';
+import { ChevronLeft, Check, X, Hand, Shuffle, Volume2, RotateCw } from 'lucide-react';
 import { db } from '../../lib/db';
 import { speak } from '../../lib/speech';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
 import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
+import './SwipeSession.css';
 
-const ShuffleDeck = () => {
-  const baseCardStyle = {
-    position: 'absolute',
-    width: '75%', maxWidth: '340px', maxHeight: '70vh', aspectRatio: '2/3',
-    left: 0, right: 0, top: 0, bottom: 0, margin: 'auto',
-    borderRadius: '24px',
-    backgroundColor: '#FFFFFF',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-    border: '1px solid #E0F2FE',
-  };
+const ShuffleDeck = ({ reducedMotion }) => (
+  <div className="swipe-shuffle" aria-hidden="true">
+    {[-1, 0, 1].map((direction) => (
+      <motion.div
+        key={direction}
+        className="swipe-card swipe-shuffle__card"
+        animate={reducedMotion ? {} : { x: [0, direction * 18, 0], rotate: [0, direction * 7, 0] }}
+        transition={{ duration: 0.45, ease: 'easeInOut' }}
+      />
+    ))}
+  </div>
+);
 
-  return (
-    <div style={{ position: 'absolute', width: '100%', height: '100%', zIndex: 5, pointerEvents: 'none' }}>
-      <motion.div
-        style={baseCardStyle}
-        animate={{ y: [0, 0, 10, 0] }}
-        transition={{ duration: 0.5, times: [0, 0.3, 0.5, 1], ease: ["linear", "easeOut", [0.34, 1.56, 0.64, 1]] }}
-      />
-      <motion.div
-        style={baseCardStyle}
-        animate={{ x: [0, 0, 20, 0], rotate: [0, 0, 8, 0] }}
-        transition={{ duration: 0.5, times: [0, 0.2, 0.5, 1], ease: ["linear", "easeOut", [0.34, 1.56, 0.64, 1]] }}
-      />
-      <motion.div
-        style={baseCardStyle}
-        animate={{ x: [0, 0, -20, 0], rotate: [0, 0, -8, 0] }}
-        transition={{ duration: 0.5, times: [0, 0.1, 0.5, 1], ease: ["linear", "easeOut", [0.34, 1.56, 0.64, 1]] }}
-      />
-    </div>
-  );
-};
-
-const Flashcard = ({ card, isActive, isRight, onSwipe, exitData, flipped, setFlipped, hasFlippedOnce, setHasFlippedOnce, shuffleState, dragOffset }) => {
+const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, hasFlippedOnce, setHasFlippedOnce, dragOffset, reducedMotion, locked }) => {
   const { prefs } = usePreferences();
   const course = useCourse();
   const [isPresent] = usePresence();
-
-  // Translation language (English / Burmese / Both) had no reader; it
-  // takes effect here, alongside Show Burmese. A card is never left with
-  // no meaning at all if the two settings contradict each other.
   const wantEnglish = prefs.translationLanguage !== 'burmese';
   const wantBurmese = prefs.translationLanguage !== 'english' && prefs.showBurmese;
   const showEnglish = wantEnglish || !wantBurmese;
-  const showBurmese = wantBurmese;
+  const cardRef = useRef(null);
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-300, 300], [-15, 15]);
+  const rotate = useTransform(x, [-200, 200], reducedMotion ? [0, 0] : [-10, 10]);
   const backgroundColor = useTransform(x, [-100, 0, 100], ['#FEE2E2', '#FFFFFF', '#DCFCE7']);
-  
-  const glowShadow = useTransform(x, [-200, 0, 200], [
-    '0 4px 32px rgba(239, 68, 68, 0.5)',
-    '0 4px 16px rgba(3, 105, 161, 0.1)',
-    '0 4px 32px rgba(34, 197, 94, 0.5)'
-  ]);
+  const nextScale = useTransform(dragOffset, [0, 100], [0.96, 1]);
+  const nextOpacity = useTransform(dragOffset, [0, 100], [0.5, 1]);
 
   useEffect(() => {
-    if (isActive && isPresent) {
-      return x.on('change', (latest) => {
-        dragOffset.set(Math.abs(latest));
-      });
-    }
+    if (isActive && isPresent) return x.on('change', (latest) => dragOffset.set(Math.abs(latest)));
   }, [isActive, isPresent, x, dragOffset]);
 
-  const nextScale = useTransform(dragOffset, [0, window.innerWidth * 0.3], [0.95, 1]);
-  const nextOpacity = useTransform(dragOffset, [0, window.innerWidth * 0.3], [0.5, 1]);
-
-  const handleDragEnd = (event, info) => {
-    const threshold = window.innerWidth * 0.1;
-    const velocityThreshold = 800;
-    if (info.offset.x > threshold || info.velocity.x > velocityThreshold) {
-      onSwipe('right', info.velocity.x, card);
-    } else if (info.offset.x < -threshold || info.velocity.x < -velocityThreshold) {
-      onSwipe('left', info.velocity.x, card);
-    }
+  const handleDragEnd = (_event, info) => {
+    // A desktop window should not make a small card harder to swipe.
+    const width = cardRef.current?.offsetWidth ?? 320;
+    const threshold = Math.min(100, Math.max(36, width * 0.22));
+    if (info.offset.x > threshold || info.velocity.x > 800) onSwipe('right', card);
+    else if (info.offset.x < -threshold || info.velocity.x < -800) onSwipe('left', card);
   };
 
-  if (!card) return null;
-
-  // The front content (Question Side)
-  const frontContent = (
-    <motion.div 
-      animate={shuffleState === 'revealing' ? {
-        boxShadow: [
-          '0 8px 32px rgba(12, 74, 110, 0.08), 0 0 0 1px #BAE6FD',
-          '0 8px 32px rgba(12, 74, 110, 0.08), 0 0 0 2px #38BDF8',
-          '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)'
-        ]
-      } : {
-        boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)'
-      }}
-      transition={{ duration: 0.2 }}
-      style={{
-        position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(0deg)',
-        display: 'flex', flexDirection: 'column', padding: '24px', 
-        backgroundColor: isActive ? backgroundColor : '#FFFFFF',
-        borderRadius: '24px'
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-        <div style={{
-          backgroundColor: '#0C4A6E', color: '#FFFFFF', padding: '4px 12px',
-          borderRadius: '100px', fontSize: '0.75rem', fontWeight: 600,
-          fontFamily: 'JetBrains Mono, monospace'
-        }}>
-          {card.level || course.levels[0].name}
-        </div>
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            speak(sayOf(card));
-          }}
-          style={{
-            width: '36px', height: '36px', borderRadius: '50%',
-            backgroundColor: '#0C4A6E', color: '#FFFFFF',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: 'none', cursor: 'pointer', transition: 'transform 0.1s, box-shadow 0.2s',
-            boxShadow: '0 4px 12px rgba(12, 74, 110, 0.3)'
-          }}
-          onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.9)'}
-          onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          <Volume2 size={20} />
-        </button>
-      </div>
-      
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: '-20px', alignSelf: 'stretch', containerType: 'inline-size' }}>
-        <h1 style={{ fontSize: fitFontCss(card.character, 72), margin: 0, color: '#0C4A6E', fontWeight: 800, textAlign: 'center', lineHeight: 1.1, whiteSpace: 'nowrap' }}>{card.character}</h1>
-        {kanaOf(card) && <p style={{ fontSize: '22px', color: '#0284C7', fontWeight: 600, margin: '8px 0 0 0' }}>{kanaOf(card)}</p>}
-        {prefs.showPinyin && <p style={{ fontSize: '20px', color: '#38BDF8', fontFamily: 'var(--font-reading)', margin: '8px 0 0 0' }}>{card.pronunciation}</p>}
-      </div>
-
-      <div style={{ 
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-        color: '#BAE6FD', fontSize: '14px', fontWeight: 500,
-        opacity: hasFlippedOnce ? 0 : 1, transition: 'opacity 0.3s'
-      }}>
-        <Hand size={16} />
-        Tap to reveal
-      </div>
-    </motion.div>
-  );
-
-  // The back content (Answer Side)
-  const backContent = (
-    <motion.div style={{
-      position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
-      WebkitBackfaceVisibility: 'hidden',
-      transform: 'rotateY(180deg)', 
-      backgroundColor: isActive ? backgroundColor : '#FFFFFF', 
-      borderRadius: '24px', 
-      boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)', overflow: 'hidden'
-    }}>
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, containerType: 'inline-size' }}>
-          <h2 style={{ fontSize: fitFontCss(card.character, 48), color: '#0C4A6E', fontWeight: 700, margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>{card.character}</h2>
-          {kanaOf(card) && <p style={{ fontSize: '18px', color: '#0284C7', fontWeight: 600, margin: '6px 0 0 0' }}>{kanaOf(card)}</p>}
-          {prefs.showPinyin && <p style={{ fontSize: '18px', color: '#38BDF8', fontFamily: 'var(--font-reading)', margin: '4px 0 16px 0' }}>{card.pronunciation}</p>}
-          
-          <div style={{ width: '100%', height: '1px', backgroundColor: '#BAE6FD', marginBottom: '16px', margin: '0 24px 16px 24px' }}></div>
-          
-          {showEnglish && <p style={{ fontSize: '22px', color: '#0C4A6E', fontWeight: 600, margin: '0 0 4px 0', textAlign: 'center' }}>{card.definition}</p>}
-          {showBurmese && <p style={{ fontSize: '18px', color: '#0284C7', fontWeight: 400, margin: 0, textAlign: 'center' }}>{card.burmese_definition}</p>}
-        </div>
-
-        {card.examples && card.examples.length > 0 && (
-          <div style={{ padding: '0 24px 24px 24px', flexShrink: 0 }}>
-            <h3 style={{ fontSize: '14px', color: '#38BDF8', fontWeight: 500, margin: '0 0 12px 0' }}>Examples</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {card.examples.map((ex, idx) => (
-                <div key={idx} style={{ backgroundColor: '#F0F9FF', borderRadius: '12px', padding: '16px', paddingRight: '56px', display: 'flex', flexDirection: 'column', gap: '4px', position: 'relative' }}>
-                  <button
-                    // The card is draggable and flips on click, so the tap must
-                    // not reach it: stop the pointer before a drag can start,
-                    // and the click before it flips the card.
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); speak(sayOf(ex)); }}
-                    title="Play sentence"
-                    aria-label={`Play sentence: ${textOf(ex)}`}
-                    style={{
-                      position: 'absolute', top: '10px', right: '10px',
-                      width: '34px', height: '34px', borderRadius: '50%',
-                      backgroundColor: '#FFFFFF', color: 'var(--color-primary-blue)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: 'none', cursor: 'pointer', padding: 0,
-                      boxShadow: '0 2px 6px rgba(3, 105, 161, 0.15)',
-                      transition: 'background-color 0.2s, color 0.2s'
-                    }}
-                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#E0F2FE'; e.currentTarget.style.color = '#0284C7'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = 'var(--color-primary-blue)'; }}
-                  >
-                    <Volume2 size={16} strokeWidth={2.5} />
-                  </button>
-                  <p style={{ fontSize: '16px', color: '#0C4A6E', fontWeight: 500, margin: 0 }}>{textOf(ex)}</p>
-                  {/* Each line only when it exists: an English sentence has no
-                      romanisation and no English translation. */}
-                  {prefs.showPinyin && readingOf(ex) && <p style={{ fontSize: '14px', color: '#38BDF8', fontFamily: 'var(--font-reading)', margin: 0 }}>{readingOf(ex)}</p>}
-                  {showEnglish && ex.english && <p style={{ fontSize: '14px', color: '#0C4A6E', fontWeight: 400, margin: 0 }}>{ex.english}</p>}
-                  {showBurmese && ex.burmese && <p style={{ fontSize: '14px', color: '#0284C7', fontWeight: 400, margin: 0 }}>{ex.burmese}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </motion.div>
-  );
-
-  const variants = {
-    enter: { scale: 0.95, opacity: 0.4 },
-    center: { 
-      x: 0, scale: 1, opacity: 1, zIndex: 10, 
-      transition: { duration: 0.4, ease: "easeOut" } 
-    },
-    exit: ({ direction, velocity }) => {
-      const v = Math.abs(velocity);
-      const calculatedDuration = v > 0 ? Math.min(Math.max((window.innerWidth * 0.8) / v, 0.2), 0.85) : 0.4;
-      return {
-        x: direction === 'right' ? window.innerWidth + 100 : -window.innerWidth - 100,
-        opacity: 1,
-        scale: 1,
-        transition: { duration: calculatedDuration, ease: "easeOut" }
-      };
-    }
+  const toggleFlipped = () => {
+    if (!isActive || !isPresent || locked) return;
+    setFlipped(!flipped);
+    setHasFlippedOnce(true);
   };
-
-  let motionProps = {};
-  if (isActive) {
-    if (shuffleState === 'shuffling') {
-      motionProps = {
-        initial: { opacity: 0, scale: 0.95 },
-        animate: { opacity: 0, scale: 0.95 },
-        style: { zIndex: 10, pointerEvents: 'none' }
-      };
-    } else if (shuffleState === 'revealing') {
-      motionProps = {
-        initial: { opacity: 0, scale: 0.95 },
-        animate: { opacity: 1, scale: 1 },
-        transition: { opacity: { duration: 0.3, ease: "easeIn" }, scale: { duration: 0.3, ease: "easeOut" } },
-        style: { zIndex: 10, pointerEvents: 'none' }
-      };
-    } else {
-      motionProps = {
-        custom: exitData,
-        variants: variants,
-        initial: "enter",
-        animate: "center",
-        exit: "exit",
-        style: {
-          x, rotate, zIndex: 10,
-          boxShadow: glowShadow,
-          cursor: 'grab'
-        },
-        drag: "x",
-        dragConstraints: { left: 0, right: 0 },
-        dragElastic: 0.7, // Add a bit more snap back
-        onDragEnd: handleDragEnd,
-        whileTap: { cursor: 'grabbing' }
-      };
-    }
-  } else if (isRight) {
-    motionProps = {
-      initial: { scale: 0.95, opacity: 0 },
-      animate: { opacity: nextOpacity, scale: nextScale },
-      transition: { duration: 0.4, ease: "easeOut" },
-      style: {
-        x: 0,
-        zIndex: 1, pointerEvents: 'none'
-      }
-    };
-  }
+  const playWord = (event) => {
+    event.stopPropagation();
+    speak(sayOf(card));
+  };
+  const pronunciation = card.pronunciation ?? readingOf(card);
 
   return (
     <motion.div
-      {...motionProps}
-      style={{
-        position: 'absolute',
-        width: '75%',
-        maxWidth: '340px',
-        maxHeight: '70vh',
-        aspectRatio: '2/3',
-        left: 0, right: 0, top: 0, bottom: 0, margin: 'auto',
-        borderRadius: '20px',
-        perspective: '1000px',
-        ...motionProps.style
+      ref={cardRef}
+      className={`swipe-card${isActive ? ' swipe-card--active' : ''}`}
+      role="group"
+      aria-label={isActive ? 'Current flashcard' : undefined}
+      aria-hidden={!isActive || !isPresent}
+      inert={!isActive || !isPresent}
+      custom={exitData}
+      variants={{
+        enter: { scale: reducedMotion ? 1 : 0.96, opacity: 0 },
+        center: { x: 0, scale: 1, opacity: 1 },
+        exit: ({ direction }) => ({ x: reducedMotion ? 0 : (direction === 'right' ? 560 : -560), opacity: 0 }),
       }}
-      onClick={() => {
-        if (isActive) {
-          setFlipped(!flipped);
-          if (!hasFlippedOnce) setHasFlippedOnce(true);
-        }
-      }}
+      initial="enter"
+      animate={isActive ? 'center' : { scale: nextScale, opacity: nextOpacity }}
+      exit="exit"
+      transition={{ duration: reducedMotion ? 0 : 0.22, ease: 'easeOut' }}
+      style={isActive ? { x, rotate, zIndex: 10 } : { zIndex: 1 }}
+      drag={isActive && isPresent && !locked ? 'x' : false}
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.7}
+      onDragEnd={handleDragEnd}
+      onClick={toggleFlipped}
     >
       <motion.div
+        className="swipe-card__turn"
         initial={false}
         animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ duration: 0.4, ease: "easeInOut" }}
-        style={{
-          width: '100%', height: '100%', position: 'relative',
-          transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d'
-        }}
+        transition={{ duration: reducedMotion ? 0 : 0.3, ease: 'easeInOut' }}
       >
-        {frontContent}
-        {backContent}
+        <motion.div
+          className="swipe-card__face swipe-card__front"
+          style={{ backgroundColor: isActive ? backgroundColor : '#FFFFFF' }}
+          aria-hidden={flipped}
+          inert={flipped}
+        >
+          <div className="swipe-card__topline">
+            <span className="swipe-card__level">{card.level || course.levels[0].name}</span>
+            <button className="swipe-audio" onPointerDown={(e) => e.stopPropagation()} onClick={playWord} aria-label="Play word">
+              <Volume2 size={20} aria-hidden="true" />
+            </button>
+          </div>
+          <div className="swipe-card__word">
+            <h2 className="swipe-card__character" style={{ '--word-size': fitFontCss(card.character, 76) }}>{card.character}</h2>
+            {kanaOf(card) && <p className="swipe-card__kana" lang="ja">{kanaOf(card)}</p>}
+            {prefs.showPinyin && pronunciation && <p className="swipe-card__reading">{pronunciation}</p>}
+          </div>
+          <p className={`swipe-card__tap${hasFlippedOnce ? ' swipe-card__tap--hidden' : ''}`}>
+            <Hand size={16} aria-hidden="true" /> Tap to reveal
+          </p>
+        </motion.div>
+
+        <motion.div
+          className="swipe-card__face swipe-card__back"
+          style={{ backgroundColor: isActive ? backgroundColor : '#FFFFFF' }}
+          aria-hidden={!flipped}
+          inert={!flipped}
+        >
+          <div className="swipe-card__answer slim-scrollbar" role="region" aria-label="Answer and examples" tabIndex={isActive && flipped ? 0 : -1}>
+            <div className="swipe-card__topline">
+              <span className="swipe-card__level">{card.level || course.levels[0].name}</span>
+              <button className="swipe-audio" onPointerDown={(e) => e.stopPropagation()} onClick={playWord} aria-label="Play word">
+                <Volume2 size={20} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="swipe-card__meaning">
+              <h2 className="swipe-card__character" style={{ '--word-size': fitFontCss(card.character, 48) }}>{card.character}</h2>
+              {kanaOf(card) && <p className="swipe-card__kana" lang="ja">{kanaOf(card)}</p>}
+              {prefs.showPinyin && pronunciation && <p className="swipe-card__reading">{pronunciation}</p>}
+              <div className="swipe-card__definitions">
+                {showEnglish && <p className="swipe-card__english" lang="en">{card.definition}</p>}
+                {wantBurmese && <p className="swipe-card__burmese" lang="my">{card.burmese_definition}</p>}
+              </div>
+            </div>
+            {card.examples?.length > 0 && (
+              <section className="swipe-card__examples" aria-label="Examples">
+                <h3>Examples</h3>
+                {card.examples.map((ex, idx) => (
+                  <div key={idx} className="swipe-example">
+                    <div className="swipe-example__topline">
+                      <p className="swipe-example__text">{textOf(ex)}</p>
+                      <button
+                        className="swipe-audio swipe-audio--example"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); speak(sayOf(ex)); }}
+                        aria-label={`Play sentence: ${textOf(ex)}`}
+                      >
+                        <Volume2 size={18} aria-hidden="true" />
+                      </button>
+                    </div>
+                    {prefs.showPinyin && readingOf(ex) && <p className="swipe-example__reading">{readingOf(ex)}</p>}
+                    {showEnglish && ex.english && <p lang="en">{ex.english}</p>}
+                    {wantBurmese && ex.burmese && <p className="swipe-example__burmese" lang="my">{ex.burmese}</p>}
+                  </div>
+                ))}
+              </section>
+            )}
+          </div>
+        </motion.div>
       </motion.div>
     </motion.div>
   );
 };
 
-/* Fisher–Yates: a .sort(() => Math.random() - 0.5) shuffle is biased. */
 const shuffleCards = (list) => {
   const copy = [...list];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -331,235 +176,126 @@ const shuffleCards = (list) => {
 export default function SwipeSession({ isReview = false }) {
   const navigate = useNavigate();
   const course = useCourse();
-  const [cards, setCards] = useState([]);
+  const { prefs } = usePreferences();
+  const reducedMotion = useReducedMotion();
+  // A session snapshots its deck; preferences cannot replace cards mid-session.
+  const [cards, setCards] = useState(() => {
+    if (isReview) return db.get('review_cards');
+    const allCards = db.get('flashcards');
+    return (prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards).slice(0, prefs.cardsPerSession);
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
-  const [sessionScore, setSessionScore] = useState({ correct: 0, review: 0 });
-  const [exitData, setExitData] = useState({ direction: 'right', velocity: 0 });
-  const [shuffleState, setShuffleState] = useState('idle');
-  
+  const [exitData, setExitData] = useState({ direction: 'right' });
+  const [shuffleState, setShuffleState] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const actionLocked = useRef(false);
+  const timers = useRef([]);
   const dragOffset = useMotionValue(0);
+  const after = (callback, delay) => timers.current.push(setTimeout(callback, delay));
 
-  const { prefs } = usePreferences();
-
-  useEffect(() => {
-    if (isReview) {
-      setCards(db.get('review_cards') || []);
-    } else {
-      // Card order and Cards per session were settings with nothing
-      // reading them; this is where they take effect.
-      const allCards = db.get('flashcards');
-      const ordered = prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards;
-      setCards(ordered.slice(0, prefs.cardsPerSession));
-    }
-    // Deliberately once per session: changing settings mid-session must
-    // not reshuffle the deck under the learner.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReview]);
-
-  // Auto-play: speak each card as it comes to the front.
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
   useEffect(() => {
     const card = cards[currentIndex];
     if (card && prefs.autoPlayAudio) speak(sayOf(card));
   }, [cards, currentIndex, prefs.autoPlayAudio]);
 
-  const triggerSwipe = (direction, velocity = 0, swipedCard = null) => {
-    setExitData({ direction, velocity });
-    
-    if (direction === 'right') {
-      setSessionScore(s => ({ ...s, correct: s.correct + 1 }));
-      if (isReview && swipedCard) {
-        const reviewCards = db.get('review_cards') || [];
-        db.set('review_cards', reviewCards.filter(c => c.id !== swipedCard.id));
-      }
-    } else {
-      setSessionScore(s => ({ ...s, review: s.review + 1 }));
-      if (!isReview && swipedCard) {
-        const reviewCards = db.get('review_cards') || [];
-        if (!reviewCards.find(c => c.id === swipedCard.id)) {
-          db.set('review_cards', [...reviewCards, swipedCard]);
-        }
-      }
+  const triggerSwipe = (direction, swipedCard = cards[currentIndex]) => {
+    if (actionLocked.current || !swipedCard) return;
+    actionLocked.current = true;
+    setAdvancing(true);
+    setExitData({ direction });
+    if (direction === 'right' && isReview) {
+      db.set('review_cards', db.get('review_cards').filter(c => c.id !== swipedCard.id));
+    } else if (direction === 'left' && !isReview) {
+      const reviewCards = db.get('review_cards');
+      if (!reviewCards.some(c => c.id === swipedCard.id)) db.set('review_cards', [...reviewCards, swipedCard]);
     }
-    
     setFlipped(false);
     setHasFlippedOnce(false);
-    
     if (currentIndex < cards.length - 1) {
-      setCurrentIndex(curr => curr + 1);
-      animate(dragOffset, 0, { duration: 0.4, ease: "easeOut" });
+      setCurrentIndex(index => index + 1);
+      animate(dragOffset, 0, { duration: reducedMotion ? 0 : 0.22 });
+      after(() => { actionLocked.current = false; setAdvancing(false); }, reducedMotion ? 0 : 240);
     } else {
-      setTimeout(() => navigate('/learn/level/1'), 400); 
+      after(() => navigate('/learn/level/1'), reducedMotion ? 0 : 240);
     }
   };
 
   const handleShuffle = () => {
-    if (shuffleState !== 'idle') return;
-    const remainingCards = cards.slice(currentIndex);
-    if (remainingCards.length <= 1) return;
-    
-    if (navigator.vibrate) navigator.vibrate(50);
-    setShuffleState('shuffling');
-
-    setTimeout(() => {
-      const shuffled = [...remainingCards].sort(() => Math.random() - 0.5);
-      const newCards = [...cards.slice(0, currentIndex), ...shuffled];
-      setCards(newCards);
+    if (actionLocked.current || cards.length - currentIndex <= 1) return;
+    actionLocked.current = true;
+    setShuffleState(true);
+    if (!reducedMotion && navigator.vibrate) navigator.vibrate(50);
+    after(() => {
+      setCards(previous => [...previous.slice(0, currentIndex), ...shuffleCards(previous.slice(currentIndex))]);
       setFlipped(false);
       setHasFlippedOnce(false);
-    }, 250);
-
-    setTimeout(() => {
-      setShuffleState('revealing');
-    }, 500);
-
-    setTimeout(() => {
-      setShuffleState('idle');
-    }, 700);
+      dragOffset.set(0);
+      setShuffleState(false);
+      actionLocked.current = false;
+    }, reducedMotion ? 0 : 450);
   };
 
-  if (cards.length === 0) {
-      return (
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: 'var(--color-page-bg)', alignItems: 'center', justifyContent: 'center' }}>
-          <h2 style={{ color: 'var(--color-text-navy)', marginBottom: '16px' }}>{isReview ? 'All caught up!' : 'Loading...'}</h2>
-          {isReview && <p style={{ color: 'var(--color-secondary-blue)' }}>You have no cards to review right now.</p>}
-          <button onClick={() => navigate(-1)} style={{ marginTop: '24px', padding: '12px 24px', backgroundColor: 'var(--color-primary-blue)', color: '#FFF', borderRadius: '12px', border: 'none', fontWeight: 'bold' }}>Go Back</button>
-        </div>
-      );
-  }
+  if (cards.length === 0) return (
+    <div className="swipe-session swipe-session--empty">
+      <div className="swipe-empty">
+        <Check size={32} aria-hidden="true" />
+        <h1>{isReview ? 'All caught up!' : 'No cards yet'}</h1>
+        <p>{isReview ? 'You have no cards to review right now.' : 'Choose a course to start learning.'}</p>
+        <button className="btn-primary" onClick={() => navigate(isReview ? '/learn/review' : '/learn')}>Back to {isReview ? 'review' : 'courses'}</button>
+      </div>
+    </div>
+  );
 
   const visibleCards = cards.slice(currentIndex, currentIndex + 2);
-
+  const locked = advancing || shuffleState;
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: 'var(--color-page-bg)' }}>
-      <header className="flex items-center justify-between" style={{ marginBottom: '32px', zIndex: 10 }}>
-        <button 
-          onClick={() => navigate(-1)} 
-          style={{ 
-            width: '40px', height: '40px', borderRadius: '50%', 
-            backgroundColor: '#FFFFFF', color: '#0369A1', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-            border: 'none', cursor: 'pointer'
-          }}
-        >
-          <ChevronLeft size={24} strokeWidth={2.5} />
-        </button>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 16px' }}>
-          <h2 style={{ fontSize: '1.25rem', margin: '0 0 12px 0', textAlign: 'center', color: 'var(--color-text-navy)', fontWeight: 800 }}>
-            {isReview ? 'Review Session' : (cards[0]?.lesson_name ?? course.copy.lessonName)}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '200px' }}>
-            <ProgressBar current={currentIndex} total={cards.length} color="var(--color-sky-accent)" />
-            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-primary-blue)' }}>
-              {currentIndex}/{cards.length}
-            </span>
-          </div>
+    <div className="swipe-session">
+      <header className="swipe-session__header">
+        <button className="swipe-session__icon" onClick={() => navigate(-1)} aria-label="Leave session"><ChevronLeft size={22} aria-hidden="true" /></button>
+        <div className="swipe-session__heading">
+          <p className="swipe-session__eyebrow">{isReview ? 'Your review' : 'Flashcard practice'}</p>
+          <h1>{isReview ? 'Review Session' : (cards[0]?.lesson_name ?? course.copy.lessonName)}</h1>
         </div>
-        <div style={{ width: '40px' }}></div>
+        <button className="swipe-session__icon" onClick={handleShuffle} disabled={locked || cards.length - currentIndex <= 1} aria-label="Shuffle remaining cards" title="Shuffle remaining cards"><Shuffle size={20} aria-hidden="true" /></button>
+        <div className="swipe-session__progress">
+          <progress value={currentIndex} max={cards.length} aria-label="Session progress" />
+          <span role="status">{currentIndex}/{cards.length} completed</span>
+        </div>
       </header>
 
-      <div style={{ flex: 1, position: 'relative', width: '100%', marginBottom: '24px' }}>
-        
-        {shuffleState !== 'idle' && <ShuffleDeck />}
-
-        {/* Active Cards handled via AnimatePresence */}
+      <div className="swipe-session__stage" aria-busy={shuffleState}>
+        {shuffleState && <ShuffleDeck reducedMotion={reducedMotion} />}
         <AnimatePresence custom={exitData}>
-          {shuffleState === 'idle' && visibleCards.map((card, idx) => {
-            const isTop = card.id === cards[currentIndex]?.id;
-            const isRight = card.id === cards[currentIndex + 1]?.id;
-
-            return (
-              <Flashcard 
-                key={card.id}
-                card={card}
-                isActive={isTop}
-                isRight={isRight}
-                flipped={isTop ? flipped : false}
-                setFlipped={setFlipped}
-                hasFlippedOnce={isTop ? hasFlippedOnce : false}
-                setHasFlippedOnce={setHasFlippedOnce}
-                onSwipe={triggerSwipe}
-                exitData={exitData}
-                shuffleState={shuffleState}
-                dragOffset={dragOffset}
-              />
-            );
-          })}
+          {!shuffleState && visibleCards.map((card, idx) => (
+            <Flashcard
+              key={card.id}
+              card={card}
+              isActive={idx === 0}
+              flipped={idx === 0 && flipped}
+              setFlipped={setFlipped}
+              hasFlippedOnce={idx === 0 && hasFlippedOnce}
+              setHasFlippedOnce={setHasFlippedOnce}
+              onSwipe={triggerSwipe}
+              exitData={exitData}
+              dragOffset={dragOffset}
+              reducedMotion={reducedMotion}
+              locked={locked}
+            />
+          ))}
         </AnimatePresence>
-
       </div>
 
-      <div className="flex justify-between items-start" style={{ padding: '0 24px 24px 24px', zIndex: 10 }}>
-        
-        {/* Left Button */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <button 
-            onClick={() => triggerSwipe('left', 0, cards[currentIndex])}
-            style={{ 
-              width: '64px', height: '64px', borderRadius: '50%', 
-              backgroundColor: '#FFFFFF', color: '#EF4444',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 24px rgba(239, 68, 68, 0.15), 0 2px 8px rgba(239, 68, 68, 0.05)',
-              border: 'none', cursor: 'pointer', transition: 'transform 0.1s'
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.92)'}
-            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            <X size={28} strokeWidth={3} />
-          </button>
-          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-navy)' }}>Review</span>
+      <footer className="swipe-session__footer">
+        <div className="swipe-session__actions">
+          <button className="swipe-action swipe-action--review" onClick={() => triggerSwipe('left')} disabled={locked} aria-label="Review this word later"><X size={24} aria-hidden="true" /><span>Review</span></button>
+          <button className="swipe-action swipe-action--flip" onClick={() => { setFlipped(!flipped); setHasFlippedOnce(true); }} disabled={locked} aria-label={flipped ? 'Show word' : 'Reveal answer'}><RotateCw size={21} aria-hidden="true" /><span>{flipped ? 'Show word' : 'Reveal'}</span></button>
+          <button className="swipe-action swipe-action--learned" onClick={() => triggerSwipe('right')} disabled={locked} aria-label="Mark this word learned"><Check size={26} aria-hidden="true" /><span>Learned</span></button>
         </div>
-
-        {/* Center Button (Shuffle) */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <motion.button 
-            onClick={handleShuffle}
-            disabled={shuffleState !== 'idle'}
-            animate={shuffleState === 'shuffling' ? { backgroundColor: ['#FFFFFF', '#E0F2FE', '#FFFFFF'] } : {}}
-            transition={{ duration: 0.15, times: [0, 0.5, 1] }}
-            style={{ 
-              padding: '12px 24px', borderRadius: '16px', 
-              backgroundColor: '#FFFFFF', color: '#0C4A6E',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              border: '0.5px solid #BAE6FD',
-              cursor: shuffleState !== 'idle' ? 'default' : 'pointer',
-              opacity: shuffleState !== 'idle' ? 0.8 : 1
-            }}
-          >
-            <motion.div
-               animate={shuffleState !== 'idle' ? { rotate: 180 } : { rotate: 0 }}
-               transition={{ duration: 0.4, ease: "easeInOut" }}
-            >
-              <Shuffle size={18} strokeWidth={2.5} color="#0369A1" />
-            </motion.div>
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>Shuffle</span>
-          </motion.button>
-        </div>
-
-        {/* Right Button */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <button 
-            onClick={() => triggerSwipe('right', 0, cards[currentIndex])}
-            style={{ 
-              width: '64px', height: '64px', borderRadius: '50%', 
-              backgroundColor: '#FFFFFF', color: '#22C55E',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 24px rgba(34, 197, 94, 0.15), 0 2px 8px rgba(34, 197, 94, 0.05)',
-              border: 'none', cursor: 'pointer', transition: 'transform 0.1s'
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.92)'}
-            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            <Check size={32} strokeWidth={3} />
-          </button>
-          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-navy)' }}>Learned</span>
-        </div>
-
-      </div>
+        <p className="swipe-session__hint">Swipe left to review · right for learned</p>
+      </footer>
     </div>
   );
 }

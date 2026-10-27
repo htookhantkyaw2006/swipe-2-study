@@ -9,9 +9,9 @@ export default function Learn() {
     <Routes>
       <Route index element={<LevelPicker />} />
       <Route path="level/:levelId" element={<LessonPicker />} />
-      <Route path="session" element={<SwipeSession />} />
+      <Route path="session" element={<SwipeSession key="learn-session" />} />
       <Route path="review" element={<ReviewWords />} />
-      <Route path="review/session" element={<SwipeSession isReview={true} />} />
+      <Route path="review/session" element={<SwipeSession key="review-session" isReview={true} />} />
     </Routes>
   );
 }
