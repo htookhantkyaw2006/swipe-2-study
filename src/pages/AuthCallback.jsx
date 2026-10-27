@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/useAuth.js';
 import { safeReturnPath } from '../lib/safeReturnPath.js';
+import { getAuthCallbackState } from '../lib/authCallbackState.js';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 /* ---------------------------------------------------------------
@@ -12,31 +13,6 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
    Does NOT redirect on an arbitrary timer; only navigates after the user
    is genuinely verified by the Auth coordinator.
    --------------------------------------------------------------- */
-
-function parseCallbackError(search, hash) {
-  const searchParams = new URLSearchParams(search);
-  const hashString = hash?.startsWith('#') ? hash.slice(1) : (hash || '');
-  const hashParams = new URLSearchParams(hashString);
-
-  const errorCode = searchParams.get('error_code') || hashParams.get('error_code');
-  const errorParam = searchParams.get('error') || hashParams.get('error');
-  const errorDesc = searchParams.get('error_description') || hashParams.get('error_description');
-
-  if (errorCode || errorParam || errorDesc) {
-    if (errorCode === 'otp_expired' || errorParam === 'otp_expired') {
-      return 'The verification link has expired. Please request a new verification email.';
-    }
-    if (errorCode === 'access_denied' && !errorDesc) {
-      return 'Verification was denied. The link may have expired or already been used.';
-    }
-    if (errorDesc) {
-      return decodeURIComponent(errorDesc.replace(/\+/g, ' '));
-    }
-    return errorParam || 'Verification failed. The link may be invalid or already used.';
-  }
-
-  return null;
-}
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -50,44 +26,33 @@ export default function AuthCallback() {
     return safeReturnPath(searchParams.get('returnTo'));
   }, [location.search]);
 
-  // 1. Check for explicit error parameters in the URL query or hash
-  const urlError = useMemo(() => {
-    return parseCallbackError(location.search, location.hash);
-  }, [location.search, location.hash]);
-
-  // 2. Check for missing code/tokens when there is no active session
-  const missingCodeError = useMemo(() => {
-    if (urlError || user || authLoading || isTransitioning) return null;
-    const searchParams = new URLSearchParams(location.search);
-    const hashString = location.hash?.startsWith('#') ? location.hash.slice(1) : (location.hash || '');
-    const hasCode = searchParams.has('code');
-    const hasAccessToken = new URLSearchParams(hashString).has('access_token');
-    if (!hasCode && !hasAccessToken) {
-      return 'No verification code was found. Please open the link from your email or sign in directly.';
-    }
-    return null;
-  }, [urlError, user, authLoading, isTransitioning, location.search, location.hash]);
+  const { error: displayError, canNavigate } = getAuthCallbackState({
+    search: location.search,
+    hash: location.hash,
+    user,
+    loading: authLoading,
+    isTransitioning,
+    authError,
+    timedOut,
+  });
 
   // 3. Timeout handler: if verification neither finishes nor errors after 10s
   useEffect(() => {
-    if (user || urlError || missingCodeError || authError) return;
+    if (user || displayError) return;
 
     const timer = setTimeout(() => {
       setTimedOut(true);
     }, 10000);
 
     return () => clearTimeout(timer);
-  }, [user, urlError, missingCodeError, authError]);
+  }, [user, displayError]);
 
   // 4. Success navigation: ONLY navigate after user is verified and transition completes
   useEffect(() => {
-    if (user && !isTransitioning) {
+    if (canNavigate) {
       navigate(returnTo, { replace: true });
     }
-  }, [user, isTransitioning, navigate, returnTo]);
-
-  // Aggregate the effective error, if any
-  const displayError = urlError || missingCodeError || authError || (timedOut ? 'Verification is taking longer than expected. The link may be expired or already used.' : null);
+  }, [canNavigate, navigate, returnTo]);
 
   return (
     <div className="auth-page">

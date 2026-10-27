@@ -150,3 +150,26 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
 - Automated tests mock client responses and simulate component mounting; live browser session cookie/token exchange with hosted Supabase Auth still requires manual verification.
 - Email deliverability with custom SMTP and live link clicking in client email clients remain unverified by local scripts.
 - Multi-user RLS data isolation between two live authenticated accounts still requires hosted verification.
+
+## 28 October 2026 — Email verification callback recovery
+
+### Changes
+- Callback error state now blocks success navigation, including when an existing user is already signed in. Loading, account transitions, Auth failures, and callback timeout also block success navigation.
+- Extracted callback parsing and navigation decisions into `src/lib/authCallbackState.js`. Query/hash descriptions are decoded once by `URLSearchParams`; literal percent signs and plus signs no longer crash or change the message. Error-code-only links remain errors, and empty code/token values are treated as missing.
+- The verification page now has an editable, required email field. Recovery from an expired callback works without an email in the URL; signup-supplied addresses remain prefilled. Resend submits the trimmed address through the existing Supabase SDK flow, preserving the safe return path. No email is inferred from a token or another account.
+- Added nine regression tests for callback error precedence and navigation decisions, malformed/percent/plus descriptions, pending states, and server-rendered callback/resend views.
+
+### Verification
+- `npm test`: **51 passed, 0 failed** (42 existing plus nine new tests).
+- `npm run lint`: **0 errors**, 14 existing warnings.
+- `npm run build`: passed; existing bundle-size and ineffective dynamic-import warnings remain (JS approximately 982 kB, 278 kB gzip).
+- `git diff --check`: passed.
+- Tests use production callback decision functions and server rendering. `renderToString` does not mount browser effects or exercise interactive form submission; it is not a browser lifecycle test. The suite also emits an existing Vite test-server port warning but completes successfully.
+
+### Still to verify on staging
+- Real email delivery, resend submission/rate limits, and a fresh confirmation link in the same browser that started the PKCE flow.
+- Error recovery in a real browser, including opening an expired link while already signed in.
+- Hosted multi-user RLS isolation remains unverified. No hosted schema, environment secrets, dependencies, or production deployment were changed in this checkpoint.
+
+### Transfer status
+- The connected account reports repository push permission, but publishing through the GitHub integration's create-tree endpoint returned HTTP 403 (`Resource not accessible by integration`). The remote branch was not updated. A verified Git bundle is supplied for importing this commit on PT's already-authenticated laptop and pushing normally.

@@ -11,15 +11,17 @@ export default function VerifyEmail() {
   const { isConfigured } = useAuth();
 
   const params = new URLSearchParams(location.search);
-  const email = params.get('email') || '';
+  const [email, setEmail] = useState(params.get('email') || '');
   const returnTo = safeReturnPath(params.get('returnTo'));
 
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState(null);
   const [resendError, setResendError] = useState(null);
 
-  const handleResend = async () => {
-    if (resending || !email) return;
+  const handleResend = async (event) => {
+    event.preventDefault();
+    const trimmedEmail = email.trim();
+    if (resending || !trimmedEmail) return;
     setResending(true);
     setResendMsg(null);
     setResendError(null);
@@ -27,7 +29,7 @@ export default function VerifyEmail() {
     try {
       const { error } = await getSupabaseClient().auth.resend({
         type: 'signup',
-        email,
+        email: trimmedEmail,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`,
         },
@@ -78,19 +80,8 @@ export default function VerifyEmail() {
           </div>
           <h1 className="auth-title">Check your email</h1>
           <p className="auth-subtitle">
-            We sent a verification link to
+            Open the verification link from your inbox, or enter your account email below to request a new one.
           </p>
-          {email && (
-            <p style={{
-              fontWeight: 700,
-              color: 'var(--color-text-navy)',
-              fontSize: '0.95rem',
-              wordBreak: 'break-all',
-              marginTop: '4px'
-            }}>
-              {email}
-            </p>
-          )}
           <p className="auth-subtitle" style={{ marginTop: '12px' }}>
             Click the link in the email to verify your account. Check your spam folder if you don't see it.
           </p>
@@ -103,15 +94,38 @@ export default function VerifyEmail() {
           <div className="auth-success" role="status">{resendMsg}</div>
         )}
 
-        <button
-          type="button"
-          className="btn-secondary auth-submit"
-          onClick={handleResend}
-          disabled={resending || !email}
-        >
-          <RefreshCw size={16} style={{ marginRight: 8, opacity: resending ? 0.5 : 1 }} />
-          {resending ? 'Resending…' : 'Resend verification email'}
-        </button>
+        <form onSubmit={handleResend} className="auth-form">
+          <div className="auth-field">
+            <label htmlFor="verification-email" className="auth-label">Account email</label>
+            <div className="auth-input-wrap">
+              <Mail size={18} className="auth-input-icon" />
+              <input
+                id="verification-email"
+                name="email"
+                type="email"
+                className="auth-input"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={event => {
+                  setEmail(event.target.value);
+                  setResendMsg(null);
+                  setResendError(null);
+                }}
+                required
+                disabled={resending}
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            className="btn-secondary auth-submit"
+            disabled={resending || !email.trim()}
+          >
+            <RefreshCw size={16} style={{ marginRight: 8, opacity: resending ? 0.5 : 1 }} />
+            {resending ? 'Resending…' : 'Resend verification email'}
+          </button>
+        </form>
 
         <div className="auth-footer" style={{ marginTop: '20px' }}>
           <p>
