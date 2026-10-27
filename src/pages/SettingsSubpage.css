@@ -1,0 +1,7 @@
+.settings-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; max-width: 1100px; }
+.settings-page > .study-header { margin-bottom: 0; }
+.settings-notice { padding: 14px 18px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-ghost-blue); color: var(--color-text-navy); font-size: 0.9375rem; line-height: 1.7; font-weight: 600; overflow-wrap: anywhere; }
+@media (min-width: 1280px) { .settings-page { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } .settings-page > .study-header, .settings-notice { grid-column: 1 / -1; } }
+
+.settings-language-value { display: inline-flex; align-items: center; gap: 8px; }
+.settings-language-value svg { flex-shrink: 0; }

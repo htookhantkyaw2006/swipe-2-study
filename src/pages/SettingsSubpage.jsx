@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Target, Languages, Shuffle, Layers, Volume2, Gauge, Mic,
+  Target, Languages, Shuffle, Layers, Volume2, Gauge, Mic,
   Type, Bell, Flame, Trash2, Download, RotateCcw, HardDrive,
   FileText, ShieldCheck, Star, MessageSquare, Info, BookOpen
 } from 'lucide-react';
@@ -14,6 +13,9 @@ import { useLanguage, useCourse } from '../lib/language';
 import { COURSES } from '../courses';
 import { db } from '../lib/db';
 import { storageOwner } from '../lib/storageOwner.js';
+import { StudyHeader } from '../components/study/StudyPage';
+import './SettingsSubpage.css';
+import LanguageFlag from '../components/ui/LanguageFlag';
 
 const GRADIENTS = {
   blue: 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)',
@@ -55,7 +57,6 @@ const formatBytes = (bytes) => {
 };
 
 export default function SettingsSubpage() {
-  const navigate = useNavigate();
   const { prefs, setPref, resetPrefs } = usePreferences();
   const { language } = useLanguage();
   const course = useCourse();
@@ -124,25 +125,12 @@ export default function SettingsSubpage() {
     setPref('accentByLanguage', { ...(prefs.accentByLanguage || {}), [course.id]: value });
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: '100px' }}>
+    <div className="study-page settings-page">
 
-      {/* Header */}
-      <header className="flex items-center justify-center relative" style={{ marginBottom: '0px' }}>
-        <button
-          onClick={() => navigate('/profile')}
-          style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
-        >
-          <ArrowLeft size={24} color="var(--color-text-navy)" />
-        </button>
-        <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>Settings</h1>
-      </header>
+      <StudyHeader title="Settings" subtitle={`${course.name} · Learning preferences`} backTo="/profile" backLabel="Back to profile" />
 
       {notice && (
-        <div style={{
-          padding: '14px 18px', borderRadius: '16px', backgroundColor: 'var(--color-ghost-blue)',
-          color: 'var(--color-text-navy)', fontWeight: 600, fontSize: '0.9rem',
-          border: '1px solid var(--color-border)'
-        }}>
+        <div className="settings-notice" role="status">
           {notice}
         </div>
       )}
@@ -153,7 +141,7 @@ export default function SettingsSubpage() {
           icon={Languages} iconGradient={GRADIENTS.blue}
           title="Learning language"
           subtitle={`${language.levelSystem} levels`}
-          value={`${language.flag} ${language.name}`}
+          value={<span className="settings-language-value"><LanguageFlag id={language.id} size={22} /><span>{language.name}</span></span>}
           onClick={() => setSheet('language')}
         />
         <SettingsRow
@@ -204,7 +192,7 @@ export default function SettingsSubpage() {
         <SettingsRow
           icon={Type} iconGradient={GRADIENTS.slate}
           title="Text size"
-          subtitle="Needs the app's fixed sizes made scalable first"
+          subtitle="Adjust the reading size"
           comingSoon
           isLast={!course.script.hasScriptVariants}
         />
@@ -212,7 +200,7 @@ export default function SettingsSubpage() {
           <SettingsRow
             icon={Languages} iconGradient={GRADIENTS.orange}
             title="Simplified / Traditional"
-            subtitle="Requires a traditional character dataset"
+            subtitle="Choose your preferred character style"
             comingSoon
             isLast
           />
@@ -249,13 +237,13 @@ export default function SettingsSubpage() {
         <SettingsRow
           icon={Bell} iconGradient={GRADIENTS.blue}
           title="Daily reminder"
-          subtitle="Needs push notifications, not available on web yet"
+          subtitle="A reminder for your daily practice"
           comingSoon
         />
         <SettingsRow
           icon={Flame} iconGradient={GRADIENTS.orange}
           title="Streak warning"
-          subtitle="Needs push notifications, not available on web yet"
+          subtitle="A nudge to keep your study streak"
           comingSoon
           isLast
         />
@@ -297,10 +285,10 @@ export default function SettingsSubpage() {
       {/* ---------------- About ---------------- */}
       <SettingsGroup title="About">
         <SettingsRow icon={Info} iconGradient={GRADIENTS.blue} title="Version" value="0.1.0" />
-        <SettingsRow icon={MessageSquare} iconGradient={GRADIENTS.teal} title="Send feedback" onClick={() => flash('Feedback form is not connected yet.')} />
-        <SettingsRow icon={Star} iconGradient={GRADIENTS.orange} title="Rate the app" onClick={() => flash('Available once the app is published.')} />
-        <SettingsRow icon={ShieldCheck} iconGradient={GRADIENTS.green} title="Privacy policy" onClick={() => flash('Privacy policy is not written yet.')} />
-        <SettingsRow icon={FileText} iconGradient={GRADIENTS.slate} title="Terms of service" onClick={() => flash('Terms are not written yet.')} isLast />
+        <SettingsRow icon={MessageSquare} iconGradient={GRADIENTS.teal} title="Send feedback" comingSoon />
+        <SettingsRow icon={Star} iconGradient={GRADIENTS.orange} title="Rate the app" comingSoon />
+        <SettingsRow icon={ShieldCheck} iconGradient={GRADIENTS.green} title="Privacy policy" comingSoon />
+        <SettingsRow icon={FileText} iconGradient={GRADIENTS.slate} title="Terms of service" comingSoon isLast />
       </SettingsGroup>
 
       {/* Sheets */}

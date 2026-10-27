@@ -1,174 +1,69 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { ChevronRight, Check, X } from 'lucide-react';
+import './SettingsControls.css';
 
-/* ---------------------------------------------------------------
-   SETTINGS CONTROLS
-   ---------------------------------------------------------------
-   Shared row primitives for the Settings and Profile pages so the
-   two surfaces stay visually identical.
-   --------------------------------------------------------------- */
-
-export const ToggleSwitch = ({ checked, onChange, disabled }) => (
-  <div
-    onClick={() => { if (!disabled && onChange) onChange(!checked); }}
+export const ToggleSwitch = ({ checked, onChange, disabled, label }) => (
+  <button
+    type="button"
+    className="settings-switch"
     role="switch"
+    aria-label={label}
     aria-checked={checked}
-    aria-disabled={disabled || undefined}
-    style={{
-      width: '52px', height: '28px', borderRadius: '14px', flexShrink: 0,
-      backgroundColor: checked ? '#10B981' : '#E0F2FE',
-      position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer',
-      transition: 'background-color 0.3s',
-      opacity: disabled ? 0.5 : 1,
-      boxShadow: checked ? 'inset 0 2px 4px rgba(0,0,0,0.1)' : 'inset 0 2px 4px rgba(3, 105, 161, 0.1)'
-    }}
-  >
-    <div style={{
-      width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#FFFFFF',
-      position: 'absolute', top: '2px', left: checked ? '26px' : '2px',
-      transition: 'left 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-    }} />
-  </div>
+    disabled={disabled}
+    onClick={() => onChange?.(!checked)}
+  />
 );
 
-/** A card that groups related rows under a heading. */
 export const SettingsGroup = ({ title, children }) => (
-  <div>
-    <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 16px 0' }}>
-      {title}
-    </h2>
-    <div className="surface-card" style={{ padding: 0, borderRadius: '24px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-      {children}
-    </div>
-  </div>
+  <section className="settings-group" aria-label={title}>
+    <h2>{title}</h2>
+    <div className="settings-group__surface">{children}</div>
+  </section>
 );
 
-/* One row. `control` is rendered on the right; when `onClick` is set the
-   whole row is tappable. `comingSoon` dims it and blocks interaction. */
-export const SettingsRow = ({
-  icon: Icon, iconGradient, title, subtitle, value, control,
-  onClick, comingSoon, danger, isLast
-}) => {
+export const SettingsRow = ({ icon: Icon, iconGradient, title, subtitle, value, control, onClick, comingSoon, danger, isLast }) => {
   const interactive = Boolean(onClick) && !comingSoon;
-
+  const Tag = interactive ? 'button' : 'div';
   return (
-    <div
+    <Tag
+      type={interactive ? 'button' : undefined}
       onClick={interactive ? onClick : undefined}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: '12px', padding: '18px 20px',
-        borderBottom: isLast ? 'none' : '1px solid var(--color-border)',
-        cursor: interactive ? 'pointer' : 'default',
-        opacity: comingSoon ? 0.55 : 1,
-        transition: 'background-color 0.2s'
-      }}
-      onMouseOver={(e) => { if (interactive) e.currentTarget.style.backgroundColor = 'var(--color-ghost-blue)'; }}
-      onMouseOut={(e) => { if (interactive) e.currentTarget.style.backgroundColor = 'transparent'; }}
+      className={`settings-row${value && !comingSoon ? ' settings-row--value' : ''}${!Icon ? ' settings-row--no-icon' : ''}${danger ? ' settings-row--danger' : ''}${isLast ? ' settings-row--last' : ''}`}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: 0 }}>
-        {Icon && (
-          <div style={{
-            width: '40px', height: '40px', flexShrink: 0, borderRadius: '12px',
-            background: iconGradient || 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 10px rgba(3, 105, 161, 0.25)'
-          }}>
-            <Icon size={20} color="#FFFFFF" strokeWidth={2.5} />
-          </div>
-        )}
-        <div style={{ minWidth: 0 }}>
-          <h3 style={{
-            fontSize: '1rem', fontWeight: 700, margin: 0,
-            color: danger ? '#EF4444' : 'var(--color-text-navy)'
-          }}>
-            {title}
-          </h3>
-          {subtitle && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--color-secondary-blue)', margin: '2px 0 0 0' }}>
-              {subtitle}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-        {comingSoon && (
-          <span style={{
-            fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-            color: 'var(--color-secondary-blue)', backgroundColor: 'var(--color-ghost-blue)',
-            padding: '4px 8px', borderRadius: '999px', whiteSpace: 'nowrap'
-          }}>
-            Soon
-          </span>
-        )}
-        {value && !comingSoon && (
-          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-secondary-blue)' }}>
-            {value}
-          </span>
-        )}
-        {control}
-        {interactive && !control && <ChevronRight size={20} color="var(--color-secondary-blue)" style={{ opacity: 0.5 }} />}
-      </div>
-    </div>
+      {Icon && <span className="settings-row__icon" style={{ '--settings-icon-background': iconGradient }}><Icon size={20} aria-hidden="true" /></span>}
+      <span className="settings-row__copy"><span className="settings-row__title">{title}</span>{subtitle && <span className="settings-row__subtitle">{subtitle}</span>}</span>
+      <span className="settings-row__end">
+        {comingSoon ? <span className="settings-row__soon">Soon</span> : value && <span className="settings-row__value">{value}</span>}
+        {React.isValidElement(control) ? React.cloneElement(control, { label: title }) : control}
+        {interactive && !control && <ChevronRight size={20} aria-hidden="true" />}
+      </span>
+    </Tag>
   );
 };
 
-/* Bottom sheet option picker — matches the language and radical sheets. */
-export const OptionSheet = ({ title, options, selected, onSelect, onClose }) => (
-  <div
-    onClick={onClose}
-    style={{
-      position: 'fixed', inset: 0, zIndex: 100,
-      backgroundColor: 'rgba(12, 74, 110, 0.4)',
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-    }}
-  >
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="surface-card"
-      style={{
-        width: '100%', maxWidth: '520px', borderRadius: '28px 28px 0 0',
-        padding: '24px', maxHeight: '80vh', overflowY: 'auto'
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>{title}</h3>
-        <button onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}>
-          <X size={22} color="var(--color-secondary-blue)" />
-        </button>
-      </div>
+export const OptionSheet = ({ title, options, selected, onSelect, onClose }) => {
+  const dialogRef = useRef(null);
+  const titleId = useId();
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const opener = document.activeElement;
+    dialog.showModal();
+    return () => { dialog.close(); if (opener?.isConnected) opener.focus(); };
+  }, []);
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {options.map((opt) => {
-          const active = opt.value === selected;
-          return (
-            <button
-              key={String(opt.value)}
-              onClick={() => { onSelect(opt.value); onClose(); }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '16px', borderRadius: '16px', width: '100%', textAlign: 'left',
-                border: active ? '2px solid var(--color-primary-blue)' : '1px solid var(--color-border)',
-                backgroundColor: active ? 'var(--color-ghost-blue)' : '#FFFFFF',
-                cursor: 'pointer', fontSize: '1rem', fontWeight: 700,
-                color: 'var(--color-text-navy)'
-              }}
-            >
-              {opt.label}
-              {active && (
-                <div style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: 'var(--color-primary-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Check size={15} color="#FFFFFF" strokeWidth={3} />
-                </div>
-              )}
-            </button>
-          );
-        })}
+  return (
+    <dialog ref={dialogRef} className="settings-dialog" aria-labelledby={titleId} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="settings-dialog__content">
+        <header><h2 id={titleId}>{title}</h2><button type="button" className="settings-dialog__close" onClick={onClose} aria-label="Close"><X size={22} aria-hidden="true" /></button></header>
+        <div className="settings-dialog__options">{options.map(option => {
+          const active = option.value === selected;
+          return <button type="button" key={String(option.value)} aria-pressed={active} onClick={() => { onSelect(option.value); onClose(); }}><span>{option.label}</span>{active && <Check size={20} aria-hidden="true" />}</button>;
+        })}</div>
       </div>
-    </div>
-  </div>
-);
+    </dialog>
+  );
+};
 
-/** Small hook for rows that open an OptionSheet. */
 export const useOptionSheet = () => {
   const [openKey, setOpenKey] = useState(null);
   return { openKey, open: setOpenKey, close: () => setOpenKey(null) };

@@ -31,8 +31,11 @@ GitHub check links:
 
 The preview origin is extracted from the check's Vercel feedback link, not a
 guessed hostname. The external fetch surface could not open the deployment or
-preview/login pages; this does not establish whether access protection or missing
-backend configuration is present. Next, inspect `/login` on that exact origin.
+preview/login pages. PT subsequently reached a Vercel login wall and received
+“Social Account is not yet connected to any Vercel user.” Application login and
+backend configuration therefore remain unverified. The owner is currently
+unavailable; request an owner-authorized shareable link or access when available.
+Independent local fixes are continuing meanwhile.
 
 Use the existing branch Preview environment. Do not promote it to Production,
 change the production branch, replace production variables or reassign the live
