@@ -15,11 +15,13 @@ npm run dev -- --host 127.0.0.1
 Email/password signup, confirmation callback, login, session restoration and
 logout are implemented. PT has reported passing the configured local-browser
 flow. Guest and signed-in learning lists remain in separate owner-scoped device
-caches; cloud progress sync, guest import, password reset, Google sign-in and
-account deletion are not implemented yet.
+caches. Password recovery is implemented with local SDK/browser simulations;
+real email delivery and hosted reset/login checks are still pending. See
+[password recovery](docs/password-recovery.md). Cloud progress sync, guest import,
+Google sign-in and account deletion are not implemented yet.
 
 The core UI pass covers Home/navigation, vocabulary sessions, lessons, saved and
-review words, Library and Profile. This is not a full pass over every helper or
+review words, Library, Profile and Settings. This is not a full pass over every helper or
 phrase screen. See [UI evidence and limits](docs/ui-checkpoint.md).
 
 ## Checks

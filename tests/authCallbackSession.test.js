@@ -31,12 +31,12 @@ test('callback inspection handles rejected network operations without leaking ra
 
 // Run the installed Supabase Auth SDK with browser-shaped globals and a fake
 // token endpoint. No hosted requests, real email links, or credentials are used.
-async function withBrowserAuth({ verifier = true, rejectedExchange = false }, run) {
+async function withBrowserAuth({ verifier = true, rejectedExchange = false, recovery = false }, run) {
   const saved = Object.fromEntries(['window', 'document', 'BroadcastChannel'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   let href = 'http://127.0.0.1:5173/auth/callback?code=test-only-auth-code&returnTo=%2F';
-  const storageKey = `callback-test-${verifier}-${rejectedExchange}`;
+  const storageKey = `callback-test-${verifier}-${rejectedExchange}-${recovery}`;
   const rows = new Map();
-  if (verifier) rows.set(`${storageKey}-code-verifier`, JSON.stringify('test-only-verifier'));
+  if (verifier) rows.set(`${storageKey}-code-verifier`, JSON.stringify(recovery ? 'test-only-verifier/recovery' : 'test-only-verifier'));
   const requests = [];
   Object.defineProperty(globalThis, 'window', { configurable: true, value: {
     location: { get href() { return href; } },
@@ -114,5 +114,20 @@ test('real SDK rejected exchange is surfaced despite getSession reporting no ses
     assert.equal(session.error, null);
     assert.equal(session.data.session, null);
     assert.equal(requests.length, 1);
+  });
+});
+
+
+test('real SDK exchanges a recovery code once and emits recovery rather than ordinary sign-in', async () => {
+  await withBrowserAuth({ recovery: true }, async ({ auth, requests }) => {
+    const events = [];
+    const { data } = auth.onAuthStateChange((event) => events.push(event));
+    assert.equal(await inspectAuthCallbackSession(auth), null);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].body.code_verifier, 'test-only-verifier');
+    assert.ok(events.filter(event => event === 'PASSWORD_RECOVERY').length >= 1);
+    assert.equal(events.filter(event => event === 'SIGNED_IN').length, 0);
+    data.subscription.unsubscribe();
   });
 });

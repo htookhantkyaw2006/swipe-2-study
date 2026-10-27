@@ -23,8 +23,10 @@ As of 28 October 2026:
   hosted deployment or configuration action has been performed here.
 - Learning lists/preferences currently use owner-scoped local caches; cloud
   progress sync and guest import remain future implementation steps. Custom SMTP,
-  Google sign-in, password reset, avatar upload and account deletion remain
-  unverified or unimplemented as described in the development log.
+  Google sign-in, avatar upload and account deletion remain unverified or
+  unimplemented as described in the development log. Password recovery is now
+  implemented and simulated locally; see password-recovery.md for callback
+  allowlisting and the real-email checks that are still pending.
 
 Follow [preview verification](preview-verification.md) for the next deployment
 checkpoint. The client remains Owner of their hosted resources.

@@ -714,3 +714,109 @@ test('AuthProvider gates rendering during loading and isTransitioning so mismatc
 
   cleanup();
 });
+
+async function recoveryCoordinatorFixture(verify) {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+  let listener;
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  const coordinator = createAuthCoordinator({ isConfigured: true, storageOwner, authClient: { auth: {
+    getSession: async () => ({ data: { session: null }, error: null }),
+    getUser: verify,
+    onAuthStateChange: callback => { listener = callback; return { data: { subscription: { unsubscribe() {} } } }; },
+    signOut: async () => ({ error: null }),
+  } } });
+  const cleanup = coordinator.initialize();
+  await waitFor(() => !coordinator.getState().loading);
+  return { coordinator, storageOwner, emit: (event, userId) => listener(event, userId ? { user: { id: userId } } : null), cleanup };
+}
+
+const recoveryId = '11111111-1111-4111-8111-111111111111';
+
+test('PASSWORD_RECOVERY cannot authorize a reset until getUser verifies its account', async () => {
+  let resolve;
+  const pending = new Promise(done => { resolve = done; });
+  const fixture = await recoveryCoordinatorFixture(() => pending);
+  try {
+    fixture.emit('PASSWORD_RECOVERY', recoveryId);
+    assert.equal(fixture.coordinator.canResetPassword(recoveryId), false);
+    assert.equal(fixture.storageOwner.getOwner(), null);
+    resolve({ data: { user: { id: recoveryId } }, error: null });
+    await waitFor(() => fixture.coordinator.canResetPassword(recoveryId));
+    assert.equal(fixture.coordinator.getState().passwordRecoveryUserId, recoveryId);
+    assert.equal(fixture.storageOwner.getOwner(), recoveryId);
+  } finally { fixture.cleanup(); }
+});
+
+test('INITIAL_SESSION following recovery does not lose the pending recovery account', async () => {
+  const fixture = await recoveryCoordinatorFixture(async () => ({ data: { user: { id: recoveryId } }, error: null }));
+  try {
+    fixture.emit('PASSWORD_RECOVERY', recoveryId);
+    fixture.emit('INITIAL_SESSION', recoveryId);
+    await waitFor(() => fixture.coordinator.canResetPassword(recoveryId));
+    assert.equal(fixture.coordinator.getState().user.id, recoveryId);
+  } finally { fixture.cleanup(); }
+});
+
+test('ordinary sign-in does not create recovery authority and mismatched recovery verification fails closed', async () => {
+  const fixture = await recoveryCoordinatorFixture(async () => ({ data: { user: { id: recoveryId } }, error: null }));
+  try {
+    fixture.emit('SIGNED_IN', recoveryId);
+    await waitFor(() => fixture.coordinator.getState().user?.id === recoveryId);
+    assert.equal(fixture.coordinator.canResetPassword(recoveryId), false);
+    fixture.emit('PASSWORD_RECOVERY', '22222222-2222-4222-8222-222222222222');
+    await waitFor(() => Boolean(fixture.coordinator.getState().error));
+    assert.equal(fixture.coordinator.getState().user, null);
+    assert.equal(fixture.coordinator.canResetPassword(recoveryId), false);
+  } finally { fixture.cleanup(); }
+});
+
+test('recovery completion consumes only the current user grant and USER_UPDATED cannot restore it', async () => {
+  let verifications = 0;
+  const fixture = await recoveryCoordinatorFixture(async () => ({ data: { user: { id: recoveryId, name: `verified-${++verifications}` } }, error: null }));
+  try {
+    fixture.emit('PASSWORD_RECOVERY', recoveryId);
+    await waitFor(() => fixture.coordinator.canResetPassword(recoveryId));
+    assert.equal(fixture.coordinator.completePasswordRecovery('another-user'), false);
+    assert.equal(fixture.coordinator.completePasswordRecovery(recoveryId), true);
+    fixture.emit('USER_UPDATED', recoveryId);
+    await waitFor(() => fixture.coordinator.getState().user?.name === 'verified-2');
+    assert.equal(fixture.coordinator.canResetPassword(recoveryId), false);
+    assert.equal(fixture.coordinator.completePasswordRecovery(recoveryId), false);
+  } finally { fixture.cleanup(); }
+});
+
+test('sign-out clears recovery authority and discards a delayed recovery verification', async () => {
+  let resolve;
+  const pending = new Promise(done => { resolve = done; });
+  const fixture = await recoveryCoordinatorFixture(() => pending);
+  try {
+    fixture.emit('PASSWORD_RECOVERY', recoveryId);
+    await fixture.coordinator.signOut();
+    resolve({ data: { user: { id: recoveryId } }, error: null });
+    await new Promise(done => setTimeout(done, 15));
+    assert.equal(fixture.coordinator.getState().user, null);
+    assert.equal(fixture.coordinator.getState().passwordRecoveryUserId, null);
+    assert.equal(fixture.coordinator.canResetPassword(recoveryId), false);
+  } finally { fixture.cleanup(); }
+});
+
+
+test('same-account refresh preserves recovery but switching to a different verified account clears it', async () => {
+  let currentId = recoveryId;
+  let verifications = 0;
+  const fixture = await recoveryCoordinatorFixture(async () => ({ data: { user: { id: currentId, name: `verified-${++verifications}` } }, error: null }));
+  try {
+    fixture.emit('PASSWORD_RECOVERY', recoveryId);
+    await waitFor(() => fixture.coordinator.canResetPassword(recoveryId));
+    fixture.emit('TOKEN_REFRESHED', recoveryId);
+    await waitFor(() => fixture.coordinator.getState().user?.name === 'verified-2');
+    assert.equal(fixture.coordinator.canResetPassword(recoveryId), true);
+    currentId = '22222222-2222-4222-8222-222222222222';
+    fixture.emit('SIGNED_IN', currentId);
+    assert.equal(fixture.coordinator.canResetPassword(recoveryId), false);
+    await waitFor(() => fixture.coordinator.getState().user?.id === currentId);
+    assert.equal(fixture.coordinator.canResetPassword(currentId), false);
+    assert.equal(fixture.coordinator.completePasswordRecovery(recoveryId), false);
+  } finally { fixture.cleanup(); }
+});

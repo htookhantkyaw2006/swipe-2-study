@@ -28,6 +28,8 @@ export function createAuthCoordinator({
   let isTransitioning = false;
   let error = null;
   let generation = 0;
+  let recoveryCandidateId = null;
+  let passwordRecoveryUserId = null;
   const listeners = new Set();
 
   function createSnapshot() {
@@ -39,6 +41,7 @@ export function createAuthCoordinator({
       isGuest: !user && !loading && !isTransitioning,
       isConfigured: configured,
       generation,
+      passwordRecoveryUserId,
       ownerId: storageOwner?.getOwner ? storageOwner.getOwner() : null,
     });
   }
@@ -81,7 +84,12 @@ export function createAuthCoordinator({
   /**
    * Verified user transition: only sets storageOwner after verification completes.
    */
-  function applyVerifiedUser(verifiedUser) {
+  function applyVerifiedUser(verifiedUser, recoveryForUserId = null) {
+    if (passwordRecoveryUserId !== verifiedUser?.id) passwordRecoveryUserId = null;
+    if (recoveryForUserId === verifiedUser?.id) {
+      passwordRecoveryUserId = verifiedUser.id;
+      recoveryCandidateId = null;
+    }
     user = verifiedUser;
     if (verifiedUser?.id) {
       storageOwner.setOwner(verifiedUser.id);
@@ -99,6 +107,8 @@ export function createAuthCoordinator({
    * Reset to guest: used on sign-out or when session verification fails.
    */
   function resetToGuest(errorMessage = null) {
+    recoveryCandidateId = null;
+    passwordRecoveryUserId = null;
     user = null;
     storageOwner.setOwner(null);
     isTransitioning = false;
@@ -112,7 +122,7 @@ export function createAuthCoordinator({
    * Verify an active session against Supabase Auth server using getUser().
    * Only applies the user if the operation generation is still current.
    */
-  async function verifySessionUser(client, opGen) {
+  async function verifySessionUser(client, opGen, recoveryForUserId = null) {
     if (!isCurrent(opGen)) return;
     try {
       const { data, error: userErr } = await client.auth.getUser();
@@ -125,7 +135,11 @@ export function createAuthCoordinator({
       }
 
       if (!isCurrent(opGen)) return;
-      applyVerifiedUser(data.user);
+      if (recoveryForUserId && data.user.id !== recoveryForUserId) {
+        resetToGuest('The recovery account could not be verified. Request a new reset link.');
+        return;
+      }
+      applyVerifiedUser(data.user, recoveryForUserId);
     } catch (ex) {
       if (!isCurrent(opGen)) return;
       resetToGuest(ex.message || 'Session verification failed.');
@@ -190,13 +204,18 @@ export function createAuthCoordinator({
           return;
         }
 
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION' || event === 'PASSWORD_RECOVERY') {
           if (!session?.user) return;
 
           // Remove unverified shortcut: coordinate verification via getUser() for ALL events.
           const eventGen = nextGeneration();
           const isAccountSwitch = !user || user.id !== session.user.id;
-          if (isAccountSwitch) {
+          if (passwordRecoveryUserId !== session.user.id) passwordRecoveryUserId = null;
+          if (recoveryCandidateId !== session.user.id) recoveryCandidateId = null;
+          if (event === 'PASSWORD_RECOVERY') recoveryCandidateId = session.user.id;
+          // INITIAL_SESSION can follow PASSWORD_RECOVERY before verification.
+          const recoveryForUserId = recoveryCandidateId === session.user.id ? recoveryCandidateId : null;
+          if (isAccountSwitch || event === 'PASSWORD_RECOVERY') {
             isTransitioning = true;
           }
           publishSnapshot();
@@ -205,7 +224,7 @@ export function createAuthCoordinator({
           // Schedule asynchronous verification outside the synchronous callback
           Promise.resolve().then(async () => {
             if (cancelled || !isCurrent(eventGen)) return;
-            await verifySessionUser(client, eventGen);
+            await verifySessionUser(client, eventGen, recoveryForUserId);
           });
         }
       });
@@ -279,6 +298,20 @@ export function createAuthCoordinator({
     }
   }
 
+  function canResetPassword(expectedUserId) {
+    return Boolean(expectedUserId && user?.id === expectedUserId
+      && passwordRecoveryUserId === expectedUserId && !loading && !isTransitioning && !error);
+  }
+
+  function completePasswordRecovery(expectedUserId) {
+    if (!canResetPassword(expectedUserId)) return false;
+    passwordRecoveryUserId = null;
+    recoveryCandidateId = null;
+    publishSnapshot();
+    notify();
+    return true;
+  }
+
   function getState() {
     return snapshot;
   }
@@ -293,6 +326,8 @@ export function createAuthCoordinator({
     subscribe,
     initialize,
     signOut,
+    canResetPassword,
+    completePasswordRecovery,
     retryVerification,
     clearError,
     captureGeneration,

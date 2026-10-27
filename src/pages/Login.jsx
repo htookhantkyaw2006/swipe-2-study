@@ -4,6 +4,7 @@ import { getSupabaseClient } from '../lib/supabase.js';
 import { useAuth } from '../lib/useAuth.js';
 import { safeReturnPath } from '../lib/safeReturnPath.js';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, Sparkles } from 'lucide-react';
+import './PasswordRecovery.css';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -138,6 +139,8 @@ export default function Login() {
               </button>
             </div>
           </div>
+
+          <Link className="auth-recovery-link" to="/forgot-password">Forgot password?</Link>
 
           <button
             type="submit"
