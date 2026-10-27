@@ -32,7 +32,9 @@ export async function requestPasswordRecovery(auth, email, origin) {
 }
 
 export function recoveryLinkError(search = '', hash = '') {
-  return parseCallbackError(search, hash) ? 'This reset link could not be used. Please request a fresh password reset email.' : null;
+  const parsed = parseCallbackError(search, hash);
+  if (!parsed) return null;
+  return `${parsed} Please request a fresh password reset email.`;
 }
 
 export async function updateRecoveredPassword(auth, { password, confirmation, expectedUserId, isAllowed }) {

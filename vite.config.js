@@ -8,5 +8,8 @@ export default defineConfig(({ mode, command }) => {
   assertSafeFrontendEnv(env)
   const config = readSupabaseConfig(env)
   if (config.status === 'invalid') throw new Error(config.issues.join(' '))
-  return { plugins: [react()] }
+  return {
+    plugins: [react()],
+    server: { host: true },
+  }
 })

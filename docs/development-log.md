@@ -286,3 +286,29 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
 - Added 17 Node recovery regressions (10 helper cases, six coordinator lifecycle cases, one installed-SDK PKCE case), retaining all previous regressions: **81 tests pass**. Lint **0 errors / 10 existing warnings**; regular guest and synthetic-configured production builds pass; whitespace clean. Existing Vite fixture-port and large-chunk warnings remain.
 - Production Chromium used synthetic credentials/identities and intercepted API responses with the actual SDK. Twelve configured layouts and two unconfigured 320px routes passed, including request/rate-limit/privacy, recovery exchange, matching email, URL-error priority, mismatched confirmation, server policy failure, repeated-submit prevention, success/receipt consumption, normal-login/missing-verifier rejection, refresh/fresh-link behavior and server-account mismatch. Zero page errors/unmocked external requests. No real mail was sent or hosted password changed.
 - Material limit: reloading the reset form after exchange needs a fresh recovery link; its state deliberately does not persist across page loads. Real email delivery, allowed redirects, old/new-password login, hosted revocation/policy behavior, Safari and physical devices remain unverified. Setup and test steps: `docs/password-recovery.md`. Existing local signup/login acceptance is not evidence that this new recovery flow has been tested against hosted Supabase.
+
+## 28 October 2026 — Diagnose and fix password recovery callback failure
+
+### Observed behavior & Root Cause Analysis
+- **Observed**: Demo1 requested a password reset, received an email, but clicking the link landed on `http://localhost:5173/reset-password?error=access_denied&error_code=otp_expired`. The form did not open.
+- **Hosted Auth Server Rejection**: The query parameters `error=access_denied&error_code=otp_expired` are returned by Supabase GoTrue Auth server (`GET /auth/v1/verify`) before the app ever receives a code. GoTrue returns `otp_expired` when:
+  1. An email token was already consumed (e.g. by an anti-phishing mail scanner/previewer making an automated GET, or double-clicking).
+  2. Multiple reset requests were submitted in succession (each call to `resetPasswordForEmail` generates a new token hash in `auth.users`, invalidating all previous links).
+  3. The OTP expiration window (`otp_exp`) elapsed.
+  4. Email template in Supabase used an invalid verification type.
+- **Origin Mismatch (`127.0.0.1` vs `localhost`)**:
+  - The reset request was initiated from `http://127.0.0.1:5173`, storing the PKCE verifier in `127.0.0.1`'s `localStorage`.
+  - Because `http://127.0.0.1:5173/**` was not configured in Supabase's allowed Redirect URLs, GoTrue fell back to the project's Site URL (`http://localhost:5173`).
+  - Origin mismatch alone does not cause `otp_expired` (which is a server-side DB token check), but partitioned `localStorage` between `127.0.0.1` and `localhost` means that any code returned to `localhost` would subsequently fail PKCE exchange with `pkce_verifier_not_found`.
+- **Client App Fixes**:
+  - `src/lib/passwordRecovery.js`: `recoveryLinkError` now preserves and formats specific callback errors from `parseCallbackError` (such as expiration or link-already-used notices) rather than discarding them for a generic string.
+  - `src/pages/ResetPassword.jsx`: Now reads and displays `authError` from `useAuth()` alongside `linkError`, preventing silent fallback to `RESET_LINK_REQUIRED` when the SDK reports an initialization or PKCE verification failure.
+  - `src/lib/authCoordinator.js`: Preserves `recoveryCandidateId` across `getSession()` restoration and `retryVerification()`, preventing React StrictMode double-initialization from wiping the recovery state during remounts.
+  - `src/pages/ForgotPassword.jsx`: Recovery note explicitly prints the active origin (`window.location.origin`), giving the developer immediate visibility into the origin that must be matched.
+  - `vite.config.js`: Added `server: { host: true }` so Vite listens on all loopback interfaces (`127.0.0.1` and `localhost`).
+
+### Verification
+- Full test suite: **83 tests passed** (81 previous plus 2 new regressions covering StrictMode recovery preservation across remounts and detailed `recoveryLinkError` formatting).
+- Linter: **0 errors**, 10 existing warnings preserved (`npm run lint`).
+- Production build: **Success** (`npm run build`).
+- Git whitespace: **Clean** (`git diff --check`).

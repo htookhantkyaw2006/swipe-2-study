@@ -89,3 +89,13 @@ test('expired or denied reset URLs remain errors regardless of an existing accou
   assert.equal(recoveryLinkError('?code=fresh-test-code'), null);
   assert.equal(recoveryLinkError(), null);
 });
+
+test('recoveryLinkError surfaces detailed expired and invalid message descriptions', () => {
+  const expired = recoveryLinkError('?error=access_denied&error_code=otp_expired');
+  assert.match(expired, /expired/i);
+  assert.match(expired, /fresh password reset/);
+
+  const custom = recoveryLinkError('?error=access_denied&error_description=Custom+server+expired+notice');
+  assert.match(custom, /Custom server expired notice/);
+  assert.match(custom, /fresh password reset/);
+});

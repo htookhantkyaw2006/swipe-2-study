@@ -33,7 +33,7 @@ export default function ForgotPassword() {
         <div className="auth-field"><label className="auth-label" htmlFor="recovery-email">Email</label><div className="auth-input-wrap"><Mail size={18} className="auth-input-icon" aria-hidden="true" /><input className="auth-input" id="recovery-email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" required disabled={busy} /></div></div>
         <button className="btn-primary auth-submit" type="submit" disabled={busy}>{busy ? 'Requesting link…' : 'Send reset link'}</button>
       </form>
-      <p className="auth-guest-note recovery-note">Open the new link in this browser and app address.</p>
+      <p className="auth-guest-note recovery-note">Open the new link in this browser and exact app address ({typeof window !== 'undefined' ? window.location.origin : 'same address'}).</p>
     </>}
   </div></div>;
 }

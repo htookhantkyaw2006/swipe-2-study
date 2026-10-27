@@ -180,7 +180,8 @@ export function createAuthCoordinator({
         }
 
         if (data?.session) {
-          await verifySessionUser(client, opGen);
+          const recoveryForUserId = recoveryCandidateId === data.session.user?.id ? recoveryCandidateId : null;
+          await verifySessionUser(client, opGen, recoveryForUserId);
         } else {
           if (cancelled || !isCurrent(opGen)) return;
           // No active session — legitimate guest state
@@ -257,7 +258,8 @@ export function createAuthCoordinator({
     publishSnapshot();
     notify();
 
-    await verifySessionUser(client, gen);
+    const recoveryForUserId = passwordRecoveryUserId || recoveryCandidateId;
+    await verifySessionUser(client, gen, recoveryForUserId);
   }
 
   /**

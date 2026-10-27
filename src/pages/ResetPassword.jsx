@@ -7,7 +7,7 @@ import { recoveryLinkError, RESET_LINK_REQUIRED, updateRecoveredPassword } from 
 import './PasswordRecovery.css';
 
 export default function ResetPassword() {
-  const { user, isConfigured, passwordRecoveryUserId, canResetPassword, completePasswordRecovery } = useAuth();
+  const { user, isConfigured, passwordRecoveryUserId, canResetPassword, completePasswordRecovery, error: authError } = useAuth();
   const location = useLocation();
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -38,7 +38,7 @@ export default function ResetPassword() {
   return <div className="auth-page"><div className="auth-card">
     <div className="auth-header"><div className="auth-logo">{success ? <Check size={28} aria-hidden="true" /> : <KeyRound size={28} aria-hidden="true" />}</div><h1 className="auth-title">{success ? 'Password updated' : 'Set a new password'}</h1><p className="auth-subtitle">{success ? 'Your new password is ready to use.' : 'Choose a password for your recovered account.'}</p></div>
     {success ? <Link className="btn-primary recovery-continue" to="/">Continue learning</Link> : !isConfigured ? <div className="auth-error" role="status">Password recovery is unavailable while the backend is not configured. <Link className="auth-link" to="/">Back to Home</Link></div> : !ready ? <>
-      <div className="auth-error" role="alert">{linkError || RESET_LINK_REQUIRED}</div><Link className="btn-primary recovery-continue" to="/forgot-password">Request a new reset link</Link><Link className="auth-link recovery-signin" to="/login">Back to Sign in</Link>
+      <div className="auth-error" role="alert">{linkError || authError || RESET_LINK_REQUIRED}</div><Link className="btn-primary recovery-continue" to="/forgot-password">Request a new reset link</Link><Link className="auth-link recovery-signin" to="/login">Back to Sign in</Link>
     </> : <>
       <p className="recovery-account">Updating password for <strong>{user.email || 'your verified account'}</strong></p>
       {error && <div className="auth-error" role="alert">{error}</div>}

@@ -758,6 +758,33 @@ test('INITIAL_SESSION following recovery does not lose the pending recovery acco
   } finally { fixture.cleanup(); }
 });
 
+test('StrictMode double-initialization preserves pending recovery account across remounts', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+  let listener;
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  const fakeClient = { auth: {
+    getSession: async () => ({ data: { session: { user: { id: recoveryId } } }, error: null }),
+    getUser: async () => ({ data: { user: { id: recoveryId } }, error: null }),
+    onAuthStateChange: callback => { listener = callback; return { data: { subscription: { unsubscribe() {} } } }; },
+    signOut: async () => ({ error: null }),
+  } };
+  const coordinator = createAuthCoordinator({ isConfigured: true, storageOwner, authClient: fakeClient });
+  const cleanup1 = coordinator.initialize();
+  listener('PASSWORD_RECOVERY', { user: { id: recoveryId } });
+  cleanup1();
+
+  const cleanup2 = coordinator.initialize();
+  listener('INITIAL_SESSION', { user: { id: recoveryId } });
+  try {
+    await waitFor(() => coordinator.canResetPassword(recoveryId));
+    assert.equal(coordinator.getState().passwordRecoveryUserId, recoveryId);
+  } finally {
+    cleanup2();
+  }
+});
+
+
 test('ordinary sign-in does not create recovery authority and mismatched recovery verification fails closed', async () => {
   const fixture = await recoveryCoordinatorFixture(async () => ({ data: { user: { id: recoveryId } }, error: null }));
   try {
