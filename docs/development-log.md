@@ -173,3 +173,22 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
 
 ### Transfer status
 - The connected account reports repository push permission, but publishing through the GitHub integration's create-tree endpoint returned HTTP 403 (`Resource not accessible by integration`). The remote branch was not updated. A verified Git bundle is supplied for importing this commit on PT's already-authenticated laptop and pushing normally.
+
+## 28 October 2026 — Diagnose missing callback sessions
+
+### Observed staging behavior
+- PT reported receiving a signup confirmation email, then seeing the callback timeout. Subsequent email/password sign-in, refresh persistence, logout, and sign-in/logout repetition passed PT's manual browser checks.
+- The exact cause of PT's callback failure is not established: browser profile/origin/verifier availability and the hosted token response were not captured. Manual login passing does not prove automatic callback completion.
+
+### Changes and evidence
+- Callback now inspects the installed SDK's cached `auth.initialize()` result before accepting success. SDK URL-exchange failures can be hidden by a later successful `getSession()` response containing no session.
+- When initialization completes without a session, the page immediately offers email/password sign-in and explains the same-browser/profile/app-address requirement. It does not wait ten seconds and then imply the confirmation email definitely expired.
+- Success navigation waits for both callback inspection and the existing coordinator's verified user. Cancellation guards discard inspection results after callback unmount. The SDK remains the only owner of automatic PKCE exchange; no manual duplicate exchange or verifier bypass was added.
+- Six new tests include three using the actual installed Supabase Auth SDK with browser-shaped globals, a storage adapter, and a mocked token endpoint: successful exchange exactly once, missing-verifier skip, and rejected exchange whose error is absent from a subsequent `getSession()` call. All network credentials and responses in these tests are synthetic.
+
+### Verification and limits
+- `npm test`: **57 passed, 0 failed**.
+- `npm run lint`: **0 errors**, 14 existing warnings.
+- `npm run build` and `git diff --check`: passed. Existing bundle/dynamic-import and Vite test-server port warnings remain.
+- These are SDK simulations, not a real browser or hosted email callback test. A fresh signup/confirmation in the same browser profile at exactly `http://127.0.0.1:5173` remains to be tested by PT. Real hosted RLS isolation is still pending.
+- No hosted configuration, dependencies, account data, or production deployment changed. Integration write access remains blocked by the previously observed 403, so this checkpoint is transferred by Git bundle.

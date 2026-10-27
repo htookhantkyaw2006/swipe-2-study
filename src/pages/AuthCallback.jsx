@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/useAuth.js';
 import { safeReturnPath } from '../lib/safeReturnPath.js';
 import { getAuthCallbackState } from '../lib/authCallbackState.js';
+import { inspectAuthCallbackSession } from '../lib/authCallbackSession.js';
+import { getSupabaseClient } from '../lib/supabase.js';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 /* ---------------------------------------------------------------
@@ -20,6 +22,25 @@ export default function AuthCallback() {
   const { user, loading: authLoading, isTransitioning, error: authError } = useAuth();
 
   const [timedOut, setTimedOut] = useState(false);
+  const [callbackCheck, setCallbackCheck] = useState({ pending: true, error: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    // initialize() returns the SDK's cached initialization result. The SDK is
+    // still the only owner of the one-time PKCE exchange.
+    (async () => {
+      try {
+        const error = await inspectAuthCallbackSession(getSupabaseClient().auth);
+        if (!cancelled) setCallbackCheck({ pending: false, error });
+      } catch {
+        if (!cancelled) setCallbackCheck({
+          pending: false,
+          error: 'Sign-in is unavailable. Return to Sign In and try again.',
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const returnTo = useMemo(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -34,18 +55,20 @@ export default function AuthCallback() {
     isTransitioning,
     authError,
     timedOut,
+    callbackPending: callbackCheck.pending,
+    callbackError: callbackCheck.error,
   });
 
   // 3. Timeout handler: if verification neither finishes nor errors after 10s
   useEffect(() => {
-    if (user || displayError) return;
+    if (canNavigate || displayError) return;
 
     const timer = setTimeout(() => {
       setTimedOut(true);
     }, 10000);
 
     return () => clearTimeout(timer);
-  }, [user, displayError]);
+  }, [canNavigate, displayError]);
 
   // 4. Success navigation: ONLY navigate after user is verified and transition completes
   useEffect(() => {

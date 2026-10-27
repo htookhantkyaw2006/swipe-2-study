@@ -25,19 +25,20 @@ export function parseCallbackError(search = '', hash = '') {
 export function getAuthCallbackState({
   search = '', hash = '', user = null, loading = false,
   isTransitioning = false, authError = null, timedOut = false,
+  callbackPending = false, callbackError = null,
 } = {}) {
   const urlError = parseCallbackError(search, hash);
   const hasCode = Boolean(new URLSearchParams(search).get('code')?.trim());
   const hasAccessToken = Boolean(callbackParams(hash).get('access_token')?.trim());
-  const missingCodeError = !user && !loading && !isTransitioning && !hasCode && !hasAccessToken
+  const missingCodeError = !user && !loading && !isTransitioning && !callbackPending && !hasCode && !hasAccessToken
     ? 'No verification code was found. Please open the link from your email or sign in directly.'
     : null;
-  const error = urlError || authError || missingCodeError || (timedOut
-    ? 'Verification is taking longer than expected. The link may be expired or already used.'
+  const error = urlError || callbackError || authError || missingCodeError || (timedOut
+    ? 'Sign-in confirmation is taking longer than expected. Check your connection and sign in with your email and password.'
     : null);
 
   return {
     error,
-    canNavigate: Boolean(user && !loading && !isTransitioning && !error),
+    canNavigate: Boolean(user && !loading && !isTransitioning && !callbackPending && !error),
   };
 }
