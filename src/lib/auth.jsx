@@ -37,9 +37,14 @@ export function AuthProvider({ children, coordinator = defaultAuthCoordinator })
     isConfigured: state.isConfigured,
   };
 
-  // Gate rendering during initialization so an unverified guest state
+  const isOwnerAligned = state.user
+    ? state.user.id === state.ownerId
+    : state.ownerId === null;
+
+  // Gate rendering during initialization and account transitions so an unverified guest state
   // or mismatched owner cache is never rendered before verification completes.
-  if (state.loading) {
+  // Resume rendering only after the verified user and selected owner agree.
+  if (state.loading || state.isTransitioning || !isOwnerAligned) {
     return (
       <div
         style={{

@@ -112,3 +112,41 @@ Base: `0bbe6fd` on `feat/backend-foundation`. Follow-up review corrections appli
 
 ### Bounded Limits (Deferred to Later Tasks)
 - No Google OAuth, password reset, avatar file upload/editing, account deletion, guest data migration/import, or cloud progress synchronization in this task. These remain bounded for future checkpoints.
+
+## 28 October 2026 — AuthCoordinator & AuthProvider Integration Corrections
+
+### Summary
+Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `AuthProvider` discovered following commit `d08e262`:
+1. **Cached Immutable Snapshot (`src/lib/authCoordinator.js`)**:
+   - `coordinator.getState()` now returns a cached, immutable snapshot (`Object.freeze(...)`).
+   - Repeated calls without state change return the exact same reference (`Object.is(s1, s2) === true`), satisfying `useSyncExternalStore` snapshot stability.
+   - A new snapshot is published before subscribers are notified across initialization, verification, error surfacing, retry, logout, and account transitions.
+2. **Transition & Owner Gating (`src/lib/auth.jsx`)**:
+   - `AuthProvider` gates rendering when `state.loading`, `state.isTransitioning`, or `!isOwnerAligned` (`state.user.id !== state.ownerId` when authenticated, or `state.ownerId !== null` when guest).
+   - Renders spinner during account transitions so no mismatched user/private cache pair ever renders.
+   - Resumes child rendering only after the verified user and selected storage owner agree.
+3. **Cleanup Invalidation & StrictMode Support (`src/lib/authCoordinator.js`)**:
+   - `initialize()` cleanup function advances the operation generation (`nextGeneration()`), sets `cancelled = true`, and unsubscribes from Auth events.
+   - Pending `getUser()` and `getSession()` responses arriving after cleanup are invalidated and cannot modify user state or storage ownership.
+   - Seamlessly supports React StrictMode mount/cleanup/remount cycles (`initialize -> cleanup -> initialize`).
+4. **Removal of Same-User Verification Shortcut (`src/lib/authCoordinator.js`)**:
+   - Removed direct assignment of unverified `session.user` for same-user events (`SIGNED_IN`, `TOKEN_REFRESHED`, `USER_UPDATED`, `INITIAL_SESSION`).
+   - Keeps event callbacks strictly synchronous while scheduling asynchronous verification via Supabase `getUser()` outside the callback.
+   - Updates user and storage ownership only after the server verification promise resolves.
+
+### Automated Verification
+- Full test suite: **42 tests passed** (`npm test`, Node test runner, 0 failures).
+  - Added 5 new regression tests in `tests/authIntegration.test.js`:
+    1. Snapshot reference stability across repeated reads and publication on state change.
+    2. Invalidation of delayed verification completing after `initialize()` cleanup.
+    3. StrictMode-style reinitialization (`initialize -> cleanup -> initialize`) without interference from stale responses.
+    4. Verification of same-user Auth events with `getUser()` instead of direct session assignment.
+    5. Mounted `AuthProvider` rendering gating during loading and account transitions using `react-dom/server` (`renderToString`).
+- Linter: **0 errors**, 14 pre-existing warnings in unrelated modules preserved (`npm run lint`).
+- Production build: **Success** in 797ms (`dist/assets/index-BO7tf5Y9.js`, `npm run build`).
+- Git whitespace: **Clean** (`git diff --check`).
+
+### Unverified Hosted & Browser Behavior (Still Required on Staging)
+- Automated tests mock client responses and simulate component mounting; live browser session cookie/token exchange with hosted Supabase Auth still requires manual verification.
+- Email deliverability with custom SMTP and live link clicking in client email clients remain unverified by local scripts.
+- Multi-user RLS data isolation between two live authenticated accounts still requires hosted verification.

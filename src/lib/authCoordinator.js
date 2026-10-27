@@ -30,6 +30,26 @@ export function createAuthCoordinator({
   let generation = 0;
   const listeners = new Set();
 
+  function createSnapshot() {
+    return Object.freeze({
+      user,
+      loading,
+      isTransitioning,
+      error,
+      isGuest: !user && !loading && !isTransitioning,
+      isConfigured: configured,
+      generation,
+      ownerId: storageOwner?.getOwner ? storageOwner.getOwner() : null,
+    });
+  }
+
+  let snapshot = createSnapshot();
+
+  function publishSnapshot() {
+    snapshot = createSnapshot();
+    return snapshot;
+  }
+
   function notify() {
     for (const listener of listeners) {
       try {
@@ -71,6 +91,7 @@ export function createAuthCoordinator({
     error = null;
     isTransitioning = false;
     loading = false;
+    publishSnapshot();
     notify();
   }
 
@@ -82,9 +103,8 @@ export function createAuthCoordinator({
     storageOwner.setOwner(null);
     isTransitioning = false;
     loading = false;
-    if (errorMessage) {
-      error = errorMessage;
-    }
+    error = errorMessage;
+    publishSnapshot();
     notify();
   }
 
@@ -93,15 +113,18 @@ export function createAuthCoordinator({
    * Only applies the user if the operation generation is still current.
    */
   async function verifySessionUser(client, opGen) {
+    if (!isCurrent(opGen)) return;
     try {
       const { data, error: userErr } = await client.auth.getUser();
-      if (!isCurrent(opGen)) return; // Stale — user logged out or switched
+      if (!isCurrent(opGen)) return; // Stale — cleanup ran, user logged out, or switched
 
       if (userErr || !data?.user) {
+        if (!isCurrent(opGen)) return;
         resetToGuest(userErr ? userErr.message : 'Invalid session user.');
         return;
       }
 
+      if (!isCurrent(opGen)) return;
       applyVerifiedUser(data.user);
     } catch (ex) {
       if (!isCurrent(opGen)) return;
@@ -111,11 +134,12 @@ export function createAuthCoordinator({
 
   /**
    * Initializes session restoration and subscribes to Auth events.
-   * Returns a cleanup function that unsubscribes.
+   * Returns a cleanup function that unsubscribes and invalidates pending operations.
    */
   function initialize() {
     if (!configured) {
       loading = false;
+      publishSnapshot();
       notify();
       return () => {};
     }
@@ -127,6 +151,8 @@ export function createAuthCoordinator({
 
     loading = true;
     error = null;
+    publishSnapshot();
+    notify();
 
     // 1. Initial Session Restoration guarded by opGen
     client.auth.getSession()
@@ -134,6 +160,7 @@ export function createAuthCoordinator({
         if (cancelled || !isCurrent(opGen)) return;
 
         if (sessionErr) {
+          if (cancelled || !isCurrent(opGen)) return;
           resetToGuest(sessionErr.message);
           return;
         }
@@ -141,6 +168,7 @@ export function createAuthCoordinator({
         if (data?.session) {
           await verifySessionUser(client, opGen);
         } else {
+          if (cancelled || !isCurrent(opGen)) return;
           // No active session — legitimate guest state
           resetToGuest(null);
         }
@@ -162,26 +190,22 @@ export function createAuthCoordinator({
           return;
         }
 
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
           if (!session?.user) return;
 
-          // If the verified user ID already matches and we are not transitioning, update metadata
-          if (user?.id === session.user.id && !isTransitioning) {
-            user = session.user;
-            notify();
-            return;
+          // Remove unverified shortcut: coordinate verification via getUser() for ALL events.
+          const eventGen = nextGeneration();
+          const isAccountSwitch = !user || user.id !== session.user.id;
+          if (isAccountSwitch) {
+            isTransitioning = true;
           }
-
-          // A new user has arrived or account switch is occurring.
-          // Synchronously advance generation and set transitioning to gate mismatched rendering.
-          const switchGen = nextGeneration();
-          isTransitioning = true;
+          publishSnapshot();
           notify();
 
           // Schedule asynchronous verification outside the synchronous callback
           Promise.resolve().then(async () => {
-            if (cancelled || !isCurrent(switchGen)) return;
-            await verifySessionUser(client, switchGen);
+            if (cancelled || !isCurrent(eventGen)) return;
+            await verifySessionUser(client, eventGen);
           });
         }
       });
@@ -192,8 +216,12 @@ export function createAuthCoordinator({
 
     return () => {
       cancelled = true;
+      nextGeneration();
       if (subscription) {
-        subscription.unsubscribe();
+        try {
+          subscription.unsubscribe();
+        } catch {}
+        subscription = null;
       }
     };
   }
@@ -207,6 +235,7 @@ export function createAuthCoordinator({
     const gen = nextGeneration();
     loading = true;
     error = null;
+    publishSnapshot();
     notify();
 
     await verifySessionUser(client, gen);
@@ -229,32 +258,29 @@ export function createAuthCoordinator({
       const res = await client.auth.signOut({ scope: 'local' });
       if (res?.error) {
         error = res.error.message;
+        publishSnapshot();
         notify();
         return { error: res.error };
       }
       return { error: null };
     } catch (err) {
       error = err.message || 'Logout failed.';
+      publishSnapshot();
       notify();
       return { error: err };
     }
   }
 
   function clearError() {
-    error = null;
-    notify();
+    if (error !== null) {
+      error = null;
+      publishSnapshot();
+      notify();
+    }
   }
 
   function getState() {
-    return {
-      user,
-      loading,
-      isTransitioning,
-      error,
-      isGuest: !user && !loading && !isTransitioning,
-      isConfigured: configured,
-      generation,
-    };
+    return snapshot;
   }
 
   function subscribe(listener) {
@@ -271,6 +297,7 @@ export function createAuthCoordinator({
     clearError,
     captureGeneration,
     isCurrent,
+    getOwner: () => (storageOwner?.getOwner ? storageOwner.getOwner() : null),
   };
 }
 

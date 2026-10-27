@@ -389,3 +389,328 @@ test('local logout preserves genuine guest cache and user caches in device stora
   // Cleanup
   storageOwner.setOwner(null);
 });
+
+async function waitFor(condition, timeoutMs = 1500) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (condition()) return;
+    await new Promise(r => setTimeout(r, 10));
+  }
+  throw new Error('Condition timed out in test');
+}
+
+test('coordinator snapshot maintains reference stability across repeated reads and publishes on changes', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  let authListener;
+  const userSnapUUID = '99999999-9999-4999-8999-999999999999';
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({ data: { user: { id: userSnapUUID } }, error: null }),
+      onAuthStateChange: (cb) => {
+        authListener = cb;
+        return { data: { subscription: { unsubscribe: () => {} } } };
+      },
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  // 1. Initial snapshot reference stability
+  const snap1 = coordinator.getState();
+  const snap2 = coordinator.getState();
+  assert.equal(snap1, snap2, 'Repeated getState() calls must return identical snapshot reference');
+  assert.ok(Object.isFrozen(snap1), 'Snapshot must be immutable');
+
+  // 2. Initialize publishes new snapshot
+  const cleanup = coordinator.initialize();
+  const snapInit = coordinator.getState();
+  assert.notEqual(snap1, snapInit, 'initialize() must publish a new snapshot');
+  assert.equal(snapInit, coordinator.getState(), 'Snapshot reference stable while loading');
+
+  await waitFor(() => !coordinator.getState().loading);
+  const snapGuest = coordinator.getState();
+  assert.equal(snapGuest.isGuest, true);
+  assert.equal(snapGuest, coordinator.getState(), 'Snapshot reference stable in guest state');
+
+  // 3. User sign-in event publishes new snapshot
+  authListener('SIGNED_IN', { user: { id: userSnapUUID } });
+  const snapTransition = coordinator.getState();
+  assert.notEqual(snapGuest, snapTransition, 'Auth event must publish transition snapshot');
+  assert.equal(snapTransition.isTransitioning, true);
+  assert.equal(snapTransition, coordinator.getState(), 'Snapshot stable during transition');
+
+  // Wait for getUser to complete
+  await waitFor(() => !coordinator.getState().isTransitioning && coordinator.getState().user?.id === userSnapUUID);
+  const snapVerified = coordinator.getState();
+  assert.notEqual(snapTransition, snapVerified, 'Verified user must publish new snapshot');
+  assert.equal(snapVerified.user?.id, userSnapUUID);
+  assert.equal(snapVerified.isTransitioning, false);
+  assert.equal(snapVerified, coordinator.getState(), 'Snapshot reference stable after verification');
+
+  // 4. Logout publishes new snapshot
+  await coordinator.signOut();
+  const snapLoggedOut = coordinator.getState();
+  assert.notEqual(snapVerified, snapLoggedOut, 'SignOut must publish new snapshot');
+  assert.equal(snapLoggedOut.user, null);
+  assert.equal(snapLoggedOut, coordinator.getState(), 'Snapshot reference stable after logout');
+
+  cleanup();
+});
+
+test('delayed verification completing after initialize() cleanup does not modify state or storage ownership', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  let resolveGetUser;
+  const getUserPromise = new Promise(resolve => { resolveGetUser = resolve; });
+  const delayedUUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: delayedUUID } } },
+        error: null,
+      }),
+      getUser: () => getUserPromise,
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  const cleanup = coordinator.initialize();
+  // Wait a tick for getSession to resolve and call getUser
+  await new Promise(r => setTimeout(r, 20));
+
+  // Run cleanup while getUser is still pending
+  cleanup();
+
+  // Now resolve getUser
+  resolveGetUser({ data: { user: { id: delayedUUID } }, error: null });
+  await new Promise(r => setTimeout(r, 30));
+
+  // Late response must not set storageOwner or user
+  assert.equal(storageOwner.getOwner(), null, 'Storage owner must remain null after cleanup');
+  assert.equal(coordinator.getState().user, null, 'User state must remain null');
+});
+
+test('supports React StrictMode initialize -> cleanup -> initialize without stale interference', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  let resolveUser1;
+  const user1Promise = new Promise(resolve => { resolveUser1 = resolve; });
+  let call1Started;
+  const call1StartedPromise = new Promise(resolve => { call1Started = resolve; });
+  let callCount = 0;
+  const strictUUID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: strictUUID } } },
+        error: null,
+      }),
+      getUser: async () => {
+        callCount += 1;
+        if (callCount === 1) {
+          call1Started();
+          return user1Promise;
+        }
+        return { data: { user: { id: strictUUID, name: 'Fresh Strict User' } }, error: null };
+      },
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  // StrictMode: Call 1 starts and initiates getUser
+  const cleanup1 = coordinator.initialize();
+  await call1StartedPromise;
+
+  // StrictMode: Cleanup 1 invalidates call 1
+  cleanup1();
+
+  // StrictMode: Call 2 starts fresh
+  const cleanup2 = coordinator.initialize();
+  await waitFor(() => coordinator.getState().user?.name === 'Fresh Strict User');
+
+  // Call 2 completes and verifies user
+  assert.equal(storageOwner.getOwner(), strictUUID);
+  assert.equal(coordinator.getState().user?.name, 'Fresh Strict User');
+
+  // Call 1 now finally resolves late
+  resolveUser1({ data: { user: { id: strictUUID, name: 'Stale First Call User' } }, error: null });
+  await new Promise(r => setTimeout(r, 40));
+
+  // Stale Call 1 must not overwrite Fresh Strict User
+  assert.equal(coordinator.getState().user?.name, 'Fresh Strict User');
+  assert.equal(storageOwner.getOwner(), strictUUID);
+
+  cleanup2();
+});
+
+test('same-user Auth-event coordinates verification with getUser() instead of assigning session directly', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  let authListener;
+  let getUserCount = 0;
+  const sameUserUUID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const verifiedServerUser = { id: sameUserUUID, user_metadata: { verified: 'by-server' } };
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: sameUserUUID, user_metadata: { verified: 'initial' } } } },
+        error: null,
+      }),
+      getUser: async () => {
+        getUserCount += 1;
+        return { data: { user: verifiedServerUser }, error: null };
+      },
+      onAuthStateChange: (cb) => {
+        authListener = cb;
+        return { data: { subscription: { unsubscribe: () => {} } } };
+      },
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  const cleanup = coordinator.initialize();
+  await waitFor(() => getUserCount === 1 && coordinator.getState().user?.user_metadata?.verified === 'by-server');
+
+  assert.equal(getUserCount, 1);
+  assert.equal(coordinator.getState().user?.user_metadata?.verified, 'by-server');
+
+  // Trigger same-user USER_UPDATED event with untrusted raw session user
+  const untrustedSessionUser = { id: sameUserUUID, user_metadata: { verified: 'tampered-in-client' } };
+  authListener('USER_UPDATED', { user: untrustedSessionUser });
+
+  // Immediately after synchronous callback, the untrusted user must NOT be applied directly
+  assert.notEqual(
+    coordinator.getState().user?.user_metadata?.verified,
+    'tampered-in-client',
+    'Shortcut must not directly assign untrusted session.user'
+  );
+
+  // Await the asynchronous verification
+  await waitFor(() => getUserCount === 2);
+  assert.equal(getUserCount, 2, 'getUser() must be called to verify same-user update');
+  assert.equal(coordinator.getState().user?.user_metadata?.verified, 'by-server');
+
+  cleanup();
+});
+
+test('AuthProvider gates rendering during loading and isTransitioning so mismatched cache never renders', async () => {
+  const React = (await import('react')).default;
+  const { renderToString } = await import('react-dom/server');
+  const { AuthProvider } = await server.ssrLoadModule('/src/lib/auth.jsx');
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  let authListener;
+  let resolveUserB;
+  const userBPromise = new Promise(resolve => { resolveUserB = resolve; });
+  const userBUUID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => userBPromise,
+      onAuthStateChange: (cb) => {
+        authListener = cb;
+        return { data: { subscription: { unsubscribe: () => {} } } };
+      },
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  const cleanup = coordinator.initialize();
+
+  // Test Component that outputs secret private cache data
+  function PrivateDashboard() {
+    return React.createElement('div', { id: 'private-content' }, `CACHE_OWNER:${storageOwner.getOwner() ?? 'guest'}`);
+  }
+
+  // 1. During initial loading, AuthProvider must render spinner, NOT PrivateDashboard
+  const loadingHtml = renderToString(
+    React.createElement(AuthProvider, { coordinator }, React.createElement(PrivateDashboard))
+  );
+  assert.ok(loadingHtml.includes('auth-spinner'), 'Must render spinner during loading');
+  assert.ok(!loadingHtml.includes('CACHE_OWNER'), 'Must not render private content while loading');
+
+  // Let initial restoration finish (resolves to guest)
+  await waitFor(() => !coordinator.getState().loading);
+
+  // 2. Guest state renders safely
+  const guestHtml = renderToString(
+    React.createElement(AuthProvider, { coordinator }, React.createElement(PrivateDashboard))
+  );
+  assert.ok(guestHtml.includes('CACHE_OWNER:guest'), 'Renders guest content when verified guest');
+  assert.ok(!guestHtml.includes('auth-spinner'));
+
+  // 3. User B signs in, triggering transition
+  authListener('SIGNED_IN', { user: { id: userBUUID } });
+  assert.equal(coordinator.getState().isTransitioning, true);
+
+  // During transition, AuthProvider MUST gate rendering with the spinner!
+  const transitionHtml = renderToString(
+    React.createElement(AuthProvider, { coordinator }, React.createElement(PrivateDashboard))
+  );
+  assert.ok(transitionHtml.includes('auth-spinner'), 'Must render spinner during account transition');
+  assert.ok(!transitionHtml.includes('CACHE_OWNER'), 'Must NOT render private content during transition');
+
+  // 4. User B verification completes
+  resolveUserB({ data: { user: { id: userBUUID } }, error: null });
+  await waitFor(() => !coordinator.getState().isTransitioning && storageOwner.getOwner() === userBUUID);
+
+  assert.equal(coordinator.getState().isTransitioning, false);
+  assert.equal(storageOwner.getOwner(), userBUUID);
+
+  // Rendering resumes with verified user and owner agreeing
+  const verifiedHtml = renderToString(
+    React.createElement(AuthProvider, { coordinator }, React.createElement(PrivateDashboard))
+  );
+  assert.ok(verifiedHtml.includes(`CACHE_OWNER:${userBUUID}`), 'Renders private content once user and owner agree');
+  assert.ok(!verifiedHtml.includes('auth-spinner'));
+
+  cleanup();
+});
