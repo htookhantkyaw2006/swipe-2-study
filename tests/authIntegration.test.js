@@ -22,7 +22,7 @@ after(async () => {
   else globalThis.localStorage = oldStorage;
 });
 
-test('safeReturnPath rejects external origins, schemes, backslashes and protocol-relative URLs', async () => {
+test('safeReturnPath rejects control characters, backslashes, external origins, and protocol-relative URLs', async () => {
   const { safeReturnPath } = await server.ssrLoadModule('/src/lib/safeReturnPath.js');
 
   // Valid internal paths
@@ -31,6 +31,14 @@ test('safeReturnPath rejects external origins, schemes, backslashes and protocol
   assert.equal(safeReturnPath('/learn/review'), '/learn/review');
   assert.equal(safeReturnPath('/flashcards/level/1?course=zh'), '/flashcards/level/1?course=zh');
   assert.equal(safeReturnPath('  /settings  '), '/settings');
+
+  // Control characters (CR, LF, TAB, NULL, DEL) - must reject
+  assert.equal(safeReturnPath('/\t/evil.example'), '/');
+  assert.equal(safeReturnPath('/evil\npath'), '/');
+  assert.equal(safeReturnPath('/evil\rpath'), '/');
+  assert.equal(safeReturnPath('/evil\x00path'), '/');
+  assert.equal(safeReturnPath('/evil\x1fpath'), '/');
+  assert.equal(safeReturnPath('/evil\x7fpath'), '/');
 
   // Open redirect attempts & invalid inputs
   assert.equal(safeReturnPath('https://evil.com'), '/');
@@ -90,73 +98,294 @@ test('displayName and initialsOf helpers never fabricate an identity or return e
   assert.equal(initialsOf(null), '?');
 });
 
-test('session restoration and local logout coordinate storage owner without wiping guest or user caches', async () => {
+test('AuthCoordinator verifies session with getUser() before selecting private cache', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  const userUUID = '11111111-2222-4333-8444-555555555555';
+  let getUserCalls = 0;
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: userUUID, email: 'user@example.com' } } },
+        error: null,
+      }),
+      getUser: async () => {
+        getUserCalls += 1;
+        return { data: { user: { id: userUUID, email: 'user@example.com' } }, error: null };
+      },
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  const cleanup = coordinator.initialize();
+  // Wait for initial verification promises to settle
+  await new Promise(r => setTimeout(r, 20));
+
+  assert.equal(getUserCalls, 1, 'getUser() must be called to verify session');
+  assert.equal(storageOwner.getOwner(), userUUID, 'storageOwner must be selected only after verification');
+  assert.equal(coordinator.getState().user?.id, userUUID);
+  assert.equal(coordinator.getState().loading, false);
+  assert.equal(coordinator.getState().error, null);
+
+  cleanup();
+});
+
+test('delayed restoration after logout is discarded and does not reactivate account', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  const userUUID = '11111111-2222-4333-8444-555555555555';
+
+  let resolveGetSession;
+  const deferredSession = new Promise(resolve => { resolveGetSession = resolve; });
+
+  const mockAuthClient = {
+    auth: {
+      getSession: () => deferredSession,
+      getUser: async () => ({ data: { user: { id: userUUID } }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  coordinator.initialize();
+  assert.equal(coordinator.getState().loading, true);
+
+  // User logs out before session restoration completes
+  await coordinator.signOut();
+  assert.equal(storageOwner.getOwner(), null);
+  assert.equal(coordinator.getState().user, null);
+
+  // Now the slow getSession resolves with user credentials
+  resolveGetSession({
+    data: { session: { user: { id: userUUID } } },
+    error: null,
+  });
+  await new Promise(r => setTimeout(r, 20));
+
+  // The late response must be discarded: owner must remain null, user null
+  assert.equal(storageOwner.getOwner(), null, 'Storage owner must remain null after delayed restoration');
+  assert.equal(coordinator.getState().user, null, 'User state must remain null');
+});
+
+test('Account A verification completing after Account B signs in is discarded', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  const userA = '11111111-1111-4111-8111-111111111111';
+  const userB = '22222222-2222-4222-8222-222222222222';
+
+  let authListener;
+  let resolveUserA;
+  const userAPromise = new Promise(resolve => { resolveUserA = resolve; });
+  let activeUserToReturn = 'A';
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => {
+        if (activeUserToReturn === 'A') {
+          return userAPromise;
+        }
+        return { data: { user: { id: userB } }, error: null };
+      },
+      onAuthStateChange: (cb) => {
+        authListener = cb;
+        return { data: { subscription: { unsubscribe: () => {} } } };
+      },
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  coordinator.initialize();
+  await new Promise(r => setTimeout(r, 10));
+
+  // 1. User A triggers SIGNED_IN event (verification started with pending userAPromise)
+  activeUserToReturn = 'A';
+  authListener('SIGNED_IN', { user: { id: userA } });
+  // Await a tick for the microtask to call getUser()
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(coordinator.getState().isTransitioning, true);
+
+  // 2. User B signs in before User A resolves
+  activeUserToReturn = 'B';
+  authListener('SIGNED_IN', { user: { id: userB } });
+  await new Promise(r => setTimeout(r, 20));
+
+  assert.equal(storageOwner.getOwner(), userB, 'User B must be active owner');
+  assert.equal(coordinator.getState().user?.id, userB);
+
+  // 3. User A's slow verification finally resolves
+  resolveUserA({ data: { user: { id: userA } }, error: null });
+  await new Promise(r => setTimeout(r, 20));
+
+  // User A's result must be discarded: User B must remain current
+  assert.equal(storageOwner.getOwner(), userB, 'Late User A response must not overwrite User B cache');
+  assert.equal(coordinator.getState().user?.id, userB);
+});
+
+test('verification failure resets to guest, surfaces actionable error, and supports retry', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  let returnSuccess = false;
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: { id: '33333333-3333-4333-8333-333333333333' } } },
+        error: null,
+      }),
+      getUser: async () => {
+        if (!returnSuccess) {
+          return { data: { user: null }, error: { message: 'Token expired' } };
+        }
+        return { data: { user: { id: '33333333-3333-4333-8333-333333333333' } }, error: null };
+      },
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  coordinator.initialize();
+  await new Promise(r => setTimeout(r, 20));
+
+  assert.equal(storageOwner.getOwner(), null, 'Failed verification must stay on guest cache');
+  assert.equal(coordinator.getState().user, null);
+  assert.equal(coordinator.getState().error, 'Token expired');
+  assert.equal(coordinator.getState().isGuest, true);
+
+  // Retry verification after recovery
+  returnSuccess = true;
+  await coordinator.retryVerification();
+
+  assert.equal(storageOwner.getOwner(), '33333333-3333-4333-8333-333333333333');
+  assert.equal(coordinator.getState().error, null);
+  assert.equal(coordinator.getState().isGuest, false);
+});
+
+test('signOut explicitly calls scope local and surfaces returned errors without reactivating account', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
+  const { createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+
+  const storageOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  let signOutOptions = null;
+
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({ data: { user: null }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: async (opts) => {
+        signOutOptions = opts;
+        return { error: { message: 'Network offline during logout' } };
+      },
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  // Manually set owner to verify logout clears it
+  storageOwner.setOwner('44444444-4444-4444-8444-444444444444');
+
+  const res = await coordinator.signOut();
+
+  assert.deepEqual(signOutOptions, { scope: 'local' }, 'signOut must pass { scope: "local" }');
+  assert.ok(res.error, 'signOut must return the error');
+  assert.equal(coordinator.getState().error, 'Network offline during logout');
+  assert.equal(storageOwner.getOwner(), null, 'Storage owner must still be reset to null even if logout failed');
+  assert.equal(coordinator.getState().user, null, 'User must remain null');
+});
+
+test('local logout preserves genuine guest cache and user caches in device storage', async () => {
+  const { createAuthCoordinator } = await server.ssrLoadModule('/src/lib/authCoordinator.js');
   const { storageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
   const { db } = await server.ssrLoadModule('/src/lib/db.js');
 
   const userA = '11111111-2222-4333-8444-555555555555';
-  const userB = '66666666-7777-4888-8999-000000000000';
+  let authListener;
 
-  // 1. Initial guest state
+  const mockAuthClient = {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({ data: { user: { id: userA } }, error: null }),
+      onAuthStateChange: (cb) => {
+        authListener = cb;
+        return { data: { subscription: { unsubscribe: () => {} } } };
+      },
+      signOut: async () => ({ error: null }),
+    },
+  };
+
+  const coordinator = createAuthCoordinator({
+    authClient: mockAuthClient,
+    storageOwner,
+    isConfigured: true,
+  });
+
+  coordinator.initialize();
+  await new Promise(r => setTimeout(r, 10));
+
+  // 1. Guest saves a card
   storageOwner.setOwner(null);
-  assert.equal(storageOwner.getOwner(), null);
-  db.insert('saved_words', { id: 'guest-word', phrase: 'guest-phrase' });
-  assert.equal(db.get('saved_words').length, 1);
+  db.insert('saved_words', { id: 'guest-card', phrase: 'guest-phrase' });
   assert.equal(db.get('saved_words')[0].phrase, 'guest-phrase');
 
   // 2. User A signs in
-  storageOwner.setOwner(userA);
+  authListener('SIGNED_IN', { user: { id: userA } });
+  await new Promise(r => setTimeout(r, 20));
+
   assert.equal(storageOwner.getOwner(), userA);
-  assert.deepEqual(db.get('saved_words'), []); // Clean owner cache
-  db.insert('saved_words', { id: 'word-a', phrase: 'phrase-a' });
-  assert.equal(db.get('saved_words').length, 1);
-  assert.equal(db.get('saved_words')[0].phrase, 'phrase-a');
+  assert.deepEqual(db.get('saved_words'), []); // User cache empty
+  db.insert('saved_words', { id: 'user-a-card', phrase: 'user-a-phrase' });
+  assert.equal(db.get('saved_words')[0].phrase, 'user-a-phrase');
 
   // 3. User A logs out
-  storageOwner.setOwner(null);
+  await coordinator.signOut();
   assert.equal(storageOwner.getOwner(), null);
 
-  // Guest data must remain intact and accessible
-  assert.equal(db.get('saved_words').length, 1);
+  // Guest card in storage must remain 100% intact
   assert.equal(db.get('saved_words')[0].phrase, 'guest-phrase');
 
-  // 4. User B signs in
-  storageOwner.setOwner(userB);
-  assert.equal(storageOwner.getOwner(), userB);
-  assert.deepEqual(db.get('saved_words'), []); // User B has their own empty cache
-  db.insert('saved_words', { id: 'word-b', phrase: 'phrase-b' });
-
-  // 5. User A signs back in — User A's cache on disk was preserved across logout
+  // User A's card in storage must also remain intact
   storageOwner.setOwner(userA);
-  assert.equal(storageOwner.getOwner(), userA);
-  assert.equal(db.get('saved_words').length, 1);
-  assert.equal(db.get('saved_words')[0].phrase, 'phrase-a');
+  assert.equal(db.get('saved_words')[0].phrase, 'user-a-phrase');
 
-  // Reset to guest for remaining tests
+  // Cleanup
   storageOwner.setOwner(null);
-});
-
-test('generation counter discards stale async responses across logout and account switching', async () => {
-  // Simulate the generation counter mechanism used in AuthProvider and useProfile
-  let generation = 0;
-  const captureGeneration = () => generation;
-  const isCurrent = (gen) => gen === generation;
-  const onUserTransition = () => { generation += 1; };
-
-  // Scenario 1: User A requests profile, then logs out before response arrives
-  const genA = captureGeneration();
-  assert.equal(isCurrent(genA), true);
-
-  // User logs out
-  onUserTransition();
-  assert.equal(isCurrent(genA), false, 'Stale response from User A must be discarded after logout');
-
-  // Scenario 2: User A requests profile, then User B signs in before response arrives
-  const genA2 = captureGeneration();
-  // User B signs in
-  onUserTransition();
-  assert.equal(isCurrent(genA2), false, 'User A profile must not be applied to User B');
-
-  const genB = captureGeneration();
-  assert.equal(isCurrent(genB), true, 'User B request is current');
 });

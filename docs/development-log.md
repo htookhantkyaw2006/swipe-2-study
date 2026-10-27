@@ -64,40 +64,51 @@ responsive account flows above the existing owner boundary.
 
 ## 28 October 2026 — Connected account flow & Auth owner coordination
 
-Base: `0bbe6fd` on `feat/backend-foundation`.
+Base: `0bbe6fd` on `feat/backend-foundation`. Follow-up review corrections applied.
 
 ### Context & Staging Migration
 - PT configured `.env.local` with verified Supabase staging credentials (`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`); `npm run check:backend` verified configuration.
 - Operator record: PT manually applied `supabase/migrations/20261027000100_backend_foundation.sql` directly through the Supabase dashboard SQL Editor ("Success. No rows returned"). The migration was not rerun and hosted security behavior will be verified against that live schema. (CLI migration history remains to be reconciled separately before remote CI pushes).
 
-### Implemented
-- **Auth Provider & Coordination (`src/lib/auth.jsx`)**:
-  - Mounted `AuthProvider` above `StorageOwnerBoundary` and `CourseShell` in `main.jsx`.
-  - Session restoration via `client.auth.getSession()`, Auth state subscription (`SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`, `USER_UPDATED`).
-  - Owner synchronization: verified user UUID is forwarded to `storageOwner.setOwner(user.id)`; signout resets owner to `null` (guest) immediately, cleanly triggering boundary remount.
-  - Race protection via generation counters (`captureGeneration`, `isCurrent`), ensuring stale async operations arriving after logout or account switching are discarded.
-- **Open-Redirect Protection (`src/lib/safeReturnPath.js`)**:
-  - Validates `returnTo` search parameters. Rejects absolute URLs, external schemes, protocol-relative paths (`//`), backslashes, and malformed inputs, defaulting safely to `/`.
-- **Learner Profile Hook (`src/lib/profile.js`)**:
-  - Fetches `public.profiles` for authenticated learners using normal credentials.
-  - Generation-guarded against account switching / logout races.
-  - Surfaces real errors with retry mechanism; never fabricates dummy profile data when loading or failed.
-  - `displayName` & `initialsOf` helpers fall back safely through profile `display_name`, user metadata (`display_name`, `full_name`), email prefix, and finally `'Learner'`.
-- **Connected Account & Guest UI**:
-  - `src/pages/Home.jsx`: Replaced hardcoded "Htoo Khant Kyaw" with real auth state, dynamic greetings (morning/afternoon/evening for users, welcome for guests), guest badge, and direct click-through to profile.
-  - `src/pages/Flashcards.jsx`: Replaced hardcoded "Hello Htoo," greeting with real learner first name or "Hello Learner,".
-  - `src/pages/Profile.jsx`: Dynamic identity card showing user initials, name, and email for authenticated learners, or clear "Guest Learner" status with "Sign In" and "Create Account" CTAs. Inline retry banner for profile fetch failures.
-  - Local logout: calls `signOut()`, reverting to local guest mode without destroying genuine guest data or other user caches.
-- **Responsive Auth Views & Styling (`src/pages/Login.jsx`, `Signup.jsx`, `VerifyEmail.jsx`, `AuthCallback.jsx`, `src/index.css`)**:
-  - Styled all auth screens with mobile-first design, specifically tested and styled down to 320px screen width and desktop centered layouts.
-  - Accessible forms, input toggle for passwords, loading states, validation errors, and resend verification handling.
-- **Automated Verification (`tests/authIntegration.test.js`)**:
-  - 4 test suites covering open redirect defense, profile fallback safety, session restoration & cache preservation across logout, and generation counter race protection.
+### Implemented & Corrected
+- **Session Verification & Auth Coordination (`src/lib/authCoordinator.js`, `src/lib/auth.jsx`)**:
+  - `auth.jsx` no longer selects private cache based on raw local JWTs. Every session from `getSession()` or Auth events is verified against the server via `client.auth.getUser()` before selecting its private cache (`storageOwner.setOwner(user.id)`).
+  - Every asynchronous operation (restoration, verification, profile loading) is guarded by an advancing operation generation (`generation`). Delayed responses arriving after logout or account switching are discarded.
+  - Event listeners on `onAuthStateChange` remain synchronous. Asynchronous verification is scheduled outside the callback.
+  - `AuthProvider` gates rendering during initial session restoration with a clean loading indicator, preventing unverified guest state or mismatched user/cache pairs from rendering.
+  - Actionable error and retry state (`retryVerification`) is exposed when verification fails.
+  - Fast Refresh lint warnings in `auth.jsx` resolved by separating context (`authContext.js`), hook (`useAuth.js`), and coordinator (`authCoordinator.js`).
+- **Callback Completion (`src/pages/AuthCallback.jsx`)**:
+  - Removed unconditional 800ms redirect timer. Navigation only occurs after the user has been genuinely verified by the Auth coordinator.
+  - URL error parameters (`error`, `error_code`, `error_description`) in both query string and hash fragments are parsed into recoverable user-facing error notices.
+  - Missing PKCE verifier / code parameters without an active session are surfaced with actionable links to sign in or resend verification.
+  - Works with existing `@supabase/supabase-js` `flowType: 'pkce'` and `detectSessionInUrl: true` without attempting redundant code exchange.
+- **Local Logout Correction**:
+  - Explicitly calls `signOut({ scope: 'local' })`.
+  - Checks returned `{ error }` and surfaces failures without reactivating the local account.
+  - Synchronously resets owner to `null` (guest) and advances generation before the network request.
+  - Genuine guest records (`s2s_...`) and other users' caches on disk are strictly preserved.
+- **Hardened Open-Redirect Defense (`src/lib/safeReturnPath.js`)**:
+  - Rejects control characters (ASCII 0–31 and 127) including embedded tab/newline (`/\t/evil.example`), backslashes, protocol-relative paths (`//`), and external URI schemes.
+  - Resolves internal paths against a fixed safe base origin to guarantee the resolved URL stays internal.
+- **Connected Account UI & Real Profile State**:
+  - `src/pages/Home.jsx`: Dynamic greetings with verified user name or "Guest Learner" tag.
+  - `src/pages/Flashcards.jsx`: Dynamic greeting with learner's verified first name or fallback.
+  - `src/pages/Profile.jsx`: Profile hero card with initials, email, retry banner on profile failure, guest state with sign-in/create account CTAs, and local logout.
+  - `src/index.css`: Mobile-first responsive styling down to 320px width and centered desktop layout.
 
-### Verification
-- Full test suite: 33 tests passed (Node test runner, 0 failures).
-- Lint: `npm run lint` passed with 0 errors (16 existing warnings preserved).
-- Production build: `npm run build` completed successfully (`dist/assets/index-*.js`, 0 errors).
+### Automated Verification
+- Full test suite: **37 tests passed** (`npm test`, Node test runner, 0 failures).
+  - Covered: control-character return paths, profile fallback safety, session verification via `getUser()`, delayed restoration after logout, Account A verification completing after Account B, verification failure & retry, local logout errors & cache preservation.
+- Linter: **0 errors**, 14 pre-existing warnings preserved; newly introduced auth warnings eliminated (`npm run lint`).
+- Production build: **Success** in 891ms (`dist/assets/index-B1tlnuIV.js`, `npm run build`).
+- Git whitespace: **Clean** (`git diff --check`).
+
+### Unverified Hosted & Browser Behavior (Still Required on Staging)
+- Automated tests mock client responses and test local storage isolation; they do not prove live network behavior.
+- Live SMTP delivery and email spam inboxing still depend on the client's Supabase SMTP settings.
+- Live browser PKCE code exchange and token redirect with email links must be validated by PT in the browser.
+- Live multi-tenant row isolation across two real accounts still requires hosted verification against Supabase RLS.
 
 ### Bounded Limits (Deferred to Later Tasks)
 - No Google OAuth, password reset, avatar file upload/editing, account deletion, guest data migration/import, or cloud progress synchronization in this task. These remain bounded for future checkpoints.

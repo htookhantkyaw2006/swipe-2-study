@@ -5,7 +5,7 @@ import LevelCarousel from '../components/ui/LevelCarousel';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import Avatar from '../components/ui/Avatar';
 import { useCourse } from '../lib/language';
-import { useAuth } from '../lib/auth.jsx';
+import { useAuth } from '../lib/useAuth.js';
 import { useProfile, displayName } from '../lib/profile.js';
 
 const PhrasesPromoCard = ({ onClick }) => {

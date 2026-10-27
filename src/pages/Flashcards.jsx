@@ -2,7 +2,7 @@ import React from 'react';
 import { Layers, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCourse } from '../lib/language';
-import { useAuth } from '../lib/auth.jsx';
+import { useAuth } from '../lib/useAuth.js';
 import { useProfile, displayName } from '../lib/profile.js';
 
 const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => {

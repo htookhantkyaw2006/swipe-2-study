@@ -1,133 +1,62 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getSupabaseClient } from './supabase.js';
-import { readSupabaseConfig } from './supabaseConfig.js';
-import { storageOwner } from './storageOwner.js';
+import React, { useEffect, useSyncExternalStore } from 'react';
+import { AuthContext } from './authContext.js';
+import { defaultAuthCoordinator } from './authCoordinator.js';
 
 /* ---------------------------------------------------------------
    AUTH PROVIDER
    ---------------------------------------------------------------
-   Lives above StorageOwnerBoundary and CourseShell. Restores the
-   Supabase session, subscribes to Auth events, and only selects an
-   owner UUID after verifying the actual user. Logout resets to
-   guest (null) before unmounting private state.
-
-   Race protection: a generation counter discards stale async work
-   that arrives after a logout or account switch. The Auth event
-   callback itself is synchronous; async follow-up work reads the
-   counter to decide whether to apply.
+   Lives above StorageOwnerBoundary and CourseShell.
+   Coordinates with AuthCoordinator to verify sessions with Supabase
+   getUser() before selecting their private cache.
+   Gates private rendering during initialization so no mismatched
+   user/cache pair ever renders.
    --------------------------------------------------------------- */
 
-const AuthContext = import.meta.hot?.data.AuthContext ?? createContext(null);
-if (import.meta.hot) import.meta.hot.data.AuthContext = AuthContext;
-
-/** True when the backend is configured; false keeps the guest-only path. */
-function isBackendConfigured() {
-  try {
-    const env = import.meta.env ?? {};
-    return readSupabaseConfig(env).status === 'configured';
-  } catch {
-    return false;
-  }
-}
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(() => isBackendConfigured());
-  const [error, setError] = useState(null);
-
-  // Generation counter: incremented on every user transition (login/logout/switch).
-  // Stale async responses check their captured generation before applying.
-  const generation = useRef(0);
-
-  // Apply a verified user. Only set the storageOwner once we trust the session.
-  const applyUser = useCallback((sessionUser) => {
-    generation.current += 1;
-    if (sessionUser) {
-      setUser(sessionUser);
-      storageOwner.setOwner(sessionUser.id);
-    } else {
-      storageOwner.setOwner(null);
-      setUser(null);
-    }
-  }, []);
-
+export function AuthProvider({ children, coordinator = defaultAuthCoordinator }) {
   useEffect(() => {
-    if (!isBackendConfigured()) {
-      setLoading(false);
-      return;
-    }
+    return coordinator.initialize();
+  }, [coordinator]);
 
-    let cancelled = false;
-    const client = getSupabaseClient();
-
-    // 1. Restore session
-    client.auth.getSession().then(({ data, error: err }) => {
-      if (cancelled) return;
-      if (err) {
-        setError(err.message);
-        setLoading(false);
-        return;
-      }
-      if (data.session?.user) {
-        applyUser(data.session.user);
-      }
-      setLoading(false);
-    });
-
-    // 2. Subscribe to Auth events (synchronous callback)
-    const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
-      if (cancelled) return;
-
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (session?.user) {
-          applyUser(session.user);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        applyUser(null);
-      }
-      // INITIAL_SESSION is handled by getSession above.
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
-  }, [applyUser]);
-
-  const signOut = useCallback(async () => {
-    if (!isBackendConfigured()) return;
-    try {
-      // Reset owner before the server round-trip so the previous user's
-      // UI is torn down immediately (StorageOwnerBoundary remounts).
-      applyUser(null);
-      await getSupabaseClient().auth.signOut();
-    } catch (err) {
-      setError(err.message);
-    }
-  }, [applyUser]);
+  const state = useSyncExternalStore(
+    coordinator.subscribe,
+    coordinator.getState,
+    coordinator.getState
+  );
 
   const value = {
-    user,
-    loading,
-    error,
-    clearError: () => setError(null),
-    signOut,
-    /** Capture the current generation so async work can detect staleness. */
-    captureGeneration: () => generation.current,
-    /** True if the captured generation still matches. */
-    isCurrent: (gen) => gen === generation.current,
-    isGuest: !user && !loading,
-    isConfigured: isBackendConfigured(),
+    user: state.user,
+    loading: state.loading,
+    isTransitioning: state.isTransitioning,
+    error: state.error,
+    clearError: coordinator.clearError,
+    retryVerification: coordinator.retryVerification,
+    signOut: coordinator.signOut,
+    captureGeneration: coordinator.captureGeneration,
+    isCurrent: coordinator.isCurrent,
+    isGuest: state.isGuest,
+    isConfigured: state.isConfigured,
   };
+
+  // Gate rendering during initialization so an unverified guest state
+  // or mismatched owner cache is never rendered before verification completes.
+  if (state.loading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg-gradient)'
+        }}
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <div className="auth-spinner" style={{ width: 36, height: 36 }} />
+      </div>
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
-  return ctx;
-}
-
-export { safeReturnPath } from './safeReturnPath.js';
-

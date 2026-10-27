@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getSupabaseClient } from '../lib/supabase.js';
-import { useAuth, safeReturnPath } from '../lib/auth.jsx';
+import { useAuth } from '../lib/useAuth.js';
+import { safeReturnPath } from '../lib/safeReturnPath.js';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, Sparkles } from 'lucide-react';
 
 export default function Login() {

@@ -1,4 +1,4 @@
-import { useAuth } from './auth.jsx';
+import { useAuth } from './useAuth.js';
 import { getSupabaseClient } from './supabase.js';
 import { useState, useEffect } from 'react';
 
@@ -11,13 +11,13 @@ import { useState, useEffect } from 'react';
    --------------------------------------------------------------- */
 
 export function useProfile() {
-  const { user, isGuest, captureGeneration, isCurrent } = useAuth();
+  const { user, isGuest, isTransitioning, captureGeneration, isCurrent } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (isGuest || !user) {
+    if (isGuest || !user || isTransitioning) {
       setProfile(null);
       setLoading(false);
       setError(null);
@@ -49,10 +49,10 @@ export function useProfile() {
         setProfile(null);
         setLoading(false);
       });
-  }, [user, isGuest, captureGeneration, isCurrent]);
+  }, [user, isGuest, isTransitioning, captureGeneration, isCurrent]);
 
   const retry = () => {
-    if (isGuest || !user) return;
+    if (isGuest || !user || isTransitioning) return;
     setError(null);
     setLoading(true);
 

@@ -9,7 +9,7 @@ import { SettingsGroup, SettingsRow, ToggleSwitch, OptionSheet } from '../compon
 import { LanguageSheet } from '../components/ui/LanguageSwitcher';
 import { usePreferences, OPTIONS } from '../lib/preferences';
 import { useLanguage, useCourse } from '../lib/language';
-import { useAuth } from '../lib/auth.jsx';
+import { useAuth } from '../lib/useAuth.js';
 import { useProfile, displayName, initialsOf } from '../lib/profile.js';
 
 export default function Profile() {
@@ -17,7 +17,7 @@ export default function Profile() {
   const { prefs, setPref } = usePreferences();
   const { language } = useLanguage();
   const course = useCourse();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, isTransitioning, error: authError, retryVerification, signOut } = useAuth();
   const { profile, loading: profileLoading, error: profileError, retry } = useProfile();
   const [loggingOut, setLoggingOut] = useState(false);
   const [languageSheet, setLanguageSheet] = useState(false);
@@ -60,7 +60,7 @@ export default function Profile() {
 
       {/* Hero Stats Card */}
       <div className="surface-card" style={{ padding: '24px', borderRadius: '24px', position: 'relative', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-        {authLoading ? (
+        {authLoading || isTransitioning ? (
           <div className="flex items-center gap-16" style={{ position: 'relative', zIndex: 1, marginBottom: '24px' }}>
             <div style={{
               width: '64px', height: '64px', borderRadius: '18px',
@@ -71,7 +71,9 @@ export default function Profile() {
             </div>
             <div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0' }}>Loading…</h2>
-              <p style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500 }}>Connecting account</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500 }}>
+                {isTransitioning ? 'Verifying account switch' : 'Connecting account'}
+              </p>
             </div>
           </div>
         ) : user ? (
@@ -165,6 +167,50 @@ export default function Profile() {
                 </div>
               </div>
             </div>
+
+            {authError && (
+              <div style={{
+                position: 'relative',
+                zIndex: 1,
+                marginBottom: '16px',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                color: '#B91C1C',
+                fontSize: '0.8125rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  <span>{authError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={retryVerification}
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #FCA5A5',
+                    color: '#B91C1C',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.75rem',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    flexShrink: 0
+                  }}
+                >
+                  <RefreshCw size={12} />
+                  <span>Retry</span>
+                </button>
+              </div>
+            )}
 
             <div style={{
               position: 'relative',
