@@ -2,17 +2,32 @@
 
 ## Current state
 
-Base source: origin/main at 96bd017. Development branch: feat/backend-foundation.
-The client reports Supabase dashboard access and business email
-admin@swipe2study.com. DNS, mailbox and SMTP access are not verified here.
+Development branch: `feat/backend-foundation`. PT reports that `main` powers the
+existing Vercel demo and must remain separate from this staging checkpoint.
 
-This workspace has no project connection or credentials configured. No migration
-has been applied to the client's hosted database. The app remains local-only.
+As of 28 October 2026:
 
-Local storage ownership is now implemented (see development-log.md). Guest keys
-stay unchanged; a future verified Auth session can select an isolated user cache.
-There is no Auth coordinator or guest import yet, so the running app is still a
-guest. This does not demonstrate cloud sync or a completed account feature.
+- Email/password signup, email confirmation callback, login, session restoration,
+  verified account/cache ownership and logout are implemented. PT has reported
+  successful configured local-browser checks, including a fresh confirmation
+  link and the core UI checks through `195ec0a`.
+- This workspace has no backend credentials or confirmed hosted project
+  connection. Its browser tests run in explicit guest mode with no Supabase env.
+- The hosted migration/policy state has not been independently inspected here.
+  The successful local Auth flow does not prove the full schema, profile trigger,
+  RLS or Storage setup. Inspect the confirmed staging project before deciding
+  whether any migration is pending; do not blindly rerun the foundation SQL.
+- GitHub reports Vercel deployment success for `195ec0a`; its check exposes a
+  branch preview URL recorded in preview-verification.md. Dashboard access,
+  Preview environment values and application access are still unverified. No
+  hosted deployment or configuration action has been performed here.
+- Learning lists/preferences currently use owner-scoped local caches; cloud
+  progress sync and guest import remain future implementation steps. Custom SMTP,
+  Google sign-in, password reset, avatar upload and account deletion remain
+  unverified or unimplemented as described in the development log.
+
+Follow [preview verification](preview-verification.md) for the next deployment
+checkpoint. The client remains Owner of their hosted resources.
 
 The first migration defines profiles, preferences, trusted content tables and a
 private avatar bucket. Server-owned account_state reserves deleting/reset_version;
@@ -76,8 +91,8 @@ Obtain staging's link/reference and place the project URL/publishable key in loc
 env. Keep privileged credentials out of chat. Confirm the client content/audio
 folder, DNS/mailbox access, Google OAuth, SMTP and production hosting access.
 
-Auth must live above StorageOwnerBoundary (and therefore above CourseShell).
-Only select a private cache after restoring/verifying the actual account; block
-private page rendering during that transition. Wire safe guest import separately
+Auth now lives above StorageOwnerBoundary and CourseShell. The coordinator
+verifies the user before selecting a private cache and gates private rendering
+during account transitions. Keep these boundaries intact. Wire safe guest import separately
 before claiming guest preservation in cloud accounts. Keep db.js synchronous
 and add online background sync; do not claim existing guest progress is synced.
