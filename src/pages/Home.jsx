@@ -5,8 +5,11 @@ import LevelCarousel from '../components/ui/LevelCarousel';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import Avatar from '../components/ui/Avatar';
 import { useCourse } from '../lib/language';
+import { useAuth } from '../lib/auth.jsx';
+import { useProfile, displayName } from '../lib/profile.js';
 
 const PhrasesPromoCard = ({ onClick }) => {
+
   return (
     <div 
       onClick={onClick}
@@ -118,10 +121,30 @@ const PhrasesPromoCard = ({ onClick }) => {
 
 export default function Home() {
   const navigate = useNavigate();
-  const [currentUser] = useState({ name: 'Htoo Khant Kyaw', initials: 'HK' });
+  const { user, isGuest, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const course = useCourse();
   const [reviewCount, setReviewCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
+
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+
+  let greetingSubtitle = timeGreeting;
+  let userName = 'Guest Learner';
+
+  if (authLoading) {
+    greetingSubtitle = 'Welcome';
+    userName = 'Loading…';
+  } else if (user) {
+    greetingSubtitle = timeGreeting;
+    userName = profileLoading
+      ? (user.user_metadata?.display_name || user.email?.split('@')[0] || 'Learner')
+      : displayName(profile, user);
+  } else {
+    greetingSubtitle = 'Welcome';
+    userName = 'Guest Learner';
+  }
 
   React.useEffect(() => {
     // Dynamic import to avoid top-level dependency issues if any
@@ -137,11 +160,34 @@ export default function Home() {
       
       {/* Header */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px', paddingBottom: '16px', borderBottom: '1px solid var(--color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+          onClick={() => navigate('/profile')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter') navigate('/profile'); }}
+          aria-label="Go to profile"
+        >
           <Avatar size={48} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: 0, fontWeight: 500 }}>Good morning</p>
-            <h1 style={{ fontSize: '1.125rem', color: 'var(--color-text-navy)', margin: 0, fontWeight: 700 }}>{currentUser.name}</h1>
+            <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: 0, fontWeight: 500 }}>{greetingSubtitle}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ fontSize: '1.125rem', color: 'var(--color-text-navy)', margin: 0, fontWeight: 700 }}>{userName}</h1>
+              {isGuest && (
+                <span style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 700,
+                  color: 'var(--color-secondary-blue)',
+                  backgroundColor: 'var(--color-ghost-blue)',
+                  padding: '2px 6px',
+                  borderRadius: '6px',
+                  letterSpacing: '0.3px',
+                  textTransform: 'uppercase'
+                }}>
+                  Guest
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <LanguageSwitcher />

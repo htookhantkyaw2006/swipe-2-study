@@ -17,11 +17,22 @@ import WritingPractice from './pages/WritingPractice';
 import LearnRadicals from './pages/LearnRadicals';
 import LearnKana from './pages/LearnKana';
 import LearnSounds from './pages/LearnSounds';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
+import AuthCallback from './pages/AuthCallback';
 import './App.css';
 
 function App() {
   return (
     <Routes>
+      {/* Auth screens — no bottom nav */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+
+      {/* Main app with bottom nav */}
       <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="learn/*" element={<Learn />} />

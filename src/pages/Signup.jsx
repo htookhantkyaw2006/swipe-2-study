@@ -1,0 +1,225 @@
+import { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { getSupabaseClient } from '../lib/supabase.js';
+import { useAuth, safeReturnPath } from '../lib/auth.jsx';
+import { Mail, Lock, Eye, EyeOff, User, ArrowLeft, Sparkles } from 'lucide-react';
+
+export default function Signup() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isConfigured } = useAuth();
+
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const returnTo = safeReturnPath(new URLSearchParams(location.search).get('returnTo'));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+    setError(null);
+
+    const trimmedName = displayName.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName) {
+      setError('Please enter your display name.');
+      return;
+    }
+    if (trimmedName.length > 100) {
+      setError('Display name must be 100 characters or less.');
+      return;
+    }
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please choose a password.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error: signUpError } = await getSupabaseClient().auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: {
+          data: { display_name: trimmedName },
+          emailRedirectTo: `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`,
+        },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      // Supabase returns a user but with no session when email confirmation is required.
+      if (data.user && !data.session) {
+        navigate(`/verify-email?email=${encodeURIComponent(trimmedEmail)}&returnTo=${encodeURIComponent(returnTo)}`);
+      } else if (data.session) {
+        // Auto-confirm is on (unlikely in production but possible in dev).
+        navigate(returnTo, { replace: true });
+      }
+    } catch (err) {
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isConfigured) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <p style={{ color: 'var(--color-secondary-blue)', textAlign: 'center' }}>
+            Backend is not configured. The app is running in guest mode.
+          </p>
+          <button className="btn-secondary" onClick={() => navigate('/')} style={{ width: '100%', marginTop: 16 }}>
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        {/* Back link */}
+        <button
+          onClick={() => navigate('/')}
+          className="auth-back-link"
+          type="button"
+          aria-label="Back to Home"
+        >
+          <ArrowLeft size={18} />
+          <span>Home</span>
+        </button>
+
+        {/* Header */}
+        <div className="auth-header">
+          <div className="auth-logo">
+            <Sparkles size={28} strokeWidth={2.5} />
+          </div>
+          <h1 className="auth-title">Create account</h1>
+          <p className="auth-subtitle">Start your language learning journey</p>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="auth-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="auth-form" noValidate>
+          <div className="auth-field">
+            <label htmlFor="signup-name" className="auth-label">Display name</label>
+            <div className="auth-input-wrap">
+              <User size={18} className="auth-input-icon" />
+              <input
+                id="signup-name"
+                type="text"
+                className="auth-input"
+                placeholder="Your name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                autoComplete="name"
+                maxLength={100}
+                required
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div className="auth-field">
+            <label htmlFor="signup-email" className="auth-label">Email</label>
+            <div className="auth-input-wrap">
+              <Mail size={18} className="auth-input-icon" />
+              <input
+                id="signup-email"
+                type="email"
+                className="auth-input"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div className="auth-field">
+            <label htmlFor="signup-password" className="auth-label">Password</label>
+            <div className="auth-input-wrap">
+              <Lock size={18} className="auth-input-icon" />
+              <input
+                id="signup-password"
+                type={showPassword ? 'text' : 'password'}
+                className="auth-input"
+                placeholder="At least 6 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                minLength={6}
+                required
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="auth-input-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="btn-primary auth-submit"
+            disabled={loading}
+          >
+            {loading ? 'Creating account…' : 'Create Account'}
+          </button>
+        </form>
+
+        {/* Footer links */}
+        <div className="auth-footer">
+          <p>
+            Already have an account?{' '}
+            <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`} className="auth-link">
+              Sign in
+            </Link>
+          </p>
+        </div>
+
+        {/* Guest access */}
+        <button
+          type="button"
+          className="btn-secondary auth-guest"
+          onClick={() => navigate('/')}
+        >
+          Continue as Guest
+        </button>
+        <p className="auth-guest-note">
+          Guest progress stays on this device and is not synced to the cloud.
+        </p>
+      </div>
+    </div>
+  );
+}

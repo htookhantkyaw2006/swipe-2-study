@@ -2,6 +2,8 @@ import React from 'react';
 import { Layers, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCourse } from '../lib/language';
+import { useAuth } from '../lib/auth.jsx';
+import { useProfile, displayName } from '../lib/profile.js';
 
 const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => {
   const radius = (size - strokeWidth) / 2;
@@ -45,9 +47,22 @@ const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => 
 
 export default function Flashcards() {
   const navigate = useNavigate();
+  const { user, isGuest, loading: authLoading } = useAuth();
+  const { profile } = useProfile();
   
   const course = useCourse();
   const levels = course.levels.map((l) => ({ ...l, progress: l.demo.phraseProgress }));
+
+  let greetingText = 'Hello Learner,';
+  if (user) {
+    const fullName = displayName(profile, user);
+    const firstName = fullName.trim().split(/\s+/)[0] || 'Learner';
+    greetingText = `Hello ${firstName},`;
+  } else if (isGuest) {
+    greetingText = 'Hello Learner,';
+  } else if (authLoading) {
+    greetingText = 'Hello,';
+  }
 
   return (
     <div style={{ 
@@ -68,7 +83,7 @@ export default function Flashcards() {
         {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '48px' }}>
           <div>
-            <p style={{ fontSize: '1rem', color: 'var(--color-secondary-blue)', margin: '0 0 8px 0', fontWeight: 600 }}>Hello Htoo,</p>
+            <p style={{ fontSize: '1rem', color: 'var(--color-secondary-blue)', margin: '0 0 8px 0', fontWeight: 600 }}>{greetingText}</p>
             <h1 style={{ fontSize: '2.5rem', color: 'var(--color-text-navy)', margin: 0, fontWeight: 900, lineHeight: 1.1 }}>
               Continue<br/>Flashcards!
             </h1>
