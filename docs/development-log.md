@@ -1,5 +1,15 @@
 # Development log
 
+## Latest — 29 October 2026 — Work batch B1: account cloud integration
+
+- Reconciled feat/backend-foundation tip with feat/global-signout-dialog (9a2f5d2), verified all 196 foundation baseline tests pass, and branched feat/account-cloud-integration.
+- **Checkpoint 1 — Global sign-out**: Extended authCoordinator.js with signOutGlobal() using scope: 'global'. Added generation guards to prevent delayed responses from overwriting subsequent sign-ins. Handled both returned SDK error objects and thrown exceptions. Local learning caches and guest records are preserved; active owner is synchronously reset to guest. Integrated GlobalSignOutDialog into Profile.jsx with honest account label, duplicate submit prevention, and failure retry paths. Added 2 dedicated integration tests.
+- **Checkpoint 2 — Durable cloud-import requests**: Created src/lib/cloudImportDurableRequest.js. Request UUID, source fingerprint, choice, expected reset version, and payload are durably persisted to s2s_user_<id>_cloud_import_request_v1 before transmission. Storage failure halts without sending; reload/retry reuses identical request UUID. State machine transitions not_sent -> unconfirmed -> server_acknowledged -> locally_applied. Reset version mismatch halts replay. Corrupted storage preserves raw bytes. Added 5 dedicated unit tests.
+- **Checkpoint 3 — Conflict-safe snapshot restore**: Created src/lib/cloudSnapshotHydration.js. Implemented 3-way reconciliation between cloud snapshot, local tables, and tombstone tracking. Local deletions do not resurrect from older cloud snapshots; newer local learning is never overwritten. Migrates pre-existing local caches safely. Atomically commits effective cache into learning_document_v1 with retry on concurrent edits. Preserves all opaque metadata (guestImport). Added 4 dedicated unit tests.
+- **Checkpoint 4 — Staging cloud guest-import activation**: Created src/lib/cloudImportGate.js and src/lib/cloudGuestImportService.js. Activated cloud import behind explicit VITE_CLOUD_IMPORT_STAGING=true gate, keeping device-only behavior intact when disabled. Audited sample filtering (is_sample: true / demo: true excluded, seeded: true bookmarks kept). "Account data only" uploads zero items and keeps guest data intact. Updated guestImportController.js to handle cloud persistence messaging. Added 3 dedicated integration tests.
+- Created docs/cloud-import-activation.md covering staging activation, environment variables, SQL verification, and remaining limitations.
+- Validation: **210 Node tests pass** (14 new tests across global sign-out, durable outbox, snapshot hydration, and staging integration; 0 failures), lint **0 errors / 8 existing warnings** preserved, production build passes (dist/assets/index-TF-4HH-Q.js, 965 kB / 287 kB gzip in 1.29s), and git diff --check is clean. No hosted migrations or live account deletions performed.
+
 ## Latest — 28 October 2026 — Work batch A: offer timing and cloud-import foundation
 
 - PT reported the configured device-only merge and refresh/logout/login checks
