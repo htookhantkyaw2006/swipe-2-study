@@ -38,6 +38,7 @@ export function AuthProvider({ children, coordinator = defaultAuthCoordinator })
     isCurrent: coordinator.isCurrent,
     isGuest: state.isGuest,
     isConfigured: state.isConfigured,
+    generation: state.generation,
   };
 
   const isOwnerAligned = state.user

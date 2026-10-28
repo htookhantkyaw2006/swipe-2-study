@@ -1,14 +1,16 @@
 # Guest import service checkpoint
 
-28 October 2026. Based on `d92dcf1`. This implements the service and cache
-primitives only. The separate IDE-agent dialog is not integrated yet; no automatic
-login prompt, Profile action, success toast or cloud sync is shipped by this commit.
+28 October 2026. Core checkpoint `c55e015`, based on `d92dcf1`, implemented the
+service/cache primitives. The subsequent [combined flow](guest-import.md) now
+integrates the IDE dialog, automatic offers, Profile re-entry and notices.
+Cloud sync remains unimplemented. The service/storage contract below still applies.
 
 ## Ownership and integration contract
 
-The IDE agent owns only `GuestImportDialog.jsx`, its CSS and its handoff document.
-The service owner integrates it later. No SQL, hosted configuration, dependencies,
-global styling, main branch or deployment changes belong to this checkpoint.
+The IDE-agent contribution owns only `GuestImportDialog.jsx`, its CSS and its
+handoff document. The integrating developer owns the provider/controller and
+entry points. No SQL, hosted configuration, dependencies, global styling,
+main-branch or deployment changes belong to this checkpoint.
 
 Production entry: `src/lib/guestImport.js` exports `guestImportService`.
 
@@ -117,7 +119,7 @@ reset/deletion version checks; it must not upload this cache envelope blindly.
 
 ## Validation and remaining work
 
-At this checkpoint:
+At the original core checkpoint (superseded by the combined-flow checks):
 
 - 145 Node tests pass, including 28 new service/data boundary tests and one real
   Vite module/cache integration test. Existing Auth, profile, policy, cache,
@@ -130,6 +132,7 @@ At this checkpoint:
   The two review-identity checks exercise real study/review buttons.
 - No real account, email, Storage or hosted database mutation is performed here.
 
-Pending: IDE dialog review, parent integration and re-entry, actual browser
-acceptance of the combined flow, multi-tab safeguards, hosted cloud progress sync,
-and Safari/physical-device checks. No “guest import feature complete” claim yet.
+The dialog review, parent integration/re-entry and simulated combined browser
+flow have since been completed; see guest-import.md. Actual configured account
+acceptance, stronger multi-tab safeguards, hosted cloud progress sync and
+Safari/physical-device checks remain pending.

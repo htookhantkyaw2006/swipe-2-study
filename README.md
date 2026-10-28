@@ -19,9 +19,10 @@ caches. Cross-browser password recovery is implemented with local SDK/browser
 simulations and requires activating the matching Supabase Reset password email
 template. Real email delivery and hosted reset/login checks are still pending.
 See [password recovery](docs/password-recovery.md) and
-[email/SMTP setup](docs/auth-email-setup.md). The explicit guest-import service
-is implemented for device caches; its separate dialog/integration is pending.
-See [guest import boundaries](docs/guest-import-core.md). Cloud progress sync,
+[email/SMTP setup](docs/auth-email-setup.md). Explicit device-only guest import is
+integrated with post-login offers, Profile re-entry and confirmation/error states;
+configured account acceptance is pending. See [guest import](docs/guest-import.md).
+Cloud progress sync,
 Google sign-in and account deletion are not implemented yet.
 
 Profile name editing and private avatar upload/replacement/removal are implemented

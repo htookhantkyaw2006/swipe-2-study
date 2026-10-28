@@ -1,5 +1,39 @@
 # Development log
 
+## Latest — 28 October 2026 — Integrated device-only guest learning import
+
+- Reviewed and merged the IDE-agent dialog `3d85c61` with the import core
+  `c55e015`. The original commits remain in history. The client-reported unrelated
+  passwordRecovery.js whitespace edit is not part of this work.
+- Added a Router-aware provider/controller above CourseShell, automatic offers
+  after verified sign-in, explicit merge/account-only actions, and Profile →
+  Guest learning re-entry. Deferral writes no decision and survives ordinary SPA
+  navigation/course changes; a fresh reload/sign-in may offer undecided rows again.
+- Reworded dialog copy to explicitly state device-only persistence, no cloud sync
+  and preserved guest records. Added recheck after errors, accessible scrollable
+  summaries and visible/focused result notices. An all-duplicate merge does not
+  claim new records were added. Pending choices suppress dismissal/double-submit.
+- Controller owner/generation/request guards discard stale UI results. Auth,
+  recovery, Edit Profile and study routes suppress the modal. Verified same-user
+  events never restart a study deck; if an import finishes after browser Back
+  enters study, the list refresh/notice waits until session exit. Profile also
+  stays usable when stored collection data cannot be read safely.
+- Validation: **160 Node tests pass**, lint **0 errors / 8 existing warnings**,
+  unconfigured and synthetic-configured production builds pass, diff whitespace
+  checks pass. Existing large-bundle warnings remain. No new dependencies/SQL,
+  hosted configuration, deployment or main-branch changes.
+- Chromium production: **49 checks / 30 layout states**. Development StrictMode:
+  **52 checks / 60 layout states**, including the isolated long multilingual-label
+  harness and keyboard summary scrolling. Unconfigured production: **9 smoke
+  checks**, including the accepted sidebar scroll/full-width collapse behavior.
+  Total: **110 checks / 90 layouts**; no uncaught page errors/unexpected requests.
+- Browser flows use the installed SDK with intercepted synthetic Auth/profile
+  responses and native localStorage/crypto. They cover actual login, deferral,
+  re-entry, stale-source/error/recheck, pending/merge, immediate counts, refresh,
+  logout/login, separate account-only decisions, real quota/retry, corrupt cache,
+  cross-tab sign-out and session preservation. These are not real hosted account,
+  email, cloud sync, RLS, Safari or physical-device acceptance. See guest-import.md.
+
 ## Latest — 28 October 2026 — Guest import service, device-cache checkpoint
 
 - PT confirmed the sidebar is good and asked to leave it until final QA. PT also

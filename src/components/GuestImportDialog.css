@@ -2,10 +2,6 @@
    Guest Import Dialog Styles
    ========================================================================== */
 
-.guest-import-dialog {
-  /* Inherits modal styles from .app-dialog */
-}
-
 .guest-import-dialog__container {
   min-width: 0;
   display: flex;
@@ -168,7 +164,9 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .guest-import-dialog__stat strong {
@@ -243,6 +241,10 @@
   overflow-wrap: anywhere;
 }
 
+.guest-import-dialog__device-note { font-size: 0.875rem; line-height: 1.6; color: var(--color-primary-blue); padding: 12px 14px; border: 1px solid var(--color-border); background: var(--color-ghost-blue); border-radius: var(--radius-btn); margin-bottom: 16px; overflow-wrap: anywhere; }
+.guest-import-dialog__reload { min-height: 44px; padding: 10px 14px; margin-bottom: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-btn); background: white; color: var(--color-primary-blue); font-weight: 600; }
+.guest-import-dialog__reload:focus-visible { outline: 2px solid var(--color-primary-blue); outline-offset: 2px; }
+
 .guest-import-dialog__action-group--later {
   padding-top: 4px;
 }
@@ -267,6 +269,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .guest-import-dialog .auth-spinner { animation: none; }
   .guest-import-dialog__btn,
   .guest-import-dialog__close-btn {
     transition: none;

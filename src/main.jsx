@@ -11,6 +11,7 @@ import StorageOwnerBoundary from './components/StorageOwnerBoundary.jsx'
 import { AuthProvider } from './lib/auth.jsx'
 import { recoveryLink } from './lib/recoveryLink.js'
 import './responsive-tools.css'
+import GuestImportProvider from './components/GuestImportProvider.jsx'
 
 // Capture and scrub custom recovery links before Auth or Router initialization.
 recoveryLink.capture(window.location.href, path => window.history.replaceState(window.history.state, '', path));
@@ -28,7 +29,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <PreferencesProvider>
           <LanguageProvider>
             <BrowserRouter>
-              <CourseShell />
+              <GuestImportProvider>
+                <CourseShell />
+              </GuestImportProvider>
             </BrowserRouter>
           </LanguageProvider>
         </PreferencesProvider>

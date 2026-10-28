@@ -4,6 +4,8 @@ import { PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import BottomNav from './BottomNav';
 import { readCollapsedPreference, writeCollapsedPreference } from '../lib/sidebarStorage';
 import { useDesktopLayout } from '../lib/useDesktopLayout';
+import { useGuestImport } from '../lib/useGuestImport';
+import GuestImportNotice from './GuestImportNotice';
 
 const readScrollCache = () => {
   try {
@@ -20,6 +22,13 @@ export default function Layout() {
   const isDesktop = useDesktopLayout();
   const [isCollapsed, setIsCollapsed] = useState(readCollapsedPreference);
   const isSessionActive = location.pathname.endsWith('/session');
+  const { learningVersion } = useGuestImport();
+  const [renderVersion, setRenderVersion] = useState(learningVersion);
+  useLayoutEffect(() => {
+    // A save can finish after browser Back enters a study session. Refresh its
+    // lists on exit, without replacing the session's in-memory deck mid-study.
+    if (!isSessionActive) setRenderVersion(learningVersion);
+  }, [isSessionActive, learningVersion]);
 
   const toggleSidebar = () => {
     const next = !isCollapsed;
@@ -65,7 +74,8 @@ export default function Layout() {
             <span>{isCollapsed ? 'Show sidebar' : 'Hide sidebar'}</span>
           </button>
         </div>}
-        <Outlet />
+        {!isSessionActive && <GuestImportNotice />}
+        <Outlet key={renderVersion} />
       </main>
     </div>
   );

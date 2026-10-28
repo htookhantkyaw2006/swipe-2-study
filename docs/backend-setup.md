@@ -22,8 +22,9 @@ As of 28 October 2026:
   Preview environment values and application access are still unverified. No
   hosted deployment or configuration action has been performed here.
 - Learning lists/preferences currently use owner-scoped local caches. The guest
-  import service now supports explicit device-only decisions; its separate dialog
-  and parent integration are pending. See guest-import-core.md. Cloud progress
+  import flow now integrates explicit device-only decisions, the IDE dialog,
+  post-login offers and Profile re-entry. Configured acceptance is pending; see
+  guest-import.md. Cloud progress
   sync remains unimplemented. Profile name editing and private avatar upload/removal
   are implemented and tested with simulated SDK/browser responses. PT reports an
   uploaded photo persisted through logout/login; broader hosted acceptance remains pending. See

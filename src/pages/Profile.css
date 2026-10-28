@@ -48,6 +48,7 @@
 .profile-switch:disabled { cursor: default; opacity: 0.5; }
 .profile-setting--logout .profile-setting__icon, .profile-setting--logout strong { color: #B91C1C; }
 .profile-setting--logout:disabled { cursor: default; opacity: 0.55; }
+.profile-setting--link:disabled { cursor: default; opacity: 0.55; }
 .profile-soon { padding: 4px 7px; font-size: 0.6875rem; line-height: 1.5; background: var(--color-ghost-blue); color: var(--color-primary-blue); border-radius: 6px; }
 @media (hover: hover) {
   .profile-setting--link:hover, .profile-setting--logout:hover:not(:disabled), .profile-counts > a:hover { background: var(--color-ghost-blue); }

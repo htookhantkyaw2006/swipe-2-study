@@ -26,6 +26,7 @@ export default function GuestImportDialog({
   error = null,
   onChoose,
   onClose,
+  onReload,
 }) {
   if (!open) {
     return null;
@@ -69,8 +70,9 @@ export default function GuestImportDialog({
         </div>
 
         <p className="guest-import-dialog__intro">
-          We found study records created on this device. Would you like to merge them into your account, or keep your account data only?
+          We found guest study records on this device. Add them to this account’s data here, or keep the account’s current data separate?
         </p>
+        <p className="guest-import-dialog__device-note">Learning data stays on this device. Cloud sync is not available yet. Your original guest records will be kept.</p>
 
         {error && (
           <div className="guest-import-dialog__error" role="alert">
@@ -78,6 +80,7 @@ export default function GuestImportDialog({
             <span>{error}</span>
           </div>
         )}
+        {error && onReload && <button type="button" className="guest-import-dialog__reload" disabled={pending} onClick={onReload}>Recheck guest data</button>}
 
         {pending && (
           <div className="guest-import-dialog__pending" role="status" aria-live="polite">
@@ -86,7 +89,7 @@ export default function GuestImportDialog({
           </div>
         )}
 
-        <div className="guest-import-dialog__summary" aria-label="Guest study summary">
+        <div className="guest-import-dialog__summary" role="region" tabIndex={0} aria-label="Guest study summary">
           {records.length > 0 ? (
             records.map((item, index) => (
               <div
@@ -129,7 +132,7 @@ export default function GuestImportDialog({
               Merge guest data
             </button>
             <p className="guest-import-dialog__action-hint">
-              Combine guest saved words, review items, and progress records with your account.
+              Combine guest words and progress with this account’s data on this device. Existing account records take priority.
             </p>
           </div>
 
@@ -143,7 +146,7 @@ export default function GuestImportDialog({
               Use account data only
             </button>
             <p className="guest-import-dialog__action-hint">
-              Keep only what is in your account and leave guest records unmerged.
+              Leave guest records separate and keep using this account’s current data on this device.
             </p>
           </div>
 

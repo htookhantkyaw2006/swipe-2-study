@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Bookmark, RotateCw, LogOut, Trash2, Languages, Target, Volume2, Crown, User, LogIn, AlertCircle, RefreshCw, ChevronRight, MessageSquare } from 'lucide-react';
+import { Settings, Bookmark, RotateCw, LogOut, Trash2, Languages, Target, Volume2, Crown, User, LogIn, AlertCircle, RefreshCw, ChevronRight, MessageSquare, FolderInput } from 'lucide-react';
 import { usePreferences, OPTIONS } from '../lib/preferences';
 import { useLanguage } from '../lib/language';
 import { useAuth } from '../lib/useAuth.js';
@@ -8,6 +8,7 @@ import { useProfile, displayName, initialsOf } from '../lib/profile.js';
 import { useAvatarUrl } from '../lib/useAvatarUrl.js';
 import Avatar from '../components/ui/Avatar';
 import { db } from '../lib/db';
+import { useGuestImport } from '../lib/useGuestImport.js';
 import '../components/study/StudyPage.css';
 import './Profile.css';
 
@@ -25,12 +26,19 @@ export default function Profile() {
   const { user, loading: authLoading, isTransitioning, error: authError, retryVerification, signOut } = useAuth();
   const { profile, loading: profileLoading, error: profileError, retry } = useProfile();
   const photo = useAvatarUrl(profile?.avatar_path);
+  const guestImport = useGuestImport();
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
+  const [, retryCollections] = useState(0);
   const busy = authLoading || isTransitioning;
   const name = user ? displayName(profile, user) : 'Guest Learner';
-  const savedCount = db.get('saved_words').length;
-  const reviewCount = db.get('review_cards').length;
+  let savedCount = null;
+  let reviewCount = null;
+  let collectionError = false;
+  try {
+    savedCount = db.get('saved_words').length;
+    reviewCount = db.get('review_cards').length;
+  } catch { collectionError = true; }
 
   const handleLogout = async () => {
     if (loggingOut || busy) return;
@@ -60,7 +68,8 @@ export default function Profile() {
           </section>
           <section className="profile-collection" aria-label={`${language.name} collections`}>
             <h2>{language.name} collections</h2>
-            <div className="profile-counts"><Link to="/saved"><Bookmark size={20} aria-hidden="true" /><strong>{savedCount}</strong><span>Saved words</span></Link><Link to="/learn/review"><RotateCw size={20} aria-hidden="true" /><strong>{reviewCount}</strong><span>To review</span></Link></div>
+            <div className="profile-counts"><Link to="/saved"><Bookmark size={20} aria-hidden="true" /><strong>{savedCount ?? '—'}</strong><span>Saved words</span></Link><Link to="/learn/review"><RotateCw size={20} aria-hidden="true" /><strong>{reviewCount ?? '—'}</strong><span>To review</span></Link></div>
+            {collectionError && <ProfileError onRetry={() => retryCollections(attempt => attempt + 1)} label="Retry learning collections">Learning data could not be read on this device. Stored records have been kept.</ProfileError>}
           </section>
           <div className="profile-plan"><span className="profile-setting__icon"><Crown size={22} aria-hidden="true" /></span><div><strong>Free plan</strong><p>Learn at your own pace.</p></div><Link className="study-text-link" to="/premium">View plans</Link></div>
         </aside>
@@ -74,6 +83,7 @@ export default function Profile() {
           </div></section>
           <section className="profile-group" aria-labelledby="profile-actions-title"><h2 id="profile-actions-title">Account & support</h2><div className="profile-group__surface">
             {user && !busy && <ProfileLink to="/profile/edit" icon={User} title="Edit profile" subtitle="Update your name and photo" />}
+            {user && !busy && <button type="button" className="profile-setting profile-setting--link" aria-label="Review guest learning" onClick={guestImport.openGuestImport} disabled={!guestImport.available || guestImport.pending || guestImport.checking}><span className="profile-setting__icon"><FolderInput size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{guestImport.checking ? 'Checking guest learning…' : 'Guest learning'}</strong><span>Review guest records on this device</span></span><ChevronRight size={20} aria-hidden="true" /></button>}
             {user ? <button className="profile-setting profile-setting--logout" onClick={handleLogout} disabled={loggingOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{loggingOut ? 'Logging out…' : 'Log out'}</strong><span>Switch back to guest mode</span></span></button> : <ProfileLink to="/login" icon={LogIn} title="Sign in or register" subtitle="Use your account" />}
             <div className="profile-setting"><span className="profile-setting__icon"><MessageSquare size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Send feedback</strong><span>Help improve Swipe 2 Study</span></span><span className="profile-soon">Soon</span></div>
             <div className="profile-setting"><span className="profile-setting__icon"><Trash2 size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Delete account</strong><span>Available in a later update</span></span><span className="profile-soon">Soon</span></div>
