@@ -1,3 +1,4 @@
+import { isCloudImportStagingEnabled } from './cloudImportGate.js';
 const initial = () => ({
   accountId: null, generation: null, autoChecked: false,
   checking: false, pending: false, open: false, offer: null,
@@ -18,7 +19,7 @@ function errorMessage(error) {
 }
 
 // Owns UI requests only. Auth selects owners; the service owns all persistence.
-export function createGuestImportController(service) {
+export function createGuestImportController(service, { allowCloud = isCloudImportStagingEnabled() } = {}) {
   let state = Object.freeze(initial());
   let operation = 0;
   const listeners = new Set();
@@ -59,7 +60,7 @@ export function createGuestImportController(service) {
     try {
       const offer = await service.inspect();
       if (!current(token, accountId, generation)) return;
-      if (offer?.ownerId !== accountId || offer.persistence !== 'device-only'
+      if (offer?.ownerId !== accountId || (allowCloud ? (offer?.persistence !== 'device-only' && offer?.persistence !== 'cloud') : offer?.persistence !== 'device-only')
         || !['available', 'nothing-to-import'].includes(offer.status)) throw new Error('Unexpected guest import offer.');
       const available = offer.status === 'available';
       publish({ checking: false, offer: available ? offer : null, open: available,
@@ -79,15 +80,16 @@ export function createGuestImportController(service) {
     try {
       const result = await service.choose(offer, choice);
       if (!current(token, accountId, generation)) return;
-      if (!['saved', 'already-decided'].includes(result?.status) || result.persistence !== 'device-only'
+      if (!['saved', 'already-decided'].includes(result?.status) || (allowCloud ? (result?.persistence !== 'device-only' && result?.persistence !== 'cloud') : result?.persistence !== 'device-only')
         || !['merge', 'account-only'].includes(result.choice)) throw new Error('Guest import save was not confirmed.');
+      const isCloudResult = result.persistence === 'cloud';
       const message = result.status === 'already-decided'
-        ? 'This guest learning is already handled on this device. Cloud sync is not available yet.'
+        ? (isCloudResult ? 'This guest learning is already handled on your account.' : 'This guest learning is already handled on this device. Cloud sync is not available yet.')
         : result.choice === 'merge'
-          ? result.addedRecords === 0
+          ? (isCloudResult ? 'Guest learning merged into your account in the cloud and on this device.' : (result.addedRecords === 0
             ? 'Guest learning checked. Existing account records were kept on this device. Cloud sync is not available yet.'
-            : 'Guest learning added to this account on this device. Cloud sync is not available yet.'
-          : 'Using account data on this device. Guest records have been kept separate.';
+            : 'Guest learning added to this account on this device. Cloud sync is not available yet.'))
+          : (isCloudResult ? 'Using account data in the cloud and on this device. Guest records have been kept separate.' : 'Using account data on this device. Guest records have been kept separate.');
       publish({ pending: false, open: false, offer: null, error: null,
         learningVersion: state.learningVersion + (result.choice === 'merge' ? 1 : 0),
         notice: { kind: 'success', message },
