@@ -1,5 +1,32 @@
 # Development log
 
+## Latest — 28 October 2026 — Guest import service, device-cache checkpoint
+
+- PT confirmed the sidebar is good and asked to leave it until final QA. PT also
+  reported a successful real profile-photo upload that survives logout/login.
+  These are user-reported acceptance results, not new hosted tests run here.
+- Started guest import in parallel with an external IDE-agent dialog task. The
+  dialog owns only three new UI/document files; this checkpoint does not integrate
+  it, modify routes, show a login prompt or claim the full feature is delivered.
+- Added read-only guest inspection, explicit merge/account-only decisions,
+  per-language counts, server-user/live-session verification and owner/generation
+  guards. Only actual learning tables are included; course seeds, search history,
+  settings, Auth keys and other accounts are excluded. Guest data is never deleted.
+- Account records win semantic conflicts, imported IDs are fresh, and counters
+  are not added. Account-specific handled identities prevent retries/new guest
+  additions from resurrecting a word the user subsequently removed or skipped.
+  Review membership/removal now matches word identity across different deck IDs.
+- Added an authoritative single-key account document for imported tables plus
+  the receipt. Existing synchronous DB CRUD follows that document; untouched
+  tables retain their format and old keys remain for recovery. A rejected quota
+  write cannot leave a half-imported set of tables; lost-response retries reconcile.
+- LocalStorage checks do not provide cross-tab compare-and-swap. This is a
+  device-cache service, not cloud sync. UI integration/re-entry, multi-tab
+  safeguards and hosted progress sync remain pending. See guest-import-core.md.
+- Validation: 145 Node tests pass (29 added), lint zero errors/eight existing
+  warnings, production build and whitespace checks pass. All 15 Chromium
+  native-storage and actual review-action checks pass; details in guest-import-core.md.
+
 ## Latest — 28 October 2026 — Test suite stability and concurrency resolution
 
 - Investigated test failures in `authCallback.test.js` and `authIntegration.test.js` where `renderToString` and hook execution threw `Cannot read properties of null`.

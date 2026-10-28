@@ -59,3 +59,35 @@ test('actual db, language, preferences and seeding modules follow an owner switc
   assert.equal(readPreferences().showPinyin, false);
   assert.equal(db.get('saved_words')[0].phrase, 'guest-only');
 });
+
+test('guest import uses the actual app cache, preserves seeding and survives a new storage-owner instance', async () => {
+  values.clear();
+  const { storageOwner, createStorageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+  const { db } = await server.ssrLoadModule('/src/lib/db.js');
+  const { seedCourse } = await server.ssrLoadModule('/src/lib/seed.js');
+  const { createGuestImportService } = await server.ssrLoadModule('/src/lib/guestImportService.js');
+  const { guestImportService: boundService } = await server.ssrLoadModule('/src/lib/guestImport.js');
+  const A = '11111111-1111-4111-8111-111111111111';
+  storageOwner.setOwner(null);
+  db.setFor('zh', 'saved_words', [{ id: 'guest', phrase: '你好', reading: 'nǐ hǎo' }]);
+  seedCourse('zh');
+  const guestCards = db.getFor('zh', 'flashcards');
+  db.setFor('zh', 'review_cards', [guestCards[0]]);
+  storageOwner.setOwner(A);
+  seedCourse('zh');
+  const accountCards = db.getFor('zh', 'flashcards');
+  const service = createGuestImportService({
+    storageOwner, getAuthState: () => ({ user: { id: A }, generation: 1 }), verifyUser: async () => {},
+  });
+  assert.equal(typeof boundService.inspect, 'function', 'production adapter is Vite-loadable');
+  await service.choose(await service.inspect(), 'merge');
+  assert.equal(db.getFor('zh', 'saved_words')[0].phrase, '你好');
+  assert.deepEqual(db.getFor('zh', 'flashcards'), accountCards, 'starter content is not replaced by guest content');
+  seedCourse('zh');
+  assert.deepEqual(db.getFor('zh', 'flashcards'), accountCards);
+  const freshOwner = createStorageOwner({ storage: () => globalThis.localStorage });
+  assert.equal(freshOwner.getOwner(), null);
+  assert.equal(JSON.parse(freshOwner.scope().getTable('zh', 'saved_words'))[0].id, 'guest');
+  freshOwner.setOwner(A);
+  assert.equal(JSON.parse(freshOwner.scope().getTable('zh', 'saved_words'))[0].phrase, '你好');
+});

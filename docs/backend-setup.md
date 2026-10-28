@@ -21,10 +21,12 @@ As of 28 October 2026:
   branch preview URL recorded in preview-verification.md. Dashboard access,
   Preview environment values and application access are still unverified. No
   hosted deployment or configuration action has been performed here.
-- Learning lists/preferences currently use owner-scoped local caches; cloud
-  progress sync and guest import remain future implementation steps. Profile
-  name editing and private avatar upload/removal are implemented and tested with
-  simulated SDK/browser responses; hosted acceptance remains pending. See
+- Learning lists/preferences currently use owner-scoped local caches. The guest
+  import service now supports explicit device-only decisions; its separate dialog
+  and parent integration are pending. See guest-import-core.md. Cloud progress
+  sync remains unimplemented. Profile name editing and private avatar upload/removal
+  are implemented and tested with simulated SDK/browser responses. PT reports an
+  uploaded photo persisted through logout/login; broader hosted acceptance remains pending. See
   profile-editing.md. Custom SMTP, Google sign-in and account deletion remain
   unverified or unimplemented as described in the development log. Password recovery is now
   implemented and simulated locally; see password-recovery.md for callback
@@ -100,3 +102,6 @@ verifies the user before selecting a private cache and gates private rendering
 during account transitions. Keep these boundaries intact. Wire safe guest import separately
 before claiming guest preservation in cloud accounts. Keep db.js synchronous
 and add online background sync; do not claim existing guest progress is synced.
+Imports now use an authoritative account learning document for touched tables;
+future sync/export/reset/deletion must use effective table reads and include that
+document rather than enumerating legacy per-table storage keys alone.

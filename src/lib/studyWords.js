@@ -1,5 +1,18 @@
 import { matchesQuery, readingOf, wordOf } from './entry.js';
 
+// IDs in old guest/account starter decks were generated independently. Compare
+// written form + pronunciation, preserving tones and distinct readings.
+export function studyWordKey(word) {
+  const normalize = value => typeof value === 'string' ? value.normalize('NFC').trim().replace(/\s+/gu, ' ').toLowerCase() : '';
+  const written = normalize(wordOf(word));
+  return written ? JSON.stringify([written, normalize(word?.pronunciation ?? readingOf(word))]) : null;
+}
+
+export function sameStudyWord(left, right) {
+  const key = studyWordKey(left);
+  return key !== null ? key === studyWordKey(right) : left?.id !== undefined && left.id === right?.id;
+}
+
 // Dictionary bookmarks and vocabulary cards have different stored shapes.
 // Adapt them for display/session use without rewriting the saved records.
 export function wordDetails(word) {

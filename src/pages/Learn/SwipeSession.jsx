@@ -7,7 +7,7 @@ import { speak } from '../../lib/speech';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
 import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
-import { readSessionCards } from '../../lib/studyWords';
+import { readSessionCards, sameStudyWord } from '../../lib/studyWords';
 import { phraseCards } from '../../lib/phraseCards';
 import './SwipeSession.css';
 
@@ -216,10 +216,10 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     setExitData({ direction });
     // Phrase practice does not write into the vocabulary review queue.
     if (!isPhrases && direction === 'right' && isReview) {
-      db.set('review_cards', db.get('review_cards').filter(c => c.id !== swipedCard.id));
+      db.set('review_cards', db.get('review_cards').filter(c => !sameStudyWord(c, swipedCard)));
     } else if (!isPhrases && direction === 'left' && !isReview) {
       const reviewCards = db.get('review_cards');
-      if (!reviewCards.some(c => c.id === swipedCard.id)) db.set('review_cards', [...reviewCards, swipedCard]);
+      if (!reviewCards.some(c => sameStudyWord(c, swipedCard))) db.set('review_cards', [...reviewCards, swipedCard]);
     }
     setFlipped(false);
     setHasFlippedOnce(false);

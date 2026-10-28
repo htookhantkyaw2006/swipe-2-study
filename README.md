@@ -19,12 +19,16 @@ caches. Cross-browser password recovery is implemented with local SDK/browser
 simulations and requires activating the matching Supabase Reset password email
 template. Real email delivery and hosted reset/login checks are still pending.
 See [password recovery](docs/password-recovery.md) and
-[email/SMTP setup](docs/auth-email-setup.md). Cloud progress sync, guest import,
+[email/SMTP setup](docs/auth-email-setup.md). The explicit guest-import service
+is implemented for device caches; its separate dialog/integration is pending.
+See [guest import boundaries](docs/guest-import-core.md). Cloud progress sync,
 Google sign-in and account deletion are not implemented yet.
 
 Profile name editing and private avatar upload/replacement/removal are implemented
-with local service tests and simulated SDK/browser checks. Real hosted profile
-and Storage acceptance is still pending. See [profile editing](docs/profile-editing.md).
+with local service tests and simulated SDK/browser checks. PT reports that an
+uploaded profile photo remains visible after logout/login in the configured app.
+Hosted replacement/removal, two-account checks and broader acceptance remain
+pending. See [profile editing](docs/profile-editing.md).
 
 PT has marked the existing-screen UI pass complete, with final acceptance checks
 deferred. It includes Home, vocabulary/phrase levels and sessions, collections,
