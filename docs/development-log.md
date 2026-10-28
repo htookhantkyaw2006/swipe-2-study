@@ -1,5 +1,17 @@
 # Development log
 
+## Latest — 29 October 2026 — Work batch B1 verification follow-up & entry-point hydration
+
+- Conducted focused follow-up verification across 5 key areas on feat/account-cloud-integration:
+  1. Documentation Correction (Global Sign-Out Cache Retention): Corrected inaccurate documentation claim. Clarified that Account A's learning cache remains preserved in local storage under s2s_user_<A>_*, active owner is reset to null (guest mode), guest view displays only guest-owned records (s2s_*), Account A's records are never visible to guest or Account B, and genuine guest records remain available independently.
+  2. Sign-In Snapshot Restore at App Entry Point: Updated src/lib/cloudGuestImportService.js inspect() to automatically trigger restoreAccountSnapshot() on verified sign-in even when guest tables have 0 records, the dialog never opens, or a pre-existing device-only import receipt exists in learning_document_v1.
+  3. Recovery After Reload: inspect() discovers previously unconfirmed requests on reload, providing an offer for idempotent retry reusing the exact same requestId and payload items. When server acknowledgement succeeds but subsequent local cache hydration fails, durable request remains in server_acknowledged state (recoverable on next reload) without falsely reporting full completion (status: 'saved').
+  4. Local Conflict Protection via DB Mutation Path: Updated src/lib/storageOwner.js setTable() to compare previous and incoming rows, recording deletion tombstones (recordLocalDeletion) in s2s_user_<ownerId>_cloud_sync_state_v1 on db.remove(), and marking edits dirty (recordLocalDirty). A deleted word/card survives subsequent snapshot restore and is not resurrected. Concurrent local edits occurring while snapshot restore is in flight commit safely via atomic retry loop.
+  5. Ownership Generation Guard in Local Logout: Updated src/lib/authCoordinator.js signOut() to capture opGen = nextGeneration() and enforce isCurrent(opGen) on async completion, handling both returned SDK error objects and thrown exceptions so delayed local logout errors from Account A cannot displace or leak to Account B.
+  6. Activation & Test Evidence Categorization: Explicitly categorized test environments into PGlite (in-process PostgreSQL), Mocked SDK (Node unit/integration runner), and Headless SSR Vite evaluators. Clearly distinguished local automated verification from pending hosted Supabase migration checks. Gate disabled preserves guest operation without network calls; gate enabled with unavailable RPCs fails closed with actionable errors.
+- Added comprehensive test file tests/cloudIntegrationFollowUp.test.js covering all 5 areas (10 new tests, 10 pass, 0 fail).
+- Validation: 220 Node tests pass (all 210 existing + 10 follow-up tests; 0 failures, 0 skipped), lint 0 errors / 8 existing warnings preserved, production build passes (dist/assets/index-Kca5Q88A.js, 968 kB in 1.36s), git diff --check clean.
+
 ## Latest — 29 October 2026 — Work batch B1: account cloud integration
 
 - Reconciled feat/backend-foundation tip with feat/global-signout-dialog (9a2f5d2), verified all 196 foundation baseline tests pass, and branched feat/account-cloud-integration.

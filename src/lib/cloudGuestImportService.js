@@ -14,6 +14,24 @@ async function sha256(value) {
   return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function buildSummary(items) {
+  const langMap = {
+    zh: { languageId: 'zh', languageLabel: 'Chinese', savedWords: 0, reviewWords: 0, progressRecords: 0 },
+    ja: { languageId: 'ja', languageLabel: 'Japanese', savedWords: 0, reviewWords: 0, progressRecords: 0 },
+    en: { languageId: 'en', languageLabel: 'English', savedWords: 0, reviewWords: 0, progressRecords: 0 },
+  };
+
+  for (const item of items) {
+    const counts = langMap[item.language];
+    if (!counts) continue;
+    if (item.kind === 'saved_words') counts.savedWords++;
+    else if (item.kind === 'review_cards') counts.reviewWords++;
+    else counts.progressRecords++;
+  }
+
+  return Object.values(langMap).filter(c => c.savedWords + c.reviewWords + c.progressRecords > 0);
+}
+
 export function createCloudGuestImportService({
   storageOwner,
   getAuthState,
@@ -46,8 +64,36 @@ export function createCloudGuestImportService({
     const client = getClient();
     const storage = globalThis.localStorage;
 
-    // Check if durable record already applied
+    // 1. Always hydrate the verified account cache from the cloud snapshot
+    // even if guest records are 0, dialog never opens, or old receipt exists
+    const restoreRes = await restoreAccountSnapshot(client, storageOwner, {
+      expectedUserId: account.ownerId,
+      isCurrent: () => {
+        try { guard(account); return true; } catch { return false; }
+      },
+      now,
+    });
+
+    guard(account);
+
+    if (restoreRes.outcome === 'error') {
+      throw new Error(restoreRes.error || 'Could not verify account cloud status.');
+    }
+
+    // 2. Check durable record status
     const existingDurable = readDurableRecord(storage, account.ownerId);
+
+    // If server acknowledged previously: local hydration just succeeded, so mark applied
+    if (existingDurable.record?.state === 'server_acknowledged') {
+      markDurableApplied(storage, account.ownerId, now);
+      return Object.freeze({
+        status: 'nothing-to-import',
+        persistence: 'cloud',
+        ownerId: account.ownerId,
+        summary: Object.freeze([]),
+      });
+    }
+
     if (existingDurable.record?.state === 'locally_applied') {
       return Object.freeze({
         status: 'nothing-to-import',
@@ -57,6 +103,31 @@ export function createCloudGuestImportService({
       });
     }
 
+    // If unconfirmed request exists after reload: discover it and offer retry
+    if (existingDurable.record?.state === 'unconfirmed') {
+      const items = existingDurable.record.items || [];
+      const summary = buildSummary(items);
+      const offer = Object.freeze({
+        status: summary.length ? 'available' : 'nothing-to-import',
+        persistence: 'cloud',
+        ownerId: account.ownerId,
+        expectedResetVersion: existingDurable.record.expectedResetVersion,
+        summary: Object.freeze(summary.map(counts => Object.freeze(counts))),
+      });
+
+      offers.set(offer, {
+        account,
+        guestSnapshot: { source: existingDurable.record.sourceFingerprint, tables: {} },
+        fingerprint: existingDurable.record.sourceFingerprint,
+        items,
+        expectedResetVersion: existingDurable.record.expectedResetVersion,
+        isRetry: true,
+      });
+
+      return offer;
+    }
+
+    // 3. Otherwise inspect local guest snapshot
     const guestSnapshot = readGuestSnapshot(storageOwner.scope(null));
     const hash = await fingerprint(guestSnapshot.source);
     guard(account);
@@ -83,23 +154,7 @@ export function createCloudGuestImportService({
 
     // Build items from guest snapshot
     const items = buildCloudImportItems(guestSnapshot.tables);
-
-    // Group items into summary counts per language
-    const langMap = {
-      zh: { languageId: 'zh', languageLabel: 'Chinese', savedWords: 0, reviewWords: 0, progressRecords: 0 },
-      ja: { languageId: 'ja', languageLabel: 'Japanese', savedWords: 0, reviewWords: 0, progressRecords: 0 },
-      en: { languageId: 'en', languageLabel: 'English', savedWords: 0, reviewWords: 0, progressRecords: 0 },
-    };
-
-    for (const item of items) {
-      const counts = langMap[item.language];
-      if (!counts) continue;
-      if (item.kind === 'saved_words') counts.savedWords++;
-      else if (item.kind === 'review_cards') counts.reviewWords++;
-      else counts.progressRecords++;
-    }
-
-    const summary = Object.values(langMap).filter(c => c.savedWords + c.reviewWords + c.progressRecords > 0);
+    const summary = buildSummary(items);
 
     const offer = Object.freeze({
       status: summary.length ? 'available' : 'nothing-to-import',
@@ -148,8 +203,10 @@ export function createCloudGuestImportService({
       await verifyGuestImportAccount(client, account.ownerId, () => guard(account));
       guard(account);
 
-      if (readGuestSnapshot(storageOwner.scope(null)).source !== guestSnapshot.source) {
-        throw new Error(SOURCE_CHANGED);
+      if (!prepared.isRetry) {
+        if (readGuestSnapshot(storageOwner.scope(null)).source !== guestSnapshot.source) {
+          throw new Error(SOURCE_CHANGED);
+        }
       }
 
       const itemsToSend = choice === 'merge' ? prepared.items : [];
@@ -173,13 +230,17 @@ export function createCloudGuestImportService({
 
         if (choice === 'merge') {
           // Reconcile and commit local cache so the current browser updates immediately
-          await restoreAccountSnapshot(client, storageOwner, {
+          const hydrateRes = await restoreAccountSnapshot(client, storageOwner, {
             expectedUserId: account.ownerId,
             isCurrent: () => {
               try { guard(account); return true; } catch { return false; }
             },
             now,
           });
+
+          if (hydrateRes.outcome === 'error') {
+            throw new Error(hydrateRes.error || 'Server acknowledged import but local cache update failed. Reload to retry.');
+          }
         }
 
         markDurableApplied(storage, account.ownerId, now);

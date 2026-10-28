@@ -1,3 +1,4 @@
+import { recordLocalDeletion, recordLocalDirty } from './cloudSnapshotHydration.js';
 // Local cache isolation is not authorization. Supabase RLS remains authoritative.
 // Only the verified Auth coordinator should select an owner.
 import { parseLearningDocument, parseLearningRows } from './learningDocument.js';
@@ -20,6 +21,45 @@ export class CacheStorageError extends Error {
     this.name = 'CacheStorageError';
     this.code = 'CACHE_STORAGE_UNAVAILABLE';
   }
+}
+
+function trackTableChanges(target, ownerId, language, table, prevRaw, nextRaw) {
+  if (!ownerId) return;
+  try {
+    const prevRows = prevRaw ? JSON.parse(prevRaw) : [];
+    const nextRows = nextRaw ? JSON.parse(nextRaw) : [];
+    if (!Array.isArray(prevRows) || !Array.isArray(nextRows)) return;
+
+    const rowKey = row => {
+      const isWord = table === 'saved_words' || table === 'review_cards';
+      const written = String((isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '').normalize('NFC').trim();
+      const reading = String((isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '').normalize('NFC').trim();
+      return `${language}:${table}:${written}:${reading}`;
+    };
+
+    const nextKeys = new Set(nextRows.map(rowKey));
+    const prevKeys = new Set(prevRows.map(rowKey));
+
+    for (const row of prevRows) {
+      const k = rowKey(row);
+      if (!nextKeys.has(k)) {
+        const isWord = table === 'saved_words' || table === 'review_cards';
+        const written = (isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '';
+        const reading = (isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '';
+        recordLocalDeletion(target, ownerId, language, table, written, reading);
+      }
+    }
+
+    for (const row of nextRows) {
+      const k = rowKey(row);
+      if (!prevKeys.has(k)) {
+        const isWord = table === 'saved_words' || table === 'review_cards';
+        const written = (isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '';
+        const reading = (isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '';
+        recordLocalDirty(target, ownerId, language, table, written, reading);
+      }
+    }
+  } catch {}
 }
 
 export function createStorageOwner({ storage = () => globalThis.localStorage } = {}) {
@@ -87,13 +127,19 @@ export function createStorageOwner({ storage = () => globalThis.localStorage } =
       return value && Object.hasOwn(value.tables, name) ? value.tables[name] : getItem(name);
     };
     const setTable = (language, table, rows) => {
+      const prevRaw = getTable(language, table);
       const name = tableName(language, table);
       const { raw, value } = readLearningDocument();
-      if (!value || !Object.hasOwn(value.tables, name)) return setItem(name, rows);
+      if (!value || !Object.hasOwn(value.tables, name)) {
+        setItem(name, rows);
+        access('write', target => trackTableChanges(target, id, language, table, prevRaw, rows));
+        return;
+      }
       parseLearningRows(rows);
       commitLearningDocument(raw, {
         ...value, revision: value.revision + 1, tables: { ...value.tables, [name]: rows },
       });
+      access('write', target => trackTableChanges(target, id, language, table, prevRaw, rows));
     };
     return Object.freeze({
       ownerId: id,

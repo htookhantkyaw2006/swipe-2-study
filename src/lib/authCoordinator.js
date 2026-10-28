@@ -270,13 +270,16 @@ export function createAuthCoordinator({
     if (!configured) return { error: null };
 
     // Advance generation immediately to discard any in-flight requests from this user
-    nextGeneration();
+    const opGen = nextGeneration();
     // Synchronously reset owner to guest before the network call
     resetToGuest(null);
 
     try {
       const client = getClient();
       const res = await client.auth.signOut({ scope: 'local' });
+      if (!isCurrent(opGen)) {
+        return { error: new Error('Account changed during sign out.') };
+      }
       if (res?.error) {
         error = res.error.message;
         publishSnapshot();
@@ -285,6 +288,9 @@ export function createAuthCoordinator({
       }
       return { error: null };
     } catch (err) {
+      if (!isCurrent(opGen)) {
+        return { error: new Error('Account changed during sign out.') };
+      }
       error = err.message || 'Logout failed.';
       publishSnapshot();
       notify();
