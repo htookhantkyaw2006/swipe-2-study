@@ -132,7 +132,7 @@ test('sign-out and account switches discard a delayed success and its UI refresh
   }
 });
 
-test('same-account generation changes invalidate offers and provide manual re-entry without auto-reprompting', async () => {
+test('same-account revalidation refreshes an open read-only offer without restarting study', async () => {
   const f = fixture();
   await f.controller.inspect({ automatic: true });
   const version = f.controller.getState().learningVersion;
@@ -140,11 +140,48 @@ test('same-account generation changes invalidate offers and provide manual re-en
   assert.equal(f.controller.getState().learningVersion, version, 'same-account revalidation must not restart a study session');
   assert.equal(f.controller.getState().offer, null);
   assert.equal(f.controller.getState().open, false);
-  assert.match(f.controller.getState().notice.message, /sign-in session changed/);
+  assert.equal(f.controller.getState().notice, null);
   await f.controller.inspect({ automatic: true });
-  assert.equal(f.calls.inspect, 1);
-  await f.controller.inspect();
+  assert.equal(f.calls.inspect, 2);
   assert.equal(f.controller.getState().open, true);
+});
+
+test('a delayed old inspection cannot hide the fresh offer after same-account revalidation', async () => {
+  const f = fixture();
+  const wait = deferred();
+  f.inspect(() => wait.promise);
+  const old = f.controller.inspect({ automatic: true });
+  f.controller.setAccount({ ...A, generation: 2 });
+  const fresh = offer(A.id);
+  f.inspect(async () => fresh);
+  await f.controller.inspect({ automatic: true });
+  wait.resolve({ ownerId: A.id, status: 'nothing-to-import', persistence: 'device-only' });
+  await old;
+  assert.equal(f.controller.getState().open, true);
+  assert.equal(f.controller.getState().offer, fresh);
+  assert.equal(f.calls.choices.length, 0);
+});
+
+test('same-account revalidation respects Decide later and never repeats an interrupted save', async () => {
+  const f = fixture();
+  await f.controller.inspect({ automatic: true });
+  f.controller.close();
+  f.controller.setAccount({ ...A, generation: 2 });
+  await f.controller.inspect({ automatic: true });
+  assert.equal(f.calls.inspect, 1, 'a deferred offer must stay deferred');
+  await f.controller.inspect();
+  const wait = deferred();
+  f.choose(() => wait.promise);
+  const saving = f.controller.choose('merge');
+  f.controller.setAccount({ ...A, generation: 3 });
+  await f.controller.inspect({ automatic: true });
+  assert.equal(f.calls.inspect, 2);
+  assert.equal(f.calls.choices.length, 1);
+  assert.match(f.controller.getState().notice.message, /sign-in session changed/);
+  wait.resolve({ status: 'saved', choice: 'merge', persistence: 'device-only' });
+  await saving;
+  assert.equal(f.controller.getState().notice.kind, 'info');
+  assert.equal(f.controller.getState().open, false);
 });
 
 test('StrictMode cleanup cancels the first inspection but permits a fresh setup', async () => {

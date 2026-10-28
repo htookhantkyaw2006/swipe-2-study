@@ -51,10 +51,11 @@ retry button, rather than throwing during render.
 
 The controller discards delayed UI results after sign-out, owner/generation
 changes or unmount. The service separately checks verified ownership/generation
-before its write. Same-account revalidation invalidates an old offer and provides
-manual re-entry; it does **not** remount a running study deck. Another browser tab
-may trigger such revalidation even if the account is unchanged. The UI does not
-silently resubmit a prior choice under a new generation.
+before its write. Same-account revalidation invalidates an old read-only offer
+and automatically prepares a fresh one if it was being checked/displayed. It does
+not reopen a deferred offer or remount a running study deck. If an explicit save
+was pending, it requires manual re-entry and does not silently resubmit that choice
+under a new generation. Another browser tab may trigger same-account revalidation.
 
 Saved choices are account-specific on this origin. Another account must make
 its own explicit choice. Logout restores the original guest cache; logging back
@@ -104,6 +105,13 @@ this workspace. The only intercepted remote mutations are synthetic Auth
 login/logout. There is no learning RPC, new SQL migration, service key, cloud
 hydration or background sync. Safari, physical devices and the combined flow
 with PT's actual configured test accounts still need acceptance.
+
+Subsequent PT acceptance: the configured device-only offer displayed two Chinese
+saved words, merge reflected them in the signed-in Home, and PT reported all the
+provided refresh/logout/login checks worked. The initial automatic-offer timing
+defect is fixed by refreshing read-only offers after same-user revalidation; eight
+targeted Chromium checks cover it. Hosted cloud import remains unactivated and
+Safari/physical-device acceptance remains separate.
 
 ## PT's configured local acceptance
 
