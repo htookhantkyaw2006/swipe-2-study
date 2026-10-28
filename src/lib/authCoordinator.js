@@ -292,6 +292,45 @@ export function createAuthCoordinator({
     }
   }
 
+  /**
+   * Signs out on all devices (global scope). Preserves all local learning caches.
+   * Advances generation and resets to guest before the network call so stale
+   * in-flight responses from the previous session are discarded immediately.
+   * Handles both the SDK's returned { error } object and thrown/network exceptions.
+   * On failure the local session is still ended; the caller receives the error.
+   */
+  async function signOutGlobal() {
+    if (!configured) return { error: null };
+
+    const opGen = nextGeneration();
+    resetToGuest(null);
+
+    try {
+      const client = getClient();
+      const res = await client.auth.signOut({ scope: 'global' });
+      if (!isCurrent(opGen)) {
+        return { error: new Error('Account changed during sign out.') };
+      }
+      if (res?.error) {
+        const message = res.error.message || 'Could not sign out on all devices. You have been signed out on this device.';
+        error = message;
+        publishSnapshot();
+        notify();
+        return { error: res.error };
+      }
+      return { error: null };
+    } catch (err) {
+      if (!isCurrent(opGen)) {
+        return { error: new Error('Account changed during sign out.') };
+      }
+      const message = err?.message || 'Could not reach the server. You have been signed out on this device. Other sessions may remain active briefly.';
+      error = message;
+      publishSnapshot();
+      notify();
+      return { error: err };
+    }
+  }
+
   function clearError() {
     if (error !== null) {
       error = null;
@@ -328,6 +367,7 @@ export function createAuthCoordinator({
     subscribe,
     initialize,
     signOut,
+    signOutGlobal,
     canResetPassword,
     completePasswordRecovery,
     retryVerification,

@@ -9,6 +9,7 @@ import { useAvatarUrl } from '../lib/useAvatarUrl.js';
 import Avatar from '../components/ui/Avatar';
 import { db } from '../lib/db';
 import { useGuestImport } from '../lib/useGuestImport.js';
+import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
 import '../components/study/StudyPage.css';
 import './Profile.css';
 
@@ -23,12 +24,16 @@ function ProfileLink({ to, icon: Icon, title, subtitle }) {
 export default function Profile() {
   const { prefs, setPref } = usePreferences();
   const { language, languages, setLanguage } = useLanguage();
-  const { user, loading: authLoading, isTransitioning, error: authError, retryVerification, signOut } = useAuth();
+  const { user, loading: authLoading, isTransitioning, error: authError, retryVerification, signOut, signOutGlobal } = useAuth();
   const { profile, loading: profileLoading, error: profileError, retry } = useProfile();
   const photo = useAvatarUrl(profile?.avatar_path);
   const guestImport = useGuestImport();
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
+  const [globalSignOutOpen, setGlobalSignOutOpen] = useState(false);
+  const [globalSigningOut, setGlobalSigningOut] = useState(false);
+  const [globalSignOutError, setGlobalSignOutError] = useState(null);
+  const [targetAccountLabel, setTargetAccountLabel] = useState('');
   const [, retryCollections] = useState(0);
   const busy = authLoading || isTransitioning;
   const name = user ? displayName(profile, user) : 'Guest Learner';
@@ -41,12 +46,42 @@ export default function Profile() {
   } catch { collectionError = true; }
 
   const handleLogout = async () => {
-    if (loggingOut || busy) return;
+    if (loggingOut || globalSigningOut || busy) return;
     setLoggingOut(true);
     setLogoutError('');
-    try { await signOut(); }
+    try {
+      const res = await signOut();
+      if (res?.error) {
+        setLogoutError(res.error?.message || 'Could not sign out. Please try again.');
+      }
+    }
     catch (error) { setLogoutError(error?.message || 'Could not sign out. Please try again.'); }
     finally { setLoggingOut(false); }
+  };
+
+  const openGlobalSignOut = () => {
+    if (loggingOut || globalSigningOut || busy) return;
+    setTargetAccountLabel(user?.email || name || '');
+    setGlobalSignOutError(null);
+    setGlobalSignOutOpen(true);
+  };
+
+  const handleGlobalSignOut = async () => {
+    if (globalSigningOut || loggingOut || busy) return;
+    setGlobalSigningOut(true);
+    setGlobalSignOutError(null);
+    try {
+      const result = await signOutGlobal();
+      if (result?.error) {
+        setGlobalSignOutError(result.error?.message || 'Could not sign out on all devices. You have been signed out on this device.');
+      } else {
+        setGlobalSignOutOpen(false);
+      }
+    } catch (err) {
+      setGlobalSignOutError(err?.message || 'Could not sign out on all devices.');
+    } finally {
+      setGlobalSigningOut(false);
+    }
   };
 
   return (
@@ -84,12 +119,26 @@ export default function Profile() {
           <section className="profile-group" aria-labelledby="profile-actions-title"><h2 id="profile-actions-title">Account & support</h2><div className="profile-group__surface">
             {user && !busy && <ProfileLink to="/profile/edit" icon={User} title="Edit profile" subtitle="Update your name and photo" />}
             {user && !busy && <button type="button" className="profile-setting profile-setting--link" aria-label="Review guest learning" onClick={guestImport.openGuestImport} disabled={!guestImport.available || guestImport.pending || guestImport.checking}><span className="profile-setting__icon"><FolderInput size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{guestImport.checking ? 'Checking guest learning…' : 'Guest learning'}</strong><span>Review guest records on this device</span></span><ChevronRight size={20} aria-hidden="true" /></button>}
-            {user ? <button className="profile-setting profile-setting--logout" onClick={handleLogout} disabled={loggingOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{loggingOut ? 'Logging out…' : 'Log out'}</strong><span>Switch back to guest mode</span></span></button> : <ProfileLink to="/login" icon={LogIn} title="Sign in or register" subtitle="Use your account" />}
+            {user ? <button type="button" className="profile-setting profile-setting--logout" onClick={handleLogout} disabled={loggingOut || globalSigningOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{loggingOut ? 'Logging out?' : 'Log out'}</strong><span>Switch back to guest mode</span></span></button> : <ProfileLink to="/login" icon={LogIn} title="Sign in or register" subtitle="Use your account" />}
+            {user && !busy && <button type="button" className="profile-setting profile-setting--logout" onClick={openGlobalSignOut} disabled={loggingOut || globalSigningOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Sign out on all devices</strong><span>Sign out here and on other devices</span></span></button>}
             <div className="profile-setting"><span className="profile-setting__icon"><MessageSquare size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Send feedback</strong><span>Help improve Swipe 2 Study</span></span><span className="profile-soon">Soon</span></div>
             <div className="profile-setting"><span className="profile-setting__icon"><Trash2 size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Delete account</strong><span>Available in a later update</span></span><span className="profile-soon">Soon</span></div>
           </div></section>
         </div>
       </div>
+      <GlobalSignOutDialog
+        open={globalSignOutOpen}
+        pending={globalSigningOut}
+        error={globalSignOutError}
+        accountLabel={targetAccountLabel}
+        onConfirm={handleGlobalSignOut}
+        onClose={() => {
+          if (!globalSigningOut) {
+            setGlobalSignOutOpen(false);
+            setGlobalSignOutError(null);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -31,6 +31,7 @@ export function AuthProvider({ children, coordinator = defaultAuthCoordinator })
     clearError: coordinator.clearError,
     retryVerification: coordinator.retryVerification,
     signOut: coordinator.signOut,
+    signOutGlobal: coordinator.signOutGlobal,
     canResetPassword: coordinator.canResetPassword,
     completePasswordRecovery: coordinator.completePasswordRecovery,
     passwordRecoveryUserId: state.passwordRecoveryUserId,
