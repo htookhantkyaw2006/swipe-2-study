@@ -21,9 +21,13 @@ template. Real email delivery and hosted reset/login checks are still pending.
 See [password recovery](docs/password-recovery.md) and
 [email/SMTP setup](docs/auth-email-setup.md). Explicit device-only guest import is
 integrated with post-login offers, Profile re-entry and confirmation/error states;
-configured account acceptance is pending. See [guest import](docs/guest-import.md).
+PT reports the configured device merge and refresh/logout/login checks pass.
+See [guest import](docs/guest-import.md).
 Cloud progress sync,
 Google sign-in and account deletion are not implemented yet.
+The [cloud import foundation](docs/cloud-import-foundation.md) now includes a
+locally tested migration/RPC transport. It is not activated in the app; durable
+request storage, safe hydration and hosted acceptance remain pending.
 
 Profile name editing and private avatar upload/replacement/removal are implemented
 with local service tests and simulated SDK/browser checks. PT reports that an

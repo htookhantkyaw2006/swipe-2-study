@@ -37,13 +37,17 @@ export function createGuestImportController(service) {
     if (accountId === state.accountId && generation === state.generation) return;
     operation++;
     const sameUser = accountId !== null && accountId === state.accountId;
-    const interrupted = sameUser && (state.open || state.pending || state.checking);
+    const interruptedSave = sameUser && state.pending;
+    // Reverification can finish while a read-only offer is being prepared (or
+    // displayed). Invalidate the old offer, then let the provider inspect again.
+    // An explicit save is different: never automatically replay that choice.
+    const refreshOffer = sameUser && !state.pending && (state.open || state.checking);
     publish({ ...initial(), accountId, generation,
-      autoChecked: sameUser && state.autoChecked,
+      autoChecked: refreshOffer ? false : sameUser && state.autoChecked,
       // Auth already remounts on a real owner change. A token/session refresh
       // must never remount an active study session and reset its deck progress.
       learningVersion: state.learningVersion,
-      notice: interrupted ? { kind: 'info', message: 'Your sign-in session changed. Open Guest learning again to check the latest data.' } : null,
+      notice: interruptedSave ? { kind: 'info', message: 'Your sign-in session changed. Open Guest learning again to check the latest data.' } : null,
     });
   }
 

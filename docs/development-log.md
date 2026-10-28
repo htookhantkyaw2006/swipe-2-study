@@ -1,5 +1,38 @@
 # Development log
 
+## Latest — 28 October 2026 — Work batch A: offer timing and cloud-import foundation
+
+- PT reported the configured device-only merge and refresh/logout/login checks
+  passed. The automatic offer had been interrupted by same-account revalidation;
+  manual Recheck opened a real offer with two saved Chinese words.
+- Fixed read-only offer invalidation: same-account revalidation now prepares a
+  fresh offer while discarding old results. Decide later stays deferred; a pending
+  explicit save is never silently resubmitted. Real SDK/Chromium checks force a
+  delayed SHA-256 inspection and cross-tab events: all **8 checks pass**, including
+  stale results, pending-save interruption and a fresh explicit retry.
+- Added a transactionally applied staging migration for user_items, private
+  request receipts, owner-checked snapshot/import RPCs, RLS reads, controlled writes,
+  stable server keys and reset/deletion guards. RPC expected-user binding blocks a
+  token/account change between client verification and fetch authorization.
+- Added pure legacy-record conversion, owner-bound retry envelopes, verified SDK
+  transport and exact acknowledgement checking. Search history is retained within
+  its limit; drill conflicts use higher seen/latest timestamp without summing.
+  Explicit samples are filtered; seeded course origin alone preserves real reviews.
+- **Not activated:** no hosted migration, cloud UI, durable request outbox or
+  conflict-safe snapshot hydration has been shipped/applied. Existing app behavior
+  remains device-only. See cloud-import-foundation.md for activation boundaries,
+  reviewed SQL and pending hosted/multi-connection checks.
+- Validation: **196 Node tests pass** (20 new PostgreSQL/RLS cases, 14 new
+  record/transport cases and 2 added controller regressions), lint **0 errors / 8
+  existing warnings**, production build and whitespace checks pass. The existing
+  large-bundle warning remains. Mapper tests were also rerun after preserving
+  genuine seeded-origin user records. Browser/SDK inputs are synthetic; this is
+  not hosted migration/JWT/cross-device acceptance.
+- External IDE task A owns only a new GlobalSignOutDialog JSX/CSS/doc on a separate
+  branch from 7f1034d. No existing Auth/Profile/global style/log file belongs to
+  that task; integration stays here. Next work batch B is deletion logic plus an
+  isolated deletion confirmation UI, after task A review. No main/deployment change.
+
 ## Latest — 28 October 2026 — Integrated device-only guest learning import
 
 - Reviewed and merged the IDE-agent dialog `3d85c61` with the import core
