@@ -38,6 +38,16 @@ test('recovery request rate limits and network failures do not report success or
   assert.match(failed.error, /connection/); assert.ok(!failed.error.includes('secret'));
 });
 
+test('resend cooldown does not claim when the project email quota resets', async () => {
+  const limited = await requestPasswordRecovery({ resetPasswordForEmail: async () => ({ error: { status: 429, code: 'over_email_send_rate_limit' } }) }, 'a@example.test', 'https://app.example.test');
+  assert.match(limited.error, /email sending limit/i);
+  assert.equal(limited.cooldownSeconds, 60);
+  assert.ok(!limited.error.includes('60'));
+  assert.equal(limited.message, undefined);
+  const sent = await requestPasswordRecovery({ resetPasswordForEmail: async () => ({ error: null }) }, 'a@example.test', 'https://app.example.test');
+  assert.equal(sent.cooldownSeconds, 60);
+});
+
 test('short or mismatched passwords are rejected before any Auth call', async () => {
   assert.match(validateNewPassword('12345', '12345'), /6 characters/);
   assert.match(validateNewPassword('long-enough', 'different'), /do not match/);

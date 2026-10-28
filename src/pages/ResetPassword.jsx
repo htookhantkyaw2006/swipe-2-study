@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Lock, Eye, EyeOff, KeyRound, Check } from 'lucide-react';
 import { useAuth } from '../lib/useAuth.js';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { recoveryLinkError, RESET_LINK_REQUIRED, updateRecoveredPassword } from '../lib/passwordRecovery.js';
+import { recoveryLink } from '../lib/recoveryLink.js';
 import './PasswordRecovery.css';
 
 export default function ResetPassword() {
   const { user, isConfigured, passwordRecoveryUserId, canResetPassword, completePasswordRecovery, error: authError } = useAuth();
   const location = useLocation();
+  const link = useSyncExternalStore(recoveryLink.subscribe, recoveryLink.getState, recoveryLink.getState);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [visible, setVisible] = useState(false);
@@ -19,7 +21,9 @@ export default function ResetPassword() {
   const locked = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const linkError = recoveryLinkError(location.search, location.hash);
-  const ready = Boolean(user && passwordRecoveryUserId === user.id && canResetPassword?.(user.id) && !linkError);
+  const needsConfirmation = link.status === 'pending' || link.status === 'verifying';
+  const ready = Boolean(user && passwordRecoveryUserId === user.id && canResetPassword?.(user.id)
+    && !linkError && !link.error && !needsConfirmation);
 
   const submit = async event => {
     event.preventDefault();
@@ -36,9 +40,12 @@ export default function ResetPassword() {
     finally { locked.current = false; if (mounted.current) setBusy(false); }
   };
   return <div className="auth-page"><div className="auth-card">
-    <div className="auth-header"><div className="auth-logo">{success ? <Check size={28} aria-hidden="true" /> : <KeyRound size={28} aria-hidden="true" />}</div><h1 className="auth-title">{success ? 'Password updated' : 'Set a new password'}</h1><p className="auth-subtitle">{success ? 'Your new password is ready to use.' : 'Choose a password for your recovered account.'}</p></div>
-    {success ? <Link className="btn-primary recovery-continue" to="/">Continue learning</Link> : !isConfigured ? <div className="auth-error" role="status">Password recovery is unavailable while the backend is not configured. <Link className="auth-link" to="/">Back to Home</Link></div> : !ready ? <>
-      <div className="auth-error" role="alert">{linkError || authError || RESET_LINK_REQUIRED}</div><Link className="btn-primary recovery-continue" to="/forgot-password">Request a new reset link</Link><Link className="auth-link recovery-signin" to="/login">Back to Sign in</Link>
+    <div className="auth-header"><div className="auth-logo">{success ? <Check size={28} aria-hidden="true" /> : <KeyRound size={28} aria-hidden="true" />}</div><h1 className="auth-title">{success ? 'Password updated' : needsConfirmation ? 'Reset your password' : 'Set a new password'}</h1><p className="auth-subtitle">{success ? 'Your new password is ready to use.' : needsConfirmation ? 'Continue to verify your reset link and choose a new password.' : 'Choose a password for your recovered account.'}</p></div>
+    {success ? <Link className="btn-primary recovery-continue" to="/">Continue learning</Link> : !isConfigured ? <div className="auth-error" role="status">Password recovery is unavailable while the backend is not configured. <Link className="auth-link" to="/">Back to Home</Link></div> : needsConfirmation ? <>
+      <button className="btn-primary recovery-continue recovery-confirm" type="button" disabled={link.status === 'verifying'} onClick={() => recoveryLink.confirm()}>{link.status === 'verifying' ? 'Verifying link…' : 'Continue'}</button>
+      <Link className="auth-link recovery-signin" to="/login">Back to Sign in</Link>
+    </> : !ready ? <>
+      <div className="auth-error" role="alert">{linkError || link.error || authError || RESET_LINK_REQUIRED}</div><Link className="btn-primary recovery-continue" to="/forgot-password">Request a new reset link</Link><Link className="auth-link recovery-signin" to="/login">Back to Sign in</Link>
     </> : <>
       <p className="recovery-account">Updating password for <strong>{user.email || 'your verified account'}</strong></p>
       {error && <div className="auth-error" role="alert">{error}</div>}

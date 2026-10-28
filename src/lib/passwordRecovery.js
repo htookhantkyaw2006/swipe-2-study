@@ -1,6 +1,6 @@
 import { parseCallbackError } from './authCallbackState.js';
 
-export const RESET_LINK_REQUIRED = 'Open a fresh password reset link in the same browser, browser profile and app address where you requested it.';
+export const RESET_LINK_REQUIRED = 'Please open the newest link from your password reset email. Older links may need the browser and app address where you requested them.';
 export const RESET_EMAIL_SENT = 'If an account can receive a reset email at this address, check your inbox and spam folder for the link.';
 
 export function validateNewPassword(password, confirmation) {
@@ -10,6 +10,9 @@ export function validateNewPassword(password, confirmation) {
 }
 
 function safeAuthError(error, fallback) {
+  if (error?.code === 'over_email_send_rate_limit') {
+    return 'The email sending limit has been reached. Please try again later; sending another request now will not help.';
+  }
   if (error?.status === 429 || error?.code === 'over_email_send_rate_limit' || error?.code === 'over_request_rate_limit') {
     return 'Too many requests. Please wait before trying again.';
   }
@@ -24,11 +27,19 @@ export async function requestPasswordRecovery(auth, email, origin) {
   try {
     const redirectTo = new URL('/reset-password', origin).href;
     const { error } = await auth.resetPasswordForEmail(trimmed, { redirectTo });
-    if (error) return { error: safeAuthError(error, 'Could not request a reset link. Please try again.') };
-    return { error: null, message: RESET_EMAIL_SENT };
+    if (error) return {
+      error: safeAuthError(error, 'Could not request a reset link. Please try again.'),
+      cooldownSeconds: error.status === 429 || error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit' ? 60 : 0,
+    };
+    return { error: null, message: RESET_EMAIL_SENT, cooldownSeconds: 60 };
   } catch {
     return { error: 'Could not request a reset link. Check your connection and try again.' };
   }
+}
+
+export function recoveryVerificationError(error) {
+  if (error?.code === 'otp_expired') return 'This reset link has expired or already been used. Please request a new reset email.';
+  return safeAuthError(error, 'This reset link could not be verified. Please request a new reset email.');
 }
 
 export function recoveryLinkError(search = '', hash = '') {

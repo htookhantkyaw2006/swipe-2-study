@@ -9,6 +9,10 @@ import { LanguageProvider } from './lib/language.jsx'
 import { PreferencesProvider } from './lib/preferences.jsx'
 import StorageOwnerBoundary from './components/StorageOwnerBoundary.jsx'
 import { AuthProvider } from './lib/auth.jsx'
+import { recoveryLink } from './lib/recoveryLink.js'
+
+// Capture and scrub custom recovery links before Auth or Router initialization.
+recoveryLink.capture(window.location.href, path => window.history.replaceState(window.history.state, '', path));
 
 // Order matters: move pre-language data into its per-language tables
 // before anything reads them, then make sure the active course has

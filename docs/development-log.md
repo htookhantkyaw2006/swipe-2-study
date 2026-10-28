@@ -312,3 +312,40 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
 - Linter: **0 errors**, 10 existing warnings preserved (`npm run lint`).
 - Production build: **Success** (`npm run build`).
 - Git whitespace: **Clean** (`git diff --check`).
+
+## 28 October 2026 — Cross-browser password recovery preparation
+
+- PT clarified that recovery was requested in Edge while the email link opened
+  in Chrome. The existing PKCE verifier is browser/profile/origin scoped. This
+  explains a missing verifier, not the earlier upstream `otp_expired` response;
+  the exact cause of that token rejection remains unproven. The rate-limit
+  message alone also did not establish which server quota was reached.
+- Fast-forwarded the clean feature checkout to Antigravity's pushed `bf390be`.
+  No `main`, production deployment, hosted Auth/email setting or real account
+  password was changed.
+- Added a custom fragment TokenHash recovery template and explicit Continue
+  confirmation. Captures/scrubs the credential before Auth/Router startup,
+  retains it privately in memory, disables referrers and verifies once with SDK
+  `verifyOtp(type: recovery)` on click. Independently verified
+  `PASSWORD_RECOVERY` permission still gates password mutation. No global Auth
+  flow downgrade, service key, new backend endpoint or new dependency.
+- Added minimum resend cooldown and specific email-quota guidance. These do not
+  alter server quotas or claim an exact quota reset time. Template/SMTP setup,
+  activation/rollback order and hosted acceptance are documented separately.
+- **92 Node tests pass**; **lint 0 errors / 10 existing warnings**; regular guest
+  and synthetic-configured builds pass; whitespace clean. Existing large-chunk
+  and Vite fixture-port warnings remain.
+- Installed SDK + mocked Auth API browser tests passed in production and dev
+  StrictMode. Each mode checked 11 layouts (confirmation/reset at five widths,
+  phone success). Isolated context B had none of context A's PKCE storage and
+  completed one verification + one password update. No verification occurred on
+  page load. Duplicate clicks, confirmation mismatch, expired/consumed/wrong-type
+  links, server identity mismatch and ordinary cached sessions were checked.
+  Legacy PKCE recovery remains supported. No page errors, horizontal overflow
+  or unmocked external requests. Guest routes remain explicitly unavailable
+  without backend configuration.
+- Material limits: Chromium contexts and synthetic responses are not real
+  Edge/Chrome, email delivery or hosted acceptance. Supabase template activation,
+  confirmed staging access, SMTP/provider/DNS setup, fresh email, old/new-password
+  login, Safari and physical devices remain pending. New code alone does not
+  upgrade already-sent emails. See `docs/auth-email-setup.md`.
