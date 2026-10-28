@@ -1,2 +1,15 @@
-.learning-icon { display: block; width: 56px; height: 56px; flex-shrink: 0; overflow: visible; }
+/* Color families from the original Library/Home tool definitions. */
+.learning-icon { --icon-start: #7DD3FC; --icon-end: #0284C7; --icon-soft: #E0F2FE; display: block; width: 56px; height: 56px; flex-shrink: 0; overflow: visible; }
 .learning-icon__front { filter: drop-shadow(0 3px 3px rgba(12, 74, 110, 0.13)); }
+.learning-icon--review { --icon-start: #FCA5A5; --icon-end: #DC2626; --icon-soft: #FEE2E2; }
+.learning-icon--saved { --icon-start: #86EFAC; --icon-end: #16A34A; --icon-soft: #DCFCE7; }
+.learning-icon--dictionary, .learning-icon--library { --icon-start: #FDBA74; --icon-end: #EA580C; --icon-soft: #FFEDD5; }
+.learning-icon--search { --icon-start: #D8B4FE; --icon-end: #7C3AED; --icon-soft: #EDE9FE; }
+.learning-icon--phrases { --icon-start: #93C5FD; --icon-end: #2563EB; --icon-soft: #DBEAFE; }
+.learning-icon--scriptDictionary { --icon-start: #FCD34D; --icon-end: #B45309; --icon-soft: #FEF3C7; }
+.learning-icon--sounds { --icon-start: #67E8F9; --icon-end: #0891B2; --icon-soft: #CFFAFE; }
+.learning-icon--kana { --icon-start: #F9A8D4; --icon-end: #DB2777; --icon-soft: #FCE7F3; }
+.learning-icon--radicals { --icon-start: #A5B4FC; --icon-end: #4338CA; --icon-soft: #E0E7FF; }
+.learning-icon--interest { --icon-start: #D8B4FE; --icon-end: #9333EA; --icon-soft: #F3E8FF; }
+.learning-icon--writing { --icon-start: #5EEAD4; --icon-end: #0F766E; --icon-soft: #CCFBF1; }
+.learning-icon--twisters { --icon-start: #FDA4AF; --icon-end: #E11D48; --icon-soft: #FFE4E6; }

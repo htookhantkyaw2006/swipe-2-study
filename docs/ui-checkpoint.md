@@ -1,7 +1,8 @@
 # Responsive UI checkpoints — 28 October 2026
 
-These checkpoints are chronological. The latest existing-screen pass is recorded
-under [Remaining screens and interaction review](#remaining-screens-and-interaction-review).
+These checkpoints are chronological. The existing-screen pass is recorded under
+[Remaining screens and interaction review](#remaining-screens-and-interaction-review),
+followed by the latest [brand identity alignment](#brand-identity-alignment).
 Earlier test counts and remaining-work notes describe their original checkpoints.
 
 ## Delivered in this checkpoint
@@ -163,3 +164,30 @@ privacy/terms pages, cloud sync status and sign-out-everywhere still belong to
 their feature milestones. Hosted Auth/email acceptance, SMTP activation,
 staging preview, Safari/Firefox and physical devices remain unverified. `main`
 and the production deployment were not changed.
+
+## Brand identity alignment
+
+PT clarified that the improved responsive UI should keep the client's original
+brand identity. The current layouts, stacked-white-card illustrations, readable
+fonts and study interactions remain. The original Lucide symbols now appear
+inside the illustrations, and navigation uses the original Home / Layers /
+Library / MessageCircle / User symbols directly. The mobile Library shortcut
+regains its original blue circular emphasis.
+
+All ten global `--color-*` tokens already matched the pre-responsive source
+exactly; they remain unchanged. Restored the original tool color families from
+`195ec0a^:src/pages/Library.jsx` and `4a4ff64^:src/pages/Home.jsx`: review red,
+saved green, Dictionary orange (Home search purple), phrases blue, radicals
+indigo, Kana pink, sounds cyan, writing teal and the other original tool accents.
+Level cards use the existing course level accent colors. These are accents on
+the current white/blue layout, not a new palette or a rollback of responsiveness.
+
+Validation: **95 tests pass**, lint **0 errors / 8 existing warnings**, production
+build and whitespace checks pass. Chromium checked **105 affected layouts**
+(three courses, Home, Library grid/list, vocabulary/phrase overviews and two
+phrase levels, at five widths), plus search and selected-level navigation.
+**37 navigation/enlarged-text/reachability checks** also passed. No measured
+overflow, unnamed inspected buttons, uncaught page errors or external requests.
+Phone Home and desktop Library screenshots were visually reviewed. Earlier
+gesture/Auth results above belong to their respective checkpoints; those flows
+were not modified here. Safari and physical-device review remain pending.

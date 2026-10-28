@@ -53,7 +53,7 @@ export default function Home() {
             <div className="section-heading"><h2 id="explore-heading">Explore & practice</h2></div>
             <div className="home-shortcuts">
               <Link to="/flashcards" className="home-shortcut"><LearningIcon kind="phrases" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Phrases</strong><span>Everyday words in context</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
-              <Link to="/dictionary" className="home-shortcut"><LearningIcon kind="dictionary" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Dictionary</strong><span>Look up a word</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
+              <Link to="/dictionary" className="home-shortcut"><LearningIcon kind="search" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Dictionary</strong><span>Look up a word</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
               <Link to="/library" className="home-shortcut"><LearningIcon kind="library" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Library</strong><span>Explore your learning tools</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
             </div>
           </section>

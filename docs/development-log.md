@@ -422,3 +422,24 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
   page UI. Hosted acceptance, SMTP, staging preview, Safari/Firefox and physical
   devices remain pending. Main and production deployment are untouched. Detailed
   evidence and limits: docs/ui-checkpoint.md.
+
+## 28 October 2026 — Original brand identity on the responsive UI
+
+- PT asked to retain the improved UI while honoring Htoo's brand identity.
+  Compared pre-responsive Home/navigation and pre-refinement Library in Git.
+  All ten global color tokens already match the original source exactly.
+- Restored original Lucide symbol mappings and tool-specific accent families
+  inside the current stacked white-card artwork. Home search is purple,
+  Library Dictionary is orange, review is red, saved words green, and helper
+  tools retain their original distinct accents. Level accents come from the
+  existing course data instead of making every level blue.
+- Navigation uses its original Home/Layers/Library/MessageCircle/User icons and
+  the mobile Library blue circle; the responsive sidebar, keyboard labels,
+  enlarged-text wrapping and measured navigation clearance remain.
+- Kept current layouts and session functionality. No Auth, recovery, database,
+  dependency, content, environment, hosted setting or main-branch change.
+- Validation: 95 tests pass; lint 0 errors / 8 existing warnings; production
+  build and whitespace checks pass. Chromium: 105 affected layouts, Library
+  search/selected-level navigation, and 37 navigation/text/reachability checks
+  pass. Phone Home and desktop Library screenshots reviewed. No new tests for
+  decorative art. Safari/physical phones and hosted acceptance remain pending.

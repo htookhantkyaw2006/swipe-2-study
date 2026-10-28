@@ -20,7 +20,7 @@ export default function LevelOverview({ phrases = false }) {
     <div className="level-overview__grid">
       {course.levels.map(level => {
         const count = phrases ? phraseCards(course, level.id).length : words.filter(word => word.level === level.id).length;
-        return <Link key={level.id} className="level-tile" to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}>
+        return <Link key={level.id} className="level-tile" style={{ '--level-accent': level.gradientEnd, '--level-tint': level.gradientStart }} to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}>
           <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
           <span className="level-tile__tier">{level.tier}</span>
           <h3>{level.name}</h3><p>{count ? `${count} ${phrases ? 'phrases' : 'cards'} available` : 'Content coming soon'}</p>
