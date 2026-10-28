@@ -379,3 +379,46 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
 - Recorded the observed hosted Source-editor SMTP lock in the activation guide.
   Hosted email template activation and SMTP/provider/DNS access remain pending;
   UI work did not change hosted Auth configuration or original `main`.
+
+## 28 October 2026 — Remaining existing screens and interaction review
+
+- Preserved PT's accepted blue/navy/white design and illustrated card family.
+  Added a shared responsive vocabulary/phrase level overview; rebuilt phrase
+  levels on available content and reused the swipe session through a read-only
+  phrase adapter. Unavailable levels cannot silently start the first deck.
+- Dictionary now uses the shared study frame, responsive result cards and
+  readable Burmese/English meanings. Real bookmarks, recent searches and speech
+  remain connected to local collections; Dictionary was kept accessible because
+  Saved Words depends on it.
+- Extracted static inline tool/shared layouts into stylesheets, keeping dynamic
+  colors/progress and existing course behavior. Added constrained desktop and
+  narrow-phone layouts for writing, radicals, Kana, sounds, topics, example
+  notifications and plan previews. Writing uses a container-sized SVG.
+- Native modal dialogs unify language selection, radical detail, quizzes and
+  Premium preview, including Escape, background inertness and focus restoration.
+  Topics are visibly Coming soon, notifications are labelled examples, and plan
+  previews do not offer checkout. No new app dependencies or content assets.
+- Interaction checks found horizontal touch cancellation inside scrollable card
+  faces. Added the gesture policy to the scroll containers themselves; vertical
+  long-answer scrolling and horizontal touch drags both pass. Session exit now
+  has a reliable parent destination even when opened directly. Repeated clicks
+  still advance once and phrase practice never pollutes vocabulary review.
+- Enlarged-text review found overlapping mobile nav labels. Labels now wrap with
+  a sensible Flash/cards break; a ResizeObserver reserves the bar's actual height
+  so final content remains reachable. The accepted default navigation art stays.
+- Verification: 95 Node tests pass, lint 0 errors / 8 existing Fast Refresh
+  warnings, production build and whitespace checks pass. Three tests cover the
+  phrase adapter's level matching, immutable mapping and missing content. Existing
+  large-chunk and test-fixture port warnings remain. Production JS is about
+  907 kB (270 kB gzip), CSS about 104 kB (16.5 kB gzip); this is not a performance
+  acceptance claim.
+- Chromium 153: 445 production route/result/empty/modal layouts at five widths
+  across three courses, 43 development StrictMode interaction checks, 13 focused
+  normal-motion/gesture/settings checks, and 37 navigation/text/reachability
+  checks at normal and doubled text size passed. Browser scripts used synthetic
+  local guest data and intercepted speech calls; no hosted credentials, real
+  email, account mutation or payment operations were involved.
+- Existing-screen refinement is not completion of future account/sync/public
+  page UI. Hosted acceptance, SMTP, staging preview, Safari/Firefox and physical
+  devices remain pending. Main and production deployment are untouched. Detailed
+  evidence and limits: docs/ui-checkpoint.md.

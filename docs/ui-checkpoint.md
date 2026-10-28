@@ -1,4 +1,8 @@
-# Home and responsive app frame — 28 October 2026
+# Responsive UI checkpoints — 28 October 2026
+
+These checkpoints are chronological. The latest existing-screen pass is recorded
+under [Remaining screens and interaction review](#remaining-screens-and-interaction-review).
+Earlier test counts and remaining-work notes describe their original checkpoints.
 
 ## Delivered in this checkpoint
 
@@ -92,3 +96,70 @@ grid/list and five widths (320–1440), plus keyboard navigation/search/carousel
 interactions. No new UI unit tests were added for decorative art. These checks do
 not complete the remaining Phrases/helper-screen pass, hosted Auth validation,
 Safari or physical-device testing. SMTP activation is still pending.
+
+## Remaining screens and interaction review
+
+The existing-screen responsive pass now includes level selection, phrase levels
+and sessions, Dictionary, LanguageSwitcher, radicals, Kana, English sounds,
+writing, example notifications and plan previews, alongside the previously
+refined Home, vocabulary sessions, collections, Library, Profile and Settings.
+The original white/sky-blue/navy palette, stacked-card illustrations and each
+helper's existing accent colors remain. No app dependency, font or audio asset
+was added.
+
+- `/learn` and `/flashcards` share a responsive level overview. Available counts
+  come from the actual local course content; unavailable phrase levels show an
+  empty state rather than starting another level's deck.
+- Phrases reuse the vocabulary session presentation and gestures through a
+  read-only card adapter. Phrase practice stays session-only and cannot insert
+  colliding phrase IDs into vocabulary review. Directly opened sessions have a
+  deterministic parent destination when leaving or finishing.
+- Dictionary remains available: it supplies real Saved Words entries. Search,
+  recent-search history, bookmarks, speech and collection sessions retain the
+  owner/language-scoped local database API.
+- Helper layouts have responsive class-based styles and constrained desktop
+  widths. The writing SVG resizes to its container. Language, quiz, radical
+  detail and Premium dialogs use native modal focus/inert behavior, Escape and
+  opener restoration. In Chromium, Tab can visit browser chrome between cycles;
+  background page controls remain excluded.
+- Topic practice is visibly Coming soon, notification data is labelled as
+  examples, and Premium is a plan/pricing preview without checkout. Working
+  learning helpers remain accessible; this does not promise their inclusion in
+  the contracted release scope.
+- Scrollable flashcard faces declare `touch-action: pan-y` themselves. Declaring
+  it only on the outer card lets the inner scroll container cancel horizontal
+  touch drags. Both vertical answer scrolling and horizontal swiping were
+  verified after the fix. Mobile navigation wraps enlarged labels and reserves
+  its measured height instead of assuming a fixed bar height.
+
+Verification in a clean guest environment without Supabase credentials:
+
+- **95 Node tests pass**, including three phrase-level/adaptation regressions;
+  lint has **0 errors / 8 existing Fast Refresh warnings**. Production build
+  and whitespace checks pass. The existing large-JS-chunk warning remains.
+- Chromium 153 production checks cover **445 route, result, empty and modal
+  layouts** across Chinese/Japanese/English at widths 320/375/768/1024/1440.
+  No measured document/main/modal horizontal overflow, clipped inspected text,
+  unnamed visible buttons, uncaught page errors or external requests occurred.
+  Course-gated helpers redirect to Library in unsupported languages.
+- Development StrictMode checks cover real course switching, modal keyboard
+  cycles/Escape/focus return, selected plan preview, Dictionary speech dispatch,
+  history persistence, save → saved session → unsave, phrase reveal/audio,
+  shuffle/completion, vocabulary review insertion/removal, mouse and emulated
+  touch drags, complete/restart radical (5-question), Kana and sound (10-question)
+  quizzes, writing controls/SVG resizing, notifications and Settings selection.
+- Additional normal-motion checks cover repeated-action guards, direct-session
+  exit, long bilingual answer scrolling, horizontal touch after vertical scroll,
+  short landscape controls and enlarged text. Navigation and level tiles are
+  checked at normal and doubled root text size across the five widths.
+- Speech calls are intercepted for verification; audible voice quality is not
+  tested. Touch uses Chromium emulation, not a physical phone. Screenshots were
+  inspected at phone and desktop sizes; automated geometry checks do not replace
+  a complete visual/accessibility audit.
+
+This completes this pass over existing screens, not every future feature UI.
+Edit Profile/avatar, guest-import choices, account deletion/reauthentication,
+privacy/terms pages, cloud sync status and sign-out-everywhere still belong to
+their feature milestones. Hosted Auth/email acceptance, SMTP activation,
+staging preview, Safari/Firefox and physical devices remain unverified. `main`
+and the production deployment were not changed.

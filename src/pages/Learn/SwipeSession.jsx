@@ -197,6 +197,10 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const actionLocked = useRef(false);
   const timers = useRef([]);
   const dragOffset = useMotionValue(0);
+  const backTo = isPhrases
+    ? (levelId ? `/flashcards/level/${encodeURIComponent(levelId)}` : '/flashcards')
+    : isSaved ? '/saved' : isReview ? '/learn/review'
+      : `/learn/level/${encodeURIComponent(levelId || cards[0]?.level || course.levels[0].id)}`;
   const after = (callback, delay) => timers.current.push(setTimeout(callback, delay));
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -210,11 +214,10 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     actionLocked.current = true;
     setAdvancing(true);
     setExitData({ direction });
-    if (isPhrases) {
-      // Phrase practice does not write into the vocabulary review queue.
-    } else if (direction === 'right' && isReview) {
+    // Phrase practice does not write into the vocabulary review queue.
+    if (!isPhrases && direction === 'right' && isReview) {
       db.set('review_cards', db.get('review_cards').filter(c => c.id !== swipedCard.id));
-    } else if (direction === 'left' && !isReview) {
+    } else if (!isPhrases && direction === 'left' && !isReview) {
       const reviewCards = db.get('review_cards');
       if (!reviewCards.some(c => c.id === swipedCard.id)) db.set('review_cards', [...reviewCards, swipedCard]);
     }
@@ -225,7 +228,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       animate(dragOffset, 0, { duration: reducedMotion ? 0 : 0.22 });
       after(() => { actionLocked.current = false; setAdvancing(false); }, reducedMotion ? 0 : 240);
     } else {
-      after(() => navigate(isPhrases ? (levelId ? `/flashcards/level/${encodeURIComponent(levelId)}` : '/flashcards') : isSaved ? '/saved' : isReview ? '/learn/review' : `/learn/level/${encodeURIComponent(levelId || cards[0]?.level || course.levels[0].id)}`), reducedMotion ? 0 : 240);
+      after(() => navigate(backTo), reducedMotion ? 0 : 240);
     }
   };
 
@@ -260,7 +263,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   return (
     <div className={`swipe-session${isPhrases ? ' swipe-session--phrases' : ''}`}>
       <header className="swipe-session__header">
-        <button className="swipe-session__icon" onClick={() => navigate(-1)} aria-label="Leave session"><ChevronLeft size={22} aria-hidden="true" /></button>
+        <button className="swipe-session__icon" onClick={() => navigate(backTo)} aria-label="Leave session"><ChevronLeft size={22} aria-hidden="true" /></button>
         <div className="swipe-session__heading">
           <p className="swipe-session__eyebrow">{isPhrases ? course.name : isReview ? 'Your review' : isSaved ? 'Your collection' : 'Flashcard practice'}</p>
           <h1>{isPhrases ? 'Phrase practice' : isReview ? 'Review Session' : isSaved ? 'Saved Words' : (cards[0]?.lesson_name ?? course.copy.lessonName)}</h1>

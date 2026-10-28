@@ -23,6 +23,7 @@ header[data-tool-header][data-tool-header] > h1 { font-size: clamp(1.0625rem, 2.
 .interest-heading-3.interest-heading-3 { line-height: 1.5; }
 .interest-copy-2.interest-copy-2 { line-height: 1.7; }
 .writing-workspace { display: grid; gap: 24px; }
+.writing-layout-6:empty { min-height: 0; margin-bottom: 0; }
 .writing-picker { min-width: 0; }
 .writing-panel-2.writing-canvas { width: 100%; max-width: 260px; aspect-ratio: 1; }
 .writing-canvas > svg { display: block; }
@@ -51,6 +52,9 @@ header[data-tool-header][data-tool-header] > h1 { font-size: clamp(1.0625rem, 2.
   .interest-grid-1.interest-grid-1 { grid-template-columns: repeat(4, minmax(0,1fr)); }
 }
 @media (max-width: 639px) {
+  .writing-layout-11.writing-layout-11 { margin-bottom: 20px; }
+  .writing-layout-12.writing-layout-12 { margin-bottom: 16px; }
+  .writing-layout-1.writing-layout-1 { margin-bottom: 12px; }
   .ui-tool-page :is(.writing-layout-10,.radicals-layout-6,.interest-layout-3,.kana-layout-4,.sounds-layout-3,.notifications-layout-3) { padding-inline: 16px; }
   .writing-panel-1.writing-panel-1 { padding: 20px 16px; }
   .premium-layout-2.premium-layout-2 { padding: 20px 16px 24px; }

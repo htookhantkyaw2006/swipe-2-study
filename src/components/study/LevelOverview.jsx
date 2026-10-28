@@ -13,7 +13,7 @@ export default function LevelOverview({ phrases = false }) {
   return <div className="study-page level-overview">
     <StudyHeader title={phrases ? 'Learn phrases' : course.copy.coursesTitle} subtitle={`${course.name} · ${course.levelSystem}`} backTo="/" backLabel="Back to Home" />
     <section className="level-overview__hero">
-      <div><p className="study-eyebrow">{phrases ? 'WORDS IN CONTEXT' : 'YOUR LEARNING PATH'}</p><h2>{phrases ? 'Small phrases. Real conversations.' : course.copy.pickerHeadline}</h2><p>{phrases ? 'Choose a level and practise everyday expressions.' : course.copy.pickerSubtitle}</p></div>
+      <div><p className="study-eyebrow">{phrases ? 'WORDS IN CONTEXT' : 'YOUR LEARNING PATH'}</p><h2>{phrases ? 'Small phrases. Real conversations.' : course.copy.pickerHeadline}</h2><p>{phrases ? 'Choose a level and practise everyday expressions.' : 'Build your vocabulary with short, focused practice.'}</p></div>
       <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
     </section>
     <div className="study-section-heading"><div><h2>{course.copy.allLevels}</h2><p>Choose a level to see its available lessons.</p></div><span className="level-overview__meta">{course.levels.length} levels <ArrowUpRight size={16} aria-hidden="true" /></span></div>

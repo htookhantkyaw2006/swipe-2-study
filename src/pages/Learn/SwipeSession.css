@@ -102,6 +102,9 @@
 .swipe-session--empty { justify-content: center; }
 .swipe-session--phrases .swipe-card__character { white-space: normal; overflow-wrap: anywhere; font-size: clamp(1.5rem, 9cqi, 2.5rem); }
 .swipe-session--phrases .swipe-card__word { overflow-y: auto; overscroll-behavior-y: contain; }
+/* Scrollable faces must declare their own gesture policy: the browser stops
+   inspecting touch-action at the first scroll container. */
+.swipe-card__word, .swipe-card__answer { touch-action: pan-y; }
 .swipe-empty { width: min(100%, 440px); padding: 32px 20px; border: 1px solid var(--color-border); border-radius: 24px; background: white; box-shadow: var(--shadow-soft); text-align: center; }
 .swipe-empty > svg { color: var(--color-primary-blue); margin-bottom: 16px; }
 .swipe-empty h1 { color: var(--color-text-navy); font-size: 1.5rem; margin-bottom: 8px; }
