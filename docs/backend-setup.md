@@ -23,8 +23,10 @@ As of 28 October 2026:
   hosted deployment or configuration action has been performed here.
 - Learning lists/preferences currently use owner-scoped local caches. The guest
   import flow now integrates explicit device-only decisions, the IDE dialog,
-  post-login offers and Profile re-entry. Configured acceptance is pending; see
-  guest-import.md. Cloud progress
+  post-login offers and Profile re-entry. PT reports the configured device-only
+  merge/refresh/logout/login checks pass; see guest-import.md. A new locally tested
+  cloud-import migration/RPC transport is prepared but not applied or connected
+  to the UI (cloud-import-foundation.md). Cloud progress
   sync remains unimplemented. Profile name editing and private avatar upload/removal
   are implemented and tested with simulated SDK/browser responses. PT reports an
   uploaded photo persisted through logout/login; broader hosted acceptance remains pending. See
