@@ -16,6 +16,15 @@ export class AccountDeletionError extends Error {
 }
 
 /**
+ * Validates avatar path ownership according to application security rules.
+ */
+export function ownsAvatarPath(userId, path) {
+  return UUID_REGEX.test(userId ?? '') && typeof path === 'string' && path.length <= 256
+    && path.startsWith(userId.toLowerCase() + '/') && !path.includes('..')
+    && /^[a-z0-9-]+\/[a-z0-9_-][a-z0-9._-]*\.(?:jpg|jpeg|png|webp)$/i.test(path);
+}
+
+/**
  * In-memory attempt throttling limiter bounded by user ID and sliding window.
  */
 export function createAttemptLimiter({
@@ -158,14 +167,12 @@ export function checkPasswordReauthSupported(user) {
     );
   }
 
-  // Check identities or app_metadata.providers
   const providers = user.app_metadata?.providers || (user.app_metadata?.provider ? [user.app_metadata.provider] : []);
   const identities = Array.isArray(user.identities) ? user.identities : [];
 
   const hasEmailIdentity = identities.some(i => i.provider === 'email')
     || providers.includes('email');
 
-  // If identities are provided and there is no email provider, account is provider-only
   if (identities.length > 0 && !hasEmailIdentity) {
     throw new AccountDeletionError(
       'Password reauthentication is not supported for this account. Provider reauthentication is required.',
@@ -199,7 +206,6 @@ export async function performPasswordReauth({
   initiatingUserId,
   createClient = defaultCreateClient,
 }) {
-  // Create an isolated non-persisting client
   const reauthClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
@@ -232,7 +238,6 @@ export async function performPasswordReauth({
 
   const reauthenticatedUser = reauthResult.data.user;
 
-  // Strict check: freshly reauthenticated user ID MUST match initiating user ID
   if (reauthenticatedUser.id !== initiatingUserId) {
     throw new AccountDeletionError(
       'Reauthenticated user does not match the initiating account owner.',
@@ -241,7 +246,6 @@ export async function performPasswordReauth({
     );
   }
 
-  // Sanitize: Explicitly drop any references to data.session tokens
   delete reauthResult.data.session;
 
   return {
@@ -272,14 +276,10 @@ export async function handleReauthenticationStep({
     );
   }
 
-  // 1. Validate payload structure & size
   const { password } = validateDeletionPayload(rawBody);
-
-  // 2. Verify caller identity from JWT token
   const verifiedUser = await verifyCallerIdentity(userClient, authHeader);
   const userId = verifiedUser.id;
 
-  // 3. Check attempt throttling
   if (attemptLimiter.isThrottled(userId)) {
     throw new AccountDeletionError(
       'Too many failed deletion attempts. Please wait before retrying.',
@@ -288,10 +288,8 @@ export async function handleReauthenticationStep({
     );
   }
 
-  // 4. Verify account supports password reauthentication
   checkPasswordReauthSupported(verifiedUser);
 
-  // 5. Perform fresh reauthentication
   try {
     await performPasswordReauth({
       supabaseUrl,
@@ -302,7 +300,6 @@ export async function handleReauthenticationStep({
       createClient,
     });
 
-    // Reset failed attempts on successful password verification
     attemptLimiter.reset(userId);
 
     return {
@@ -315,4 +312,360 @@ export async function handleReauthenticationStep({
     }
     throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Step 2 & 3: Database & Lifecycle Functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Transactionally marks an account as deleting using the account-row locking protocol.
+ * The transaction commits immediately so no SQL transaction remains open during network calls.
+ */
+export async function markAccountDeleting(dbClient, userId) {
+  if (!UUID_REGEX.test(userId)) {
+    throw new AccountDeletionError('Invalid user ID for deletion marking.', 'INVALID_IDENTITY', 400);
+  }
+
+  // Support both Supabase adminClient.rpc and direct SQL (PGlite / pg pool)
+  if (typeof dbClient.rpc === 'function') {
+    const { data, error } = await dbClient.rpc('s2s_begin_account_deletion', { p_user_id: userId });
+    if (error) {
+      if (error.message?.includes('ACCOUNT_NOT_FOUND')) {
+        throw new AccountDeletionError('Account does not exist or has already been deleted.', 'ACCOUNT_NOT_FOUND', 404);
+      }
+      throw new AccountDeletionError(error.message || 'Failed to mark account as deleting.', 'LIFECYCLE_LOCK_FAILED', 500);
+    }
+    return data;
+  }
+
+  if (typeof dbClient.query === 'function') {
+    const res = await dbClient.query('select public.s2s_begin_account_deletion($1::uuid) as result', [userId]);
+    return res.rows[0].result;
+  }
+
+  throw new AccountDeletionError('Unsupported database client interface.', 'SERVER_CONFIGURATION_ERROR', 500);
+}
+
+/**
+ * Records deletion lifecycle progress in private.account_deletions.
+ */
+export async function recordDeletionProgress(dbClient, userId, status, errorText = null) {
+  if (!UUID_REGEX.test(userId)) {
+    throw new AccountDeletionError('Invalid user ID for progress recording.', 'INVALID_IDENTITY', 400);
+  }
+
+  if (typeof dbClient.rpc === 'function') {
+    const { data, error } = await dbClient.rpc('s2s_record_deletion_progress', {
+      p_user_id: userId,
+      p_status: status,
+      p_error: errorText,
+    });
+    if (error) throw new AccountDeletionError(error.message || 'Failed to record deletion progress.', 'PROGRESS_RECORD_FAILED', 500);
+    return data;
+  }
+
+  if (typeof dbClient.query === 'function') {
+    const res = await dbClient.query(
+      'select public.s2s_record_deletion_progress($1::uuid, $2::text, $3::text) as result',
+      [userId, status, errorText]
+    );
+    return res.rows[0].result;
+  }
+
+  throw new AccountDeletionError('Unsupported database client interface.', 'SERVER_CONFIGURATION_ERROR', 500);
+}
+
+/**
+ * Retrieves the current durable deletion state for operators or retry reconciliation.
+ */
+export async function getDeletionState(dbClient, userId) {
+  if (!UUID_REGEX.test(userId)) {
+    throw new AccountDeletionError('Invalid user ID for state retrieval.', 'INVALID_IDENTITY', 400);
+  }
+
+  if (typeof dbClient.rpc === 'function') {
+    const { data, error } = await dbClient.rpc('s2s_get_deletion_state', { p_user_id: userId });
+    if (error) throw new AccountDeletionError(error.message || 'Failed to retrieve deletion state.', 'STATE_LOOKUP_FAILED', 500);
+    return data;
+  }
+
+  if (typeof dbClient.query === 'function') {
+    const res = await dbClient.query('select public.s2s_get_deletion_state($1::uuid) as result', [userId]);
+    return res.rows[0].result;
+  }
+
+  throw new AccountDeletionError('Unsupported database client interface.', 'SERVER_CONFIGURATION_ERROR', 500);
+}
+
+/**
+ * Enumerates and removes all avatar objects owned by userId in the avatars bucket.
+ * Never touches shared buckets, other users' folders, or unchecked paths.
+ */
+export async function cleanupUserAvatars(adminClient, userId) {
+  if (!UUID_REGEX.test(userId)) {
+    throw new AccountDeletionError('Invalid user ID for avatar cleanup.', 'INVALID_IDENTITY', 400);
+  }
+
+  const folder = userId.toLowerCase();
+  let listResult;
+  try {
+    listResult = await adminClient.storage.from('avatars').list(folder);
+  } catch {
+    throw new AccountDeletionError(
+      'Storage service unavailable while listing avatar files.',
+      'STORAGE_CLEANUP_FAILED',
+      502
+    );
+  }
+
+  if (listResult.error) {
+    throw new AccountDeletionError(
+      'Failed to inspect user avatar files in storage.',
+      'STORAGE_CLEANUP_FAILED',
+      502
+    );
+  }
+
+  const files = listResult.data;
+  if (!Array.isArray(files) || files.length === 0) {
+    return { cleanedCount: 0, removedPaths: [] };
+  }
+
+  // Enforce exact ownership validation on every path
+  const pathsToRemove = files
+    .map(f => `${folder}/${f.name}`)
+    .filter(path => ownsAvatarPath(userId, path));
+
+  if (pathsToRemove.length === 0) {
+    return { cleanedCount: 0, removedPaths: [] };
+  }
+
+  let removeResult;
+  try {
+    removeResult = await adminClient.storage.from('avatars').remove(pathsToRemove);
+  } catch {
+    throw new AccountDeletionError(
+      'Storage service unavailable while removing avatar files.',
+      'STORAGE_CLEANUP_FAILED',
+      502
+    );
+  }
+
+  if (removeResult.error) {
+    throw new AccountDeletionError(
+      'Failed to remove user avatar files from storage.',
+      'STORAGE_CLEANUP_FAILED',
+      502
+    );
+  }
+
+  return { cleanedCount: pathsToRemove.length, removedPaths: pathsToRemove };
+}
+
+/**
+ * Deletes the Auth user using the administrative Supabase API.
+ * Triggers foreign key cascades in PostgreSQL for profiles, preferences, items, and receipts.
+ */
+export async function deleteAuthUser(adminClient, userId) {
+  if (!UUID_REGEX.test(userId)) {
+    throw new AccountDeletionError('Invalid user ID for auth deletion.', 'INVALID_IDENTITY', 400);
+  }
+
+  let deleteResult;
+  try {
+    deleteResult = await adminClient.auth.admin.deleteUser(userId);
+  } catch {
+    throw new AccountDeletionError(
+      'Auth administration service unavailable.',
+      'AUTH_DELETION_FAILED',
+      502
+    );
+  }
+
+  if (deleteResult.error) {
+    throw new AccountDeletionError(
+      'Failed to delete user account from identity provider.',
+      'AUTH_DELETION_FAILED',
+      502
+    );
+  }
+
+  return { deleted: true };
+}
+
+/**
+ * Executes the complete server-side account deletion lifecycle:
+ * 1. Verify caller identity and fresh password reauthentication.
+ * 2. Transactionally mark account as deleting (blocking all client writes/imports).
+ * 3. Enumerate and delete all owned avatar files in Storage.
+ * 4. Administratively delete the Auth user (cascading all dependent rows).
+ * 5. Finalize durable deletion tracking.
+ */
+export async function executeAccountDeletion({
+  userClient,
+  adminClient,
+  dbClient = adminClient,
+  authHeader,
+  rawBody,
+  env = typeof process !== 'undefined' ? process.env : {},
+  attemptLimiter,
+  createClient = defaultCreateClient,
+}) {
+  // Step 1: Authentication & Reauthentication
+  const { verifiedUser } = await handleReauthenticationStep({
+    authHeader,
+    rawBody,
+    env,
+    userClient,
+    attemptLimiter,
+    createClient,
+  });
+
+  const userId = verifiedUser.id;
+
+  // Step 2A: Transactionally mark as deleting
+  await markAccountDeleting(dbClient, userId);
+
+  // Step 2B: Avatar storage cleanup
+  try {
+    await cleanupUserAvatars(adminClient, userId);
+    await recordDeletionProgress(dbClient, userId, 'storage_cleaned');
+  } catch (storageError) {
+    await recordDeletionProgress(dbClient, userId, 'pending', storageError.message);
+    throw storageError;
+  }
+
+  // Step 2C: Administrative Auth user deletion
+  try {
+    await deleteAuthUser(adminClient, userId);
+  } catch (authError) {
+    await recordDeletionProgress(dbClient, userId, 'storage_cleaned', authError.message);
+    throw authError;
+  }
+
+  // Step 2D: Finalize durable record
+  await recordDeletionProgress(dbClient, userId, 'finalized');
+
+  return {
+    success: true,
+    status: 'deleted',
+    userId,
+  };
+}
+
+/**
+ * Server/operator reconciliation utility:
+ * Resumes a partially completed deletion safely without exposing an anonymous public endpoint.
+ * Requires service_role administrative authorization.
+ */
+export async function reconcilePendingDeletion({
+  adminClient,
+  dbClient = adminClient,
+  targetUserId,
+}) {
+  if (!UUID_REGEX.test(targetUserId)) {
+    throw new AccountDeletionError('Invalid target user ID for reconciliation.', 'INVALID_IDENTITY', 400);
+  }
+
+  const state = await getDeletionState(dbClient, targetUserId);
+
+  // If already finalized and account does not exist
+  if (state.deletion_record?.status === 'finalized' && !state.account_exists) {
+    return {
+      status: 'finalized',
+      reconciled: false,
+      message: 'Account was already deleted and finalized.',
+    };
+  }
+
+  // Ensure marked deleting if account still exists
+  if (state.account_exists && !state.deleting) {
+    await markAccountDeleting(dbClient, targetUserId);
+  }
+
+  // Ensure storage is cleaned
+  if (!state.deletion_record?.storage_cleaned_at) {
+    await cleanupUserAvatars(adminClient, targetUserId);
+    await recordDeletionProgress(dbClient, targetUserId, 'storage_cleaned');
+  }
+
+  // Ensure auth user is deleted
+  if (state.account_exists) {
+    await deleteAuthUser(adminClient, targetUserId);
+  }
+
+  await recordDeletionProgress(dbClient, targetUserId, 'finalized');
+
+  return {
+    status: 'finalized',
+    reconciled: true,
+    message: 'Pending deletion successfully reconciled and finalized.',
+  };
+}
+
+/**
+ * Standard Web Request / Response HTTP Handler suitable for Supabase Edge Functions.
+ */
+export function createDeletionHttpHandler({
+  adminClient,
+  dbClient = adminClient,
+  env = typeof process !== 'undefined' ? process.env : {},
+  attemptLimiter = createAttemptLimiter(),
+  createClient = defaultCreateClient,
+}) {
+  return async function handleRequest(request) {
+    if (request.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Method not allowed. Use POST.', code: 'METHOD_NOT_ALLOWED' }), {
+        status: 405,
+        headers: { 'Content-Type': 'application/json', Allow: 'POST' },
+      });
+    }
+
+    const authHeader = request.headers.get('Authorization') || request.headers.get('authorization');
+    let rawBody;
+    try {
+      rawBody = await request.text();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Could not read request body.', code: 'INVALID_PAYLOAD' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // User client initialized with caller's token header
+    const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: authHeader ? { Authorization: authHeader } : {} },
+    });
+
+    try {
+      const result = await executeAccountDeletion({
+        userClient,
+        adminClient,
+        dbClient,
+        authHeader,
+        rawBody,
+        env,
+        attemptLimiter,
+        createClient,
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      const status = err.status || 500;
+      const code = err.code || 'INTERNAL_SERVER_ERROR';
+      const errorMsg = err.message || 'An unexpected error occurred during account deletion.';
+
+      return new Response(JSON.stringify({ error: errorMsg, code, status: 'pending' }), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  };
 }
