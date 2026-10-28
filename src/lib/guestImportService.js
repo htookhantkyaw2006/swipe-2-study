@@ -115,6 +115,7 @@ export function createGuestImportService({
       guard(account);
       if (scope.readLearningDocument().raw !== raw) throw new Error(STATE_CHANGED);
       scope.commitLearningDocument(raw, {
+        ...(value ?? {}),
         version: 1, revision: (value?.revision ?? 0) + 1, tables,
         guestImport: {
           fingerprint: prepared.fingerprint, choice, decidedAt: now(),
