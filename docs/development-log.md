@@ -1,5 +1,31 @@
 # Development log
 
+## Latest — 28 October 2026 — Sidebar alignment and collapse refinement
+
+- Reviewed the actual merged `dfe10b4`, including IDE-agent commit `fffef4d` and
+  Edit Profile. Reproduced a concrete defect: at 300px scroll, collapsing focused
+  the newly inserted Show button and reset main scroll to 0. The old Hide label
+  also started 13px left of the navigation-label column at the tested short size.
+- Replaced the two conditional controls with one persistent sticky desktop
+  toolbar control. Its height is the same expanded/collapsed, focus stays on the
+  same button, and it remains reachable when scrolled. Sidebar icons use one
+  40px grid column and labels share the same start, including Settings.
+- Sidebar slides with transform/visibility; main width/offset transition together
+  over 220ms, reaching full viewport width when collapsed. Hidden desktop links
+  are inert immediately. The breakpoint subscription re-enables mobile nav;
+  sessions/Auth remain navigation-free and reduced motion disables transitions.
+- Scroll handlers now capture a pending position and persist after 150ms idle,
+  flushing on route change/pagehide/unmount. The 15-event browser sample produced
+  one Storage write. Default sessionStorage getter failures are caught as well
+  as method failures; added a regression for that case.
+- Validation: 116 Node tests pass, lint 0 errors / 8 existing warnings, build and
+  whitespace checks pass. Chromium production and dev StrictMode each passed
+  22 behavioral checks and 60 layout states (44 / 120 total), including scroll
+  preservation/restoration, animated intermediate widths, focus, persistence,
+  keyboard, mobile/desktop resizing, enlarged text and reduced motion. No page
+  errors or external requests. Screenshots inspected; no universal device/FPS
+  claim. Hosted profile/Storage acceptance and final device review remain pending.
+
 ## Latest — 28 October 2026 — Profile name and private avatar editing
 
 - PT marked the existing-screen UI step complete with final acceptance deferred,

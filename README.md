@@ -28,9 +28,10 @@ and Storage acceptance is still pending. See [profile editing](docs/profile-edit
 
 PT has marked the existing-screen UI pass complete, with final acceptance checks
 deferred. It includes Home, vocabulary/phrase levels and sessions, collections,
-Library, Profile, Settings, Dictionary and helper screens. Sidebar matching and
-collapse are a separate IDE-agent handoff; this checkout has not verified that
-update. See [UI evidence and limits](docs/ui-checkpoint.md).
+Library, Profile, Settings, Dictionary and helper screens. The IDE-agent sidebar
+update has been integrated and refined for alignment, collapse transitions and
+scroll preservation. See [sidebar checks](docs/sidebar-refinement.md) and
+[UI evidence and limits](docs/ui-checkpoint.md).
 
 ## Checks
 

@@ -54,3 +54,17 @@ test('writeCollapsedPreference handles quota and security exceptions silently wi
     writeCollapsedPreference(true, faultyStorage);
   });
 });
+
+test('default storage access survives a browser sessionStorage getter that throws', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+    get sessionStorage() { throw new Error('SecurityError'); },
+  } });
+  try {
+    assert.equal(readCollapsedPreference(), false);
+    assert.doesNotThrow(() => writeCollapsedPreference(true));
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'window', descriptor);
+    else delete globalThis.window;
+  }
+});

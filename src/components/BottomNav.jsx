@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useLayoutEffect, useRef } from 'react';
-import { ArrowUpRight, Home, Layers, Library, MessageCircle, User, Settings, PanelLeftClose } from 'lucide-react';
+import { ArrowUpRight, Home, Layers, Library, MessageCircle, User, Settings } from 'lucide-react';
 import LearningIcon from './ui/LearningIcon';
 
 const items = [
@@ -11,7 +11,7 @@ const items = [
   { path: '/profile', icon: User, kind: 'profile', label: 'Profile' },
 ];
 
-export default function BottomNav({ isCollapsed = false, onToggleCollapse, hideButtonRef }) {
+export default function BottomNav({ isCollapsed = false, isDesktop = false }) {
   const navRef = useRef(null);
   useLayoutEffect(() => {
     const nav = navRef.current;
@@ -19,6 +19,10 @@ export default function BottomNav({ isCollapsed = false, onToggleCollapse, hideB
     const shell = nav.parentElement;
     if (!shell) return;
     const measure = () => {
+      if (window.matchMedia('(min-width: 1024px)').matches) {
+        shell.style.removeProperty('--navigation-height');
+        return;
+      }
       const height = nav.getBoundingClientRect().height;
       if (height > 0) {
         shell.style.setProperty('--navigation-height', `${height}px`);
@@ -31,32 +35,19 @@ export default function BottomNav({ isCollapsed = false, onToggleCollapse, hideB
   }, []);
 
   return (
-    <nav id="app-navigation" ref={navRef} className={`app-navigation${isCollapsed ? ' is-collapsed' : ''}`} aria-label="Main navigation">
+    <nav id="app-navigation" ref={navRef} className={`app-navigation${isCollapsed ? ' is-collapsed' : ''}`} aria-label="Main navigation" inert={isDesktop && isCollapsed} aria-hidden={isDesktop && isCollapsed ? true : undefined}>
       <div className="sidebar-header">
         <NavLink to="/" className="app-brand" aria-label="Swipe 2 Study home">
           <span className="app-brand-mark" aria-hidden="true"><Layers size={25} /></span>
           <span>Swipe <span className="brand-two">2</span> Study<span className="app-brand-caption">Your language companion.</span></span>
         </NavLink>
-        <button
-          type="button"
-          ref={hideButtonRef}
-          className="sidebar-toggle sidebar-toggle--hide"
-          onClick={onToggleCollapse}
-          aria-expanded={!isCollapsed}
-          aria-controls="app-navigation"
-          aria-label="Hide sidebar"
-          title="Hide sidebar"
-        >
-          <PanelLeftClose size={18} aria-hidden="true" />
-          <span>Hide sidebar</span>
-        </button>
       </div>
       <div className="navigation-links">
         {items.map(({ path, icon: Icon, kind, label }) => (
           <NavLink key={path} to={path} end={path === '/'} className={({ isActive }) => `navigation-link${path === '/library' ? ' navigation-link--library' : ''}${isActive ? ' is-active' : ''}`}>
             <span className="navigation-symbol" aria-hidden="true"><Icon size={22} strokeWidth={2} /></span>
             <LearningIcon kind={kind} className="navigation-art" />
-            <span>{label === 'Flashcards' ? <>Flash<wbr />cards</> : label}</span>
+            <span className="navigation-label">{label === 'Flashcards' ? <>Flash<wbr />cards</> : label}</span>
           </NavLink>
         ))}
       </div>
@@ -69,7 +60,7 @@ export default function BottomNav({ isCollapsed = false, onToggleCollapse, hideB
         <NavLink to="/settings" className={({ isActive }) => `navigation-link${isActive ? ' is-active' : ''}`}>
           <span className="navigation-symbol" aria-hidden="true"><Settings size={22} /></span>
           <LearningIcon kind="settings" className="navigation-art" />
-          <span>Settings</span>
+          <span className="navigation-label">Settings</span>
         </NavLink>
       </div>
     </nav>
