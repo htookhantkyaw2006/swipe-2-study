@@ -9,7 +9,12 @@ import { useAvatarUrl } from '../lib/useAvatarUrl.js';
 import Avatar from '../components/ui/Avatar';
 import { db } from '../lib/db';
 import { useGuestImport } from '../lib/useGuestImport.js';
+import { storageOwner } from '../lib/storageOwner.js';
+import { getSupabaseClient } from '../lib/supabase.js';
+import { isAccountDeletionEnabled } from '../lib/accountDeletionGate.js';
+import { sendDeletionRequest, removeOwnerLocalData, UNCONFIRMED_DELETION_GUIDANCE } from '../lib/accountDeletionClient.js';
 import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
+import DeleteAccountDialog from '../components/DeleteAccountDialog.jsx';
 import '../components/study/StudyPage.css';
 import './Profile.css';
 
@@ -24,7 +29,7 @@ function ProfileLink({ to, icon: Icon, title, subtitle }) {
 export default function Profile() {
   const { prefs, setPref } = usePreferences();
   const { language, languages, setLanguage } = useLanguage();
-  const { user, loading: authLoading, isTransitioning, error: authError, retryVerification, signOut, signOutGlobal } = useAuth();
+  const { user, loading: authLoading, isTransitioning, error: authError, retryVerification, signOut, signOutGlobal, captureGeneration, isCurrent } = useAuth();
   const { profile, loading: profileLoading, error: profileError, retry } = useProfile();
   const photo = useAvatarUrl(profile?.avatar_path);
   const guestImport = useGuestImport();
@@ -34,6 +39,12 @@ export default function Profile() {
   const [globalSigningOut, setGlobalSigningOut] = useState(false);
   const [globalSignOutError, setGlobalSignOutError] = useState(null);
   const [targetAccountLabel, setTargetAccountLabel] = useState('');
+  const deletionEnabled = isAccountDeletionEnabled();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deletionError, setDeletionError] = useState(null);
+  const [localCleanupError, setLocalCleanupError] = useState(false);
+  const [deletionNotice, setDeletionNotice] = useState('');
   const [, retryCollections] = useState(0);
   const busy = authLoading || isTransitioning;
   const name = user ? displayName(profile, user) : 'Guest Learner';
@@ -84,6 +95,98 @@ export default function Profile() {
     }
   };
 
+  const openDeleteAccount = () => {
+    if (loggingOut || globalSigningOut || deletingAccount || busy) return;
+    setDeletionError(null);
+    setLocalCleanupError(false);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteAccount = async ({ password }) => {
+    if (deletingAccount || loggingOut || globalSigningOut || busy) return;
+    const initiatingUserId = user?.id;
+    const initiatingGen = captureGeneration ? captureGeneration() : 0;
+    setDeletingAccount(true);
+    setDeletionError(null);
+    setLocalCleanupError(false);
+
+    try {
+      const client = getSupabaseClient();
+      const result = await sendDeletionRequest({
+        client,
+        password,
+        initiatingUserId,
+      });
+
+      // Guard against account switch during in-flight request
+      const isCurrentSession = isCurrent ? isCurrent(initiatingGen) : true;
+      if (!isCurrentSession || user?.id !== initiatingUserId) {
+        setDeletingAccount(false);
+        if (result.status === 'confirmed_deleted') {
+          try { removeOwnerLocalData(initiatingUserId); } catch {}
+        }
+        return;
+      }
+
+      if (result.status === 'confirmed_deleted') {
+        let cleanupSucceeded = false;
+        try {
+          removeOwnerLocalData(initiatingUserId);
+          cleanupSucceeded = true;
+        } catch {
+          cleanupSucceeded = false;
+        }
+
+        if (!cleanupSucceeded) {
+          setDeletingAccount(false);
+          setLocalCleanupError(true);
+          setDeletionError('Your account was deleted on the server, but local cached data could not be completely cleared.');
+          return;
+        }
+
+        setDeletingAccount(false);
+        setDeleteDialogOpen(false);
+        setDeletionNotice('Your account has been deleted. You are now in guest mode.');
+        storageOwner.setOwner(null);
+        await signOut();
+        return;
+      }
+
+      setDeletingAccount(false);
+      setDeletionError(result.message || 'Account deletion failed.');
+    } catch {
+      setDeletingAccount(false);
+      setDeletionError(UNCONFIRMED_DELETION_GUIDANCE);
+    }
+  };
+
+  const handleRetryLocalCleanup = async () => {
+    if (deletingAccount || !localCleanupError) return;
+    const initiatingUserId = user?.id;
+    if (!initiatingUserId) return;
+    setDeletingAccount(true);
+    setDeletionError(null);
+
+    let cleanupSucceeded = false;
+    try {
+      removeOwnerLocalData(initiatingUserId);
+      cleanupSucceeded = true;
+    } catch {
+      cleanupSucceeded = false;
+    }
+
+    setDeletingAccount(false);
+    if (cleanupSucceeded) {
+      setLocalCleanupError(false);
+      setDeleteDialogOpen(false);
+      setDeletionNotice('Your account has been deleted. You are now in guest mode.');
+      storageOwner.setOwner(null);
+      await signOut();
+    } else {
+      setDeletionError('Could not clear device storage. Please try again.');
+    }
+  };
+
   return (
     <div className="study-page profile-page">
       <header className="profile-header"><div><p>Your learning space</p><h1>Profile</h1></div><Link className="study-icon-button" to="/settings" aria-label="Open all settings"><Settings size={21} aria-hidden="true" /></Link></header>
@@ -110,6 +213,7 @@ export default function Profile() {
         </aside>
 
         <div className="profile-sections">
+            {deletionNotice && <div className="profile-deletion-notice" role="status"><p>{deletionNotice}</p><button type="button" onClick={() => setDeletionNotice('')} aria-label="Dismiss notice">Dismiss</button></div>}
           <section className="profile-group" aria-labelledby="profile-quick-title"><h2 id="profile-quick-title">Quick settings</h2><div className="profile-group__surface">
             <div className="profile-setting profile-setting--select"><span className="profile-setting__icon"><Languages size={21} aria-hidden="true" /></span><label className="profile-setting__copy" htmlFor="profile-language"><strong>Learning language</strong><span>Choose your course</span></label><select id="profile-language" aria-label="Learning language" value={language.id} disabled={busy} onChange={event => setLanguage(event.target.value)}>{languages.map(item => <option key={item.id} value={item.id} disabled={item.status !== 'active'}>{item.name}</option>)}</select></div>
             <div className="profile-setting profile-setting--select"><span className="profile-setting__icon"><Target size={21} aria-hidden="true" /></span><label className="profile-setting__copy" htmlFor="profile-goal"><strong>Daily goal</strong><span>Cards to aim for each day</span></label><select id="profile-goal" aria-label="Daily goal" value={prefs.dailyGoal} disabled={busy} onChange={event => setPref('dailyGoal', Number(event.target.value))}>{OPTIONS.dailyGoal.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
@@ -122,10 +226,48 @@ export default function Profile() {
             {user ? <button type="button" className="profile-setting profile-setting--logout" onClick={handleLogout} disabled={loggingOut || globalSigningOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{loggingOut ? 'Logging out?' : 'Log out'}</strong><span>Switch back to guest mode</span></span></button> : <ProfileLink to="/login" icon={LogIn} title="Sign in or register" subtitle="Use your account" />}
             {user && !busy && <button type="button" className="profile-setting profile-setting--logout" onClick={openGlobalSignOut} disabled={loggingOut || globalSigningOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Sign out on all devices</strong><span>Sign out here and on other devices</span></span></button>}
             <div className="profile-setting"><span className="profile-setting__icon"><MessageSquare size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Send feedback</strong><span>Help improve Swipe 2 Study</span></span><span className="profile-soon">Soon</span></div>
-            <div className="profile-setting"><span className="profile-setting__icon"><Trash2 size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Delete account</strong><span>Available in a later update</span></span><span className="profile-soon">Soon</span></div>
+            {user && !busy && deletionEnabled ? (
+              <button
+                type="button"
+                className="profile-setting profile-setting--logout"
+                onClick={openDeleteAccount}
+                disabled={loggingOut || globalSigningOut || deletingAccount || busy}
+              >
+                <span className="profile-setting__icon"><Trash2 size={21} aria-hidden="true" /></span>
+                <span className="profile-setting__copy">
+                  <strong>Delete account</strong>
+                  <span>Permanently delete your account and data</span>
+                </span>
+              </button>
+            ) : (
+              <div className="profile-setting">
+                <span className="profile-setting__icon"><Trash2 size={21} aria-hidden="true" /></span>
+                <span className="profile-setting__copy">
+                  <strong>Delete account</strong>
+                  <span>Available in a later update</span>
+                </span>
+                <span className="profile-soon">Soon</span>
+              </div>
+            )}
           </div></section>
         </div>
       </div>
+      <DeleteAccountDialog
+        open={deleteDialogOpen}
+        pending={deletingAccount}
+        error={deletionError}
+        localCleanupError={localCleanupError}
+        accountLabel={user?.email || name || ''}
+        onConfirm={handleDeleteAccount}
+        onRetryCleanup={handleRetryLocalCleanup}
+        onClose={() => {
+          if (!deletingAccount) {
+            setDeleteDialogOpen(false);
+            setDeletionError(null);
+            setLocalCleanupError(false);
+          }
+        }}
+      />
       <GlobalSignOutDialog
         open={globalSignOutOpen}
         pending={globalSigningOut}

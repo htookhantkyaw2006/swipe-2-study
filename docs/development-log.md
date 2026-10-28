@@ -1,5 +1,29 @@
 # Development log
 
+## Latest — 29 October 2026 — Work batch B2.2: account deletion UI, client coordination and owner cleanup
+
+- Branched `feat/account-deletion-ui` from completed server foundation tip `5f46aba` on `feat/account-deletion-server`.
+- Completed all three checkpoints sequentially:
+  1. **Checkpoint 1 — Server handoff corrections & runtime verification**:
+     - Corrected unconfirmed guidance text: "Deletion could not be confirmed. Being unable to sign in does not confirm deletion. Contact support for verification."
+     - Added durable, atomic database attempt throttling in PostgreSQL (`private.account_deletion_attempts`, `public.s2s_check_deletion_throttled`, `public.s2s_record_deletion_attempt_failure`, `public.s2s_reset_deletion_attempts`) using row-level locking (`FOR UPDATE`) to prevent concurrent instances from bypassing the 5-attempt limit.
+     - Updated avatar storage cleanup (`cleanupUserAvatars`) to handle paginated results (`limit: 100`, `offset`) with explicit path validation (`ownsAvatarPath`).
+     - Fixed Edge Function relative import in `supabase/functions/delete-account/index.js` (from `../../` to `../../../src/server/accountDeletion.js`) so it resolves and bundles cleanly. Verified via Node syntax check, Oxlint, and Vite SSR bundling. Recorded local validation gap (Docker container/Deno not present on host).
+     - Added 3 dedicated tests in `tests/accountDeletionLifecycle.test.js`. Committed as `375c992`.
+  2. **Checkpoint 2 — Presentational dialog, client service & capability gate**:
+     - Created `src/components/DeleteAccountDialog.jsx` and `DeleteAccountDialog.css`: Accessible, presentational confirmation modal requiring exact "DELETE" confirmation and current password. Disables submission until fields are valid; suppresses backdrop dismissal, buttons, and Escape while pending; clears password on close and after failed requests; never prefills or remembers fields.
+     - Created `src/lib/accountDeletionGate.js`: `isAccountDeletionEnabled()` capability gate behind `VITE_ACCOUNT_DELETION_ENABLED` and configured backend, disabled by default and completely independent of cloud import.
+     - Created `src/lib/accountDeletionClient.js`: `sendDeletionRequest` strictly validates 200 response shape (`json.success === true && json.status === 'deleted' && json.userId === initiatingUserId`), maps all error codes honestly, respects server-provided retry timing on 429, never replays password-bearing requests automatically, and never infers deletion from 401 or network drops.
+     - Implemented `removeOwnerLocalData(ownerId, storage)`: Exact prefix matching (`s2s_user_<ownerId>_`) removing learning document, sync tombstones, import outbox/receipts, scoped tables, and profile caches without calling `localStorage.clear()` and preserving guest and other accounts' data.
+     - Implemented `createAccountDeletionController`: Generation-guarded coordination protecting Account B from stale Account A deletions.
+     - Added 13 dedicated tests in `tests/accountDeletionClient.test.js`. Committed as `292e090`.
+  3. **Checkpoint 3 — Owner-specific cleanup & Profile integration**:
+     - Wired `DeleteAccountDialog` into `src/pages/Profile.jsx` gated behind `isAccountDeletionEnabled()`. When disabled, preserves pre-existing "Available in a later update / Soon" placeholder.
+     - Generation-guarded async flow ensures account switches during in-flight deletion never sign out, change owner, or redirect Account B.
+     - Handles local storage cleanup failure honestly with a dedicated retry option that does not re-submit the deletion request to the server.
+     - Upon confirmed server deletion and local cleanup, clears local Auth session and transitions safely to guest mode with a visible completion notice.
+- Validation: **256 Node tests pass** (all 240 existing + 16 new deletion tests; 0 failures), lint **0 errors / 8 existing warnings** preserved, production build passes (`dist/assets/index-B9Rbo7vt.js`, 977 kB in 1.09s), and `git diff --check` is clean.
+
 ## Latest — 29 October 2026 — Work batch B2.1: server-side account deletion foundation
 
 - Branched `feat/account-deletion-server` from completed B1 verification tip `e1cf651` on `feat/account-cloud-integration`.

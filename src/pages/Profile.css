@@ -50,6 +50,9 @@
 .profile-setting--logout:disabled { cursor: default; opacity: 0.55; }
 .profile-setting--link:disabled { cursor: default; opacity: 0.55; }
 .profile-soon { padding: 4px 7px; font-size: 0.6875rem; line-height: 1.5; background: var(--color-ghost-blue); color: var(--color-primary-blue); border-radius: 6px; }
+.profile-deletion-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 12px 16px; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 14px; color: #065F46; font-size: 0.875rem; line-height: 1.5; }
+.profile-deletion-notice button { background: transparent; border: 0; color: #047857; font-weight: 600; cursor: pointer; padding: 6px 10px; border-radius: 8px; }
+.profile-deletion-notice button:hover { background: #D1FAE5; }
 @media (hover: hover) {
   .profile-setting--link:hover, .profile-setting--logout:hover:not(:disabled), .profile-counts > a:hover { background: var(--color-ghost-blue); }
 }

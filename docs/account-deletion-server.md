@@ -187,36 +187,46 @@ Operators can safely reconcile and finalize the deletion without exposing any an
 
 ## 7. Environment Variables & Staging Deployment
 
-### Server Environment Variable Names Only (No Secrets)
-- `SUPABASE_URL`: HTTPS project origin of the Supabase project.
-- `SUPABASE_ANON_KEY`: Public anon key for user authentication.
-- `SUPABASE_SERVICE_ROLE_KEY`: Privileged secret key for administrative Storage cleanup and Auth deletion.
+### Client & Server Environment Variable Names Only (No Secrets)
+- `VITE_ACCOUNT_DELETION_ENABLED`: Client capability gate flag (boolean string `'true'`). Disabled by default. Completely independent of `VITE_CLOUD_IMPORT_STAGING`.
+- `SUPABASE_URL` / `VITE_SUPABASE_URL`: HTTPS project origin of the Supabase project.
+- `SUPABASE_ANON_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY`: Public anon/publishable key for user authentication.
+- `SUPABASE_SERVICE_ROLE_KEY`: Privileged secret key for administrative Storage cleanup, Auth deletion, and durable attempt throttling.
 
 > **Security Rule:** `SUPABASE_SERVICE_ROLE_KEY` must exist **only** in server environment variables or Supabase Edge Function secrets. It must **never** be prefixed with `VITE_` or included in frontend bundles.
 
-### Staging Deployment Prerequisites
-1. Apply additive migration `supabase/migrations/20261029000100_account_deletion_foundation.sql` to the confirmed staging project.
-2. Deploy the Edge Function:
+### Staging Deployment & Verification Prerequisites
+1. Apply additive migration `supabase/migrations/20261029000100_account_deletion_foundation.sql` to the staging project.
+2. Verify durable throttling table and RPCs:
+   ```sql
+   SELECT to_regclass('private.account_deletion_attempts') AS attempts_table,
+          to_regprocedure('public.s2s_check_deletion_throttled(uuid,integer,integer)') AS check_throttle_rpc,
+          to_regprocedure('public.s2s_record_deletion_attempt_failure(uuid,integer,integer)') AS record_throttle_rpc,
+          to_regprocedure('public.s2s_reset_deletion_attempts(uuid)') AS reset_throttle_rpc;
+   ```
+3. Deploy the Edge Function:
    ```bash
    supabase functions deploy delete-account
    ```
-3. Verify function secrets:
+4. Verify function secrets:
    ```bash
    supabase secrets list
    # Ensure SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY are set.
    ```
-4. Verify SQL permissions:
-   ```sql
-   SELECT to_regclass('private.account_deletions') AS deletions_table,
-          to_regprocedure('public.s2s_begin_account_deletion(uuid)') AS begin_rpc,
-          to_regprocedure('public.s2s_record_deletion_progress(uuid,text,text)') AS progress_rpc,
-          to_regprocedure('public.s2s_get_deletion_state(uuid)') AS state_rpc;
+5. Enable the client gate for staging testing in `.env`:
+   ```bash
+   VITE_ACCOUNT_DELETION_ENABLED=true
    ```
+
+### Local Tooling Validation & Remaining Validation Gaps
+- **Local Automated Testing:** 256 Node/PGlite tests pass locally (11 database & lifecycle tests, 12 server reauth tests, 13 client coordination & dialog tests).
+- **Edge Function Verification:** Entry point (`supabase/functions/delete-account/index.js`) and imports verified via Node syntax check, Oxlint, and Vite SSR bundling.
+- **Validation Gap (Recorded):** Docker daemon is not active on this host, and Deno is not in Windows system PATH. Therefore `supabase functions serve` (local Docker container) and hosted deployment were not executed locally. Staging Edge Function execution remains to be validated upon staging deployment.
 
 ---
 
 ## 8. Remaining Limitations
 
-- **Provider Reauthentication:** Google OAuth / Apple / SAML reauthentication is not implemented in this server iteration; provider-only accounts receive `UNSUPPORTED_AUTH_PROVIDER`.
-- **UI & Cache Clearing (Batch B2.2):** Profile deletion dialog, confirmation buttons, local device cache purge, and router redirect remain for Task B2.2.
+- **Provider Reauthentication:** Google OAuth / Apple / SAML reauthentication is not supported in this version; provider-only accounts receive `UNSUPPORTED_AUTH_PROVIDER` and cannot be deleted via password.
+- **Hosted Tests Not Performed:** No migrations were applied to live Supabase hosts, no live accounts were deleted, and no hosted JWT roundtrips were executed in this local work batch.
 
