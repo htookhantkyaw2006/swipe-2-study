@@ -1,0 +1,274 @@
+/* ==========================================================================
+   Guest Import Dialog Styles
+   ========================================================================== */
+
+.guest-import-dialog {
+  /* Inherits modal styles from .app-dialog */
+}
+
+.guest-import-dialog__container {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.guest-import-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.guest-import-dialog__header-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--color-ghost-blue);
+  color: var(--color-primary-blue);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.guest-import-dialog__header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.guest-import-dialog__title {
+  font-size: 1.25rem;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--color-text-navy);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.guest-import-dialog__close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-ghost-blue);
+  color: var(--color-primary-blue);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.guest-import-dialog__close-btn:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.guest-import-dialog__close-btn:focus-visible {
+  outline: 2px solid var(--color-primary-blue);
+  outline-offset: 2px;
+}
+
+.guest-import-dialog__close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.guest-import-dialog__intro {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: #334155;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* Error Banner */
+.guest-import-dialog__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-btn);
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+
+.guest-import-dialog__error-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #DC2626;
+}
+
+/* Pending Indicator */
+.guest-import-dialog__pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-btn);
+  background: var(--color-ghost-blue);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-navy);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* Summary List */
+.guest-import-dialog__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.guest-import-dialog__summary-card {
+  padding: 12px 14px;
+  background: var(--color-page-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.guest-import-dialog__summary-label {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text-navy);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.guest-import-dialog__summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-primary-blue);
+}
+
+.guest-import-dialog__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.guest-import-dialog__stat strong {
+  font-weight: 700;
+  color: var(--color-text-navy);
+}
+
+.guest-import-dialog__stat-divider {
+  color: #94A3B8;
+  user-select: none;
+}
+
+.guest-import-dialog__summary-empty {
+  padding: 14px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #64748B;
+  background: var(--color-page-bg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+/* Action Choices */
+.guest-import-dialog__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.guest-import-dialog__action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.guest-import-dialog__btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 20px;
+  border-radius: var(--radius-btn);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  line-height: 1.4;
+  border: 0;
+  transition: background-color 0.15s, transform 0.1s, opacity 0.15s;
+}
+
+.guest-import-dialog__btn:focus-visible {
+  outline: 2px solid var(--color-primary-blue);
+  outline-offset: 2px;
+}
+
+.guest-import-dialog__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.guest-import-dialog__action-hint {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #64748B;
+  margin: 0;
+  padding: 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.guest-import-dialog__action-group--later {
+  padding-top: 4px;
+}
+
+.guest-import-dialog__btn--later {
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  background-color: transparent;
+}
+
+.guest-import-dialog__btn--later:hover:not(:disabled) {
+  background: #F1F5F9;
+  border-color: #94A3B8;
+  color: var(--color-text-navy);
+}
+
+/* Responsive adjustments */
+@media (min-width: 640px) {
+  .guest-import-dialog__summary {
+    max-height: 260px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guest-import-dialog__btn,
+  .guest-import-dialog__close-btn {
+    transition: none;
+  }
+}
