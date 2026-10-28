@@ -156,7 +156,7 @@ If the server successfully executes `auth.admin.deleteUser()`, but the client ne
 4. **Guiding Rule:** A generic 401 or missing session is **NOT proof of completed deletion**.
 5. The future UI must recognize that if a deletion request timed out / disconnected and subsequent token verification returns 401:
    - Report status as **`unconfirmed`**.
-   - Advise the learner: *"Deletion could not be confirmed over the network. If your account is no longer accessible, deletion was finalized. Contact support if you need manual verification."*
+   - Advise the learner: *"Deletion could not be confirmed. Being unable to sign in does not confirm deletion. Contact support for verification."*
 
 ### Operator Reconciliation Procedure
 If an account deletion is stuck in `pending` or `storage_cleaned` due to an infrastructure outage:

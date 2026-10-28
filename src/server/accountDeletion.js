@@ -54,20 +54,126 @@ export function createAttemptLimiter({
       }
       return record.count >= maxAttempts;
     },
+    getRetryAfter: (userId) => {
+      const record = attempts.get(userId);
+      if (!record) return 0;
+      const remainingMs = record.resetAt - now();
+      return remainingMs > 0 ? Math.ceil(remainingMs / 1000) : 0;
+    },
     recordFailure: (userId) => {
       cleanup();
       const current = attempts.get(userId);
       const currentTime = now();
       if (!current || currentTime > current.resetAt) {
         attempts.set(userId, { count: 1, resetAt: currentTime + windowMs });
-      } else {
-        current.count += 1;
+        return { throttled: false, retryAfterSeconds: 0, failedAttempts: 1 };
       }
+      current.count += 1;
+      const throttled = current.count >= maxAttempts;
+      const retryAfterSeconds = throttled ? Math.ceil((current.resetAt - currentTime) / 1000) : 0;
+      return { throttled, retryAfterSeconds, failedAttempts: current.count };
     },
     reset: (userId) => {
       attempts.delete(userId);
     },
     _getAttempts: (userId) => attempts.get(userId)?.count ?? 0,
+  };
+}
+
+/**
+ * Shared, durable, atomic attempt throttling limiter backed by PostgreSQL.
+ * Uses SELECT ... FOR UPDATE on private.account_deletion_attempts so concurrent
+ * failed attempts across multiple serverless/edge instances cannot race or bypass limits.
+ */
+export function createDatabaseAttemptLimiter(dbClient, {
+  maxAttempts = DEFAULT_MAX_ATTEMPTS,
+  windowSeconds = Math.ceil(DEFAULT_WINDOW_MS / 1000),
+} = {}) {
+  return {
+    async isThrottled(userId) {
+      if (!UUID_REGEX.test(userId ?? '')) return false;
+      if (typeof dbClient.rpc === 'function') {
+        const { data, error } = await dbClient.rpc('s2s_check_deletion_throttled', {
+          p_user_id: userId,
+          p_max_attempts: maxAttempts,
+          p_window_seconds: windowSeconds,
+        });
+        if (error) throw new AccountDeletionError(error.message, 'THROTTLE_CHECK_FAILED', 500);
+        return Boolean(data?.throttled);
+      }
+      if (typeof dbClient.query === 'function') {
+        const res = await dbClient.query(
+          'select public.s2s_check_deletion_throttled($1::uuid, $2::int, $3::int) as result',
+          [userId, maxAttempts, windowSeconds]
+        );
+        const data = res.rows?.[0]?.result;
+        return Boolean(data?.throttled);
+      }
+      return false;
+    },
+
+    async getRetryAfter(userId) {
+      if (!UUID_REGEX.test(userId ?? '')) return 0;
+      if (typeof dbClient.rpc === 'function') {
+        const { data, error } = await dbClient.rpc('s2s_check_deletion_throttled', {
+          p_user_id: userId,
+          p_max_attempts: maxAttempts,
+          p_window_seconds: windowSeconds,
+        });
+        if (error) return 0;
+        return Number(data?.retry_after_seconds ?? 0);
+      }
+      if (typeof dbClient.query === 'function') {
+        const res = await dbClient.query(
+          'select public.s2s_check_deletion_throttled($1::uuid, $2::int, $3::int) as result',
+          [userId, maxAttempts, windowSeconds]
+        );
+        const data = res.rows?.[0]?.result;
+        return Number(data?.retry_after_seconds ?? 0);
+      }
+      return 0;
+    },
+
+    async recordFailure(userId) {
+      if (!UUID_REGEX.test(userId ?? '')) return { throttled: false, retryAfterSeconds: 0 };
+      if (typeof dbClient.rpc === 'function') {
+        const { data, error } = await dbClient.rpc('s2s_record_deletion_attempt_failure', {
+          p_user_id: userId,
+          p_max_attempts: maxAttempts,
+          p_window_seconds: windowSeconds,
+        });
+        if (error) throw new AccountDeletionError(error.message, 'THROTTLE_RECORD_FAILED', 500);
+        return {
+          throttled: Boolean(data?.throttled),
+          retryAfterSeconds: Number(data?.retry_after_seconds ?? 0),
+          failedAttempts: Number(data?.failed_attempts ?? 1),
+        };
+      }
+      if (typeof dbClient.query === 'function') {
+        const res = await dbClient.query(
+          'select public.s2s_record_deletion_attempt_failure($1::uuid, $2::int, $3::int) as result',
+          [userId, maxAttempts, windowSeconds]
+        );
+        const data = res.rows?.[0]?.result;
+        return {
+          throttled: Boolean(data?.throttled),
+          retryAfterSeconds: Number(data?.retry_after_seconds ?? 0),
+          failedAttempts: Number(data?.failed_attempts ?? 1),
+        };
+      }
+      return { throttled: false, retryAfterSeconds: 0 };
+    },
+
+    async reset(userId) {
+      if (!UUID_REGEX.test(userId ?? '')) return;
+      if (typeof dbClient.rpc === 'function') {
+        await dbClient.rpc('s2s_reset_deletion_attempts', { p_user_id: userId });
+        return;
+      }
+      if (typeof dbClient.query === 'function') {
+        await dbClient.query('select public.s2s_reset_deletion_attempts($1::uuid)', [userId]);
+      }
+    },
   };
 }
 
@@ -280,12 +386,20 @@ export async function handleReauthenticationStep({
   const verifiedUser = await verifyCallerIdentity(userClient, authHeader);
   const userId = verifiedUser.id;
 
-  if (attemptLimiter.isThrottled(userId)) {
-    throw new AccountDeletionError(
+  const throttled = await attemptLimiter.isThrottled(userId);
+  if (throttled) {
+    const retryAfter = typeof attemptLimiter.getRetryAfter === 'function'
+      ? await attemptLimiter.getRetryAfter(userId)
+      : null;
+    const error = new AccountDeletionError(
       'Too many failed deletion attempts. Please wait before retrying.',
       'RATE_LIMITED',
       429
     );
+    if (retryAfter) {
+      error.retryAfter = retryAfter;
+    }
+    throw error;
   }
 
   checkPasswordReauthSupported(verifiedUser);
@@ -300,7 +414,7 @@ export async function handleReauthenticationStep({
       createClient,
     });
 
-    attemptLimiter.reset(userId);
+    await attemptLimiter.reset(userId);
 
     return {
       success: true,
@@ -308,7 +422,10 @@ export async function handleReauthenticationStep({
     };
   } catch (error) {
     if (error.code === 'INVALID_CREDENTIALS' || error.code === 'IDENTITY_MISMATCH') {
-      attemptLimiter.recordFailure(userId);
+      const failInfo = await attemptLimiter.recordFailure(userId);
+      if (failInfo && typeof failInfo === 'object' && failInfo.retryAfterSeconds) {
+        error.retryAfter = failInfo.retryAfterSeconds;
+      }
     }
     throw error;
   }
@@ -408,59 +525,78 @@ export async function cleanupUserAvatars(adminClient, userId) {
   }
 
   const folder = userId.toLowerCase();
-  let listResult;
-  try {
-    listResult = await adminClient.storage.from('avatars').list(folder);
-  } catch {
-    throw new AccountDeletionError(
-      'Storage service unavailable while listing avatar files.',
-      'STORAGE_CLEANUP_FAILED',
-      502
-    );
+  const limit = 100;
+  let offset = 0;
+  let hasMore = true;
+  const removedPaths = [];
+
+  while (hasMore) {
+    let listResult;
+    try {
+      listResult = await adminClient.storage.from('avatars').list(folder, {
+        limit,
+        offset,
+        sortBy: { column: 'name', order: 'asc' },
+      });
+    } catch {
+      throw new AccountDeletionError(
+        'Storage service unavailable while listing avatar files.',
+        'STORAGE_CLEANUP_FAILED',
+        502
+      );
+    }
+
+    if (listResult.error) {
+      throw new AccountDeletionError(
+        'Failed to inspect user avatar files in storage.',
+        'STORAGE_CLEANUP_FAILED',
+        502
+      );
+    }
+
+    const files = listResult.data;
+    if (!Array.isArray(files) || files.length === 0) {
+      break;
+    }
+
+    // Enforce exact ownership validation on every path
+    const pathsToRemove = files
+      .map(f => `${folder}/${f.name}`)
+      .filter(path => ownsAvatarPath(userId, path));
+
+    if (pathsToRemove.length > 0) {
+      let removeResult;
+      try {
+        removeResult = await adminClient.storage.from('avatars').remove(pathsToRemove);
+      } catch {
+        throw new AccountDeletionError(
+          'Storage service unavailable while removing avatar files.',
+          'STORAGE_CLEANUP_FAILED',
+          502
+        );
+      }
+
+      if (removeResult.error) {
+        throw new AccountDeletionError(
+          'Failed to remove user avatar files from storage.',
+          'STORAGE_CLEANUP_FAILED',
+          502
+        );
+      }
+
+      removedPaths.push(...pathsToRemove);
+    }
+
+    if (files.length < limit) {
+      hasMore = false;
+    } else {
+      // Advance offset past unremoved files to prevent infinite loops if unowned files exist
+      const unremovedCount = files.length - pathsToRemove.length;
+      offset += unremovedCount;
+    }
   }
 
-  if (listResult.error) {
-    throw new AccountDeletionError(
-      'Failed to inspect user avatar files in storage.',
-      'STORAGE_CLEANUP_FAILED',
-      502
-    );
-  }
-
-  const files = listResult.data;
-  if (!Array.isArray(files) || files.length === 0) {
-    return { cleanedCount: 0, removedPaths: [] };
-  }
-
-  // Enforce exact ownership validation on every path
-  const pathsToRemove = files
-    .map(f => `${folder}/${f.name}`)
-    .filter(path => ownsAvatarPath(userId, path));
-
-  if (pathsToRemove.length === 0) {
-    return { cleanedCount: 0, removedPaths: [] };
-  }
-
-  let removeResult;
-  try {
-    removeResult = await adminClient.storage.from('avatars').remove(pathsToRemove);
-  } catch {
-    throw new AccountDeletionError(
-      'Storage service unavailable while removing avatar files.',
-      'STORAGE_CLEANUP_FAILED',
-      502
-    );
-  }
-
-  if (removeResult.error) {
-    throw new AccountDeletionError(
-      'Failed to remove user avatar files from storage.',
-      'STORAGE_CLEANUP_FAILED',
-      502
-    );
-  }
-
-  return { cleanedCount: pathsToRemove.length, removedPaths: pathsToRemove };
+  return { cleanedCount: removedPaths.length, removedPaths };
 }
 
 /**
@@ -512,13 +648,15 @@ export async function executeAccountDeletion({
   attemptLimiter,
   createClient = defaultCreateClient,
 }) {
+  const effectiveLimiter = attemptLimiter || (dbClient ? createDatabaseAttemptLimiter(dbClient) : createAttemptLimiter());
+
   // Step 1: Authentication & Reauthentication
   const { verifiedUser } = await handleReauthenticationStep({
     authHeader,
     rawBody,
     env,
     userClient,
-    attemptLimiter,
+    attemptLimiter: effectiveLimiter,
     createClient,
   });
 
@@ -611,9 +749,11 @@ export function createDeletionHttpHandler({
   adminClient,
   dbClient = adminClient,
   env = typeof process !== 'undefined' ? process.env : {},
-  attemptLimiter = createAttemptLimiter(),
+  attemptLimiter,
   createClient = defaultCreateClient,
 }) {
+  const effectiveLimiter = attemptLimiter || (dbClient ? createDatabaseAttemptLimiter(dbClient) : createAttemptLimiter());
+
   return async function handleRequest(request) {
     if (request.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'Method not allowed. Use POST.', code: 'METHOD_NOT_ALLOWED' }), {
@@ -649,7 +789,7 @@ export function createDeletionHttpHandler({
         authHeader,
         rawBody,
         env,
-        attemptLimiter,
+        attemptLimiter: effectiveLimiter,
         createClient,
       });
 
@@ -661,10 +801,19 @@ export function createDeletionHttpHandler({
       const status = err.status || 500;
       const code = err.code || 'INTERNAL_SERVER_ERROR';
       const errorMsg = err.message || 'An unexpected error occurred during account deletion.';
+      const headers = { 'Content-Type': 'application/json' };
+      if (code === 'RATE_LIMITED' && err.retryAfter) {
+        headers['Retry-After'] = String(err.retryAfter);
+      }
 
-      return new Response(JSON.stringify({ error: errorMsg, code, status: 'pending' }), {
+      return new Response(JSON.stringify({
+        error: errorMsg,
+        code,
+        status: 'pending',
+        ...(err.retryAfter ? { retryAfter: err.retryAfter } : {}),
+      }), {
         status,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
       });
     }
   };

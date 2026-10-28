@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { createDeletionHttpHandler, createAttemptLimiter } from '../../src/server/accountDeletion.js';
+import { createDeletionHttpHandler } from '../../../src/server/accountDeletion.js';
 
 const getEnv = () => {
   if (typeof Deno !== 'undefined' && Deno?.env?.get) {
@@ -17,9 +17,8 @@ const getEnv = () => {
 };
 
 const env = getEnv();
-const attemptLimiter = createAttemptLimiter();
 
-// Administrative client for privileged Storage cleanup and Auth user deletion
+// Administrative client for privileged Storage cleanup, durable throttling, and Auth user deletion
 const adminClient = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -29,7 +28,6 @@ const adminClient = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
 export const handler = createDeletionHttpHandler({
   adminClient,
   env,
-  attemptLimiter,
 });
 
 // Default export / serve entry point for Deno / Supabase Edge Runtime

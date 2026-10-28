@@ -157,4 +157,173 @@ $$;
 revoke all on function public.s2s_get_deletion_state(uuid) from public, anon, authenticated;
 grant execute on function public.s2s_get_deletion_state(uuid) to service_role;
 
+-- Durable, atomic account deletion attempt tracking across function instances.
+create table if not exists private.account_deletion_attempts (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  failed_attempts integer not null default 0,
+  window_started_at timestamptz not null default now(),
+  throttled_until timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+alter table private.account_deletion_attempts enable row level security;
+revoke all on private.account_deletion_attempts from public, anon, authenticated;
+grant all on private.account_deletion_attempts to service_role;
+
+-- Atomically inspects attempt rate-limiting for an account.
+create or replace function public.s2s_check_deletion_throttled(
+  p_user_id uuid,
+  p_max_attempts integer default 5,
+  p_window_seconds integer default 900
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  rec private.account_deletion_attempts%rowtype;
+  now_ts timestamptz := now();
+  retry_after integer := 0;
+begin
+  if p_user_id is null then
+    raise exception 'ACCOUNT_REQUIRED' using errcode = '42501';
+  end if;
+
+  select * into rec
+    from private.account_deletion_attempts
+    where user_id = p_user_id
+    for update;
+
+  if found then
+    if rec.throttled_until is not null and rec.throttled_until > now_ts then
+      retry_after := ceil(extract(epoch from (rec.throttled_until - now_ts)))::integer;
+      return jsonb_build_object(
+        'throttled', true,
+        'retry_after_seconds', retry_after,
+        'failed_attempts', rec.failed_attempts
+      );
+    end if;
+
+    if rec.window_started_at + (p_window_seconds || ' seconds')::interval <= now_ts then
+      update private.account_deletion_attempts
+        set failed_attempts = 0,
+            window_started_at = now_ts,
+            throttled_until = null,
+            updated_at = now_ts
+        where user_id = p_user_id;
+      return jsonb_build_object('throttled', false, 'retry_after_seconds', 0, 'failed_attempts', 0);
+    end if;
+
+    if rec.failed_attempts >= p_max_attempts then
+      retry_after := ceil(extract(epoch from ((rec.window_started_at + (p_window_seconds || ' seconds')::interval) - now_ts)))::integer;
+      if retry_after <= 0 then retry_after := p_window_seconds; end if;
+      update private.account_deletion_attempts
+        set throttled_until = now_ts + (retry_after || ' seconds')::interval,
+            updated_at = now_ts
+        where user_id = p_user_id;
+      return jsonb_build_object('throttled', true, 'retry_after_seconds', retry_after, 'failed_attempts', rec.failed_attempts);
+    end if;
+  end if;
+
+  return jsonb_build_object('throttled', false, 'retry_after_seconds', 0, 'failed_attempts', coalesce(rec.failed_attempts, 0));
+end;
+$$;
+
+revoke all on function public.s2s_check_deletion_throttled(uuid, integer, integer) from public, anon, authenticated;
+grant execute on function public.s2s_check_deletion_throttled(uuid, integer, integer) to service_role;
+
+-- Atomically records a failed deletion attempt.
+create or replace function public.s2s_record_deletion_attempt_failure(
+  p_user_id uuid,
+  p_max_attempts integer default 5,
+  p_window_seconds integer default 900
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  rec private.account_deletion_attempts%rowtype;
+  now_ts timestamptz := now();
+  new_count integer := 1;
+  is_throttled boolean := false;
+  retry_after integer := 0;
+begin
+  if p_user_id is null then
+    raise exception 'ACCOUNT_REQUIRED' using errcode = '42501';
+  end if;
+
+  select * into rec
+    from private.account_deletion_attempts
+    where user_id = p_user_id
+    for update;
+
+  if not found then
+    insert into private.account_deletion_attempts (user_id, failed_attempts, window_started_at, updated_at)
+      values (p_user_id, 1, now_ts, now_ts)
+      returning * into rec;
+  else
+    if rec.window_started_at + (p_window_seconds || ' seconds')::interval <= now_ts then
+      new_count := 1;
+      update private.account_deletion_attempts
+        set failed_attempts = new_count,
+            window_started_at = now_ts,
+            throttled_until = null,
+            updated_at = now_ts
+        where user_id = p_user_id
+        returning * into rec;
+    else
+      new_count := rec.failed_attempts + 1;
+      if new_count >= p_max_attempts then
+        retry_after := ceil(extract(epoch from ((rec.window_started_at + (p_window_seconds || ' seconds')::interval) - now_ts)))::integer;
+        if retry_after <= 0 then retry_after := p_window_seconds; end if;
+        update private.account_deletion_attempts
+          set failed_attempts = new_count,
+              throttled_until = now_ts + (retry_after || ' seconds')::interval,
+              updated_at = now_ts
+          where user_id = p_user_id
+          returning * into rec;
+      else
+        update private.account_deletion_attempts
+          set failed_attempts = new_count,
+              updated_at = now_ts
+          where user_id = p_user_id
+          returning * into rec;
+      end if;
+    end if;
+  end if;
+
+  is_throttled := rec.failed_attempts >= p_max_attempts or (rec.throttled_until is not null and rec.throttled_until > now_ts);
+  if is_throttled and retry_after = 0 then
+    retry_after := ceil(extract(epoch from (rec.throttled_until - now_ts)))::integer;
+  end if;
+
+  return jsonb_build_object(
+    'failed_attempts', rec.failed_attempts,
+    'throttled', is_throttled,
+    'retry_after_seconds', greatest(0, retry_after)
+  );
+end;
+$$;
+
+revoke all on function public.s2s_record_deletion_attempt_failure(uuid, integer, integer) from public, anon, authenticated;
+grant execute on function public.s2s_record_deletion_attempt_failure(uuid, integer, integer) to service_role;
+
+-- Atomically resets attempt records upon successful reauthentication.
+create or replace function public.s2s_reset_deletion_attempts(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from private.account_deletion_attempts where user_id = p_user_id;
+end;
+$$;
+
+revoke all on function public.s2s_reset_deletion_attempts(uuid) from public, anon, authenticated;
+grant execute on function public.s2s_reset_deletion_attempts(uuid) to service_role;
+
 commit;

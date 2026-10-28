@@ -12,6 +12,7 @@ import {
   reconcilePendingDeletion,
   createDeletionHttpHandler,
   createAttemptLimiter,
+  createDatabaseAttemptLimiter,
 } from '../src/server/accountDeletion.js';
 
 const db = new PGlite();
@@ -504,4 +505,141 @@ test('createDeletionHttpHandler: processes standard web Request/Response and emi
   assert.equal(goodJson.success, true);
   assert.equal(goodJson.status, 'deleted');
   assert.equal(goodJson.userId, HTTP_USER);
+});
+
+test('cleanupUserAvatars: handles paginated results and explicit object paths across multiple pages', async () => {
+  const PAGINATED_USER = '44444444-4444-4444-8444-444444444444';
+  const folder = PAGINATED_USER.toLowerCase();
+
+  // Simulate 150 items across 2 pages
+  let allStoredFiles = Array.from({ length: 150 }, (_, i) => ({
+    name: `avatar_${String(i).padStart(3, '0')}.webp`,
+    id: `id_${i}`,
+  }));
+
+  const removedBatches = [];
+
+  const mockStorage = {
+    from(bucket) {
+      assert.equal(bucket, 'avatars');
+      return {
+        list(targetFolder, options = {}) {
+          assert.equal(targetFolder, folder);
+          const limit = options.limit || 100;
+          const offset = options.offset || 0;
+          const page = allStoredFiles.slice(offset, offset + limit);
+          return Promise.resolve({ data: page, error: null });
+        },
+        remove(paths) {
+          removedBatches.push(paths);
+          // Simulate storage removal from stored files
+          const pathSet = new Set(paths);
+          allStoredFiles = allStoredFiles.filter(f => !pathSet.has(`${folder}/${f.name}`));
+          return Promise.resolve({ data: paths.map(p => ({ path: p })), error: null });
+        },
+      };
+    },
+  };
+
+  const res = await cleanupUserAvatars({ storage: mockStorage }, PAGINATED_USER);
+  assert.equal(res.cleanedCount, 150, 'All 150 files should be cleaned across pages');
+  assert.equal(removedBatches.length, 2, 'Should perform 2 separate paginated list/remove cycles');
+  assert.equal(removedBatches[0].length, 100, 'Page 1 should have 100 items');
+  assert.equal(removedBatches[1].length, 50, 'Page 2 should have 50 items');
+  assert.equal(allStoredFiles.length, 0, 'No files should remain in storage');
+});
+
+test('createDatabaseAttemptLimiter: atomically and durably throttles failed attempts across instances', async () => {
+  const LIMITER_USER = '55555555-5555-4555-8555-555555555555';
+  await db.query('insert into auth.users(id, email) values ($1, $2) on conflict do nothing', [
+    LIMITER_USER, 'limiter@example.com',
+  ]);
+
+  // Instance 1 & Instance 2 share the same database
+  const instance1 = createDatabaseAttemptLimiter(db, { maxAttempts: 3, windowSeconds: 60 });
+  const instance2 = createDatabaseAttemptLimiter(db, { maxAttempts: 3, windowSeconds: 60 });
+
+  assert.equal(await instance1.isThrottled(LIMITER_USER), false);
+  assert.equal(await instance2.isThrottled(LIMITER_USER), false);
+
+  // Instance 1 records failure 1
+  const f1 = await instance1.recordFailure(LIMITER_USER);
+  assert.equal(f1.failedAttempts, 1);
+  assert.equal(f1.throttled, false);
+
+  // Instance 2 sees failure 1 and records failure 2
+  const f2 = await instance2.recordFailure(LIMITER_USER);
+  assert.equal(f2.failedAttempts, 2);
+  assert.equal(f2.throttled, false);
+
+  // Instance 1 records failure 3 -> triggers throttling
+  const f3 = await instance1.recordFailure(LIMITER_USER);
+  assert.equal(f3.failedAttempts, 3);
+  assert.equal(f3.throttled, true);
+  assert.ok(f3.retryAfterSeconds > 0, 'Must have retryAfterSeconds');
+
+  // Both instances immediately observe throttled state
+  assert.equal(await instance1.isThrottled(LIMITER_USER), true);
+  assert.equal(await instance2.isThrottled(LIMITER_USER), true);
+  assert.ok(await instance2.getRetryAfter(LIMITER_USER) > 0);
+
+  // Instance 1 resets upon successful auth
+  await instance1.reset(LIMITER_USER);
+
+  // Both instances immediately see throttling cleared
+  assert.equal(await instance1.isThrottled(LIMITER_USER), false);
+  assert.equal(await instance2.isThrottled(LIMITER_USER), false);
+});
+
+test('createDeletionHttpHandler: returns Retry-After header and retryAfter body on 429 RATE_LIMITED', async () => {
+  const THROTTLED_USER = '66666666-6666-4666-8666-666666666666';
+  await db.query('insert into auth.users(id, email) values ($1, $2) on conflict do nothing', [
+    THROTTLED_USER, 'throttled@example.com',
+  ]);
+
+  const mockLimiter = {
+    isThrottled: () => true,
+    getRetryAfter: () => 540,
+    recordFailure: () => ({ throttled: true, retryAfterSeconds: 540 }),
+    reset: () => {},
+  };
+
+  const mockUserClient = {
+    auth: {
+      getUser: () => Promise.resolve({
+        data: {
+          user: {
+            id: THROTTLED_USER,
+            email: 'throttled@example.com',
+            app_metadata: { provider: 'email' },
+          },
+        },
+        error: null,
+      }),
+    },
+  };
+
+  const handler = createDeletionHttpHandler({
+    adminClient: {},
+    dbClient: db,
+    env: TEST_ENV,
+    attemptLimiter: mockLimiter,
+    createClient: () => mockUserClient,
+  });
+
+  const req = new Request('https://api.example.com/delete-account', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer user-token',
+    },
+    body: JSON.stringify({ password: 'any-password' }),
+  });
+
+  const res = await handler(req);
+  assert.equal(res.status, 429);
+  assert.equal(res.headers.get('Retry-After'), '540');
+  const json = await res.json();
+  assert.equal(json.code, 'RATE_LIMITED');
+  assert.equal(json.retryAfter, 540);
 });
