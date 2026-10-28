@@ -1,5 +1,34 @@
 # Development log
 
+## Latest — 29 October 2026 — Work batch B2.1: server-side account deletion foundation
+
+- Branched `feat/account-deletion-server` from completed B1 verification tip `e1cf651` on `feat/account-cloud-integration`.
+- Implemented **server-side account deletion foundation** strictly without UI or client cache purge (reserved for B2.2):
+  1. **Step 1 — Password Reauthentication & In-Memory Rate Limiting**:
+     - Verified caller JWT token strictly server-side using `client.auth.getUser(token)`. Target user ID is derived exclusively from verified identity; caller-supplied target IDs or extraneous parameters are rejected (`400 UNEXPECTED_PARAMETER`).
+     - Reauthentication executed using an isolated, non-persisting Supabase client (`persistSession: false, autoRefreshToken: false, detectSessionInUrl: false`). Enforced verified user identity match (`reauthenticatedUser.id === initiatingUserId`).
+     - Added sliding-window attempt limiter enforcing max 5 failed attempts per user ID per 15-minute window (`429 RATE_LIMITED`).
+     - Supported password-authenticated accounts only; provider-only accounts (e.g. Google OAuth without email/password) return actionable error (`400 UNSUPPORTED_AUTH_PROVIDER`).
+     - Enforced strict payload limits (4 KB body limit, 1,024 char password limit). Passwords and freshly issued session tokens are never logged, persisted, or returned in HTTP responses.
+     - Added 12 dedicated tests in `tests/accountReauth.test.js`.
+  2. **Step 2 — Additive Database Migration, Storage Cleanup & Auth Deletion Lifecycle**:
+     - Created additive migration `supabase/migrations/20261029000100_account_deletion_foundation.sql`.
+     - Created `private.account_deletions` audit table to retain durable deletion history after database cascades.
+     - Added row-locking definer RPC `public.s2s_begin_account_deletion(p_user_id uuid)` (`service_role` only). Atomically locks `private.account_state` for update, marks `deleting = true`, inserts `pending` deletion record, and commits immediately (no long-running SQL transaction during external network calls).
+     - Marking `deleting = true` instantly triggers `private.is_active_user() = false`, disabling RLS reads/writes across user items, profiles, preferences, and avatar storage, and halts snapshot/import RPCs.
+     - Added progress tracking RPC `public.s2s_record_deletion_progress(p_user_id uuid, p_status text, p_error text)` (`pending`, `storage_cleaned`, `auth_deleted`, `finalized`) and state lookup RPC `public.s2s_get_deletion_state(p_user_id uuid)`.
+     - Owner-bound Storage cleanup (`cleanupUserAvatars`) enumerates and deletes all files strictly within `avatars/${userId}/*`. Validates paths via `ownsAvatarPath()`; never touches other users' files or shared buckets.
+     - Fail-safe ordering: Storage failure halts before Auth deletion, leaves `deleting = true` without reactivation, and subsequent retry succeeds.
+     - Administrative Auth deletion (`auth.admin.deleteUser(userId)`) permanently removes auth identity, triggering database relational cascades (`profiles`, `user_preferences`, `user_items`, `guest_import_receipts`, `account_state` cascade; `account_deletions` preserved).
+     - Added operator reconciliation helper `reconcilePendingDeletion` for recovering stuck deletions without exposing public endpoints.
+     - Created Supabase Edge Function HTTP handler in `src/server/accountDeletion.js` and entry point `supabase/functions/delete-account/index.js`.
+     - Added 8 dedicated PGlite/mocked lifecycle tests in `tests/accountDeletionLifecycle.test.js`.
+  3. **Step 3 — API Contract, Partial Failure Recovery & Operator Handoff**:
+     - Documented exact API request/response specification, error codes, retry behavior, lost-response/unconfirmed state handling, operator reconciliation, environment variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`), and staging deployment prerequisites in `docs/account-deletion-server.md`.
+     - Reusable exports provided for subsequent B2.2 UI integration (`createDeletionHttpHandler`, `validateDeletionPayload`, `ownsAvatarPath`, `cleanupUserAvatars`, `reconcilePendingDeletion`, `ERROR_CODES`).
+- Preserved all B1 fixes, guest import, restore, logout, and learning caches. No deletion UI, confirmation dialog, profile edits, or client-side storage cache purging performed in this batch.
+- Validation: **240 Node tests pass** (20 new tests across reauthentication, lifecycle, RLS blocking, cascades, and recovery; 0 failures), lint **0 errors / 8 existing warnings** preserved, production build passes (`dist/assets/index-Kca5Q88A.js`), and `git diff --check` is clean.
+
 ## Latest — 29 October 2026 — Work batch B1 verification follow-up & entry-point hydration
 
 - Conducted focused follow-up verification across 5 key areas on feat/account-cloud-integration:
