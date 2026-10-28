@@ -1,3 +1,5 @@
+import './RadicalDrill.css';
+import AppDialog from './ui/AppDialog';
 import React, { useState, useCallback } from 'react';
 import { X, Check, Volume2, RotateCcw, ArrowRight } from 'lucide-react';
 import { recordAnswer, levelFor } from '../lib/radicalProgress';
@@ -105,36 +107,29 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
   const score = results.filter((r) => r.wasCorrect).length;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 200,
-      background: 'var(--bg-gradient)', overflowY: 'auto'
-    }}>
-      <div style={{ maxWidth: '520px', margin: '0 auto', padding: '24px', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+    <AppDialog label="Practice quiz" onClose={onClose} className="app-dialog--quiz">
+      <div className="radical-quiz-layout-1" >
 
         {/* Top bar — progress segments + close */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-          <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
+        <div className="radical-quiz-layout-2" >
+          <div className="radical-quiz-layout-3" >
             {questions.map((q, i) => {
               const answered = i < results.length;
               const correct = answered && results[i].wasCorrect;
               return (
-                <div
+                <div className="radical-quiz-panel-1"
                   key={q.id}
-                  style={{
-                    flex: 1, height: '6px', borderRadius: '999px',
-                    backgroundColor: answered
+                  style={{ backgroundColor: answered
                       ? (correct ? '#16A34A' : '#EF4444')
-                      : (i === index ? 'var(--color-primary-blue)' : 'var(--color-border)'),
-                    transition: 'background-color 0.3s'
-                  }}
+                      : (i === index ? 'var(--color-primary-blue)' : 'var(--color-border)') }}
                 />
               );
             })}
           </div>
-          <button
+          <button className="radical-quiz-button-1"
             onClick={onClose}
             aria-label="Close drill"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex' }}
+
           >
             <X size={22} color="var(--color-secondary-blue)" />
           </button>
@@ -142,71 +137,48 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
 
         {done ? (
           /* ---------------- Summary ---------------- */
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div className="surface-card" style={{ borderRadius: '24px', padding: '32px 24px', textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{
-                width: '88px', height: '88px', borderRadius: '50%', margin: '0 auto 16px auto',
-                background: GRADIENT, boxShadow: `0 10px 20px ${SHADOW}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#FFFFFF', fontSize: '2rem', fontWeight: 800
-              }}>
+          <div className="radical-quiz-layout-4" >
+            <div className="surface-card radical-quiz-panel-2" >
+              <div className="radical-quiz-panel-3" style={{ background: GRADIENT, boxShadow: `0 10px 20px ${SHADOW}` }}>
                 {score}/{results.length}
               </div>
-              <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>
+              <h2 className="radical-quiz-heading-1" >
                 {score === results.length ? 'Every one right' : score >= results.length - 1 ? 'Almost perfect' : 'Good practice'}
               </h2>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-secondary-blue)', fontWeight: 500 }}>
+              <p className="radical-quiz-copy-1" >
                 Three clean answers in a row marks a {copy.unit} as known.
               </p>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+            <div className="radical-quiz-layout-5" >
               {results.map((r, i) => (
-                <div
+                <div className="radical-quiz-panel-4"
                   key={`${r.radical.radical}-${i}`}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '14px',
-                    padding: '12px 16px', borderRadius: '14px',
-                    backgroundColor: 'var(--color-card-surface)',
-                    border: `1px solid ${r.wasCorrect ? '#BBF7D0' : '#FECACA'}`
-                  }}
+                  style={{ border: `1px solid ${r.wasCorrect ? '#BBF7D0' : '#FECACA'}` }}
                 >
-                  <span style={{
-                    width: '38px', height: '38px', flexShrink: 0, borderRadius: '12px',
-                    background: GRADIENT, color: '#FFFFFF', fontSize: `${fitFontPx(r.radical.radical, 19.2, 32)}px`, fontWeight: 800,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
+                  <span className="radical-quiz-label-1" style={{ background: GRADIENT, fontSize: `${fitFontPx(r.radical.radical, 19.2, 32)}px` }}>
                     {r.radical.radical}
                   </span>
-                  <span style={{ flex: 1, fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-navy)' }}>
+                  <span className="radical-quiz-label-2" >
                     {r.radical.meaning}
                   </span>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: r.wasCorrect ? '#16A34A' : '#DC2626' }}>
+                  <span className="radical-quiz-label-3" style={{ color: r.wasCorrect ? '#16A34A' : '#DC2626' }}>
                     {r.wasCorrect ? 'Correct' : 'Missed'}
                   </span>
                 </div>
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
-              <button
+            <div className="radical-quiz-layout-6" >
+              <button className="radical-quiz-button-2"
                 onClick={again}
-                style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  padding: '16px', borderRadius: '16px', border: 'none', cursor: 'pointer',
-                  background: GRADIENT, boxShadow: `0 8px 16px ${SHADOW}`,
-                  color: '#FFFFFF', fontWeight: 700, fontSize: '0.95rem'
-                }}
+                style={{ background: GRADIENT, boxShadow: `0 8px 16px ${SHADOW}` }}
               >
                 <RotateCcw size={18} strokeWidth={2.5} /> Again
               </button>
-              <button
+              <button className="radical-quiz-button-3"
                 onClick={onClose}
-                style={{
-                  flex: 1, padding: '16px', borderRadius: '16px', cursor: 'pointer',
-                  border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card-surface)',
-                  color: 'var(--color-primary-blue)', fontWeight: 700, fontSize: '0.95rem'
-                }}
+
               >
                 Done
               </button>
@@ -214,34 +186,20 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
           </div>
         ) : (
           /* ---------------- Question ---------------- */
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <p style={{
-              margin: '0 0 16px 0', fontSize: '0.75rem', fontWeight: 800,
-              textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)'
-            }}>
+          <div className="radical-quiz-layout-4" >
+            <p className="radical-quiz-copy-2" >
               {question.type === 'decode' ? copy.decodeLabel : copy.identifyLabel}
             </p>
 
-            <h2 style={{
-              margin: '0 0 20px 0', fontSize: '1.5rem', fontWeight: 800,
-              color: 'var(--color-text-navy)', lineHeight: 1.25
-            }}>
+            <h2 className="radical-quiz-heading-2" >
               {question.type === 'decode'
                 ? copy.decodeQuestion
                 : copy.identifyQuestion}
             </h2>
 
             {/* The glyph */}
-            <div className="surface-card" style={{
-              borderRadius: '24px', padding: '32px 24px', textAlign: 'center', marginBottom: '20px'
-            , containerType: 'inline-size'}}>
-              <div style={{
-                // Sized to the card's real width: on a phone it is ~280px, and a
-                // fixed guess let "peaceful" spill out of it.
-                fontSize: fitFontCss(question.type === 'decode' ? question.char.char : question.radical.radical, 80),
-                lineHeight: 1.1, fontWeight: 800, whiteSpace: 'nowrap',
-                color: 'var(--color-text-navy)'
-              }}>
+            <div className="surface-card radical-quiz-panel-5" >
+              <div className="radical-quiz-layout-7" style={{ fontSize: fitFontCss(question.type === 'decode' ? question.char.char : question.radical.radical, 80) }}>
                 {question.type === 'decode'
                   ? <PartWord word={question.char.char} radical={question.radical} />
                   : question.radical.radical}
@@ -250,18 +208,14 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
               {/* Pinyin is only revealed after answering — it would give
                   a decode question away for anyone who knows the word. */}
               {picked && question.type === 'decode' && (
-                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}>
+                <div className="radical-quiz-layout-8" >
+                  <span className="radical-quiz-label-4" >
                     {[pronunciationOf(question.char), question.char.english].filter(Boolean).join(' · ')}
                   </span>
-                  <button
+                  <button className="radical-quiz-button-4"
                     onClick={() => speak(sayOf(question.char))}
                     aria-label={`Play ${question.char.char}`}
-                    style={{
-                      width: '34px', height: '34px', borderRadius: '50%', cursor: 'pointer',
-                      border: 'none', backgroundColor: 'var(--color-ghost-blue)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}
+
                   >
                     <Volume2 size={16} color="var(--color-primary-blue)" strokeWidth={2.5} />
                   </button>
@@ -270,7 +224,7 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
             </div>
 
             {/* Options */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="radical-quiz-layout-9" >
               {question.options.map((option) => {
                 const isAnswer = option.radical === question.radical.radical;
                 const isPicked = picked && option.radical === picked.radical;
@@ -281,20 +235,13 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
                 else if (isPicked) { borderColor = '#DC2626'; background = '#FEF2F2'; }
 
                 return (
-                  <button
+                  <button className="radical-quiz-button-5"
                     key={option.radical}
                     onClick={() => choose(option)}
                     disabled={Boolean(picked)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '12px',
-                      width: '100%', textAlign: 'left', padding: '16px 18px',
-                      borderRadius: '16px', border: `2px solid ${borderColor}`,
-                      backgroundColor: background, cursor: picked ? 'default' : 'pointer',
-                      fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-navy)',
-                      transition: 'border-color 0.2s, background-color 0.2s'
-                    }}
+                    style={{ border: `2px solid ${borderColor}`, backgroundColor: background, cursor: picked ? 'default' : 'pointer' }}
                   >
-                    <span style={{ flex: 1 }}>{option.meaning}</span>
+                    <span className="radical-quiz-label-5" >{option.meaning}</span>
                     {picked && isAnswer && <Check size={20} color="#16A34A" strokeWidth={3} />}
                     {isPicked && !isAnswer && <X size={20} color="#DC2626" strokeWidth={3} />}
                   </button>
@@ -304,11 +251,8 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
 
             {/* Reveal */}
             {picked && (
-              <div style={{
-                marginTop: '20px', padding: '16px 18px', borderRadius: '16px',
-                backgroundColor: 'var(--color-ghost-blue)', border: '1px solid var(--color-border)'
-              }}>
-                <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-navy)', lineHeight: 1.5 }}>
+              <div className="radical-quiz-panel-6" >
+                <p className="radical-quiz-copy-3" >
                   {question.type === 'decode' ? (
                     <>
                       <strong>{question.char.char}</strong>{pronunciationOf(question.char) && ` ${pronunciationOf(question.char)}`} — {question.char.english}.
@@ -323,25 +267,17 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
                     </>
                   )}
                 </p>
-                <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: 'var(--color-secondary-blue)', fontWeight: 500 }}>
+                <p className="radical-quiz-copy-4" >
                   {question.radical.burmese}
                 </p>
               </div>
             )}
 
-            <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-              <button
+            <div className="radical-quiz-layout-10" >
+              <button className="radical-quiz-button-6"
                 onClick={next}
                 disabled={!picked}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  padding: '16px', borderRadius: '16px', border: 'none',
-                  background: picked ? GRADIENT : 'var(--color-border)',
-                  boxShadow: picked ? `0 8px 16px ${SHADOW}` : 'none',
-                  color: '#FFFFFF', fontWeight: 700, fontSize: '0.95rem',
-                  cursor: picked ? 'pointer' : 'not-allowed',
-                  opacity: picked ? 1 : 0.6, transition: 'opacity 0.2s'
-                }}
+                style={{ background: picked ? GRADIENT : 'var(--color-border)', boxShadow: picked ? `0 8px 16px ${SHADOW}` : 'none', cursor: picked ? 'pointer' : 'not-allowed', opacity: picked ? 1 : 0.6 }}
               >
                 {index + 1 >= questions.length ? 'See results' : 'Next'}
                 <ArrowRight size={18} strokeWidth={2.5} />
@@ -351,6 +287,6 @@ export default function RadicalDrill({ radicals, progress, onClose, onRecorded }
         )}
 
       </div>
-    </div>
+    </AppDialog>
   );
 }

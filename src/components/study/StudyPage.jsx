@@ -17,13 +17,13 @@ export function StudyHeader({ title, subtitle, backTo, backLabel }) {
   );
 }
 
-export function StudySearch({ value, onChange, label }) {
+export function StudySearch({ value, onChange, label, placeholder = label, onKeyDown }) {
   const inputRef = useRef(null);
   const clearSearch = () => { onChange(''); inputRef.current?.focus(); };
   return (
     <div className="study-search" role="search" aria-label={label}>
       <Search size={19} aria-hidden="true" />
-      <input ref={inputRef} type="search" aria-label={label} placeholder={label} value={value} onChange={event => onChange(event.target.value)} />
+      <input ref={inputRef} type="search" aria-label={label} placeholder={placeholder} value={value} onKeyDown={onKeyDown} onChange={event => onChange(event.target.value)} />
       {value && <button className="study-icon-button" onClick={clearSearch} aria-label="Clear search"><X size={18} aria-hidden="true" /></button>}
     </div>
   );

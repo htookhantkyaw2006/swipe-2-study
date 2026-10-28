@@ -1,3 +1,4 @@
+import './PartWord.css';
 import React from 'react';
 
 /* ---------------------------------------------------------------
@@ -29,7 +30,7 @@ export default function PartWord({ word, radical, color = '#4338CA' }) {
   return (
     <>
       {before}
-      <span style={{ color, textDecoration: 'underline', textDecorationThickness: '0.08em', textUnderlineOffset: '0.12em' }}>{part}</span>
+      <span className="word-part-label-1" style={{ color }}>{part}</span>
       {after}
     </>
   );

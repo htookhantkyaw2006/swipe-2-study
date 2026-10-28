@@ -1,0 +1,34 @@
+.sounds-label-1.sounds-label-1 { font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
+.sounds-grid-1.sounds-grid-1 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sounds-button-1.sounds-button-1 { position: relative; aspect-ratio: 1; border-radius: 16px; cursor: pointer; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform 0.15s, background-color 0.2s, border-color 0.2s; }
+.sounds-label-2.sounds-label-2 { font-size: 1.45rem; font-weight: 700; color: var(--color-text-navy); line-height: 1.1; }
+.sounds-label-3.sounds-label-3 { font-size: 0.75rem; font-weight: 600; color: var(--color-secondary-blue); }
+.sounds-label-4.sounds-label-4 { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; }
+.sounds-layout-1.sounds-layout-1 { min-height: 100%; background: transparent; padding-bottom: 24px; font-family: var(--font-sans); }
+.sounds-layout-2.sounds-layout-2 { max-width: 640px; margin: 0 auto; position: relative; z-index: 1; }
+.sounds-layout-3.sounds-layout-3 { padding: 24px 24px 16px 24px; }
+.sounds-layout-4.sounds-layout-4 { margin-bottom: 32px; }
+.sounds-button-2.sounds-button-2 { position: absolute; left: 0; background: transparent; padding: 8px; border: none; cursor: pointer; z-index: 10; }
+.sounds-heading-1.sounds-heading-1 { font-size: 1.25rem; margin: 0; color: var(--color-text-navy); font-weight: 800; }
+.sounds-layout-5.sounds-layout-5 { margin-bottom: 24px; }
+.sounds-heading-2.sounds-heading-2 { font-size: 2rem; color: var(--color-text-navy); margin: 0 0 8px 0; font-weight: 900; letter-spacing: -0.5px; line-height: 1.1; }
+.sounds-copy-1.sounds-copy-1 { color: var(--color-secondary-blue); font-size: 1rem; margin: 0; font-weight: 500; }
+.sounds-button-3.sounds-button-3 { width: 100%; display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 24px; border: none; cursor: pointer; text-align: left; margin-bottom: 20px; transition: transform 0.2s; }
+.sounds-panel-1.sounds-panel-1 { width: 52px; height: 52px; flex-shrink: 0; border-radius: 16px; background-color: rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center; }
+.sounds-layout-6.sounds-layout-6 { flex: 1; min-width: 0; }
+.sounds-heading-3.sounds-heading-3 { margin: 0; font-size: 1.1rem; font-weight: 800; color: #FFFFFF; }
+.sounds-copy-2.sounds-copy-2 { margin: 2px 0 0 0; font-size: 0.85rem; color: rgba(255, 255, 255, 0.92); font-weight: 500; }
+.sounds-layout-7.sounds-layout-7 { margin-bottom: 20px; }
+.sounds-layout-8.sounds-layout-8 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sounds-label-5.sounds-label-5 { font-size: 0.85rem; font-weight: 700; color: var(--color-secondary-blue); }
+.sounds-button-4.sounds-button-4 { display: flex; align-items: center; gap: 6px; background: transparent; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--color-secondary-blue); }
+.sounds-panel-2.sounds-panel-2 { height: 6px; border-radius: 999px; background-color: var(--color-ghost-blue); overflow: hidden; }
+.sounds-panel-3.sounds-panel-3 { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.sounds-copy-3.sounds-copy-3 { font-size: 0.8rem; color: var(--color-secondary-blue); font-weight: 600; margin: 0 0 24px 4px; }
+.sounds-layout-9.sounds-layout-9 { margin-bottom: 28px; }
+.sounds-layout-10.sounds-layout-10 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 12px 0; }
+.sounds-heading-4.sounds-heading-4 { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-secondary-blue); margin: 0; }
+.sounds-label-6.sounds-label-6 { font-size: 0.72rem; font-weight: 600; color: var(--color-secondary-blue); opacity: 0.85; text-align: right; }
+.sounds-panel-4.sounds-panel-4 { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; margin-bottom: 12px; background-color: #FFF7ED; }
+.sounds-layout-11.sounds-layout-11 { flex-shrink: 0; margin-top: 2px; }
+.sounds-layout-12.sounds-layout-12 { font-size: 0.8rem; line-height: 1.5; color: var(--color-text-navy); font-weight: 500; }

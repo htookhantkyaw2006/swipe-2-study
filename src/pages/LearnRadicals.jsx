@@ -1,3 +1,5 @@
+import './LearnRadicals.css';
+import AppDialog from '../components/ui/AppDialog';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, X, Lightbulb, PenLine, Zap, RotateCcw } from 'lucide-react';
@@ -12,7 +14,7 @@ const RadicalMeta = ({ radical }) => {
   const detail = radical.strokes ? `${radical.strokes} strokes` : radical.kind;
   return (
     <>
-      {reading && <span style={{ whiteSpace: 'nowrap' }}>{reading}</span>}
+      {reading && <span className="radicals-label-1" >{reading}</span>}
       {reading && detail && ' · '}
       {detail}
     </>
@@ -40,90 +42,59 @@ function RadicalDetail({ radical, onClose, onPractise }) {
   const practiseChar = practisableChar(radical, course.writing);
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 100,
-        backgroundColor: 'rgba(12, 74, 110, 0.4)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="surface-card"
-        style={{
-          width: '100%', maxWidth: '520px', borderRadius: '28px 28px 0 0',
-          padding: '24px', maxHeight: '80vh', overflowY: 'auto'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{
-              width: '64px', height: '64px', borderRadius: '20px',
-              background: RADICAL_GRADIENT,
-              boxShadow: `0 8px 16px ${RADICAL_SHADOW}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: `${fitFontPx(radical.radical, 32, 52)}px`, fontWeight: 800, color: '#FFFFFF'
-            }}>
+    <AppDialog label={radical.meaning} onClose={onClose}>
+      <div>
+        <div className="radicals-layout-1" >
+          <div className="radicals-layout-2" >
+            <div className="radicals-panel-1" style={{ background: RADICAL_GRADIENT, boxShadow: `0 8px 16px ${RADICAL_SHADOW}`, fontSize: `${fitFontPx(radical.radical, 32, 52)}px` }}>
               {radical.radical}
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>
+              <h3 className="radicals-heading-1" >
                 {radical.meaning}
               </h3>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
+              <p className="radicals-copy-1" >
                 <RadicalMeta radical={radical} />
               </p>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'var(--color-secondary-blue)', opacity: 0.85 }}>
+              <p className="radicals-copy-2" >
                 {radical.burmese}
               </p>
             </div>
           </div>
-          <button
+          <button aria-label="Close" className="radicals-button-1"
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
+
           >
             <X size={22} color="var(--color-secondary-blue)" />
           </button>
         </div>
 
         {radical.standalone && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            backgroundColor: 'var(--color-ghost-blue)', borderRadius: '14px',
-            padding: '12px 16px', marginBottom: '16px'
-          }}>
+          <div className="radicals-panel-2" >
             <Lightbulb size={16} color="var(--color-primary-blue)" strokeWidth={2.5} />
-            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-navy)', fontWeight: 600 }}>
+            <span className="radicals-label-2" >
               Written {radical.radical} inside a character, {radical.standalone} on its own.
             </span>
           </div>
         )}
 
-        <h4 style={{
-          fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase',
-          letterSpacing: '0.5px', color: 'var(--color-secondary-blue)', margin: '0 0 12px 0'
-        }}>
+        <h4 className="radicals-heading-2" >
           {course.radicals.copy.examplesTitle}
         </h4>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="radicals-layout-3" >
           {radical.examples.map((ex) => (
-            <div key={ex.char} style={{
-              display: 'flex', alignItems: 'center', gap: '16px',
-              padding: '12px 16px', borderRadius: '14px',
-              backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)'
-            }}>
-              <span style={{ fontSize: `${fitFontPx(ex.char, 28, 150)}px`, fontWeight: 800, color: 'var(--color-primary-blue)', minWidth: '40px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+            <div className="radicals-panel-3" key={ex.char} >
+              <span className="radicals-label-3" style={{ fontSize: `${fitFontPx(ex.char, 28, 150)}px` }}>
                 <PartWord word={ex.char} radical={radical} />
               </span>
               <div>
                 {pronunciationOf(ex) && (
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
+                <p className="radicals-copy-3" >
                   {pronunciationOf(ex)}
                 </p>
                 )}
-                <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--color-text-navy)', fontWeight: 700 }}>
+                <p className="radicals-copy-4" >
                   {ex.english}
                 </p>
               </div>
@@ -133,22 +104,15 @@ function RadicalDetail({ radical, onClose, onPractise }) {
 
         {/* Only offered when the radical is itself in the writing set. */}
         {practiseChar && (
-          <button
+          <button className="radicals-button-2"
             onClick={() => onPractise(practiseChar)}
-            style={{
-              width: '100%', marginTop: '16px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              padding: '14px', borderRadius: '16px', border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)',
-              boxShadow: '0 8px 16px rgba(15, 118, 110, 0.35)',
-              color: '#FFFFFF', fontWeight: 700, fontSize: '0.9rem'
-            }}
+
           >
             <PenLine size={18} strokeWidth={2.5} /> Practise writing {practiseChar}
           </button>
         )}
       </div>
-    </div>
+    </AppDialog>
   );
 }
 
@@ -182,42 +146,36 @@ export default function LearnRadicals() {
     : radicals.filter((r) => r.category === category);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        <div style={{ padding: '24px 24px 16px 24px' }}>
+    <div className="ui-tool-page radicals-layout-4" >
+      <div className="radicals-layout-5" >
+        <div className="radicals-layout-6" >
 
-          <header className="flex items-center justify-center relative" style={{ marginBottom: '32px' }}>
-            <button
-              onClick={() => navigate(-1)}
-              style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
+          <header data-tool-header="true" className="flex items-center justify-center relative radicals-layout-7" >
+            <button aria-label="Back" className="radicals-button-3"
+              onClick={() => navigate('/library')}
+
             >
               <ChevronLeft size={24} color="var(--color-text-navy)" />
             </button>
-            <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>
+            <h1 className="radicals-heading-3" >
               {copy.title}
             </h1>
           </header>
 
-          <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '2rem', color: 'var(--color-text-navy)', margin: '0 0 8px 0', fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.1 }}>
+          <div className="radicals-layout-8" >
+            <h2 className="radicals-heading-4" >
               {copy.headline[0]}<br />{copy.headline[1]}
             </h2>
-            <p style={{ color: 'var(--color-secondary-blue)', fontSize: '1rem', margin: 0, fontWeight: 500 }}>
+            <p className="radicals-copy-5" >
               {copy.intro}
             </p>
           </div>
 
           {/* The drill is the primary action — reading the grid teaches
               recognition, but only recall proves you can decode. */}
-          <button
+          <button className="radicals-button-4"
             onClick={() => setDrillOpen(true)}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: '16px',
-              padding: '20px', borderRadius: '24px', border: 'none', cursor: 'pointer',
-              background: RADICAL_GRADIENT, boxShadow: `0 10px 20px ${RADICAL_SHADOW}`,
-              textAlign: 'left', marginBottom: '20px',
-              transition: 'transform 0.2s, box-shadow 0.2s'
-            }}
+            style={{ background: RADICAL_GRADIENT, boxShadow: `0 10px 20px ${RADICAL_SHADOW}` }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
               e.currentTarget.style.boxShadow = `0 14px 26px ${RADICAL_SHADOW}`;
@@ -227,18 +185,14 @@ export default function LearnRadicals() {
               e.currentTarget.style.boxShadow = `0 10px 20px ${RADICAL_SHADOW}`;
             }}
           >
-            <div style={{
-              width: '52px', height: '52px', flexShrink: 0, borderRadius: '16px',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
+            <div className="radicals-panel-4" >
               <Zap size={24} color="#FFFFFF" strokeWidth={2.5} />
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF' }}>
+            <div className="radicals-layout-9" >
+              <h3 className="radicals-heading-5" >
                 {copy.drillTitle}
               </h3>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 500 }}>
+              <p className="radicals-copy-6" >
                 {copy.drillSubtitle}
               </p>
             </div>
@@ -246,47 +200,34 @@ export default function LearnRadicals() {
           </button>
 
           {/* Progress */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}>
+          <div className="radicals-layout-10" >
+            <div className="radicals-layout-11" >
+              <span className="radicals-label-4" >
                 {known} of {radicals.length} {copy.units} known
               </span>
               {started && (
-                <button
+                <button className="radicals-button-5"
                   onClick={clearProgress}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-secondary-blue)'
-                  }}
+
                 >
                   <RotateCcw size={14} strokeWidth={2.5} /> Reset
                 </button>
               )}
             </div>
-            <div style={{ height: '6px', borderRadius: '999px', backgroundColor: 'var(--color-ghost-blue)', overflow: 'hidden' }}>
-              <div style={{
-                width: `${(known / radicals.length) * 100}%`, height: '100%',
-                background: RADICAL_GRADIENT, borderRadius: '999px', transition: 'width 0.4s ease'
-              }} />
+            <div className="radicals-panel-5" >
+              <div className="radicals-panel-6" style={{ width: `${(known / radicals.length) * 100}%`, background: RADICAL_GRADIENT }} />
             </div>
           </div>
 
           {/* Category filter */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px' }}>
+          <div className="radicals-layout-12" >
             {['All', ...radicalCategories].map((c) => {
               const active = c === category;
               return (
-                <button
+                <button className="radicals-button-6"
                   key={c}
                   onClick={() => setCategory(c)}
-                  style={{
-                    flexShrink: 0, padding: '8px 16px', borderRadius: '999px', cursor: 'pointer',
-                    border: '1px solid ' + (active ? 'var(--color-primary-blue)' : 'var(--color-border)'),
-                    backgroundColor: active ? 'var(--color-primary-blue)' : 'var(--color-card-surface)',
-                    color: active ? '#FFFFFF' : 'var(--color-secondary-blue)',
-                    fontWeight: 700, fontSize: '0.8rem'
-                  }}
+                  style={{ border: '1px solid ' + (active ? 'var(--color-primary-blue)' : 'var(--color-border)'), backgroundColor: active ? 'var(--color-primary-blue)' : 'var(--color-card-surface)', color: active ? '#FFFFFF' : 'var(--color-secondary-blue)' }}
                 >
                   {c}
                 </button>
@@ -294,20 +235,15 @@ export default function LearnRadicals() {
             })}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
+          <div className="radicals-grid-1" >
             {visibleRadicals.map((r) => {
               const level = levelFor(progress[r.radical]);
               return (
-              <div
+              <button type="button" aria-haspopup="dialog"
                 key={r.radical}
-                className="surface-card"
+                className="surface-card radicals-panel-7"
                 onClick={() => setOpenRadical(r)}
-                style={{
-                  padding: '16px', borderRadius: '20px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  position: 'relative',
-                  transition: 'transform 0.2s, box-shadow 0.2s'
-                }}
+
                 onMouseOver={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
                   e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.06)';
@@ -317,20 +253,14 @@ export default function LearnRadicals() {
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)';
                 }}
               >
-                <div style={{
-                  width: '44px', height: '44px', flexShrink: 0, borderRadius: '14px',
-                  background: RADICAL_GRADIENT,
-                  boxShadow: `0 6px 12px ${RADICAL_SHADOW}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: `${fitFontPx(r.radical, 22.4, 38)}px`, fontWeight: 800, color: '#FFFFFF'
-                }}>
+                <div className="radicals-panel-8" style={{ background: RADICAL_GRADIENT, boxShadow: `0 6px 12px ${RADICAL_SHADOW}`, fontSize: `${fitFontPx(r.radical, 22.4, 38)}px` }}>
                   {r.radical}
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 2px 0', lineHeight: 1.2 }}>
+                <div className="radicals-layout-13" >
+                  <h3 className="radicals-heading-6" >
                     {r.meaning}
                   </h3>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500 }}>
+                  <p className="radicals-copy-7" >
                     <RadicalMeta radical={r} />
                   </p>
                 </div>
@@ -338,16 +268,12 @@ export default function LearnRadicals() {
                 {/* Only learning/known get a dot — a marker on all 32 would
                     just be noise on a fresh install. */}
                 {level !== 'new' && (
-                  <span
+                  <span className="radicals-label-5"
                     title={LEVELS[level].label}
-                    style={{
-                      position: 'absolute', top: '10px', right: '10px',
-                      width: '8px', height: '8px', borderRadius: '50%',
-                      backgroundColor: LEVELS[level].color
-                    }}
+                    style={{ backgroundColor: LEVELS[level].color }}
                   />
                 )}
-              </div>
+              </button>
               );
             })}
           </div>

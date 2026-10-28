@@ -1,3 +1,4 @@
+import './WritingPractice.css';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, PenLine, Play, RotateCcw, Eraser, CheckCircle } from 'lucide-react';
@@ -24,9 +25,18 @@ const charDataLoader = (char, onComplete) => {
 function PracticePanel({ entry, isMastered, onMastered }) {
   const targetRef = useRef(null);
   const writerRef = useRef(null);
+  const gridRef = useRef(null);
+  const [canvasSize, setCanvasSize] = useState(WRITER_SIZE);
   const [mode, setMode] = useState('idle'); // idle | animating | quizzing
   const [mistakes, setMistakes] = useState(0);
   const [justCompleted, setJustCompleted] = useState(false);
+
+  useEffect(() => {
+    const grid = gridRef.current;
+    const observer = new ResizeObserver(() => setCanvasSize(Math.max(120, Math.min(WRITER_SIZE, Math.floor(grid.clientWidth)))));
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, []);
 
   // Rebuild the writer whenever the character changes.
   useEffect(() => {
@@ -44,8 +54,8 @@ function PracticePanel({ entry, isMastered, onMastered }) {
     }
 
     writerRef.current = HanziWriter.create(node, entry.character, {
-      width: WRITER_SIZE,
-      height: WRITER_SIZE,
+      width: canvasSize,
+      height: canvasSize,
       padding: 16,
       showCharacter: false,
       showOutline: true,
@@ -62,7 +72,7 @@ function PracticePanel({ entry, isMastered, onMastered }) {
       node.innerHTML = '';
       writerRef.current = null;
     };
-  }, [entry.character]);
+  }, [entry.character, canvasSize]);
 
   const animate = useCallback(() => {
     if (!writerRef.current) return;
@@ -106,35 +116,30 @@ function PracticePanel({ entry, isMastered, onMastered }) {
   const hasData = Boolean(strokeData[entry.character]);
 
   return (
-    <div className="surface-card" style={{ borderRadius: '24px', padding: '24px', textAlign: 'center' }}>
+    <div className="surface-card writing-panel-1" >
       {/* Character meta */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>
+      <div className="writing-layout-1" >
+        <div className="writing-layout-2" >
+          <h2 className="writing-heading-1" >
             {entry.pronunciation}
           </h2>
           {isMastered && <CheckCircle size={20} color="#16A34A" strokeWidth={3} />}
         </div>
-        <p style={{ color: 'var(--color-secondary-blue)', fontSize: '0.95rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+        <p className="writing-copy-1" >
           {entry.definition}
         </p>
-        <p style={{ color: 'var(--color-secondary-blue)', fontSize: '0.85rem', margin: '2px 0 0 0', opacity: 0.85 }}>
+        <p className="writing-copy-2" >
           {entry.burmese_definition}
         </p>
       </div>
 
       {/* Writing grid */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-        <div style={{
-          position: 'relative', width: WRITER_SIZE, height: WRITER_SIZE,
-          borderRadius: '20px', backgroundColor: '#FFFFFF',
-          border: '2px solid var(--color-border)', overflow: 'hidden',
-          touchAction: 'none'
-        }}>
+      <div className="writing-layout-3" >
+        <div ref={gridRef} className="writing-panel-2 writing-canvas" aria-label={`Writing grid for ${entry.character}`}>
           {/* Guide lines — the 米字格 practice grid */}
-          <svg
-            width={WRITER_SIZE} height={WRITER_SIZE}
-            style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+          <svg className="writing-graphic-1"
+            viewBox={`0 0 ${WRITER_SIZE} ${WRITER_SIZE}`} width="100%" height="100%"
+
           >
             <line x1="0" y1={WRITER_SIZE / 2} x2={WRITER_SIZE} y2={WRITER_SIZE / 2}
               stroke="var(--color-border)" strokeWidth="1" strokeDasharray="6 6" />
@@ -146,34 +151,30 @@ function PracticePanel({ entry, isMastered, onMastered }) {
               stroke="var(--color-border)" strokeWidth="1" strokeDasharray="6 6" opacity="0.5" />
           </svg>
 
-          <div ref={targetRef} style={{ position: 'relative', zIndex: 1 }} />
+          <div className="writing-layout-4" ref={targetRef}  />
 
           {!hasData && (
-            <div style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', padding: '24px', fontSize: '0.8rem',
-              color: 'var(--color-secondary-blue)', textAlign: 'center'
-            }}>
-              No stroke data bundled for {entry.character}. Run npm run build:strokes
+            <div className="writing-layout-5" >
+              Writing practice for {entry.character} is not available yet.
             </div>
           )}
         </div>
       </div>
 
       {/* Status line */}
-      <div style={{ minHeight: '24px', marginBottom: '12px' }}>
+      <div className="writing-layout-6" >
         {mode === 'quizzing' && (
-          <span style={{ fontSize: '0.85rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
+          <span className="writing-label-1" >
             Trace the character — {mistakes === 0 ? 'no mistakes yet' : `${mistakes} mistake${mistakes > 1 ? 's' : ''}`}
           </span>
         )}
         {mode === 'animating' && (
-          <span style={{ fontSize: '0.85rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
+          <span className="writing-label-1" >
             Watch the stroke order…
           </span>
         )}
         {mode === 'idle' && justCompleted && (
-          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: mistakes === 0 ? '#16A34A' : '#CA8A04' }}>
+          <span className="writing-label-2" style={{ color: mistakes === 0 ? '#16A34A' : '#CA8A04' }}>
             {mistakes === 0
               ? 'Perfect — character mastered!'
               : `Complete, with ${mistakes} mistake${mistakes > 1 ? 's' : ''}. Try again for a clean run.`}
@@ -182,48 +183,27 @@ function PracticePanel({ entry, isMastered, onMastered }) {
       </div>
 
       {/* Controls */}
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-        <button
+      <div className="writing-layout-7" >
+        <button className="writing-button-1"
           onClick={animate}
           disabled={!hasData || mode !== 'idle'}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '10px 18px', borderRadius: '14px', border: 'none',
-            backgroundColor: 'var(--color-ghost-blue)', color: 'var(--color-primary-blue)',
-            fontWeight: 700, fontSize: '0.85rem',
-            cursor: hasData && mode === 'idle' ? 'pointer' : 'not-allowed',
-            opacity: hasData && mode === 'idle' ? 1 : 0.5
-          }}
+          style={{ cursor: hasData && mode === 'idle' ? 'pointer' : 'not-allowed', opacity: hasData && mode === 'idle' ? 1 : 0.5 }}
         >
           <Play size={16} strokeWidth={2.5} /> Show me
         </button>
 
-        <button
+        <button className="writing-button-2"
           onClick={startQuiz}
           disabled={!hasData || mode === 'quizzing'}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '10px 18px', borderRadius: '14px', border: 'none',
-            background: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)',
-            color: '#FFFFFF', fontWeight: 700, fontSize: '0.85rem',
-            boxShadow: '0 8px 16px rgba(15, 118, 110, 0.35)',
-            cursor: hasData && mode !== 'quizzing' ? 'pointer' : 'not-allowed',
-            opacity: hasData && mode !== 'quizzing' ? 1 : 0.5
-          }}
+          style={{ cursor: hasData && mode !== 'quizzing' ? 'pointer' : 'not-allowed', opacity: hasData && mode !== 'quizzing' ? 1 : 0.5 }}
         >
           <PenLine size={16} strokeWidth={2.5} /> Practise
         </button>
 
-        <button
+        <button className="writing-button-1"
           onClick={reset}
           disabled={!hasData}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '10px 18px', borderRadius: '14px', border: 'none',
-            backgroundColor: 'var(--color-ghost-blue)', color: 'var(--color-primary-blue)',
-            fontWeight: 700, fontSize: '0.85rem',
-            cursor: hasData ? 'pointer' : 'not-allowed', opacity: hasData ? 1 : 0.5
-          }}
+          style={{ cursor: hasData ? 'pointer' : 'not-allowed', opacity: hasData ? 1 : 0.5 }}
         >
           <Eraser size={16} strokeWidth={2.5} /> Clear
         </button>
@@ -267,51 +247,48 @@ function WritingPractice({ writingChars }) {
   const entry = writingChars[selectedIdx];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        <div style={{ padding: '24px 24px 16px 24px' }}>
+    <div className="ui-tool-page writing-layout-8" >
+      <div className="writing-layout-9" >
+        <div className="writing-layout-10" >
 
-          <header className="flex items-center justify-center relative" style={{ marginBottom: '32px' }}>
-            <button
-              onClick={() => navigate(-1)}
-              style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
+          <header data-tool-header="true" className="flex items-center justify-center relative writing-layout-11" >
+            <button aria-label="Back" className="writing-button-3"
+              onClick={() => navigate('/library')}
+
             >
               <ChevronLeft size={24} color="var(--color-text-navy)" />
             </button>
-            <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>
+            <h1 className="writing-heading-2" >
               Practise Writing
             </h1>
           </header>
 
-          <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '2rem', color: 'var(--color-text-navy)', margin: '0 0 8px 0', fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.1 }}>
+          <div className="writing-layout-12" >
+            <h2 className="writing-heading-3" >
               Write it<br />stroke by stroke
             </h2>
-            <p style={{ color: 'var(--color-secondary-blue)', fontSize: '1rem', margin: 0, fontWeight: 500 }}>
+            <p className="writing-copy-3" >
               Watch the order, then trace it with your finger.
             </p>
           </div>
 
           {/* Progress */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}>
+          <div className="writing-layout-13" >
+            <span className="writing-label-3" >
               {mastered.length} of {writingChars.length} written cleanly
             </span>
             {mastered.length > 0 && (
-              <button
+              <button className="writing-button-4"
                 onClick={resetProgress}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-secondary-blue)'
-                }}
+
               >
                 <RotateCcw size={14} strokeWidth={2.5} /> Reset
               </button>
             )}
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
+          <div className="writing-workspace">
+          <div className="writing-layout-14" >
             <PracticePanel
               entry={entry}
               isMastered={mastered.includes(entry.character)}
@@ -319,33 +296,24 @@ function WritingPractice({ writingChars }) {
             />
           </div>
 
+          <aside className="writing-picker">
           {/* Character picker */}
-          <h4 style={{
-            fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase',
-            letterSpacing: '0.5px', color: 'var(--color-secondary-blue)', margin: '0 0 12px 0'
-          }}>
+          <h4 className="writing-heading-4" >
             Choose a character
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: '10px' }}>
+          <div className="writing-grid-1" >
             {writingChars.map((w, idx) => {
               const active = idx === selectedIdx;
               const done = mastered.includes(w.character);
               return (
-                <button
+                <button className="writing-button-5"
                   key={w.character}
                   onClick={() => setSelectedIdx(idx)}
-                  style={{
-                    position: 'relative', aspectRatio: '1', borderRadius: '16px', cursor: 'pointer',
-                    border: active ? '2px solid var(--color-primary-blue)' : '1px solid var(--color-border)',
-                    backgroundColor: active ? 'var(--color-ghost-blue)' : 'var(--color-card-surface)',
-                    fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'border-color 0.2s, background-color 0.2s'
-                  }}
+                  style={{ border: active ? '2px solid var(--color-primary-blue)' : '1px solid var(--color-border)', backgroundColor: active ? 'var(--color-ghost-blue)' : 'var(--color-card-surface)' }}
                 >
                   {w.character}
                   {done && (
-                    <span style={{ position: 'absolute', top: '4px', right: '4px' }}>
+                    <span className="writing-label-4" >
                       <CheckCircle size={12} color="#16A34A" strokeWidth={3} />
                     </span>
                   )}
@@ -353,7 +321,8 @@ function WritingPractice({ writingChars }) {
               );
             })}
           </div>
-
+          </aside>
+          </div>
 
         </div>
       </div>
@@ -373,31 +342,26 @@ export default function WritingPracticePage() {
   if (course.writing) return <WritingPractice writingChars={course.writing.chars} />;
 
   return (
-    <div style={{ padding: '24px', maxWidth: '600px', margin: '0 auto', paddingBottom: '100px' }}>
-      <header className="flex items-center justify-center relative" style={{ marginBottom: '32px' }}>
-        <button
-          onClick={() => navigate(-1)}
+    <div className="writing-layout-15" >
+      <header data-tool-header="true" className="flex items-center justify-center relative writing-layout-11" >
+        <button className="writing-button-3"
+          onClick={() => navigate('/library')}
           aria-label="Back"
-          style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
+
         >
           <ChevronLeft size={24} color="var(--color-text-navy)" />
         </button>
-        <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>Practise Writing</h1>
+        <h1 className="writing-heading-2" >Practise Writing</h1>
       </header>
 
-      <div className="surface-card" style={{ borderRadius: '24px', padding: '32px 24px', textAlign: 'center' }}>
-        <div style={{
-          width: '64px', height: '64px', borderRadius: '20px', margin: '0 auto 16px auto',
-          background: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)',
-          boxShadow: '0 8px 16px rgba(15, 118, 110, 0.35)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
+      <div className="surface-card writing-panel-3" >
+        <div className="writing-panel-4" >
           <PenLine size={28} color="#FFFFFF" strokeWidth={2.5} />
         </div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 8px 0' }}>
+        <h2 className="writing-heading-5" >
           Not available for {course.name} yet
         </h2>
-        <p style={{ fontSize: '0.95rem', lineHeight: 1.5, color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500 }}>
+        <p className="writing-copy-4" >
           {course.copy.writingNote}
         </p>
       </div>

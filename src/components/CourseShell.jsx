@@ -1,3 +1,4 @@
+import './CourseShell.css';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -25,45 +26,35 @@ const SPLASH_MS = 850;
 
 function SwitchSplash({ language }) {
   return (
-    <motion.div
+    <motion.div className="course-shell-layout-1"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'var(--bg-gradient)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: '10px'
-      }}
+
       aria-live="polite"
     >
-      <motion.div
+      <motion.div className="course-shell-panel-1"
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-        style={{
-          width: '96px', height: '96px', borderRadius: '28px',
-          background: '#FFFFFF', boxShadow: '0 12px 32px rgba(3, 105, 161, 0.18)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '3rem', lineHeight: 1, marginBottom: '8px'
-        }}
+
       >
         <LanguageFlag id={language.id} size={52} />
       </motion.div>
-      <motion.div
+      <motion.div className="course-shell-layout-2"
         initial={{ y: 8, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.08, duration: 0.3 }}
-        style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--color-text-navy)', letterSpacing: '-0.5px' }}
+
       >
         {language.nativeName}
       </motion.div>
-      <motion.div
+      <motion.div className="course-shell-layout-3"
         initial={{ y: 8, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.14, duration: 0.3 }}
-        style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-secondary-blue)' }}
+
       >
         Learning {language.name} · {language.levelSystem}
       </motion.div>

@@ -1,252 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Search, Bookmark, BookmarkMinus, Clock, Volume2 } from 'lucide-react';
+import { useState } from 'react';
+import { Bookmark, BookmarkMinus, Clock, Search, Volume2 } from 'lucide-react';
 import { db } from '../lib/db';
 import { speak } from '../lib/speech';
 import { useCourse } from '../lib/language';
 import { readingOf, sayOf, kanaOf, matchesQuery } from '../lib/entry';
-
-/* Dictionary entries come from the active course (src/courses). */
+import { StudyHeader, StudySearch } from '../components/study/StudyPage';
+import './Dictionary.css';
 
 export default function Dictionary() {
-  const navigate = useNavigate();
   const course = useCourse();
-  const dictionaryDatabase = course.dictionary;
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [savedWordsMap, setSavedWordsMap] = useState({});
-
-  // Load history and saved words
-  useEffect(() => {
-    setHistory(db.get('search_history'));
-    
-    // Create a lookup map for saved words
-    const saved = db.get('saved_words');
-    const map = {};
-    saved.forEach(word => {
-      // Use phrase as the key to check if saved since IDs might differ
-      map[word.phrase] = word;
-    });
-    setSavedWordsMap(map);
-  }, []);
-
-  const handleSearch = (text) => {
-    setQuery(text);
-    if (!text.trim()) {
-      setResults([]);
-      return;
-    }
-
-    // Matches the word, its kana, its romanisation ignoring tone marks
-    // and macrons ("ni" finds "Nǐ", "kyou" finds "kyō"), English or Burmese.
-    setResults(dictionaryDatabase.filter((word) => matchesQuery(word, text)));
+  const [history, setHistory] = useState(() => db.get('search_history'));
+  const [saved, setSaved] = useState(() => db.get('saved_words'));
+  const results = query.trim() ? course.dictionary.filter(word => matchesQuery(word, query)) : [];
+  const remember = event => {
+    if (event.key !== 'Enter' || !query.trim()) return;
+    const remaining = db.get('search_history').filter(item => item.term.toLowerCase() !== query.trim().toLowerCase());
+    const next = [{ term: query.trim(), id: Date.now().toString() }, ...remaining].slice(0, 10);
+    db.set('search_history', next); setHistory(next);
   };
-
-  const handleSearchSubmit = (e) => {
-    if (e.key === 'Enter' && query.trim()) {
-      const newHistoryItem = { term: query.trim(), id: Date.now().toString() };
-      const currentHistory = db.get('search_history');
-      
-      // Prevent duplicates
-      const filteredHistory = currentHistory.filter(h => h.term.toLowerCase() !== query.trim().toLowerCase());
-      filteredHistory.unshift(newHistoryItem);
-      
-      // Keep only last 10
-      const limitedHistory = filteredHistory.slice(0, 10);
-      db.set('search_history', limitedHistory);
-      setHistory(limitedHistory);
-    }
+  const toggleSave = word => {
+    const existing = db.get('saved_words').find(item => item.phrase === word.phrase);
+    if (existing) db.remove('saved_words', existing.id);
+    else db.insert('saved_words', { phrase: word.phrase, ...(word.kana ? { kana: word.kana } : {}), reading: readingOf(word), english: word.english, burmese: word.burmese });
+    setSaved(db.get('saved_words'));
   };
-
-  const handleHistoryClick = (term) => {
-    handleSearch(term);
-  };
-
-  const clearHistory = () => {
-    db.set('search_history', []);
-    setHistory([]);
-  };
-
-  const toggleSave = (word, e) => {
-    e.stopPropagation();
-    
-    if (savedWordsMap[word.phrase]) {
-      // Unsave
-      const savedId = savedWordsMap[word.phrase].id;
-      db.remove('saved_words', savedId);
-      
-      const newMap = { ...savedWordsMap };
-      delete newMap[word.phrase];
-      setSavedWordsMap(newMap);
-    } else {
-      // Save
-      const savedWord = db.insert('saved_words', {
-        phrase: word.phrase,
-        ...(word.kana ? { kana: word.kana } : {}),
-        reading: readingOf(word),
-        english: word.english,
-        burmese: word.burmese
-      });
-      
-      setSavedWordsMap({
-        ...savedWordsMap,
-        [word.phrase]: savedWord
-      });
-    }
-  };
-
-  return (
-    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
-      
-      {/* Header */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
-        <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
-          <ChevronLeft size={24} color="var(--color-text-navy)" strokeWidth={2.5} />
-        </button>
-        <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Dictionary</h1>
-      </header>
-
-      <div style={{ padding: '0 24px' }}>
-        
-        {/* Search Bar */}
-        <div style={{ 
-          backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '16px',
-          display: 'flex', alignItems: 'center', gap: '12px',
-          boxShadow: '0 4px 12px rgba(12, 74, 110, 0.05)', marginBottom: '24px',
-          border: '1px solid #E0F2FE'
-        }}>
-          <Search size={20} color="var(--color-primary-blue)" strokeWidth={2.5} />
-          <input 
-            type="text" 
-            placeholder={course.copy.searchPlaceholder}
-            value={query}
-            onChange={(e) => handleSearch(e.target.value)}
-            onKeyDown={handleSearchSubmit}
-            style={{ 
-              flex: 1, border: 'none', outline: 'none', fontSize: '1rem',
-              color: 'var(--color-text-navy)', background: 'transparent'
-            }}
-          />
-        </div>
-
-        {/* Results or History */}
-        {query.trim() === '' ? (
-          /* History View */
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>
-                Recent Searches
-              </h3>
-              {history.length > 0 && (
-                <button onClick={clearHistory} style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
-                  Clear All
-                </button>
-              )}
-            </div>
-            
-            {history.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#94A3B8', marginTop: '40px' }}>
-                <Search size={48} strokeWidth={1.5} style={{ opacity: 0.2, marginBottom: '16px' }} />
-                <p>No recent searches.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {history.map(item => (
-                  <div 
-                    key={item.id}
-                    onClick={() => handleHistoryClick(item.term)}
-                    style={{ 
-                      display: 'flex', alignItems: 'center', gap: '12px', padding: '16px',
-                      backgroundColor: '#FFFFFF', borderRadius: '16px', cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(12, 74, 110, 0.03)'
-                    }}
-                  >
-                    <Clock size={16} color="#94A3B8" />
-                    <span style={{ fontSize: '1rem', color: 'var(--color-text-navy)', fontWeight: 500 }}>{item.term}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Results View */
-          <div>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 16px 0' }}>
-              Search Results
-            </h3>
-            
-            {results.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#94A3B8', marginTop: '40px' }}>
-                <p>No words found for "{query}".</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {results.map((word) => {
-                  const isSaved = !!savedWordsMap[word.phrase];
-                  
-                  return (
-                    <div 
-                      key={word.id}
-                      style={{ 
-                        backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '16px', 
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        boxShadow: '0 4px 12px rgba(12, 74, 110, 0.05)', position: 'relative'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                            <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{word.phrase}</h4>
-                            {kanaOf(word) && <span style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>{kanaOf(word)}</span>}
-                            <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'var(--font-reading)' }}>{readingOf(word)}</span>
-                          </div>
-                          <p style={{ fontSize: '0.875rem', color: '#64748B', margin: 0 }}>
-                            {word.english} <span style={{ opacity: 0.5 }}>•</span> {word.burmese}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button 
-                          onClick={(e) => toggleSave(word, e)}
-                          style={{
-                            width: '36px', height: '36px', borderRadius: '50%',
-                            backgroundColor: isSaved ? '#D1FAE5' : 'var(--color-page-bg)', 
-                            color: isSaved ? '#059669' : '#94A3B8',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            border: 'none', cursor: 'pointer', transition: 'all 0.2s',
-                            flexShrink: 0
-                          }}
-                          title={isSaved ? "Unsave" : "Save Word"}
-                        >
-                          {isSaved ? <BookmarkMinus size={18} strokeWidth={2.5} /> : <Bookmark size={18} strokeWidth={2.5} />}
-                        </button>
-                        
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            speak(sayOf(word));
-                          }}
-                          style={{
-                            width: '36px', height: '36px', borderRadius: '50%',
-                            backgroundColor: 'var(--color-page-bg)', color: 'var(--color-primary-blue)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            border: 'none', cursor: 'pointer', transition: 'background-color 0.2s',
-                            flexShrink: 0
-                          }}
-                        >
-                          <Volume2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <div className="study-page dictionary-page">
+    <StudyHeader title="Dictionary" subtitle={course.copy.dictionarySubtitle} backTo="/library" backLabel="Back to Library" />
+    <StudySearch value={query} onChange={setQuery} onKeyDown={remember} label="Search dictionary" placeholder={course.copy.searchPlaceholder} />
+    {!query.trim() ? <section className="dictionary-section" aria-label="Recent searches">
+      <div className="study-section-heading"><h2>Recent searches</h2>{history.length > 0 && <button className="dictionary-clear" onClick={() => { db.set('search_history', []); setHistory([]); }}>Clear all</button>}</div>
+      {!history.length ? <div className="study-empty"><Search size={32} aria-hidden="true" /><h3>Find your next word</h3><p>Search a word, reading or meaning. Press Enter to keep it in your recent searches.</p></div> : <div className="dictionary-history">{history.map(item => <button className="dictionary-history__item" key={item.id} onClick={() => setQuery(item.term)}><Clock size={18} aria-hidden="true" /><span>{item.term}</span></button>)}</div>}
+    </section> : <section className="dictionary-section" aria-label="Dictionary results">
+      <div className="study-section-heading"><h2>Search results</h2><p role="status">{results.length} {results.length === 1 ? 'word' : 'words'} found</p></div>
+      {!results.length ? <div className="study-empty"><h3>No matching words</h3><p>No words found for “{query}”. Try another word or meaning.</p></div> : <div className="dictionary-results">{results.map(word => {
+        const isSaved = saved.some(item => item.phrase === word.phrase);
+        return <article className="dictionary-word" key={word.id}>
+          <div className="dictionary-word__copy"><h3>{word.phrase}</h3>{kanaOf(word) && <p className="dictionary-word__kana" lang="ja">{kanaOf(word)}</p>}<p className="dictionary-word__reading">{readingOf(word)}</p><p className="dictionary-word__english" lang="en">{word.english}</p><p className="dictionary-word__burmese" lang="my">{word.burmese}</p></div>
+          <div className="dictionary-word__actions"><button className="study-icon-button" onClick={() => toggleSave(word)} aria-label={`${isSaved ? 'Unsave' : 'Save'} ${word.phrase}`} aria-pressed={isSaved}>{isSaved ? <BookmarkMinus size={19} aria-hidden="true" /> : <Bookmark size={19} aria-hidden="true" />}</button><button className="study-icon-button" onClick={() => speak(sayOf(word))} aria-label={`Play ${word.phrase}`}><Volume2 size={19} aria-hidden="true" /></button></div>
+        </article>;
+      })}</div>}
+    </section>}
+  </div>;
 }

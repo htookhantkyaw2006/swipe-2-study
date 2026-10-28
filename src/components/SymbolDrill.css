@@ -1,0 +1,27 @@
+.symbol-quiz-layout-1.symbol-quiz-layout-1 { max-width: 520px; margin: 0 auto; padding: 24px; min-height: 100%; display: flex; flex-direction: column; }
+.symbol-quiz-layout-2.symbol-quiz-layout-2 { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+.symbol-quiz-layout-3.symbol-quiz-layout-3 { display: flex; gap: 4px; flex: 1; }
+.symbol-quiz-panel-1.symbol-quiz-panel-1 { flex: 1; height: 6px; border-radius: 999px; transition: background-color 0.3s; }
+.symbol-quiz-button-1.symbol-quiz-button-1 { background: transparent; border: none; cursor: pointer; padding: 4px; display: flex; }
+.symbol-quiz-layout-4.symbol-quiz-layout-4 { flex: 1; display: flex; flex-direction: column; }
+.symbol-quiz-panel-2.symbol-quiz-panel-2 { border-radius: 24px; padding: 32px 24px; text-align: center; margin-bottom: 20px; }
+.symbol-quiz-panel-3.symbol-quiz-panel-3 { width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 16px auto; display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-size: 1.75rem; font-weight: 800; }
+.symbol-quiz-heading-1.symbol-quiz-heading-1 { margin: 0 0 6px 0; font-size: 1.4rem; font-weight: 800; color: var(--color-text-navy); }
+.symbol-quiz-copy-1.symbol-quiz-copy-1 { margin: 0; font-size: 0.9rem; color: var(--color-secondary-blue); font-weight: 500; }
+.symbol-quiz-grid-1.symbol-quiz-grid-1 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; }
+.symbol-quiz-panel-4.symbol-quiz-panel-4 { padding: 10px 4px; border-radius: 14px; text-align: center; background-color: var(--color-card-surface); }
+.symbol-quiz-layout-5.symbol-quiz-layout-5 { font-size: 1.5rem; font-weight: 800; color: var(--color-text-navy); line-height: 1.1; white-space: nowrap; }
+.symbol-quiz-layout-6.symbol-quiz-layout-6 { font-size: 0.7rem; font-weight: 700; overflow-wrap: anywhere; }
+.symbol-quiz-layout-7.symbol-quiz-layout-7 { display: flex; gap: 10px; margin-top: auto; }
+.symbol-quiz-button-2.symbol-quiz-button-2 { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px; border-radius: 16px; border: none; cursor: pointer; color: #FFFFFF; font-weight: 700; font-size: 0.95rem; }
+.symbol-quiz-button-3.symbol-quiz-button-3 { flex: 1; padding: 16px; border-radius: 16px; cursor: pointer; border: 1px solid var(--color-border); background-color: var(--color-card-surface); color: var(--color-primary-blue); font-weight: 700; font-size: 0.95rem; }
+.symbol-quiz-copy-2.symbol-quiz-copy-2 { margin: 0 0 16px 0; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-secondary-blue); }
+.symbol-quiz-heading-2.symbol-quiz-heading-2 { margin: 0 0 20px 0; font-size: 1.5rem; font-weight: 800; color: var(--color-text-navy); line-height: 1.25; }
+.symbol-quiz-panel-5.symbol-quiz-panel-5 { border-radius: 24px; padding: 28px 24px; text-align: center; margin-bottom: 20px; position: relative; }
+.symbol-quiz-layout-8.symbol-quiz-layout-8 { font-size: 6rem; line-height: 1; font-weight: 700; color: var(--color-text-navy); }
+.symbol-quiz-layout-9.symbol-quiz-layout-9 { margin-top: 12px; font-size: 1rem; font-weight: 600; color: var(--color-secondary-blue); }
+.symbol-quiz-button-4.symbol-quiz-button-4 { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; }
+.symbol-quiz-grid-2.symbol-quiz-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.symbol-quiz-button-5.symbol-quiz-button-5 { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 18px 12px; border-radius: 16px; font-size: 1.15rem; font-weight: 800; color: var(--color-text-navy); transition: border-color 0.2s, background-color 0.2s; }
+.symbol-quiz-layout-10.symbol-quiz-layout-10 { margin-top: auto; padding-top: 20px; }
+.symbol-quiz-button-6.symbol-quiz-button-6 { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 16px; border-radius: 16px; border: none; color: #FFFFFF; font-weight: 700; font-size: 0.95rem; }

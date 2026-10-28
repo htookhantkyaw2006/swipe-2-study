@@ -1,0 +1,13 @@
+.phrase-level__layout { display: grid; gap: 24px; }
+.phrase-level__hero { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 28px; border-radius: 24px; color: white; background: linear-gradient(125deg, var(--color-primary-blue), var(--color-text-navy)); box-shadow: var(--shadow-raised); }
+.phrase-level__hero h2 { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.3; margin: 8px 0; color: white; }
+.phrase-level__hero > .learning-icon { width: 80px; height: 80px; }
+.phrase-level__modules { display: grid; align-content: start; gap: 14px; }
+.phrase-level__modules > h2 { font-size: 1.125rem; color: var(--color-text-navy); }
+.phrase-module { display: flex; align-items: center; gap: 16px; padding: 22px; border-radius: 20px; background: white; color: var(--color-text-navy); border: 1px solid var(--color-border); box-shadow: var(--shadow-soft); }
+.phrase-module > span { flex: 1; min-width: 0; }
+.phrase-module strong, .phrase-module small { display: block; }
+.phrase-module small { font-size: 0.875rem; color: var(--color-primary-blue); margin-top: 4px; }
+.phrase-module--soon { box-shadow: none; }
+.phrase-level__notice { margin: 24px 0 0; }
+@media (min-width: 1024px) { .phrase-level__layout { grid-template-columns: 1fr 1fr; align-items: start; } }

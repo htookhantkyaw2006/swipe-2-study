@@ -1,0 +1,22 @@
+.notifications-layout-1.notifications-layout-1 { min-height: 100%; background: transparent; padding-bottom: 24px; font-family: var(--font-sans); }
+.notifications-layout-2.notifications-layout-2 { display: flex; align-items: center; justify-content: center; position: relative; padding: 24px; }
+.notifications-button-1.notifications-button-1 { position: absolute; left: 24px; background: transparent; padding: 0; border: none; cursor: pointer; }
+.notifications-heading-1.notifications-heading-1 { font-size: 1.25rem; font-weight: 800; color: var(--color-text-navy); margin: 0; }
+.notifications-layout-3.notifications-layout-3 { padding: 0 24px; }
+.notifications-panel-1.notifications-panel-1 { background: linear-gradient(135deg, #FDBA74 0%, #EA580C 100%); border-radius: 24px; padding: 24px; color: #FFFFFF; box-shadow: 0 12px 24px rgba(234, 88, 12, 0.2); margin-bottom: 32px; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; overflow: hidden; }
+.notifications-layout-4.notifications-layout-4 { position: absolute; right: -10%; top: -10%; font-size: 10rem; color: #FED7AA; opacity: 0.15; font-weight: 900; z-index: 0; pointer-events: none; }
+.notifications-layout-5.notifications-layout-5 { position: relative; z-index: 1; }
+.notifications-panel-2.notifications-panel-2 { width: 56px; height: 56px; background-color: rgba(255,255,255,0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; backdrop-filter: blur(8px); margin: 0 auto 16px; }
+.notifications-heading-2.notifications-heading-2 { font-size: 2.5rem; font-weight: 900; margin: 0 0 8px 0; line-height: 1; color: #FFFFFF; }
+.notifications-copy-1.notifications-copy-1 { font-size: 1rem; margin: 0 0 24px 0; opacity: 0.9; }
+.notifications-button-2.notifications-button-2 { background-color: #FFFFFF; color: #EA580C; border: none; border-radius: 100px; padding: 12px 24px; font-size: 0.875rem; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: transform 0.2s; margin: 0 auto; }
+.notifications-layout-6.notifications-layout-6 { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
+.notifications-panel-3.notifications-panel-3 { background-color: #FFFFFF; border-radius: 20px; padding: 20px; display: flex; gap: 16px; box-shadow: 0 4px 12px rgba(12, 74, 110, 0.05); position: relative; transition: opacity 0.3s; }
+.notifications-panel-4.notifications-panel-4 { position: absolute; top: 24px; right: 20px; width: 8px; height: 8px; border-radius: 50%; }
+.notifications-panel-5.notifications-panel-5 { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.notifications-layout-7.notifications-layout-7 { flex: 1; padding-right: 12px; }
+.notifications-layout-8.notifications-layout-8 { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.notifications-label-1.notifications-label-1 { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+.notifications-label-2.notifications-label-2 { font-size: 0.75rem; color: #94A3B8; }
+.notifications-heading-3.notifications-heading-3 { font-size: 1rem; font-weight: 800; color: var(--color-text-navy); margin: 0 0 6px 0; line-height: 1.2; }
+.notifications-copy-2.notifications-copy-2 { font-size: 0.875rem; color: #64748B; margin: 0; line-height: 1.5; }

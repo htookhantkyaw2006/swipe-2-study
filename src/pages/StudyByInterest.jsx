@@ -1,3 +1,4 @@
+import './StudyByInterest.css';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCourse } from '../lib/language';
@@ -33,75 +34,53 @@ export default function StudyByInterest() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
-      
+    <div className="ui-tool-page interest-layout-1" >
+
       {/* Header Container */}
-      <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        <div style={{ padding: '24px 24px 16px 24px' }}>
-          <header className="flex items-center justify-center relative" style={{ marginBottom: '32px' }}>
-            <button 
-              onClick={() => navigate(-1)} 
-              style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
+      <div className="interest-layout-2" >
+        <div className="interest-layout-3" >
+          <header data-tool-header="true" className="flex items-center justify-center relative interest-layout-4" >
+            <button aria-label="Back" className="interest-button-1"
+              onClick={() => navigate('/library')}
+
             >
               <ChevronLeft size={24} color="var(--color-text-navy)" />
             </button>
-            <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>Study by Interest</h1>
+            <h1 className="interest-heading-1" >Study by Interest</h1>
           </header>
 
-          <div style={{ marginBottom: '32px' }}>
-            <h2 style={{ fontSize: '2rem', color: 'var(--color-text-navy)', margin: '0 0 8px 0', fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.1 }}>
+          <div className="interest-layout-4" >
+            <h2 className="interest-heading-2" >
               Learn what<br/>matters to you
             </h2>
-            <p style={{ color: 'var(--color-secondary-blue)', fontSize: '1rem', margin: 0, fontWeight: 500 }}>
-              Vocabulary grouped by real-life topics.
+            <p className="interest-copy-1" >
+              Vocabulary grouped by real-life topics. Topic lessons are coming soon.
             </p>
           </div>
 
           {/* Categories Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
+          <div className="interest-grid-1" >
             {categories.map((cat) => (
-              <div 
+              <div
                 key={cat.id}
-                className="surface-card"
-                onClick={() => {
-                  // In the future this can route to a specific interest session
-                  // navigate(`/interest/${cat.id}`)
-                }}
-                style={{ 
-                  padding: '20px 16px', borderRadius: '24px', cursor: 'pointer', 
-                  display: 'flex', flexDirection: 'column', gap: '16px',
-                  position: 'relative', overflow: 'hidden',
-                  transition: 'transform 0.2s, box-shadow 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.06)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)';
-                }}
+                className="surface-card interest-panel-1"
               >
-                <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '48px', height: '48px', borderRadius: '16px', background: `linear-gradient(135deg, ${cat.gradientStart} 0%, ${cat.gradientEnd} 100%)`, boxShadow: `0 8px 16px ${cat.shadow}` }}>
+                <div className="interest-panel-2" style={{ background: `linear-gradient(135deg, ${cat.gradientStart} 0%, ${cat.gradientEnd} 100%)`, boxShadow: `0 8px 16px ${cat.shadow}` }}>
                   <cat.icon size={24} color="#FFFFFF" strokeWidth={2.5} />
                 </div>
-                
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0', lineHeight: 1.2 }}>
+
+                <div className="interest-layout-5" >
+                  <h3 className="interest-heading-3" >
                     {cat.title}
                   </h3>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500, lineHeight: 1.3 }}>
+                  <p className="interest-copy-2" >
                     {cat.subtitle}
                   </p>
                 </div>
 
+                <span className="topic-soon">Coming soon</span>
                 {/* Faint background character */}
-                <div style={{ 
-                  position: 'absolute', right: '-10px', bottom: '-20px', 
-                  fontSize: '5rem', color: 'var(--color-ghost-blue)', 
-                  fontWeight: 800, opacity: 0.6, zIndex: 0, pointerEvents: 'none',
-                  lineHeight: 1
-                }}>
+                <div className="interest-layout-6" >
                   {course.interestChars[cat.id] ?? cat.char}
                 </div>
               </div>

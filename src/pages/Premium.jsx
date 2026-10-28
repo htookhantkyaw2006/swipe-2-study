@@ -1,3 +1,5 @@
+import './Premium.css';
+import AppDialog from '../components/ui/AppDialog';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Crown, Check, Minus, X, Sparkles, ShieldCheck } from 'lucide-react';
@@ -6,8 +8,8 @@ import { useCourse } from '../lib/language';
 /* ---------------------------------------------------------------
    S2S PREMIUM — plans and comparison
    ---------------------------------------------------------------
-   NOTHING HERE TAKES MONEY. There is no payment provider, no auth
-   and no server, so the subscribe button opens an honest sheet
+   NOTHING HERE TAKES MONEY. There is no payment provider, so
+   the plan preview button opens an honest sheet
    instead of pretending to charge. Wire a real provider before this
    page goes anywhere near a user.
 
@@ -63,10 +65,7 @@ function Cell({ value, strong }) {
     return <Minus size={18} color="var(--color-border)" strokeWidth={3} />;
   }
   return (
-    <span style={{
-      fontSize: '0.8rem', fontWeight: 700,
-      color: strong ? 'var(--color-primary-blue)' : 'var(--color-secondary-blue)'
-    }}>
+    <span className="premium-label-1" style={{ color: strong ? 'var(--color-primary-blue)' : 'var(--color-secondary-blue)' }}>
       {value}
     </span>
   );
@@ -75,73 +74,45 @@ function Cell({ value, strong }) {
 /* Shown instead of a checkout, because there is no checkout. */
 function NotConnectedSheet({ plan, onClose }) {
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 200,
-        backgroundColor: 'rgba(12, 74, 110, 0.4)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="surface-card"
-        style={{
-          width: '100%', maxWidth: '520px', borderRadius: '28px 28px 0 0',
-          padding: '24px', maxHeight: '80vh', overflowY: 'auto'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <div style={{
-            width: '52px', height: '52px', borderRadius: '16px', background: GRADIENT,
-            boxShadow: '0 8px 16px rgba(3, 105, 161, 0.3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
+    <AppDialog label="Premium plans" onClose={onClose}>
+      <div>
+        <div className="premium-layout-1" >
+          <div className="premium-panel-1" style={{ background: GRADIENT }}>
             <Crown size={24} color="#FFFFFF" strokeWidth={2.5} />
           </div>
-          <button
+          <button className="premium-button-1"
             onClick={onClose}
             aria-label="Close"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
+
           >
             <X size={22} color="var(--color-secondary-blue)" />
           </button>
         </div>
 
-        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>
+        <h3 className="premium-heading-1" >
           Payments are not connected yet
         </h3>
-        <p style={{ margin: '0 0 16px 0', fontSize: '0.95rem', lineHeight: 1.5, color: 'var(--color-secondary-blue)', fontWeight: 500 }}>
-          This page is the subscription design, not a working checkout. S2S has no
-          payment provider, no accounts and no server, so nothing can be charged and
-          no plan can be activated.
+        <p className="premium-copy-1" >
+          Subscriptions are not available yet. You can explore the example plans here; no payment will be taken.
         </p>
 
-        <div style={{
-          padding: '14px 16px', borderRadius: '16px',
-          backgroundColor: 'var(--color-ghost-blue)', border: '1px solid var(--color-border)'
-        }}>
-          <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)' }}>
+        <div className="premium-panel-2" >
+          <p className="premium-copy-2" >
             You selected
           </p>
-          <p style={{ margin: '4px 0 0 0', fontSize: '1rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>
+          <p className="premium-copy-3" >
             {plan.label} · {money(plan.perMonth)}/month
           </p>
         </div>
 
-        <button
+        <button className="premium-button-2"
           onClick={onClose}
-          style={{
-            width: '100%', marginTop: '16px', padding: '16px', borderRadius: '16px',
-            border: 'none', cursor: 'pointer', background: GRADIENT,
-            boxShadow: '0 8px 16px rgba(3, 105, 161, 0.3)',
-            color: '#FFFFFF', fontWeight: 700, fontSize: '0.95rem'
-          }}
+          style={{ background: GRADIENT }}
         >
           Got it
         </button>
       </div>
-    </div>
+    </AppDialog>
   );
 }
 
@@ -155,45 +126,41 @@ export default function Premium() {
   const plan = PLANS.find((p) => p.id === selected);
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="ui-tool-page premium-layout-2" >
 
       {/* Header — same shape as Settings and the other subpages */}
-      <header className="flex items-center justify-center relative">
-        <button
-          onClick={() => navigate(-1)}
+      <header data-tool-header="true" className="flex items-center justify-center relative">
+        <button className="premium-button-3"
+          onClick={() => navigate('/profile')}
           aria-label="Back"
-          style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
+
         >
           <ChevronLeft size={24} color="var(--color-text-navy)" />
         </button>
-        <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>
+        <h1 className="premium-heading-2" >
           S2S Premium
         </h1>
       </header>
 
       {/* Hero — echoes the promo card on Home so the two read as one thing */}
-      <div style={{
-        position: 'relative', borderRadius: '24px', overflow: 'hidden',
-        background: GRADIENT, color: '#FFFFFF', padding: '28px 24px',
-        boxShadow: '0 12px 32px rgba(3, 105, 161, 0.25)'
-      }}>
-        <div style={{ position: 'absolute', top: '-30px', left: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
-        <div style={{ position: 'absolute', bottom: '-50px', left: '45%', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
-        <div style={{ position: 'absolute', right: '-16px', bottom: '-44px', fontSize: '9rem', fontWeight: 800, color: 'rgba(255,255,255,0.12)', lineHeight: 1, pointerEvents: 'none' }}>
+      <div className="premium-panel-3" style={{ background: GRADIENT }}>
+        <div className="premium-panel-4"  />
+        <div className="premium-panel-5"  />
+        <div className="premium-layout-3" >
           {course.copy.heroWatermark}
         </div>
 
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(255,255,255,0.5)', padding: '4px 12px', borderRadius: '999px', marginBottom: '14px' }}>
+        <div className="premium-layout-4" >
+          <div className="premium-panel-6" >
             <Crown size={13} color="#E0F2FE" strokeWidth={3} />
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#E0F2FE' }}>
+            <span className="premium-label-2" >
               S2S Premium
             </span>
           </div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0 0 8px 0', lineHeight: 1.1, letterSpacing: '-0.5px' }}>
+          <h2 className="premium-heading-3" >
             {course.copy.premium.headline[0]}<br />{course.copy.premium.headline[1]}
           </h2>
-          <p style={{ fontSize: '0.95rem', color: '#E0F2FE', margin: 0, lineHeight: 1.45, maxWidth: '300px' }}>
+          <p className="premium-copy-4" >
             {course.copy.premium.subhead}
           </p>
         </div>
@@ -201,70 +168,52 @@ export default function Premium() {
 
       {/* Plans */}
       <div>
-        <h3 style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)', margin: '0 0 12px 0' }}>
-          Choose a plan
+        <h3 className="premium-heading-4" >
+          Preview plans and pricing
         </h3>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div className="premium-layout-5" >
           {PLANS.map((p) => {
             const active = p.id === selected;
             const save = savingsPct(p);
             return (
-              <button
+              <button className="premium-button-4"
                 key={p.id}
                 onClick={() => setSelected(p.id)}
                 aria-pressed={active}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '14px', width: '100%', textAlign: 'left',
-                  padding: '16px 18px', borderRadius: '18px', cursor: 'pointer',
-                  border: active ? '2px solid var(--color-primary-blue)' : '1px solid var(--color-border)',
-                  backgroundColor: active ? 'var(--color-ghost-blue)' : 'var(--color-card-surface)',
-                  transition: 'border-color 0.2s, background-color 0.2s'
-                }}
+                style={{ border: active ? '2px solid var(--color-primary-blue)' : '1px solid var(--color-border)', backgroundColor: active ? 'var(--color-ghost-blue)' : 'var(--color-card-surface)' }}
               >
                 {/* Radio */}
-                <span style={{
-                  flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%',
-                  border: active ? 'none' : '2px solid var(--color-border)',
-                  background: active ? GRADIENT : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
+                <span className="premium-label-3" style={{ border: active ? 'none' : '2px solid var(--color-border)', background: active ? GRADIENT : 'transparent' }}>
                   {active && <Check size={13} color="#FFFFFF" strokeWidth={4} />}
                 </span>
 
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>
+                <span className="premium-label-4" >
+                  <span className="premium-label-5" >
+                    <span className="premium-label-6" >
                       {p.label}
                     </span>
                     {p.trialDays > 0 && (
-                      <span style={{
-                        fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px',
-                        color: '#15803D', backgroundColor: '#DCFCE7', padding: '3px 8px', borderRadius: '999px'
-                      }}>
+                      <span className="premium-label-7" >
                         {p.trialDays} days free
                       </span>
                     )}
                   </span>
-                  <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-secondary-blue)', fontWeight: 500, marginTop: '2px' }}>
+                  <span className="premium-label-8" >
                     {money(p.perMonth * p.months)} billed {cadence(p.months)}
                   </span>
                 </span>
 
-                <span style={{ flexShrink: 0, textAlign: 'right' }}>
+                <span className="premium-label-9" >
                   {save > 0 && (
-                    <span style={{
-                      display: 'inline-block', marginBottom: '3px',
-                      fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px',
-                      color: 'var(--color-primary-blue)', backgroundColor: '#E0F2FE', padding: '3px 8px', borderRadius: '999px'
-                    }}>
+                    <span className="premium-label-10" >
                       Save {save}%
                     </span>
                   )}
-                  <span style={{ display: 'block', fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>
+                  <span className="premium-label-11" >
                     {money(p.perMonth)}
                   </span>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>
+                  <span className="premium-label-12" >
                     / month
                   </span>
                 </span>
@@ -276,42 +225,34 @@ export default function Premium() {
 
       {/* Comparison */}
       <div>
-        <h3 style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)', margin: '0 0 12px 0' }}>
+        <h3 className="premium-heading-4" >
           What you get
         </h3>
 
-        <div className="surface-card" style={{ borderRadius: '20px', overflow: 'hidden' }}>
+        <div className="surface-card premium-panel-7" >
           {/* Column headers */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 72px 86px', alignItems: 'center',
-            padding: '14px 18px', borderBottom: '1px solid var(--color-border)',
-            backgroundColor: 'var(--color-ghost-blue)'
-          }}>
+          <div className="premium-grid-1" >
             <span />
-            <span style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)' }}>
+            <span className="premium-label-13" >
               Free
             </span>
-            <span style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-primary-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+            <span className="premium-label-14" >
               <Crown size={11} strokeWidth={3} /> Premium
             </span>
           </div>
 
           {COMPARISON.map((row, i) => (
-            <div
+            <div className="premium-grid-2"
               key={row.feature}
-              style={{
-                display: 'grid', gridTemplateColumns: '1fr 72px 86px', alignItems: 'center',
-                padding: '14px 18px',
-                borderBottom: i === COMPARISON.length - 1 ? 'none' : '1px solid var(--color-ghost-blue)'
-              }}
+              style={{ borderBottom: i === COMPARISON.length - 1 ? 'none' : '1px solid var(--color-ghost-blue)' }}
             >
-              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-navy)' }}>
+              <span className="premium-label-15" >
                 {row.feature}
               </span>
-              <span style={{ display: 'flex', justifyContent: 'center' }}>
+              <span className="premium-label-16" >
                 <Cell value={row.free} />
               </span>
-              <span style={{ display: 'flex', justifyContent: 'center' }}>
+              <span className="premium-label-16" >
                 <Cell value={row.premium} strong />
               </span>
             </div>
@@ -321,32 +262,23 @@ export default function Premium() {
 
       {/* CTA */}
       <div>
-        <button
+        <button className="premium-button-5"
           onClick={() => setSheetOpen(true)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            padding: '18px', borderRadius: '18px', border: 'none', cursor: 'pointer',
-            background: GRADIENT, boxShadow: '0 10px 24px rgba(3, 105, 161, 0.3)',
-            color: '#FFFFFF', fontWeight: 800, fontSize: '1rem',
-            transition: 'transform 0.2s'
-          }}
+          style={{ background: GRADIENT }}
           onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
           onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
         >
           <Sparkles size={18} strokeWidth={2.5} />
-          {plan.trialDays > 0 ? `Start ${plan.trialDays}-day free trial` : `Subscribe · ${money(plan.perMonth)}/month`}
+          Preview selected plan
         </button>
 
-        <p style={{ margin: '12px 0 0 0', fontSize: '0.75rem', lineHeight: 1.5, color: 'var(--color-secondary-blue)', textAlign: 'center', fontWeight: 500 }}>
-          {plan.trialDays > 0
-            ? `Free for ${plan.trialDays} days, then ${money(plan.perMonth * plan.months)} billed ${cadence(plan.months)}. `
-            : `${money(plan.perMonth * plan.months)} billed ${cadence(plan.months)}. `}
-          Cancel anytime.
+        <p className="premium-copy-5" >
+          Plans and prices are a preview. Subscriptions are not available yet.
         </p>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '14px' }}>
+        <div className="premium-layout-6" >
           <ShieldCheck size={14} color="var(--color-secondary-blue)" strokeWidth={2.5} />
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-secondary-blue)' }}>
+          <span className="premium-label-17" >
             Billing is not connected yet — nothing will be charged
           </span>
         </div>

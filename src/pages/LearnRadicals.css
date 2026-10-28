@@ -1,0 +1,46 @@
+.radicals-label-1.radicals-label-1 { white-space: nowrap; }
+.radicals-layout-1.radicals-layout-1 { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.radicals-layout-2.radicals-layout-2 { display: flex; align-items: center; gap: 16px; }
+.radicals-panel-1.radicals-panel-1 { width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #FFFFFF; }
+.radicals-heading-1.radicals-heading-1 { margin: 0; font-size: 1.25rem; font-weight: 800; color: var(--color-text-navy); }
+.radicals-copy-1.radicals-copy-1 { margin: 2px 0 0 0; font-size: 0.9rem; color: var(--color-secondary-blue); font-weight: 600; }
+.radicals-copy-2.radicals-copy-2 { margin: 2px 0 0 0; font-size: 0.85rem; color: var(--color-secondary-blue); opacity: 0.85; }
+.radicals-button-1.radicals-button-1 { background: transparent; border: none; cursor: pointer; padding: 4px; }
+.radicals-panel-2.radicals-panel-2 { display: flex; align-items: center; gap: 8px; background-color: var(--color-ghost-blue); border-radius: 14px; padding: 12px 16px; margin-bottom: 16px; }
+.radicals-label-2.radicals-label-2 { font-size: 0.85rem; color: var(--color-text-navy); font-weight: 600; }
+.radicals-heading-2.radicals-heading-2 { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-secondary-blue); margin: 0 0 12px 0; }
+.radicals-layout-3.radicals-layout-3 { display: flex; flex-direction: column; gap: 8px; }
+.radicals-panel-3.radicals-panel-3 { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border-radius: 14px; background-color: #F8FAFC; border: 1px solid var(--color-border); }
+.radicals-label-3.radicals-label-3 { font-weight: 800; color: var(--color-primary-blue); min-width: 40px; text-align: center; white-space: nowrap; }
+.radicals-copy-3.radicals-copy-3 { margin: 0; font-size: 0.85rem; color: var(--color-secondary-blue); font-weight: 600; }
+.radicals-copy-4.radicals-copy-4 { margin: 0; font-size: 0.95rem; color: var(--color-text-navy); font-weight: 700; }
+.radicals-button-2.radicals-button-2 { width: 100%; margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; border-radius: 16px; border: none; cursor: pointer; background: linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%); box-shadow: 0 8px 16px rgba(15, 118, 110, 0.35); color: #FFFFFF; font-weight: 700; font-size: 0.9rem; }
+.radicals-layout-4.radicals-layout-4 { min-height: 100%; background: transparent; padding-bottom: 24px; font-family: var(--font-sans); }
+.radicals-layout-5.radicals-layout-5 { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
+.radicals-layout-6.radicals-layout-6 { padding: 24px 24px 16px 24px; }
+.radicals-layout-7.radicals-layout-7 { margin-bottom: 32px; }
+.radicals-button-3.radicals-button-3 { position: absolute; left: 0; background: transparent; padding: 8px; border: none; cursor: pointer; z-index: 10; }
+.radicals-heading-3.radicals-heading-3 { font-size: 1.25rem; margin: 0; color: var(--color-text-navy); font-weight: 800; }
+.radicals-layout-8.radicals-layout-8 { margin-bottom: 24px; }
+.radicals-heading-4.radicals-heading-4 { font-size: 2rem; color: var(--color-text-navy); margin: 0 0 8px 0; font-weight: 900; letter-spacing: -0.5px; line-height: 1.1; }
+.radicals-copy-5.radicals-copy-5 { color: var(--color-secondary-blue); font-size: 1rem; margin: 0; font-weight: 500; }
+.radicals-button-4.radicals-button-4 { width: 100%; display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 24px; border: none; cursor: pointer; text-align: left; margin-bottom: 20px; transition: transform 0.2s, box-shadow 0.2s; }
+.radicals-panel-4.radicals-panel-4 { width: 52px; height: 52px; flex-shrink: 0; border-radius: 16px; background-color: rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center; }
+.radicals-layout-9.radicals-layout-9 { flex: 1; min-width: 0; }
+.radicals-heading-5.radicals-heading-5 { margin: 0; font-size: 1.1rem; font-weight: 800; color: #FFFFFF; }
+.radicals-copy-6.radicals-copy-6 { margin: 2px 0 0 0; font-size: 0.85rem; color: rgba(255, 255, 255, 0.85); font-weight: 500; }
+.radicals-layout-10.radicals-layout-10 { margin-bottom: 20px; }
+.radicals-layout-11.radicals-layout-11 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.radicals-label-4.radicals-label-4 { font-size: 0.85rem; font-weight: 700; color: var(--color-secondary-blue); }
+.radicals-button-5.radicals-button-5 { display: flex; align-items: center; gap: 6px; background: transparent; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--color-secondary-blue); }
+.radicals-panel-5.radicals-panel-5 { height: 6px; border-radius: 999px; background-color: var(--color-ghost-blue); overflow: hidden; }
+.radicals-panel-6.radicals-panel-6 { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.radicals-layout-12.radicals-layout-12 { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; }
+.radicals-button-6.radicals-button-6 { flex-shrink: 0; padding: 8px 16px; border-radius: 999px; cursor: pointer; font-weight: 700; font-size: 0.8rem; }
+.radicals-grid-1.radicals-grid-1 { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.radicals-panel-7.radicals-panel-7 { padding: 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; position: relative; transition: transform 0.2s, box-shadow 0.2s; }
+.radicals-panel-8.radicals-panel-8 { width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #FFFFFF; }
+.radicals-layout-13.radicals-layout-13 { min-width: 0; }
+.radicals-heading-6.radicals-heading-6 { font-size: 0.95rem; font-weight: 800; color: var(--color-text-navy); margin: 0 0 2px 0; line-height: 1.2; }
+.radicals-copy-7.radicals-copy-7 { font-size: 0.75rem; color: var(--color-secondary-blue); margin: 0; font-weight: 500; }
+.radicals-label-5.radicals-label-5 { position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 50%; }

@@ -8,6 +8,7 @@ import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
 import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
 import { readSessionCards } from '../../lib/studyWords';
+import { phraseCards } from '../../lib/phraseCards';
 import './SwipeSession.css';
 
 const ShuffleDeck = ({ reducedMotion }) => (
@@ -174,7 +175,7 @@ const shuffleCards = (list) => {
   return copy;
 };
 
-export default function SwipeSession({ isReview = false, isSaved = false }) {
+export default function SwipeSession({ isReview = false, isSaved = false, isPhrases = false }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const levelId = searchParams.get('level');
@@ -183,7 +184,7 @@ export default function SwipeSession({ isReview = false, isSaved = false }) {
   const reducedMotion = useReducedMotion();
   // A session snapshots its deck; preferences cannot replace cards mid-session.
   const [cards, setCards] = useState(() => {
-    const allCards = readSessionCards(db, { mode: isReview ? 'review' : isSaved ? 'saved' : 'learn', levelId });
+    const allCards = isPhrases ? phraseCards(course, levelId) : readSessionCards(db, { mode: isReview ? 'review' : isSaved ? 'saved' : 'learn', levelId });
     if (isReview || isSaved) return allCards;
     return (prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards).slice(0, prefs.cardsPerSession);
   });
@@ -209,7 +210,9 @@ export default function SwipeSession({ isReview = false, isSaved = false }) {
     actionLocked.current = true;
     setAdvancing(true);
     setExitData({ direction });
-    if (direction === 'right' && isReview) {
+    if (isPhrases) {
+      // Phrase practice does not write into the vocabulary review queue.
+    } else if (direction === 'right' && isReview) {
       db.set('review_cards', db.get('review_cards').filter(c => c.id !== swipedCard.id));
     } else if (direction === 'left' && !isReview) {
       const reviewCards = db.get('review_cards');
@@ -222,7 +225,7 @@ export default function SwipeSession({ isReview = false, isSaved = false }) {
       animate(dragOffset, 0, { duration: reducedMotion ? 0 : 0.22 });
       after(() => { actionLocked.current = false; setAdvancing(false); }, reducedMotion ? 0 : 240);
     } else {
-      after(() => navigate(isSaved ? '/saved' : isReview ? '/learn/review' : `/learn/level/${encodeURIComponent(levelId || cards[0]?.level || course.levels[0].id)}`), reducedMotion ? 0 : 240);
+      after(() => navigate(isPhrases ? (levelId ? `/flashcards/level/${encodeURIComponent(levelId)}` : '/flashcards') : isSaved ? '/saved' : isReview ? '/learn/review' : `/learn/level/${encodeURIComponent(levelId || cards[0]?.level || course.levels[0].id)}`), reducedMotion ? 0 : 240);
     }
   };
 
@@ -246,8 +249,8 @@ export default function SwipeSession({ isReview = false, isSaved = false }) {
       <div className="swipe-empty">
         <Check size={32} aria-hidden="true" />
         <h1>{isReview ? 'All caught up!' : isSaved ? 'No saved words yet' : 'No cards yet'}</h1>
-        <p>{isReview ? 'You have no cards to review right now.' : isSaved ? 'Bookmark words in the dictionary to study them here.' : 'Choose a course to start learning.'}</p>
-        <button className="btn-primary" onClick={() => navigate(isSaved ? '/saved' : isReview ? '/learn/review' : '/learn')}>Back to {isSaved ? 'saved words' : isReview ? 'review' : 'courses'}</button>
+        <p>{isPhrases ? 'Phrases for this level are not available yet. Choose another level to practise.' : isReview ? 'You have no cards to review right now.' : isSaved ? 'Bookmark words in the dictionary to study them here.' : 'Choose a course to start learning.'}</p>
+        <button className="btn-primary" onClick={() => navigate(isPhrases ? '/flashcards' : isSaved ? '/saved' : isReview ? '/learn/review' : '/learn')}>Back to {isPhrases ? 'phrases' : isSaved ? 'saved words' : isReview ? 'review' : 'courses'}</button>
       </div>
     </div>
   );
@@ -255,12 +258,12 @@ export default function SwipeSession({ isReview = false, isSaved = false }) {
   const visibleCards = cards.slice(currentIndex, currentIndex + 2);
   const locked = advancing || shuffleState;
   return (
-    <div className="swipe-session">
+    <div className={`swipe-session${isPhrases ? ' swipe-session--phrases' : ''}`}>
       <header className="swipe-session__header">
         <button className="swipe-session__icon" onClick={() => navigate(-1)} aria-label="Leave session"><ChevronLeft size={22} aria-hidden="true" /></button>
         <div className="swipe-session__heading">
-          <p className="swipe-session__eyebrow">{isReview ? 'Your review' : isSaved ? 'Your collection' : 'Flashcard practice'}</p>
-          <h1>{isReview ? 'Review Session' : isSaved ? 'Saved Words' : (cards[0]?.lesson_name ?? course.copy.lessonName)}</h1>
+          <p className="swipe-session__eyebrow">{isPhrases ? course.name : isReview ? 'Your review' : isSaved ? 'Your collection' : 'Flashcard practice'}</p>
+          <h1>{isPhrases ? 'Phrase practice' : isReview ? 'Review Session' : isSaved ? 'Saved Words' : (cards[0]?.lesson_name ?? course.copy.lessonName)}</h1>
         </div>
         <button className="swipe-session__icon" onClick={handleShuffle} disabled={locked || cards.length - currentIndex <= 1} aria-label="Shuffle remaining cards" title="Shuffle remaining cards"><Shuffle size={20} aria-hidden="true" /></button>
         <div className="swipe-session__progress">
@@ -293,11 +296,11 @@ export default function SwipeSession({ isReview = false, isSaved = false }) {
 
       <footer className="swipe-session__footer">
         <div className="swipe-session__actions">
-          <button className="swipe-action swipe-action--review" onClick={() => triggerSwipe('left')} disabled={locked} aria-label="Review this word later"><X size={24} aria-hidden="true" /><span>Review</span></button>
+          <button className="swipe-action swipe-action--review" onClick={() => triggerSwipe('left')} disabled={locked} aria-label={isPhrases ? 'Needs more phrase practice' : 'Review this word later'}><X size={24} aria-hidden="true" /><span>{isPhrases ? 'Practise' : 'Review'}</span></button>
           <button className="swipe-action swipe-action--flip" onClick={() => { setFlipped(!flipped); setHasFlippedOnce(true); }} disabled={locked} aria-label={flipped ? 'Show word' : 'Reveal answer'}><RotateCw size={21} aria-hidden="true" /><span>{flipped ? 'Show word' : 'Reveal'}</span></button>
-          <button className="swipe-action swipe-action--learned" onClick={() => triggerSwipe('right')} disabled={locked} aria-label="Mark this word learned"><Check size={26} aria-hidden="true" /><span>Learned</span></button>
+          <button className="swipe-action swipe-action--learned" onClick={() => triggerSwipe('right')} disabled={locked} aria-label={isPhrases ? 'Mark this phrase familiar' : 'Mark this word learned'}><Check size={26} aria-hidden="true" /><span>{isPhrases ? 'Familiar' : 'Learned'}</span></button>
         </div>
-        <p className="swipe-session__hint">Swipe left to review · right for learned</p>
+        <p className="swipe-session__hint">{isPhrases ? 'Swipe left for more practice · right for familiar' : 'Swipe left to review · right for learned'}</p>
       </footer>
     </div>
   );

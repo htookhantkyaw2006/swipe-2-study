@@ -1,0 +1,33 @@
+.kana-grid-1.kana-grid-1 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.kana-button-1.kana-button-1 { position: relative; aspect-ratio: 1; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; transition: transform 0.15s, background-color 0.2s, border-color 0.2s; }
+.kana-label-1.kana-label-1 { font-size: 1.6rem; font-weight: 700; color: var(--color-text-navy); line-height: 1.1; }
+.kana-label-2.kana-label-2 { font-size: 0.7rem; font-weight: 700; color: var(--color-secondary-blue); font-family: JetBrains Mono, monospace; }
+.kana-label-3.kana-label-3 { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; }
+.kana-layout-1.kana-layout-1 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 12px 0; }
+.kana-heading-1.kana-heading-1 { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-secondary-blue); margin: 0; }
+.kana-label-4.kana-label-4 { font-size: 0.75rem; font-weight: 600; color: var(--color-secondary-blue); opacity: 0.8; }
+.kana-layout-2.kana-layout-2 { min-height: 100%; background: transparent; padding-bottom: 24px; font-family: var(--font-sans); }
+.kana-layout-3.kana-layout-3 { max-width: 640px; margin: 0 auto; position: relative; z-index: 1; }
+.kana-layout-4.kana-layout-4 { padding: 24px 24px 16px 24px; }
+.kana-layout-5.kana-layout-5 { margin-bottom: 32px; }
+.kana-button-2.kana-button-2 { position: absolute; left: 0; background: transparent; padding: 8px; border: none; cursor: pointer; z-index: 10; }
+.kana-heading-2.kana-heading-2 { font-size: 1.25rem; margin: 0; color: var(--color-text-navy); font-weight: 800; }
+.kana-layout-6.kana-layout-6 { margin-bottom: 24px; }
+.kana-heading-3.kana-heading-3 { font-size: 2rem; color: var(--color-text-navy); margin: 0 0 8px 0; font-weight: 900; letter-spacing: -0.5px; line-height: 1.1; }
+.kana-copy-1.kana-copy-1 { color: var(--color-secondary-blue); font-size: 1rem; margin: 0; font-weight: 500; }
+.kana-button-3.kana-button-3 { width: 100%; display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 24px; border: none; cursor: pointer; text-align: left; margin-bottom: 20px; transition: transform 0.2s, box-shadow 0.2s; }
+.kana-panel-1.kana-panel-1 { width: 52px; height: 52px; flex-shrink: 0; border-radius: 16px; background-color: rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center; }
+.kana-layout-7.kana-layout-7 { flex: 1; min-width: 0; }
+.kana-heading-4.kana-heading-4 { margin: 0; font-size: 1.1rem; font-weight: 800; color: #FFFFFF; }
+.kana-copy-2.kana-copy-2 { margin: 2px 0 0 0; font-size: 0.85rem; color: rgba(255, 255, 255, 0.9); font-weight: 500; }
+.kana-layout-8.kana-layout-8 { margin-bottom: 20px; }
+.kana-layout-9.kana-layout-9 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.kana-label-5.kana-label-5 { font-size: 0.85rem; font-weight: 700; color: var(--color-secondary-blue); }
+.kana-button-4.kana-button-4 { display: flex; align-items: center; gap: 6px; background: transparent; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--color-secondary-blue); }
+.kana-panel-2.kana-panel-2 { height: 6px; border-radius: 999px; background-color: var(--color-ghost-blue); overflow: hidden; }
+.kana-panel-3.kana-panel-3 { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.kana-grid-2.kana-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px; border-radius: 18px; background-color: var(--color-ghost-blue); margin-bottom: 10px; }
+.kana-button-5.kana-button-5 { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 14px; border: none; cursor: pointer; font-weight: 800; font-size: 0.9rem; transition: background-color 0.2s; }
+.kana-label-6.kana-label-6 { font-size: 1.1rem; }
+.kana-copy-3.kana-copy-3 { font-size: 0.8rem; color: var(--color-secondary-blue); font-weight: 600; margin: 0 0 24px 4px; }
+.kana-layout-10.kana-layout-10 { height: 28px; }

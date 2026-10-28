@@ -1,0 +1,10 @@
+.app-dialog { position: fixed; inset: auto 0 0; width: min(100%, 560px); max-width: 100%; max-height: 90dvh; margin: auto auto 0; padding: 0; border: 1px solid var(--color-border); border-radius: 26px 26px 0 0; color: var(--color-text-navy); background: white; box-shadow: 0 24px 80px rgba(12,74,110,0.22); overflow: auto; overscroll-behavior: contain; }
+.app-dialog::backdrop { background: rgba(12,74,110,0.42); backdrop-filter: blur(4px); }
+.app-dialog__body { min-width: 0; padding: 24px max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); overflow-wrap: anywhere; }
+.app-dialog__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.app-dialog__header h2 { font-size: 1.25rem; color: var(--color-text-navy); }
+.app-dialog button { min-height: 44px; }
+.app-dialog svg { flex-shrink: 0; }
+.app-dialog--quiz { inset: 0; width: min(calc(100% - 24px), 640px); max-height: calc(100dvh - 24px); margin: auto; border-radius: 24px; background: var(--bg-gradient); }
+.app-dialog--quiz > .app-dialog__body { padding: 0; }
+@media (min-width: 640px) { .app-dialog { inset: 0; max-height: min(85dvh, 900px); margin: auto; border-radius: 26px; } .app-dialog__body { padding: 28px; } }

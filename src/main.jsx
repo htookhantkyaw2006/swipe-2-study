@@ -10,6 +10,7 @@ import { PreferencesProvider } from './lib/preferences.jsx'
 import StorageOwnerBoundary from './components/StorageOwnerBoundary.jsx'
 import { AuthProvider } from './lib/auth.jsx'
 import { recoveryLink } from './lib/recoveryLink.js'
+import './responsive-tools.css'
 
 // Capture and scrub custom recovery links before Auth or Router initialization.
 recoveryLink.capture(window.location.href, path => window.history.replaceState(window.history.state, '', path));

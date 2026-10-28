@@ -1,3 +1,5 @@
+import './SymbolDrill.css';
+import AppDialog from './ui/AppDialog';
 import React, { useState, useCallback } from 'react';
 import { X, Check, Volume2, RotateCcw, ArrowRight } from 'lucide-react';
 import { levelFor } from '../lib/progress';
@@ -110,127 +112,100 @@ export default function SymbolDrill({
   const score = results.filter((r) => r.wasCorrect).length;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'var(--bg-gradient)', overflowY: 'auto' }}>
-      <div style={{ maxWidth: '520px', margin: '0 auto', padding: '24px', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+    <AppDialog label={`${label} quiz`} onClose={onClose} className="app-dialog--quiz">
+      <div className="symbol-quiz-layout-1" >
 
         {/* Progress segments + close */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-          <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
+        <div className="symbol-quiz-layout-2" >
+          <div className="symbol-quiz-layout-3" >
             {questions.map((q, i) => {
               const answered = i < results.length;
               return (
-                <div
+                <div className="symbol-quiz-panel-1"
                   key={q.id}
-                  style={{
-                    flex: 1, height: '6px', borderRadius: '999px',
-                    backgroundColor: answered
+                  style={{ backgroundColor: answered
                       ? (results[i].wasCorrect ? '#16A34A' : '#EF4444')
-                      : (i === index && !done ? accent : 'var(--color-border)'),
-                    transition: 'background-color 0.3s'
-                  }}
+                      : (i === index && !done ? accent : 'var(--color-border)') }}
                 />
               );
             })}
           </div>
-          <button onClick={onClose} aria-label="Close quiz" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex' }}>
+          <button className="symbol-quiz-button-1" onClick={onClose} aria-label="Close quiz" >
             <X size={22} color="var(--color-secondary-blue)" />
           </button>
         </div>
 
         {done ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div className="surface-card" style={{ borderRadius: '24px', padding: '32px 24px', textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{
-                width: '88px', height: '88px', borderRadius: '50%', margin: '0 auto 16px auto',
-                background: gradient, boxShadow: `0 10px 20px ${shadow}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#FFFFFF', fontSize: '1.75rem', fontWeight: 800
-              }}>
+          <div className="symbol-quiz-layout-4" >
+            <div className="surface-card symbol-quiz-panel-2" >
+              <div className="symbol-quiz-panel-3" style={{ background: gradient, boxShadow: `0 10px 20px ${shadow}` }}>
                 {score}/{results.length}
               </div>
-              <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>
+              <h2 className="symbol-quiz-heading-1" >
                 {score === results.length ? 'Every one right' : score >= results.length - 2 ? 'Almost there' : 'Good practice'}
               </h2>
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-secondary-blue)', fontWeight: 500 }}>
+              <p className="symbol-quiz-copy-1" >
                 Three clean answers in a row marks a {unit} as known.
               </p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '20px' }}>
+            <div className="symbol-quiz-grid-1" >
               {results.map((r, i) => (
-                <div
+                <div className="symbol-quiz-panel-4"
                   key={`${r.key}-${i}`}
-                  style={{
-                    padding: '10px 4px', borderRadius: '14px', textAlign: 'center',
-                    backgroundColor: 'var(--color-card-surface)',
-                    border: `2px solid ${r.wasCorrect ? '#BBF7D0' : '#FECACA'}`
-                  }}
+                  style={{ border: `2px solid ${r.wasCorrect ? '#BBF7D0' : '#FECACA'}` }}
                 >
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1.1, whiteSpace: 'nowrap' }}>{r.glyph}</div>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: r.wasCorrect ? '#16A34A' : '#DC2626', overflowWrap: 'anywhere' }}>{r.answer}</div>
+                  <div className="symbol-quiz-layout-5" >{r.glyph}</div>
+                  <div className="symbol-quiz-layout-6" style={{ color: r.wasCorrect ? '#16A34A' : '#DC2626' }}>{r.answer}</div>
                 </div>
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
-              <button
+            <div className="symbol-quiz-layout-7" >
+              <button className="symbol-quiz-button-2"
                 onClick={again}
-                style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  padding: '16px', borderRadius: '16px', border: 'none', cursor: 'pointer',
-                  background: gradient, boxShadow: `0 8px 16px ${shadow}`,
-                  color: '#FFFFFF', fontWeight: 700, fontSize: '0.95rem'
-                }}
+                style={{ background: gradient, boxShadow: `0 8px 16px ${shadow}` }}
               >
                 <RotateCcw size={18} strokeWidth={2.5} /> Again
               </button>
-              <button
+              <button className="symbol-quiz-button-3"
                 onClick={onClose}
-                style={{
-                  flex: 1, padding: '16px', borderRadius: '16px', cursor: 'pointer',
-                  border: '1px solid var(--color-border)', backgroundColor: 'var(--color-card-surface)',
-                  color: 'var(--color-primary-blue)', fontWeight: 700, fontSize: '0.95rem'
-                }}
+
               >
                 Done
               </button>
             </div>
           </div>
         ) : (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <p style={{ margin: '0 0 16px 0', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)' }}>
+          <div className="symbol-quiz-layout-4" >
+            <p className="symbol-quiz-copy-2" >
               {label} · {index + 1} of {questions.length}
             </p>
-            <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1.25 }}>
+            <h2 className="symbol-quiz-heading-2" >
               {prompt}
             </h2>
 
-            <div className="surface-card" style={{ borderRadius: '24px', padding: '28px 24px', textAlign: 'center', marginBottom: '20px', position: 'relative' }}>
-              <div style={{ fontSize: '6rem', lineHeight: 1, fontWeight: 700, color: 'var(--color-text-navy)' }}>
+            <div className="surface-card symbol-quiz-panel-5" >
+              <div className="symbol-quiz-layout-8" >
                 {question.glyph}
               </div>
               {picked && renderReveal && (
-                <div style={{ marginTop: '12px', fontSize: '1rem', fontWeight: 600, color: 'var(--color-secondary-blue)' }}>
+                <div className="symbol-quiz-layout-9" >
                   {renderReveal(question)}
                 </div>
               )}
               {picked && (
-                <button
+                <button className="symbol-quiz-button-4"
                   onClick={() => speak(question.say)}
                   aria-label={`Play ${question.say}`}
-                  style={{
-                    position: 'absolute', top: '14px', right: '14px',
-                    width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer',
-                    border: 'none', backgroundColor: accentSoft,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}
+                  style={{ backgroundColor: accentSoft }}
                 >
                   <Volume2 size={17} color={accent} strokeWidth={2.5} />
                 </button>
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+            <div className="symbol-quiz-grid-2" >
               {question.options.map((option) => {
                 const isAnswer = option === question.answer;
                 const isPicked = picked === option;
@@ -239,18 +214,11 @@ export default function SymbolDrill({
                 if (picked && isAnswer) { borderColor = '#16A34A'; background = '#F0FDF4'; }
                 else if (isPicked) { borderColor = '#DC2626'; background = '#FEF2F2'; }
                 return (
-                  <button
+                  <button className="symbol-quiz-button-5"
                     key={option}
                     onClick={() => choose(option)}
                     disabled={Boolean(picked)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                      padding: '18px 12px', borderRadius: '16px', border: `2px solid ${borderColor}`,
-                      backgroundColor: background, cursor: picked ? 'default' : 'pointer',
-                      fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-text-navy)',
-                      fontFamily: optionMono ? 'JetBrains Mono, monospace' : 'inherit',
-                      transition: 'border-color 0.2s, background-color 0.2s'
-                    }}
+                    style={{ border: `2px solid ${borderColor}`, backgroundColor: background, cursor: picked ? 'default' : 'pointer', fontFamily: optionMono ? 'JetBrains Mono, monospace' : 'inherit' }}
                   >
                     {option}
                     {picked && isAnswer && <Check size={18} color="#16A34A" strokeWidth={3} />}
@@ -260,18 +228,11 @@ export default function SymbolDrill({
               })}
             </div>
 
-            <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-              <button
+            <div className="symbol-quiz-layout-10" >
+              <button className="symbol-quiz-button-6"
                 onClick={next}
                 disabled={!picked}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  padding: '16px', borderRadius: '16px', border: 'none',
-                  background: picked ? gradient : 'var(--color-border)',
-                  boxShadow: picked ? `0 8px 16px ${shadow}` : 'none',
-                  color: '#FFFFFF', fontWeight: 700, fontSize: '0.95rem',
-                  cursor: picked ? 'pointer' : 'not-allowed', opacity: picked ? 1 : 0.6
-                }}
+                style={{ background: picked ? gradient : 'var(--color-border)', boxShadow: picked ? `0 8px 16px ${shadow}` : 'none', cursor: picked ? 'pointer' : 'not-allowed', opacity: picked ? 1 : 0.6 }}
               >
                 {index + 1 >= questions.length ? 'See results' : 'Next'}
                 <ArrowRight size={18} strokeWidth={2.5} />
@@ -280,6 +241,6 @@ export default function SymbolDrill({
           </div>
         )}
       </div>
-    </div>
+    </AppDialog>
   );
 }

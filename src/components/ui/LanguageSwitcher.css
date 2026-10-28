@@ -1,0 +1,11 @@
+.language-trigger { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 14px; border-radius: 22px; background: white; color: var(--color-text-navy); box-shadow: var(--shadow-soft); font-size: 0.875rem; font-weight: 650; }
+.language-trigger svg { flex-shrink: 0; }
+.language-options { display: grid; gap: 12px; }
+.language-option { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px; text-align: left; border: 1px solid var(--color-border); border-radius: 18px; background: white; color: var(--color-primary-blue); }
+.language-option[aria-pressed="true"] { border: 2px solid var(--color-primary-blue); background: var(--color-page-bg); padding: 15px; }
+.language-option:disabled { opacity: 0.55; }
+.language-option__copy { min-width: 0; flex: 1; }
+.language-option__copy strong { display: block; font-size: 1rem; color: var(--color-text-navy); }
+.language-option__copy strong span { font-size: 0.875rem; color: var(--color-primary-blue); font-weight: 500; margin-left: 4px; }
+.language-option__copy small { display: block; font-size: 0.8125rem; margin-top: 3px; }
+.language-option__soon { font-size: 0.75rem; font-weight: 650; padding: 3px 8px; border-radius: 8px; background: var(--color-ghost-blue); }

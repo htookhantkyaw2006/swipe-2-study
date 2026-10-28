@@ -1,0 +1,4 @@
+.course-shell-layout-1.course-shell-layout-1 { position: fixed; inset: 0; z-index: 1000; background: var(--bg-gradient); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.course-shell-panel-1.course-shell-panel-1 { width: 96px; height: 96px; border-radius: 28px; background: #FFFFFF; box-shadow: 0 12px 32px rgba(3, 105, 161, 0.18); display: flex; align-items: center; justify-content: center; font-size: 3rem; line-height: 1; margin-bottom: 8px; }
+.course-shell-layout-2.course-shell-layout-2 { font-size: 2rem; font-weight: 900; color: var(--color-text-navy); letter-spacing: -0.5px; }
+.course-shell-layout-3.course-shell-layout-3 { font-size: 0.9rem; font-weight: 600; color: var(--color-secondary-blue); }

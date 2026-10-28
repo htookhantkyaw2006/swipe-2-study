@@ -1,0 +1,62 @@
+/* Shared rhythm for the original learning tools. Course accent colors and
+   existing learning behavior remain in each tool's own stylesheet. */
+.relative { position: relative; }
+.ui-tool-page { width: 100%; min-width: 0; max-width: 1200px; margin-inline: auto; }
+.ui-tool-page :where(section, div, span) { min-width: 0; }
+.ui-tool-page :where(h1,h2,h3,h4,p) { overflow-wrap: anywhere; }
+.ui-tool-page :where(button) { min-height: 44px; min-width: 44px; }
+.ui-tool-page svg { flex-shrink: 0; }
+header[data-tool-header][data-tool-header] { position: relative; display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; gap: 10px; padding: 0; min-height: 44px; }
+header[data-tool-header][data-tool-header]::after { content: ''; width: 44px; }
+header[data-tool-header][data-tool-header] > button { position: static; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 8px; background: white; border: 1px solid var(--color-border); border-radius: 13px; }
+header[data-tool-header][data-tool-header] > h1 { font-size: clamp(1.0625rem, 2.5vw, 1.375rem); line-height: 1.4; text-align: center; }
+.notifications-layout-1 > header[data-tool-header] { margin: 24px; }
+.notifications-layout-7.notifications-layout-7 { min-width: 0; }
+.radicals-panel-7.radicals-panel-7 { text-align: left; }
+.radicals-label-1.radicals-label-1 { white-space: normal; }
+.notifications-layout-8.notifications-layout-8 { flex-wrap: wrap; }
+.notifications-panel-3.notifications-panel-3 { width: 100%; text-align: left; cursor: pointer; }
+.notifications-panel-3:disabled { cursor: default; }
+.notifications-layout-3.notifications-layout-3 { max-width: 1000px; margin: auto; }
+.topic-soon { position: relative; z-index: 1; display: inline-block; align-self: flex-start; padding: 3px 8px; border-radius: 7px; font-size: 0.6875rem; font-weight: 650; background: var(--color-ghost-blue); color: var(--color-primary-blue); }
+.interest-panel-1.interest-panel-1 { cursor: default; }
+.interest-heading-3.interest-heading-3 { line-height: 1.5; }
+.interest-copy-2.interest-copy-2 { line-height: 1.7; }
+.writing-workspace { display: grid; gap: 24px; }
+.writing-picker { min-width: 0; }
+.writing-panel-2.writing-canvas { width: 100%; max-width: 260px; aspect-ratio: 1; }
+.writing-canvas > svg { display: block; }
+.writing-canvas > div > svg { display: block; max-width: 100%; }
+.writing-layout-14.writing-layout-14 { margin-bottom: 0; }
+.app-dialog :where(p,span,h2,h3,div) { min-width: 0; }
+.app-dialog :where(button) { min-width: 44px; }
+.symbol-quiz-layout-8.symbol-quiz-layout-8 { font-size: clamp(2.5rem, 12vw, 4.5rem); overflow-wrap: anywhere; }
+.symbol-quiz-layout-5.symbol-quiz-layout-5 { font-size: 1.25rem; }
+.symbol-quiz-grid-2.symbol-quiz-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.symbol-quiz-button-5.symbol-quiz-button-5, .radical-quiz-button-5.radical-quiz-button-5 { overflow-wrap: anywhere; min-width: 0; }
+.radical-quiz-label-5.radical-quiz-label-5 { min-width: 0; }
+.radical-quiz-layout-8.radical-quiz-layout-8 { flex-wrap: wrap; }
+.premium-button-4.premium-button-4 { display: grid; grid-template-columns: 22px minmax(0,1fr) auto; gap: 10px; padding: 16px 12px; }
+.premium-grid-1.premium-grid-1, .premium-grid-2.premium-grid-2 { grid-template-columns: minmax(0,1fr) minmax(52px,0.4fr) minmax(65px,0.5fr); gap: 8px; }
+.premium-grid-2 > span { min-width: 0; overflow-wrap: anywhere; }
+.premium-heading-3.premium-heading-3 { color: white; line-height: 1.3; }
+.premium-layout-6.premium-layout-6 { align-items: flex-start; }
+@media (min-width: 640px) {
+  .ui-tool-page { padding-block: 8px; }
+  .interest-grid-1.interest-grid-1 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .notifications-layout-6.notifications-layout-6 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (min-width: 1024px) {
+  .writing-workspace { grid-template-columns: minmax(0,1.2fr) minmax(220px,0.8fr); align-items: start; }
+  .interest-grid-1.interest-grid-1 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+}
+@media (max-width: 639px) {
+  .ui-tool-page :is(.writing-layout-10,.radicals-layout-6,.interest-layout-3,.kana-layout-4,.sounds-layout-3,.notifications-layout-3) { padding-inline: 16px; }
+  .writing-panel-1.writing-panel-1 { padding: 20px 16px; }
+  .premium-layout-2.premium-layout-2 { padding: 20px 16px 24px; }
+  .interest-grid-1.interest-grid-1 { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  .interest-panel-1.interest-panel-1 { padding: 18px 14px; }
+  .symbol-quiz-layout-1.symbol-quiz-layout-1, .radical-quiz-layout-1.radical-quiz-layout-1 { padding: 20px 16px; }
+  .symbol-quiz-grid-1.symbol-quiz-grid-1 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .symbol-quiz-button-4.symbol-quiz-button-4, .radical-quiz-button-4.radical-quiz-button-4 { width: 44px; height: 44px; }
+}
