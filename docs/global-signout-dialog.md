@@ -113,3 +113,4 @@ import GlobalSignOutDialog from './components/GlobalSignOutDialog.jsx';
 ### Limitations / Untested Items
 - Interactive gestures in native mobile browsers (iOS WebKit / Android Chrome) were verified through component rendering and responsive CSS breakpoints, not on physical mobile hardware.
 - Real global session revocation via Supabase server functions was not executed, as backend integration belongs to the parent workflow.
+
