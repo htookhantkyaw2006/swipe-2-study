@@ -1,18 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PenLine, Bookmark, Mic, Layers, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List, Blocks, Languages, Type, AudioLines } from 'lucide-react';
+import { ChevronRight, User, LayoutGrid, List } from 'lucide-react';
 import { db } from '../lib/db';
 import { useCourse } from '../lib/language';
 import { StudySearch } from '../components/study/StudyPage';
+import LearningIcon from '../components/ui/LearningIcon';
 import './Library.css';
 
-const EXPLORE_ICONS = { scriptDictionary: Languages, sounds: AudioLines, kana: Type, radicals: Blocks, interest: Layers, writing: PenLine, twisters: Mic };
-
 function ToolCard({ tool }) {
-  const Icon = tool.icon || BookOpen;
   const available = Boolean(tool.path && tool.path !== '#');
   const content = <>
-    <span className="library-tool__icon"><Icon size={24} aria-hidden="true" /></span>
+    <LearningIcon kind={tool.key} className="library-tool__art" />
     <span className="library-tool__copy"><span className="library-tool__title">{tool.title}</span><span className="library-tool__subtitle">{tool.subtitle}</span></span>
     {available ? <ChevronRight className="library-tool__arrow" size={20} aria-hidden="true" /> : <span className="library-tool__soon">Soon</span>}
   </>;
@@ -29,15 +27,15 @@ export default function Library() {
   const reviewCount = db.get('review_cards').length;
   const cardCount = db.get('flashcards').length;
   const coreTools = [
-    { key: 'cards', title: 'Flashcards', subtitle: 'Build your vocabulary', icon: Layers, path: '/learn' },
-    { key: 'review', title: 'Review', subtitle: `${reviewCount} ${reviewCount === 1 ? 'word' : 'words'} to revisit`, icon: RotateCw, path: '/learn/review' },
-    { key: 'saved', title: 'Saved Words', subtitle: `${savedCount} bookmarked ${savedCount === 1 ? 'word' : 'words'}`, icon: Bookmark, path: '/saved' },
-    { key: 'dictionary', title: 'Dictionary', subtitle: course.copy.dictionarySubtitle, icon: BookOpen, path: '/dictionary' },
-    { key: 'phrases', title: 'Learn Phrases', subtitle: 'Everyday expressions', icon: MessageCircle, path: '/flashcards' },
+    { key: 'cards', title: 'Flashcards', subtitle: 'Build your vocabulary', path: '/learn' },
+    { key: 'review', title: 'Review', subtitle: `${reviewCount} ${reviewCount === 1 ? 'word' : 'words'} to revisit`, path: '/learn/review' },
+    { key: 'saved', title: 'Saved Words', subtitle: `${savedCount} bookmarked ${savedCount === 1 ? 'word' : 'words'}`, path: '/saved' },
+    { key: 'dictionary', title: 'Dictionary', subtitle: course.copy.dictionarySubtitle, path: '/dictionary' },
+    { key: 'phrases', title: 'Learn Phrases', subtitle: 'Everyday expressions', path: '/flashcards' },
   ];
   const sections = [
     { title: 'Learn & Review', tools: coreTools },
-    { title: 'Explore & Practise', tools: course.exploreTools.map(tool => ({ ...tool, subtitle: tool.key === 'writing' && !tool.path ? 'Character writing practice' : tool.subtitle, icon: EXPLORE_ICONS[tool.key] })) },
+    { title: 'Explore & Practise', tools: course.exploreTools.map(tool => ({ ...tool, subtitle: tool.key === 'writing' && !tool.path ? 'Character writing practice' : tool.subtitle })) },
   ].map(section => ({ ...section, tools: section.tools.filter(tool => `${tool.title} ${tool.subtitle}`.toLowerCase().includes(query.trim().toLowerCase())) }));
   const matchCount = sections.reduce((total, section) => total + section.tools.length, 0);
 
@@ -49,12 +47,12 @@ export default function Library() {
       </header>
       <section className="library-intro" aria-label="Library overview">
         <div><p className="study-eyebrow">One word at a time</p><h2>Make room for a little practice.</h2><p>Learn something new or revisit your favourites.</p></div>
-        <BookOpen size={42} aria-hidden="true" />
+        <LearningIcon kind="library" className="library-intro__art" />
       </section>
       <div className="library-counts" aria-label="Current course collections">
-        <Link to="/learn"><Layers size={19} aria-hidden="true" /><strong>{cardCount}</strong><span>Cards available</span></Link>
-        <Link to="/saved"><Bookmark size={19} aria-hidden="true" /><strong>{savedCount}</strong><span>Saved words</span></Link>
-        <Link to="/learn/review"><RotateCw size={19} aria-hidden="true" /><strong>{reviewCount}</strong><span>To review</span></Link>
+        <Link to="/learn"><LearningIcon kind="cards" className="library-counts__art" /><strong>{cardCount}</strong><span>Cards available</span></Link>
+        <Link to="/saved"><LearningIcon kind="saved" className="library-counts__art" /><strong>{savedCount}</strong><span>Saved words</span></Link>
+        <Link to="/learn/review"><LearningIcon kind="review" className="library-counts__art" /><strong>{reviewCount}</strong><span>To review</span></Link>
       </div>
       <div className="library-toolbar">
         <StudySearch label="Find a learning tool" value={query} onChange={setQuery} />

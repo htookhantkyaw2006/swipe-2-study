@@ -349,3 +349,33 @@ Fixed four specific integration and lifecycle issues in `AuthCoordinator` and `A
   confirmed staging access, SMTP/provider/DNS setup, fresh email, old/new-password
   login, Safari and physical devices remain pending. New code alone does not
   upgrade already-sent emails. See `docs/auth-email-setup.md`.
+
+## 28 October 2026 — Illustrated learning icons and navigation refinement
+
+- PT approved adapting the stacked white/blue card illustration from his fourth
+  reference across the Home shortcuts, review/saved panel, sidebar and Library.
+- Added reusable `LearningIcon` SVG illustrations: filled semantic artwork,
+  layered cards, restrained shadows and the existing sky/navy palette. No raster
+  assets, external icon service, font download or new app dependency. Decorative
+  SVGs stay out of accessible names and use unique React IDs for gradients.
+- Updated the five main navigation items, brand/study note and Settings artwork;
+  desktop active states have a clearer border/indicator. Sidebar/mobile widths,
+  navigation labels, destinations and existing responsive breakpoints remain.
+- Home shortcuts/review/saved/study-tip and Library tools/counts use the same
+  illustration family. Library grid/list, search, unavailable tools and actual
+  local collection counts retain their existing behavior. This is a visual pass,
+  not completion of remaining Phrases/helper-screen responsiveness.
+- `npm test`: **92 passed**. Lint: **0 errors / 10 existing warnings**. Production
+  build passes with the existing large-chunk warning. No new unit tests were
+  added for decorative graphics; verification used the existing suite and real
+  browser interaction/layout checks.
+- Chromium checked 45 layouts: Chinese/Japanese/English Home and Library grid/list
+  at 320/375/768/1024/1440. No document/main/nav horizontal or measured text
+  overflow; nav targets remain at least 44px, SVG gradient IDs are unique and
+  illustrations are decorative. Keyboard navigation, one active destination,
+  Settings, course carousel/open, Home shortcuts and Library search/clear/list
+  were checked. No page errors or external requests. Safari and physical phones
+  remain unverified.
+- Recorded the observed hosted Source-editor SMTP lock in the activation guide.
+  Hosted email template activation and SMTP/provider/DNS access remain pending;
+  UI work did not change hosted Auth configuration or original `main`.

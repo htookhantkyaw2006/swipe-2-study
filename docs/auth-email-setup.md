@@ -5,9 +5,17 @@ environment. No hosted setting is changed by a build or this repository commit.
 Confirm the Supabase project's purpose before editing it; keep production and
 staging separate. Do not merge `main` to test this feature.
 
+**Current dashboard blocker:** PT's hosted Reset password screen displays
+`Set up custom SMTP to edit the source` and disables Source. In that project,
+complete the SMTP setup below before attempting to replace the template. The
+cross-browser code is ready, but the new template has not been activated.
+The existing built-in emails retain the old same-browser PKCE requirements.
+
 ## Activate cross-browser recovery
 
 1. Run/deploy the feature-branch code first at a known local/staging origin.
+   If Source is locked behind SMTP, obtain provider/DNS access and complete the
+   custom SMTP section before editing this hosted template.
 2. In that Supabase project, inspect Authentication → URL Configuration. Allow
    the exact app origin's `/reset-password` route and SDK query variants. For
    local development, `http://localhost:5173/**` and

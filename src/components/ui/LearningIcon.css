@@ -1,0 +1,2 @@
+.learning-icon { display: block; width: 56px; height: 56px; flex-shrink: 0; overflow: visible; }
+.learning-icon__front { filter: drop-shadow(0 3px 3px rgba(12, 74, 110, 0.13)); }

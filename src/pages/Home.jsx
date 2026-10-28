@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, Bookmark, BookOpen, Layers, Library, MessageCircle, RotateCw, Search } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Layers } from 'lucide-react';
 import LevelCarousel from '../components/ui/LevelCarousel';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import Avatar from '../components/ui/Avatar';
 import LanguageFlag from '../components/ui/LanguageFlag';
+import LearningIcon from '../components/ui/LearningIcon';
 import { useCourse } from '../lib/language';
 import { useAuth } from '../lib/useAuth.js';
 import { useProfile, displayName } from '../lib/profile.js';
@@ -51,9 +52,9 @@ export default function Home() {
           <section aria-labelledby="explore-heading">
             <div className="section-heading"><h2 id="explore-heading">Explore & practice</h2></div>
             <div className="home-shortcuts">
-              <Link to="/flashcards" className="home-shortcut"><span className="shortcut-icon"><MessageCircle size={23} aria-hidden="true" /></span><span><strong>Phrases</strong><span>Everyday words in context</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
-              <Link to="/dictionary" className="home-shortcut"><span className="shortcut-icon"><Search size={23} aria-hidden="true" /></span><span><strong>Dictionary</strong><span>Look up a word</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
-              <Link to="/library" className="home-shortcut"><span className="shortcut-icon"><Library size={23} aria-hidden="true" /></span><span><strong>Library</strong><span>Explore your learning tools</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
+              <Link to="/flashcards" className="home-shortcut"><LearningIcon kind="phrases" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Phrases</strong><span>Everyday words in context</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
+              <Link to="/dictionary" className="home-shortcut"><LearningIcon kind="dictionary" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Dictionary</strong><span>Look up a word</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
+              <Link to="/library" className="home-shortcut"><LearningIcon kind="library" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Library</strong><span>Explore your learning tools</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
             </div>
           </section>
         </div>
@@ -62,13 +63,13 @@ export default function Home() {
             <div className="practice-panel-heading"><span className="section-eyebrow">MAKE IT STICK</span><Layers size={19} aria-hidden="true" /></div>
             <h2 id="practice-heading">A word worth revisiting.</h2><p>Your review queue and saved words, all in one place.</p>
             <div className="practice-links">
-              <Link to="/learn/review" className="practice-link"><span className="practice-icon"><RotateCw size={20} aria-hidden="true" /></span><span><strong>Review queue</strong><span>Go over your cards</span></span><span className="practice-count">{counts.review ?? '—'}</span><ArrowRight size={16} aria-hidden="true" /></Link>
-              <Link to="/saved" className="practice-link"><span className="practice-icon"><Bookmark size={20} aria-hidden="true" /></span><span><strong>Saved words</strong><span>Keep them close</span></span><span className="practice-count">{counts.saved ?? '—'}</span><ArrowRight size={16} aria-hidden="true" /></Link>
+              <Link to="/learn/review" className="practice-link"><LearningIcon kind="review" className="practice-art" /><span><strong>Review queue</strong><span>Go over your cards</span></span><span className="practice-count">{counts.review ?? '—'}</span><ArrowRight size={16} aria-hidden="true" /></Link>
+              <Link to="/saved" className="practice-link"><LearningIcon kind="saved" className="practice-art" /><span><strong>Saved words</strong><span>Keep them close</span></span><span className="practice-count">{counts.saved ?? '—'}</span><ArrowRight size={16} aria-hidden="true" /></Link>
             </div>
             <p className="device-note">{counts.error ? 'Saved data could not be read on this device.' : 'Learning records on this device.'}</p>
           </section>
           <section className="study-note" aria-labelledby="study-note-heading">
-            <span className="study-note-icon" aria-hidden="true"><BookOpen size={22} /></span><p className="section-eyebrow">A SMALL STUDY TIP</p>
+            <LearningIcon kind="dictionary" className="study-note-art" /><p className="section-eyebrow">A SMALL STUDY TIP</p>
             <h2 id="study-note-heading">Take a moment.<br />Say it out loud.</h2><p>Read the word, listen to its pronunciation, then try saying it yourself.</p>
             <Link to="/learn">Find your next word <ArrowRight size={17} aria-hidden="true" /></Link>
           </section>

@@ -78,3 +78,17 @@ The requested core-screen sequence is complete through Library/Profile. This is 
 A 90-layout smoke audit of the remaining main learning/phrase/settings/dictionary routes found clipped Settings labels at 320/375px while the document itself did not overflow. Settings now has scoped responsive rows, stacked phone values, two-column desktop groups, vector language flags, native keyboard-operable rows/switches and a focus-managed option dialog. Existing preference/data operations and confirmation prompts are retained; unfinished About actions are labelled Soon.
 
 Targeted Settings/dialog checks cover 22 layout states plus keyboard/focus, persistence/Profile agreement, accent/language switching, synthetic-data clear cancel/confirm and JSON export. Tests: 64 pass; lint zero errors / 10 warnings; build/whitespace checks pass. No full page redesign or complete functional test is claimed for the other audited helper routes. Owner-authorized preview access and hosted checks remain pending; PT requested progressing with independent local work meanwhile.
+
+## 28 October — stacked-card icon refinement
+
+Home, the shared desktop/mobile navigation and Library now use a single SVG
+illustration family based on PT's fourth reference (layered white cards, sky-blue
+back cards, soft shadows). Existing blue/navy colors and readable labels are
+retained. Other small action controls remain concise line icons.
+
+Validation: 92 tests pass; lint 0 errors/10 existing warnings; build passes.
+Chromium layout checks cover 45 Home/Library combinations across three courses,
+grid/list and five widths (320–1440), plus keyboard navigation/search/carousel
+interactions. No new UI unit tests were added for decorative art. These checks do
+not complete the remaining Phrases/helper-screen pass, hosted Auth validation,
+Safari or physical-device testing. SMTP activation is still pending.
