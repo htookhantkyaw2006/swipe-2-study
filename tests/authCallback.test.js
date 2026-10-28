@@ -62,8 +62,10 @@ test('URL errors take precedence and Auth errors are not hidden by missing-code 
   assert.equal(getAuthCallbackState({ authError: 'Network error' }).error, 'Network error');
 });
 
+// ws: false prevents Vite from starting its HMR WebSocket server, avoiding
+// port 24678 conflicts when multiple Vite servers run in the same test process.
 const server = await createServer({
-  server: { middlewareMode: true, hmr: false, host: '127.0.0.1', watch: null },
+  server: { middlewareMode: true, hmr: false, ws: false, host: '127.0.0.1', watch: null },
 });
 after(() => server.close());
 

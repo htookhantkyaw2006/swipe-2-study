@@ -13,7 +13,9 @@ globalThis.localStorage = {
   setItem: (key, value) => values.set(key, value),
   removeItem: key => values.delete(key),
 };
-const server = await createServer({ server: { middlewareMode: true, hmr: false, host: '127.0.0.1', watch: null } });
+// ws: false prevents Vite from starting its HMR WebSocket server, avoiding
+// port 24678 conflicts when multiple Vite servers run in the same test process.
+const server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false, host: '127.0.0.1', watch: null } });
 after(async () => {
   await server.close();
   if (oldStorage === undefined) delete globalThis.localStorage;

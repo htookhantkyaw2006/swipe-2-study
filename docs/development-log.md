@@ -1,6 +1,14 @@
 # Development log
 
-## Latest — 28 October 2026 — Sidebar alignment and collapse refinement
+## Latest — 28 October 2026 — Test suite stability and concurrency resolution
+
+- Investigated test failures in `authCallback.test.js` and `authIntegration.test.js` where `renderToString` and hook execution threw `Cannot read properties of null`.
+- Root cause: Node.js 22 test runner runs test files concurrently by default. Multiple test files spinning up in-process Vite SSR servers collided on HMR WebSocket port 24678 and mutated `globalThis.localStorage` concurrently, corrupting SSR module evaluation and hook dispatchers.
+- Added `ws: false` to test Vite servers in `authCallback.test.js`, `authIntegration.test.js`, and `cacheIntegration.test.js` to eliminate port binding collisions.
+- Configured `"test": "node --test --test-concurrency=1"` in `package.json` to serialize test file execution, ensuring safe `globalThis.localStorage` mock state isolation.
+- Validation: all **116 Node tests pass** (0 failures), lint **0 errors / 8 pre-existing warnings**, production build passes cleanly, and whitespace checks pass.
+
+## 28 October 2026 — Sidebar alignment and collapse refinement
 
 - Reviewed the actual merged `dfe10b4`, including IDE-agent commit `fffef4d` and
   Edit Profile. Reproduced a concrete defect: at 300px scroll, collapsing focused
