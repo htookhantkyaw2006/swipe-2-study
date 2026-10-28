@@ -7,6 +7,7 @@ import Flashcards from './pages/Flashcards';
 import PhrasesLevel from './pages/PhrasesLevel';
 import PhrasesSwipeSession from './pages/PhrasesSwipeSession';
 import Profile from './pages/Profile';
+import EditProfile from './pages/EditProfile';
 import Premium from './pages/Premium';
 import SettingsSubpage from './pages/SettingsSubpage';
 import SavedWords from './pages/SavedWords';
@@ -55,6 +56,7 @@ function App() {
         <Route path="sounds" element={<LearnSounds />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="profile/edit" element={<EditProfile />} />
         <Route path="premium" element={<Premium />} />
         <Route path="settings" element={<SettingsSubpage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

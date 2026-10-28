@@ -1,5 +1,34 @@
 # Development log
 
+## Latest — 28 October 2026 — Profile name and private avatar editing
+
+- PT marked the existing-screen UI step complete with final acceptance deferred,
+  then authorized Edit Profile as the next account milestone. Sidebar/collapse
+  remains a separate IDE-agent handoff. No sidebar, Layout or global theme file
+  is changed by this feature.
+- Added `/profile/edit` and its signed-in Profile entry. Guests receive a sign-in
+  return path. Names support Burmese/CJK/emoji within the existing 100-character
+  database limit. Photo selection/removal is staged with local preview and undo;
+  invalid, oversized, undecodable and unsupported image files are rejected.
+- Profile service uses verified Auth identity/current session, owner/generation
+  guards and `updated_at` compare-and-swap. Photos use unique owned paths in the
+  existing private bucket; signed reads live in memory for five minutes and
+  refresh before expiry. Confirmed updates refresh Profile/Home, including after
+  navigating away during a save. New image sources recover from earlier errors.
+- Old-photo deletion follows a confirmed profile update and has explicit retry.
+  Lost update responses require reload and retain possibly committed files.
+  Storage/profile updates are not atomic; private orphan cleanup is not durably
+  queued in this milestone. See profile-editing.md for the boundaries.
+- Validation: **110 Node tests pass** (15 new service cases); lint **0 errors /
+  8 existing warnings**; regular and synthetic-configured builds and whitespace
+  checks pass. Chromium production and dev StrictMode each passed 32 flow checks
+  and 50 layouts. Another 12 boundary/renewal/reachability checks and 20 real
+  unconfigured guest layouts passed: **76 checks / 120 layouts** total.
+- No page errors or unmocked external requests; phone/desktop screenshots
+  reviewed. Auth/PostgREST/Storage responses and files were synthetic. Hosted
+  profile/Storage/RLS acceptance, Safari and physical devices remain pending.
+  No migration, hosted configuration, privileged key, dependency or main change.
+
 ## 27 October 2026 — Local owner isolation
 
 Base: `83b4927` on `feat/backend-foundation`. This is the next implementation

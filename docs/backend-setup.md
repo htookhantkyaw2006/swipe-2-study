@@ -22,9 +22,11 @@ As of 28 October 2026:
   Preview environment values and application access are still unverified. No
   hosted deployment or configuration action has been performed here.
 - Learning lists/preferences currently use owner-scoped local caches; cloud
-  progress sync and guest import remain future implementation steps. Custom SMTP,
-  Google sign-in, avatar upload and account deletion remain unverified or
-  unimplemented as described in the development log. Password recovery is now
+  progress sync and guest import remain future implementation steps. Profile
+  name editing and private avatar upload/removal are implemented and tested with
+  simulated SDK/browser responses; hosted acceptance remains pending. See
+  profile-editing.md. Custom SMTP, Google sign-in and account deletion remain
+  unverified or unimplemented as described in the development log. Password recovery is now
   implemented and simulated locally; see password-recovery.md for callback
   allowlisting and the real-email checks that are still pending.
 

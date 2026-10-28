@@ -22,9 +22,15 @@ See [password recovery](docs/password-recovery.md) and
 [email/SMTP setup](docs/auth-email-setup.md). Cloud progress sync, guest import,
 Google sign-in and account deletion are not implemented yet.
 
-The core UI pass covers Home/navigation, vocabulary sessions, lessons, saved and
-review words, Library, Profile and Settings. This is not a full pass over every helper or
-phrase screen. See [UI evidence and limits](docs/ui-checkpoint.md).
+Profile name editing and private avatar upload/replacement/removal are implemented
+with local service tests and simulated SDK/browser checks. Real hosted profile
+and Storage acceptance is still pending. See [profile editing](docs/profile-editing.md).
+
+PT has marked the existing-screen UI pass complete, with final acceptance checks
+deferred. It includes Home, vocabulary/phrase levels and sessions, collections,
+Library, Profile, Settings, Dictionary and helper screens. Sidebar matching and
+collapse are a separate IDE-agent handoff; this checkout has not verified that
+update. See [UI evidence and limits](docs/ui-checkpoint.md).
 
 ## Checks
 

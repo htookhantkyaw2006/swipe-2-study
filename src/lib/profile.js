@@ -1,93 +1,41 @@
 import { useAuth } from './useAuth.js';
 import { getSupabaseClient } from './supabase.js';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { readProfile } from './profileService.js';
+import { subscribeProfileChanges } from './profileEvents.js';
 
-/* ---------------------------------------------------------------
-   PROFILE HOOK
-   ---------------------------------------------------------------
-   Fetches the current user's public.profiles row under normal
-   learner credentials. Never fabricates a profile when the fetch
-   fails — surfaces the error so the UI can show retry.
-   --------------------------------------------------------------- */
-
-export function useProfile() {
+export function useProfile({ listen = true } = {}) {
   const { user, isGuest, isTransitioning, captureGeneration, isCurrent } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
+  const userId = user?.id;
+  const [state, setState] = useState({ owner: null, profile: null, loading: false, error: null });
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt(value => value + 1), []);
   useEffect(() => {
-    if (isGuest || !user || isTransitioning) {
-      setProfile(null);
-      setLoading(false);
-      setError(null);
-      return;
+    let active = true;
+    if (isGuest || !userId || isTransitioning) {
+      setState({ owner: null, profile: null, loading: false, error: null });
+      return () => { active = false; };
     }
-
-    const gen = captureGeneration();
-    setLoading(true);
-    setError(null);
-
-    getSupabaseClient()
-      .from('profiles')
-      .select('id, display_name, avatar_path, created_at, updated_at')
-      .eq('id', user.id)
-      .single()
-      .then(({ data, error: err }) => {
-        if (!isCurrent(gen)) return; // Stale — user switched/logged out.
-        if (err) {
-          setError(err.message);
-          setProfile(null);
-        } else {
-          setProfile(data);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (!isCurrent(gen)) return;
-        setError(err.message || 'Failed to load profile.');
-        setProfile(null);
-        setLoading(false);
-      });
-  }, [user, isGuest, isTransitioning, captureGeneration, isCurrent]);
-
-  const retry = () => {
-    if (isGuest || !user || isTransitioning) return;
-    setError(null);
-    setLoading(true);
-
-    const gen = captureGeneration();
-    getSupabaseClient()
-      .from('profiles')
-      .select('id, display_name, avatar_path, created_at, updated_at')
-      .eq('id', user.id)
-      .single()
-      .then(({ data, error: err }) => {
-        if (!isCurrent(gen)) return;
-        if (err) {
-          setError(err.message);
-          setProfile(null);
-        } else {
-          setProfile(data);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (!isCurrent(gen)) return;
-        setError(err.message || 'Failed to load profile.');
-        setProfile(null);
-        setLoading(false);
-      });
-  };
-
-  return { profile, loading, error, retry };
+    const generation = captureGeneration();
+    const allowed = () => active && isCurrent(generation);
+    setState({ owner: userId, profile: null, loading: true, error: null });
+    (async () => {
+      try {
+        const result = await readProfile(getSupabaseClient(), { userId, isCurrent: allowed });
+        if (allowed()) setState({ owner: userId, profile: result.profile, loading: false, error: result.error });
+      } catch {
+        if (allowed()) setState({ owner: userId, profile: null, loading: false, error: 'Could not load your profile. Please retry.' });
+      }
+    })();
+    const unsubscribe = listen ? subscribeProfileChanges(owner => { if (owner === userId && allowed()) retry(); }) : () => {};
+    return () => { active = false; unsubscribe(); };
+  }, [userId, isGuest, isTransitioning, captureGeneration, isCurrent, attempt, listen, retry]);
+  if (!userId || isGuest || isTransitioning) return { profile: null, loading: false, error: null, retry };
+  if (state.owner !== userId) return { profile: null, loading: true, error: null, retry };
+  return { profile: state.profile, loading: state.loading, error: state.error, retry };
 }
 
-/**
- * Display name: prefer the profile row, fall back to Auth metadata,
- * then to the email prefix. Never returns an empty string for a
- * logged-in user.
- */
+/** A profile row is authoritative; Auth metadata is a fallback for older accounts. */
 export function displayName(profile, user) {
   if (profile?.display_name) return profile.display_name;
   if (user?.user_metadata?.display_name) return user.user_metadata.display_name;
@@ -96,11 +44,10 @@ export function displayName(profile, user) {
   return 'Learner';
 }
 
-/** Two-letter initials from a display name. */
 export function initialsOf(name) {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  if (parts.length === 1) return [...parts[0]].slice(0, 2).join('').toUpperCase();
+  return ([...parts[0]][0] + [...parts[parts.length - 1]][0]).toUpperCase();
 }
