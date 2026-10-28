@@ -5,6 +5,8 @@ import { usePreferences, OPTIONS } from '../lib/preferences';
 import { useLanguage } from '../lib/language';
 import { useAuth } from '../lib/useAuth.js';
 import { useProfile, displayName, initialsOf } from '../lib/profile.js';
+import { useAvatarUrl } from '../lib/useAvatarUrl.js';
+import Avatar from '../components/ui/Avatar';
 import { db } from '../lib/db';
 import '../components/study/StudyPage.css';
 import './Profile.css';
@@ -22,6 +24,7 @@ export default function Profile() {
   const { language, languages, setLanguage } = useLanguage();
   const { user, loading: authLoading, isTransitioning, error: authError, retryVerification, signOut } = useAuth();
   const { profile, loading: profileLoading, error: profileError, retry } = useProfile();
+  const photo = useAvatarUrl(profile?.avatar_path);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
   const busy = authLoading || isTransitioning;
@@ -45,12 +48,13 @@ export default function Profile() {
         <aside className="profile-summary" aria-label="Account overview">
           <section className="profile-account" aria-busy={busy || profileLoading}>
             <div className="profile-identity">
-              <div className="profile-avatar" aria-hidden="true">{user && /^[A-Za-z0-9]/.test(name) ? initialsOf(name) : <User size={28} />}</div>
+              {photo.url ? <Avatar src={photo.url} size={56} alt="Your profile photo" /> : <div className="profile-avatar" aria-hidden="true">{user && /^[A-Za-z0-9]/.test(name) ? initialsOf(name) : <User size={28} />}</div>}
               <div className="profile-identity__copy"><p className="study-eyebrow">{busy ? 'Connecting account' : user ? 'Signed in' : 'Guest mode'}</p><h2>{busy ? 'Loading…' : name}</h2><p>{busy ? 'Please wait a moment.' : user?.email || 'Learning on this device'}</p></div>
             </div>
             {!user && !busy && <div className="profile-signin"><p>Sign in to use your account. Guest words stay on this device.</p><div><Link className="btn-primary" to="/login">Sign in</Link><Link className="btn-secondary" to="/signup">Create account</Link></div></div>}
             {user && !busy && <p className="profile-local-note">Saved words and review lists are stored on this device.</p>}
             {profileError && <ProfileError onRetry={retry} label="Retry profile">Could not load your profile.</ProfileError>}
+            {photo.error && <ProfileError onRetry={photo.retry} label="Retry profile photo">{photo.error}</ProfileError>}
             {authError && <ProfileError onRetry={retryVerification} label="Retry account verification">{authError}</ProfileError>}
             {logoutError && <ProfileError onRetry={handleLogout} label="Retry sign out">{logoutError}</ProfileError>}
           </section>
@@ -69,6 +73,7 @@ export default function Profile() {
             <ProfileLink to="/settings" icon={Settings} title="All settings" subtitle="Display, audio, data and more" />
           </div></section>
           <section className="profile-group" aria-labelledby="profile-actions-title"><h2 id="profile-actions-title">Account & support</h2><div className="profile-group__surface">
+            {user && !busy && <ProfileLink to="/profile/edit" icon={User} title="Edit profile" subtitle="Update your name and photo" />}
             {user ? <button className="profile-setting profile-setting--logout" onClick={handleLogout} disabled={loggingOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{loggingOut ? 'Logging out…' : 'Log out'}</strong><span>Switch back to guest mode</span></span></button> : <ProfileLink to="/login" icon={LogIn} title="Sign in or register" subtitle="Use your account" />}
             <div className="profile-setting"><span className="profile-setting__icon"><MessageSquare size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Send feedback</strong><span>Help improve Swipe 2 Study</span></span><span className="profile-soon">Soon</span></div>
             <div className="profile-setting"><span className="profile-setting__icon"><Trash2 size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Delete account</strong><span>Available in a later update</span></span><span className="profile-soon">Soon</span></div>

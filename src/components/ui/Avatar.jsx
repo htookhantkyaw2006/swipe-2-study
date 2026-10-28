@@ -10,12 +10,12 @@ import React from 'react';
    used whenever there is no src, or when that image fails to load.
    --------------------------------------------------------------- */
 export default function Avatar({ src, alt = 'Profile', size = 48, style = {} }) {
-  const [failed, setFailed] = React.useState(false);
+  const [failedSrc, setFailedSrc] = React.useState(null);
   // Unique gradient id so multiple avatars on a page never collide.
   // Both hooks must run before any early return, or hook order changes
   // when a photo fails and this falls back to the silhouette.
   const uid = React.useId();
-  const showPhoto = src && !failed;
+  const showPhoto = src && failedSrc !== src;
 
   const frame = {
     width: size,
@@ -28,7 +28,7 @@ export default function Avatar({ src, alt = 'Profile', size = 48, style = {} }) 
   };
 
   if (showPhoto) {
-    return <img src={src} alt={alt} style={frame} onError={() => setFailed(true)} />;
+    return <img src={src} alt={alt} style={frame} referrerPolicy="no-referrer" onError={() => setFailedSrc(src)} />;
   }
 
   return (

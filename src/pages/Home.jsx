@@ -9,11 +9,13 @@ import LearningIcon from '../components/ui/LearningIcon';
 import { useCourse } from '../lib/language';
 import { useAuth } from '../lib/useAuth.js';
 import { useProfile, displayName } from '../lib/profile.js';
+import { useAvatarUrl } from '../lib/useAvatarUrl.js';
 import { db } from '../lib/db';
 
 export default function Home() {
   const { user, isGuest, loading: authLoading } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
+  const photo = useAvatarUrl(profile?.avatar_path);
   const course = useCourse();
   const [counts, setCounts] = useState({ review: null, saved: null, error: false });
   const hour = new Date().getHours();
@@ -34,7 +36,7 @@ export default function Home() {
     <div className="home-page">
       <header className="home-header">
         <Link to="/profile" className="home-identity" aria-label="Go to profile">
-          <Avatar size={44} alt="Your profile" />
+          <Avatar src={photo.url} size={44} alt="Your profile" />
           <div className="home-greeting"><p>{user ? greeting : 'Welcome'}</p><div className="home-name"><h1>{name}</h1>{isGuest && <span className="guest-badge">Guest</span>}</div></div>
         </Link>
         <LanguageSwitcher />
