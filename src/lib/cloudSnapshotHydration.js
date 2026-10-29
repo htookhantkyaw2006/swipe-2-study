@@ -159,12 +159,10 @@ export function reconcileSnapshotWithLocal({
 
         const tracked = nextRecords[itemKey];
 
-        // Check if item was deleted locally
-        if (tracked?.status === 'deleted' && tracked.deletedAt) {
-          // If deleted locally after or at the cloud updated_at, do NOT resurrect!
-          if (Date.parse(tracked.deletedAt) >= Date.parse(item.updated_at)) {
-            continue; // Keep deleted!
-          }
+        // Check if item was deleted locally (preserve unacknowledged tombstone)
+        if (tracked?.status === 'deleted') {
+          nextRecords[itemKey] = tracked;
+          continue; // Keep absent regardless of device/server clock ordering
         }
 
         const existingLocal = localMap.get(itemKey);
@@ -176,8 +174,13 @@ export function reconcileSnapshotWithLocal({
           const localIsDirty = tracked?.status === 'dirty';
 
           if (localIsDirty || (localTime && Date.parse(localTime) > Date.parse(cloudTime))) {
-            // Newer local learning wins: keep local row
+            // Local learning wins: keep local row and retain dirty status
             mergedRows.push(existingLocal);
+            nextRecords[itemKey] = {
+              status: 'dirty',
+              updatedAt: tracked?.updatedAt || localTime || now(),
+            };
+            continue;
           } else {
             // Cloud version is newer or equal: use cloud data mapped to local shape
             const row = {
@@ -196,6 +199,12 @@ export function reconcileSnapshotWithLocal({
               row[KIND_FIELDS[item.kind]] = item.written_form;
             }
             mergedRows.push(row);
+            nextRecords[itemKey] = {
+              status: 'synced',
+              cloudRevision: item.revision,
+              updatedAt: item.updated_at,
+            };
+            continue;
           }
         } else {
           // Cloud item not in local: add it
@@ -216,26 +225,27 @@ export function reconcileSnapshotWithLocal({
           }
           mergedRows.push(row);
           changesCount++;
+          nextRecords[itemKey] = {
+            status: 'synced',
+            cloudRevision: item.revision,
+            updatedAt: item.updated_at,
+          };
+          continue;
         }
-
-        nextRecords[itemKey] = {
-          status: 'synced',
-          cloudRevision: item.revision,
-          updatedAt: item.updated_at,
-        };
       }
 
       // 2. Process local rows not in cloud snapshot (e.g. offline creations or pre-existing caches)
       for (const [key, row] of localMap.entries()) {
         if (!seenKeys.has(key)) {
+          if (nextRecords[key]?.status === 'deleted') {
+            continue; // Tombstone exists, keep deleted!
+          }
           // Retain local item! Never discard local data!
           mergedRows.push(row);
-          if (!nextRecords[key] || nextRecords[key].status !== 'deleted') {
-            nextRecords[key] = {
-              status: 'dirty',
-              updatedAt: row.updated_at || row.created_at || now(),
-            };
-          }
+          nextRecords[key] = {
+            status: 'dirty',
+            updatedAt: row.updated_at || row.created_at || now(),
+          };
         }
       }
 

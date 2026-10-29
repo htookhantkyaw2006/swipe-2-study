@@ -23,8 +23,28 @@ export class CacheStorageError extends Error {
   }
 }
 
+function rowsEqual(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.hasOwn(b, key)) return false;
+    const valA = a[key];
+    const valB = b[key];
+    if (typeof valA === 'object' && valA !== null && typeof valB === 'object' && valB !== null) {
+      if (JSON.stringify(valA) !== JSON.stringify(valB)) return false;
+    } else if (valA !== valB) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function trackTableChanges(target, ownerId, language, table, prevRaw, nextRaw) {
   if (!ownerId) return;
+  if (prevRaw === nextRaw) return;
   try {
     const prevRows = prevRaw ? JSON.parse(prevRaw) : [];
     const nextRows = nextRaw ? JSON.parse(nextRaw) : [];
@@ -37,12 +57,22 @@ function trackTableChanges(target, ownerId, language, table, prevRaw, nextRaw) {
       return `${language}:${table}:${written}:${reading}`;
     };
 
-    const nextKeys = new Set(nextRows.map(rowKey));
-    const prevKeys = new Set(prevRows.map(rowKey));
-
+    const prevMap = new Map();
     for (const row of prevRows) {
-      const k = rowKey(row);
-      if (!nextKeys.has(k)) {
+      if (row && typeof row === 'object') {
+        prevMap.set(rowKey(row), row);
+      }
+    }
+
+    const nextMap = new Map();
+    for (const row of nextRows) {
+      if (row && typeof row === 'object') {
+        nextMap.set(rowKey(row), row);
+      }
+    }
+
+    for (const [k, row] of prevMap.entries()) {
+      if (!nextMap.has(k)) {
         const isWord = table === 'saved_words' || table === 'review_cards';
         const written = (isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '';
         const reading = (isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '';
@@ -50,12 +80,13 @@ function trackTableChanges(target, ownerId, language, table, prevRaw, nextRaw) {
       }
     }
 
-    for (const row of nextRows) {
-      const k = rowKey(row);
-      if (!prevKeys.has(k)) {
-        const isWord = table === 'saved_words' || table === 'review_cards';
-        const written = (isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '';
-        const reading = (isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '';
+    for (const [k, row] of nextMap.entries()) {
+      const prevRow = prevMap.get(k);
+      const isWord = table === 'saved_words' || table === 'review_cards';
+      const written = (isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '';
+      const reading = (isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '';
+
+      if (!prevRow || !rowsEqual(prevRow, row)) {
         recordLocalDirty(target, ownerId, language, table, written, reading);
       }
     }
