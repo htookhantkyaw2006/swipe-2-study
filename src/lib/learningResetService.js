@@ -25,6 +25,9 @@ export const ALL_LEARNING_KINDS = Object.freeze([
  * Clears local learning tables and document for a verified account.
  * Updates the authoritative learning document with empty tables and the new reset generation,
  * clears pending sync envelopes, and resets the streak cache.
+ *
+ * Repeat-safe: If the document is already at newResetVersion, preserves any post-reset
+ * learning that was created after the confirmed server reset.
  */
 export function performLocalAccountLearningReset(
   accountId,
@@ -35,14 +38,6 @@ export function performLocalAccountLearningReset(
   const storage = storageOwner.getStorage?.() || globalThis.localStorage;
   const scope = storageOwner.scope(accountId);
 
-  const emptyTables = {};
-  for (const lang of CLOUD_LANGUAGES) {
-    for (const kind of ALL_LEARNING_KINDS) {
-      emptyTables[`${lang}_${kind}`] = '[]';
-    }
-  }
-
-  // 1. Commit empty learning tables and new reset version to authoritative document
   let doc;
   try {
     doc = scope.readLearningDocument();
@@ -50,37 +45,49 @@ export function performLocalAccountLearningReset(
     doc = { raw: null, value: null };
   }
 
-  const nextCloudSync = {
-    schemaVersion: 1,
-    ownerId: accountId.toLowerCase(),
-    resetVersion: String(newResetVersion),
-    records: {},
-    lastServerTime: now(),
-    updatedAt: now(),
-  };
+  const currentDocResetVersion = doc.value?.cloudSync?.resetVersion;
+  const alreadyAdvanced = currentDocResetVersion !== undefined && String(currentDocResetVersion) === String(newResetVersion);
 
-  const nextValue = {
-    ...(doc.value || {}),
-    version: 1,
-    revision: (doc.value?.revision || 0) + 1,
-    tables: {
-      ...(doc.value?.tables || {}),
-      ...emptyTables,
-    },
-    cloudSync: nextCloudSync,
-    guestImport: doc.value?.guestImport ?? {
-      fingerprint: '0'.repeat(64),
-      choice: 'account-only',
-      decidedAt: now(),
-      handled: {},
-    },
-  };
+  if (!alreadyAdvanced) {
+    const emptyTables = {};
+    for (const lang of CLOUD_LANGUAGES) {
+      for (const kind of ALL_LEARNING_KINDS) {
+        emptyTables[`${lang}_${kind}`] = '[]';
+      }
+    }
 
-  // Atomically commit document
-  scope.commitLearningDocument(doc.raw, nextValue, {});
+    const nextCloudSync = {
+      schemaVersion: 1,
+      ownerId: accountId.toLowerCase(),
+      resetVersion: String(newResetVersion),
+      records: {},
+      lastServerTime: now(),
+      updatedAt: now(),
+    };
 
-  // 2. Clear legacy sidecars and mirror
-  mirrorSyncStateToSidecar(storage, nextCloudSync);
+    const nextValue = {
+      ...(doc.value || {}),
+      version: 1,
+      revision: (doc.value?.revision || 0) + 1,
+      tables: {
+        ...(doc.value?.tables || {}),
+        ...emptyTables,
+      },
+      cloudSync: nextCloudSync,
+      guestImport: doc.value?.guestImport ?? {
+        fingerprint: '0'.repeat(64),
+        choice: 'account-only',
+        decidedAt: now(),
+        handled: {},
+      },
+    };
+
+    // Atomically commit document
+    scope.commitLearningDocument(doc.raw, nextValue, {});
+    mirrorSyncStateToSidecar(storage, nextCloudSync);
+  }
+
+  // 2. Clear pending sync requests
   clearPendingSyncRequest(storage, accountId);
 
   // 3. Reset streak cache
@@ -94,7 +101,7 @@ export function performLocalAccountLearningReset(
     updatedAt: now(),
   });
 
-  // 4. Clean any individual table keys
+  // 4. Clean any legacy individual table keys
   for (const lang of CLOUD_LANGUAGES) {
     for (const kind of ALL_LEARNING_KINDS) {
       try {
@@ -116,32 +123,23 @@ export function createLearningResetService({
 } = {}) {
   /**
    * Resets guest-owned learning data only on this device.
+   * Reports storage failures honestly.
    */
   function resetGuestLearning() {
     const scope = storageOwner.scope(null);
     const storage = storageOwner.getStorage?.() || globalThis.localStorage;
 
-    for (const lang of CLOUD_LANGUAGES) {
-      for (const kind of ALL_LEARNING_KINDS) {
-        try {
+    try {
+      for (const lang of CLOUD_LANGUAGES) {
+        for (const kind of ALL_LEARNING_KINDS) {
           if (scope.setTable) {
             scope.setTable(lang, kind, '[]');
           } else {
             scope.setItem(`${lang}_${kind}`, '[]');
           }
-        } catch {
-          // fallback direct storage write
-          try {
-            storage.setItem(`s2s_${lang}_${kind}`, '[]');
-          } catch {
-            // ignore
-          }
         }
       }
-    }
 
-    // Reset guest streak cache
-    try {
       writeStreakState(storage, null, {
         currentStreak: 0,
         longestStreak: 0,
@@ -151,8 +149,11 @@ export function createLearningResetService({
         isGuest: true,
         updatedAt: now(),
       });
-    } catch {
-      // non-fatal
+    } catch (err) {
+      return {
+        status: 'failed',
+        error: `Storage failure during guest reset: ${err?.message || 'Write failed'}`,
+      };
     }
 
     return { status: 'success', scope: 'guest' };
@@ -160,7 +161,7 @@ export function createLearningResetService({
 
   /**
    * Performs atomic cloud learning reset for a verified account.
-   * Employs a durable request ID for replay safety across network failures.
+   * Employs an immutable durable request envelope for replay safety across network failures.
    */
   async function resetAccountLearning({
     accountId,
@@ -191,20 +192,42 @@ export function createLearningResetService({
 
     const storage = storageOwner.getStorage?.() || globalThis.localStorage;
 
-    // Check for existing pending reset request to retry using the exact same identity
-    const { state: existingPending } = readPendingLearningReset(storage, accountId);
+    // Check for existing pending reset request; fail closed on corrupt envelope
+    const { state: existingPending, error: pendingReadError, corrupt } = readPendingLearningReset(storage, accountId);
+    if (corrupt || pendingReadError) {
+      return {
+        status: 'failed',
+        error: `Recovery error reading pending reset request: ${pendingReadError || 'Corrupt pending reset envelope'}`,
+        corrupt: true,
+      };
+    }
+
     let pending = existingPending;
 
-    if (!pending || pending.status === 'failed') {
+    if (!pending) {
       const { state: syncState } = readSyncState(storage, accountId);
       const expectedResetVersion = String(syncState?.resetVersion ?? '0');
 
       pending = {
         ownerId: accountId,
-        requestId: existingPending?.requestId || globalThis.crypto.randomUUID(),
+        requestId: globalThis.crypto.randomUUID(),
         expectedResetVersion,
         status: 'pending',
-        createdAt: existingPending?.createdAt || now(),
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      const persisted = writePendingLearningReset(storage, accountId, pending);
+      if (!persisted) {
+        return {
+          status: 'failed',
+          error: 'Failed to persist durable reset envelope before network dispatch.',
+        };
+      }
+    } else if (pending.status === 'failed') {
+      // Uncertain retry: preserve exact original requestId and expectedResetVersion
+      pending = {
+        ...pending,
+        status: 'pending',
         updatedAt: now(),
       };
       writePendingLearningReset(storage, accountId, pending);
@@ -237,8 +260,21 @@ export function createLearningResetService({
       return { status: 'account_changed' };
     }
 
-    if (rpcError || !resData || resData.status !== 'reset') {
-      const msg = rpcError?.message || 'Server learning reset did not confirm completion.';
+    // Strictly validate server confirmation response shape and bindings
+    const isResponseValid = (
+      !rpcError &&
+      resData &&
+      typeof resData === 'object' &&
+      resData.status === 'reset' &&
+      resData.user_id?.toLowerCase() === accountId.toLowerCase() &&
+      resData.request_id === pending.requestId &&
+      String(resData.previous_reset_version) === String(pending.expectedResetVersion) &&
+      resData.items_reset === true &&
+      typeof resData.reset_version === 'string'
+    );
+
+    if (!isResponseValid) {
+      const msg = rpcError?.message || 'Server learning reset did not confirm valid completion.';
       writePendingLearningReset(storage, accountId, {
         ...pending,
         status: 'failed',
@@ -252,12 +288,20 @@ export function createLearningResetService({
     }
 
     // Server confirmed: record server confirmation before attempting local cleanup
-    writePendingLearningReset(storage, accountId, {
+    const confirmationPersisted = writePendingLearningReset(storage, accountId, {
       ...pending,
       status: 'server_confirmed',
       serverResult: resData,
       updatedAt: now(),
     });
+
+    if (!confirmationPersisted) {
+      return {
+        status: 'local_cleanup_failed',
+        serverResult: resData,
+        error: 'Server reset confirmed, but confirmation state could not be persisted locally.',
+      };
+    }
 
     // Execute local device cleanup
     let cleanupSucceeded = false;
@@ -301,9 +345,9 @@ export function createLearningResetService({
     }
 
     const storage = storageOwner.getStorage?.() || globalThis.localStorage;
-    const { state: pending } = readPendingLearningReset(storage, accountId);
+    const { state: pending, error: readError } = readPendingLearningReset(storage, accountId);
 
-    if (!pending || pending.status !== 'server_confirmed' || !pending.serverResult) {
+    if (readError || !pending || pending.status !== 'server_confirmed' || !pending.serverResult) {
       return {
         status: 'failed',
         error: 'No confirmed server reset pending local cleanup.',

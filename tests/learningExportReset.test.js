@@ -3,9 +3,15 @@ import assert from 'node:assert/strict';
 
 import { createStorageOwner } from '../src/lib/storageOwner.js';
 import { isLearningExportResetEnabled } from '../src/lib/learningExportResetGate.js';
-import { createLearningExportService } from '../src/lib/learningExportService.js';
+import { createLearningExportService, collectLocalLearning } from '../src/lib/learningExportService.js';
 import { createLearningResetService } from '../src/lib/learningResetService.js';
-import { readPendingLearningReset } from '../src/lib/learningResetStorage.js';
+import {
+  readPendingLearningReset,
+  writePendingLearningReset,
+  getPendingLearningResetKey,
+} from '../src/lib/learningResetStorage.js';
+import { getPendingPreferencesKey } from '../src/lib/preferencesSyncStorage.js';
+import { createOnlineSyncService } from '../src/lib/onlineSyncService.js';
 import { writePendingSyncRequest, readPendingSyncRequest } from '../src/lib/onlineSyncRequest.js';
 
 const OWNER_A = '11111111-1111-4111-8111-111111111111';
@@ -65,6 +71,7 @@ function createMockSupabaseClient({
       user_id: OWNER_A,
       request_id: p_request_id,
       reset_version: String(BigInt(p_expected_reset_version) + 1n),
+      previous_reset_version: String(p_expected_reset_version),
       items_reset: true,
       replayed: false,
     },
@@ -400,6 +407,7 @@ test('Network Uncertainty & Replay-Safe Identical Retry: reuses durable request 
           user_id: OWNER_A,
           request_id: params.p_request_id,
           reset_version: '1',
+          previous_reset_version: '0',
           items_reset: true,
           replayed: true,
         },
@@ -508,6 +516,7 @@ test('Local Cleanup Failure Recovery: offers local recovery without starting ano
           user_id: OWNER_A,
           request_id: params.p_request_id,
           reset_version: '1',
+          previous_reset_version: '0',
           items_reset: true,
           replayed: false,
         },
@@ -580,6 +589,7 @@ test('Account Switch Protection: in-flight reset for Account A aborts when accou
           user_id: OWNER_A,
           request_id: params.p_request_id,
           reset_version: '1',
+          previous_reset_version: '0',
           items_reset: true,
         },
         error: null,
@@ -614,4 +624,237 @@ test('Account Switch Protection: in-flight reset for Account A aborts when accou
 
   // Account B data was not touched
   assert.equal(JSON.parse(bScope.getItem('zh_saved_words'))[0].phrase, '用户B的重要数据');
+});
+
+
+// ---------------------------------------------------------------------------
+// 11. Data Integrity Regressions (Checkpoint 2)
+// ---------------------------------------------------------------------------
+test('Regression: collectLocalLearning must throw on corrupted JSON data rather than returning empty arrays', () => {
+  const storage = createMemoryStorage({
+    s2s_zh_saved_words: '{"invalid-json":',
+  });
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  const scope = storageOwner.scope(null);
+
+  assert.throws(
+    () => collectLocalLearning(scope),
+    /corrupt|invalid|error/i,
+    'Corrupt learning table data must throw actionable error'
+  );
+});
+
+test('Regression: exportAccountLearningData must throw when pending metadata readers fail', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  storage.setItem(getPendingPreferencesKey(OWNER_A), '{invalid-json');
+
+  const mockClient = createMockSupabaseClient();
+  const service = createLearningExportService({
+    storageOwner,
+    getClient: () => mockClient,
+  });
+
+  await assert.rejects(
+    () => service.exportAccountLearningData({ accountId: OWNER_A, isCurrent: () => true }),
+    /export failed|pending|corrupt/i,
+    'Corrupt pending metadata must fail export closed'
+  );
+});
+
+test('Regression: resetGuestLearning must report failure when storage write fails', () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+
+  storage.setThrowPattern(() => true);
+
+  const service = createLearningResetService({ storageOwner });
+  const res = service.resetGuestLearning();
+
+  assert.equal(res.status, 'failed', 'Guest reset must not return success on write failure');
+  assert.match(res.error, /storage|failed/i);
+});
+
+test('Regression: resetAccountLearning must strictly validate response binding (user_id, request_id, items_reset)', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  const mockClient = createMockSupabaseClient({
+    resetHandler: async () => ({
+      data: {
+        status: 'reset',
+        user_id: '99999999-9999-4999-8999-999999999999',
+        request_id: 'bad-request-id',
+        items_reset: false,
+      },
+      error: null,
+    }),
+  });
+
+  const service = createLearningResetService({
+    storageOwner,
+    getClient: () => mockClient,
+  });
+
+  const res = await service.resetAccountLearning({
+    accountId: OWNER_A,
+    isCurrent: () => true,
+  });
+
+  assert.equal(res.status, 'failed', 'Invalid response binding must be rejected');
+  assert.match(res.error, /invalid|mismatch|failed|confirm/i);
+});
+
+test('Regression: corrupt pending reset envelope must fail closed without network dispatch or replacement', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  const key = getPendingLearningResetKey(OWNER_A);
+  storage.setItem(key, '{"ownerId":"' + OWNER_A + '", invalid');
+
+  let rpcCalled = false;
+  const mockClient = {
+    rpc: async () => {
+      rpcCalled = true;
+      return { data: {}, error: null };
+    },
+  };
+
+  const service = createLearningResetService({
+    storageOwner,
+    getClient: () => mockClient,
+  });
+
+  const res = await service.resetAccountLearning({
+    accountId: OWNER_A,
+    isCurrent: () => true,
+  });
+
+  assert.equal(res.status, 'failed');
+  assert.equal(rpcCalled, false, 'Corrupt pending reset must not dispatch network request');
+});
+
+test('Regression: pre-reset sync ACK must NOT overwrite post-reset document generation or clear newer envelopes', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+  const scope = storageOwner.scope(OWNER_A);
+
+  const initialDoc = {
+    version: 1,
+    revision: 1,
+    tables: { zh_saved_words: JSON.stringify([{ id: 'zh:saved_words:你好:nǐ hǎo' }]) },
+    cloudSync: {
+      schemaVersion: 1,
+      ownerId: OWNER_A,
+      resetVersion: '0',
+      records: {
+        'zh:saved_words:你好:nǐ hǎo': { status: 'dirty', localMutationId: 1 },
+      },
+    },
+    guestImport: { fingerprint: '0'.repeat(64), choice: 'account-only', decidedAt: '2026-01-01', handled: {} },
+  };
+  scope.commitLearningDocument(null, initialDoc, {});
+
+  let resolveSync;
+  const deferredSync = new Promise((resolve) => { resolveSync = resolve; });
+
+  const mockClient = {
+    rpc: async (fn, params) => {
+      if (fn === 's2s_apply_mutations') {
+        await deferredSync;
+        return {
+          data: {
+            status: 'committed',
+            user_id: OWNER_A,
+            request_id: params.p_request_id,
+            reset_version: '0',
+            acknowledged: [
+              { client_id: 'zh:saved_words:你好:nǐ hǎo', server_revision: '1' },
+            ],
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    },
+  };
+
+  const syncService = createOnlineSyncService({
+    storageOwner,
+    getClient: () => mockClient,
+  });
+
+  const syncPromise = syncService.performSync({
+    accountId: OWNER_A,
+    isCurrent: () => true,
+  });
+
+  const resetDoc = {
+    version: 1,
+    revision: 2,
+    tables: { zh_saved_words: '[]' },
+    cloudSync: {
+      schemaVersion: 1,
+      ownerId: OWNER_A,
+      resetVersion: '1',
+      records: {},
+    },
+    guestImport: { fingerprint: '0'.repeat(64), choice: 'account-only', decidedAt: '2026-01-01', handled: {} },
+  };
+  scope.commitLearningDocument(scope.readLearningDocument().raw, resetDoc, {});
+
+  resolveSync();
+  await syncPromise;
+
+  const finalDoc = scope.readLearningDocument().value;
+  assert.equal(finalDoc.cloudSync.resetVersion, '1', 'Pre-reset ACK must NOT rewrite resetVersion to 0');
+  assert.equal(finalDoc.tables.zh_saved_words, '[]', 'Post-reset tables must NOT be contaminated');
+});
+
+test('Regression: repeat-safe local cleanup recovery must NOT wipe post-reset learning created after confirmed reset', () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+  const scope = storageOwner.scope(OWNER_A);
+
+  const postResetDoc = {
+    version: 1,
+    revision: 5,
+    tables: { zh_saved_words: JSON.stringify([{ id: 'zh:saved_words:新词:xīn cí' }]) },
+    cloudSync: {
+      schemaVersion: 1,
+      ownerId: OWNER_A,
+      resetVersion: '1',
+      records: {},
+    },
+    guestImport: { fingerprint: '0'.repeat(64), choice: 'account-only', decidedAt: '2026-01-01', handled: {} },
+  };
+  scope.commitLearningDocument(null, postResetDoc, {});
+
+  writePendingLearningReset(storage, OWNER_A, {
+    ownerId: OWNER_A,
+    requestId: '11111111-2222-3333-4444-555555555555',
+    expectedResetVersion: '0',
+    status: 'server_confirmed',
+    serverResult: {
+      status: 'reset',
+      reset_version: '1',
+      previous_reset_version: '0',
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  const service = createLearningResetService({ storageOwner });
+  const res = service.retryLocalAccountCleanup({ accountId: OWNER_A, isCurrent: () => true });
+
+  assert.equal(res.status, 'success');
+  const finalDoc = scope.readLearningDocument().value;
+  assert.equal(finalDoc.cloudSync.resetVersion, '1');
+  assert.notEqual(finalDoc.tables.zh_saved_words, '[]', 'Post-reset word must NOT be wiped by repeat cleanup');
 });

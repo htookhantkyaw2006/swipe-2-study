@@ -361,6 +361,15 @@ export function createOnlineSyncService({
         records: {},
       };
 
+      // Validate that document generation has not changed while this sync request was in flight
+      if (String(currentSyncState.resetVersion ?? '0') !== String(envelope.resetVersion ?? '0')) {
+        return {
+          status: 'reset_reloaded',
+          pendingCount: 0,
+          lastSyncedAt: now(),
+        };
+      }
+
       const nextRecords = { ...(currentSyncState.records || {}) };
 
       for (const ack of data.acknowledged) {

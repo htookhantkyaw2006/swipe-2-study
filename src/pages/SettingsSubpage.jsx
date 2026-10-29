@@ -105,16 +105,24 @@ export default function SettingsSubpage() {
   const exportData = async () => {
     if (exporting) return;
     setExporting(true);
+    const initiatingUserId = user?.id ?? null;
     try {
-      const isAccountCloud = Boolean(user?.id && isLearningExportResetEnabled());
       let payload;
-      if (isAccountCloud) {
+      if (initiatingUserId) {
+        if (!isLearningExportResetEnabled()) {
+          flash('Account learning export is currently disabled.');
+          return;
+        }
         payload = await learningExportService.exportAccountLearningData({
-          accountId: user.id,
+          accountId: initiatingUserId,
           isCurrent,
         });
       } else {
         payload = learningExportService.exportGuestLearningData();
+      }
+
+      if ((user?.id ?? null) !== initiatingUserId || !isCurrent()) {
+        return;
       }
 
       const scope = payload.scope || 'data';
@@ -130,6 +138,7 @@ export default function SettingsSubpage() {
       URL.revokeObjectURL(url);
       flash('Export completed.');
     } catch (err) {
+      if ((user?.id ?? null) !== initiatingUserId || !isCurrent()) return;
       flash(err?.message || 'Export failed. Please try again.');
     } finally {
       setExporting(false);
@@ -146,30 +155,48 @@ export default function SettingsSubpage() {
     if (resetPending || resetLocalCleanupError) return;
     setResetPending(true);
     setResetError(null);
+    const initiatingUserId = user?.id ?? null;
 
     try {
-      const isAccountCloud = Boolean(user?.id && isLearningExportResetEnabled());
       let res;
-      if (isAccountCloud) {
+      if (initiatingUserId) {
+        if (!isLearningExportResetEnabled()) {
+          setResetError('Account learning reset is currently disabled.');
+          return;
+        }
         res = await learningResetService.resetAccountLearning({
-          accountId: user.id,
+          accountId: initiatingUserId,
           isCurrent,
         });
       } else {
         res = learningResetService.resetGuestLearning();
       }
 
+      if ((user?.id ?? null) !== initiatingUserId || !isCurrent()) {
+        setResetDialogOpen(false);
+        flash('Account changed. Please reopen Settings.');
+        return;
+      }
+
       if (res.status === 'local_cleanup_failed') {
         setResetLocalCleanupError(true);
         setResetError(res.error || 'Your data was reset on the server, but local cached data could not be completely cleared.');
+      } else if (res.status === 'account_changed') {
+        setResetDialogOpen(false);
+        flash('Account changed. Please reopen Settings.');
       } else if (res.status === 'failed') {
         setResetError(res.error || 'Learning reset failed. Please try again.');
-      } else {
+      } else if (res.status === 'success') {
         setResetDialogOpen(false);
         refreshUsage();
         flash('Learning data has been reset.');
       }
     } catch (err) {
+      if ((user?.id ?? null) !== initiatingUserId || !isCurrent()) {
+        setResetDialogOpen(false);
+        flash('Account changed. Please reopen Settings.');
+        return;
+      }
       setResetError(err?.message || 'Learning reset failed. Please try again.');
     } finally {
       setResetPending(false);
@@ -180,22 +207,37 @@ export default function SettingsSubpage() {
     if (resetPending || !resetLocalCleanupError || !user?.id) return;
     setResetPending(true);
     setResetError(null);
+    const initiatingUserId = user.id;
 
     try {
       const res = learningResetService.retryLocalAccountCleanup({
-        accountId: user.id,
+        accountId: initiatingUserId,
         isCurrent,
       });
+
+      if ((user?.id ?? null) !== initiatingUserId || !isCurrent()) {
+        setResetDialogOpen(false);
+        flash('Account changed. Please reopen Settings.');
+        return;
+      }
 
       if (res.status === 'success') {
         setResetLocalCleanupError(false);
         setResetDialogOpen(false);
         refreshUsage();
         flash('Local learning data has been cleared.');
+      } else if (res.status === 'account_changed') {
+        setResetDialogOpen(false);
+        flash('Account changed. Please reopen Settings.');
       } else {
         setResetError(res.error || 'Could not clear device storage. Please try again.');
       }
     } catch (err) {
+      if ((user?.id ?? null) !== initiatingUserId || !isCurrent()) {
+        setResetDialogOpen(false);
+        flash('Account changed. Please reopen Settings.');
+        return;
+      }
       setResetError(err?.message || 'Could not clear device storage. Please try again.');
     } finally {
       setResetPending(false);

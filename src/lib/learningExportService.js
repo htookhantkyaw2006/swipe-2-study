@@ -19,32 +19,35 @@ export const EXPORT_TABLES = Object.freeze([
 
 /**
  * Parses table rows safely from string or array.
+ * Missing keys legitimately mean empty data ([]).
+ * Corrupted or unparseable JSON throws an actionable error rather than silently omitting data.
  */
-function safeParseRows(raw) {
-  if (!raw) return [];
+function parseTableRows(raw, tableName) {
+  if (raw === null || raw === undefined || raw === '') return [];
   if (Array.isArray(raw)) return raw;
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Expected array for table ${tableName || 'unknown'}, got ${typeof parsed}`);
+    }
+    return parsed;
+  } catch (err) {
+    throw new Error(`Export failed: Corrupted learning table data in ${tableName || 'unknown'}: ${err.message}`);
   }
 }
 
 /**
  * Collects local learning tables across all supported languages for a given scope.
+ * Fails closed on corrupted data.
  */
 export function collectLocalLearning(scope) {
   const learning = {};
   for (const lang of CLOUD_LANGUAGES) {
     learning[lang] = {};
     for (const kind of EXPORT_TABLES) {
-      try {
-        const raw = scope.getTable ? scope.getTable(lang, kind) : scope.getItem(`${lang}_${kind}`);
-        learning[lang][kind] = safeParseRows(raw);
-      } catch {
-        learning[lang][kind] = [];
-      }
+      const tableName = `${lang}_${kind}`;
+      const raw = scope.getTable ? scope.getTable(lang, kind) : scope.getItem(tableName);
+      learning[lang][kind] = parseTableRows(raw, tableName);
     }
   }
   return learning;
@@ -138,10 +141,24 @@ export function createLearningExportService({
     const storage = storageOwner.getStorage?.() || globalThis.localStorage;
     const scope = storageOwner.scope(accountId);
 
-    // Inspect pending device changes
-    const { state: syncState } = readSyncState(storage, accountId);
-    const pendingRequest = readPendingSyncRequest(storage, accountId).request;
-    const pendingPreferences = readPendingPreferences(storage, accountId).state;
+    // Inspect pending device changes; fail closed if metadata readers fail
+    const syncStateRes = readSyncState(storage, accountId);
+    if (syncStateRes.error) {
+      throw new Error(`Export failed: Corrupted sync state metadata: ${syncStateRes.error}`);
+    }
+    const syncState = syncStateRes.state;
+
+    const pendingRequestRes = readPendingSyncRequest(storage, accountId);
+    if (pendingRequestRes.error) {
+      throw new Error(`Export failed: Corrupted pending sync request metadata: ${pendingRequestRes.error}`);
+    }
+    const pendingRequest = pendingRequestRes.request;
+
+    const pendingPrefRes = readPendingPreferences(storage, accountId);
+    if (pendingPrefRes.error) {
+      throw new Error(`Export failed: Corrupted pending preferences metadata: ${pendingPrefRes.error}`);
+    }
+    const pendingPreferences = pendingPrefRes.state;
 
     const dirtyRecords = [];
     const pendingDeletions = [];
@@ -209,4 +226,3 @@ export function createLearningExportService({
 }
 
 export const learningExportService = createLearningExportService();
-
