@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   Target, Languages, Shuffle, Layers, Volume2, Gauge, Mic,
   Type, Bell, Flame, Trash2, Download, RotateCcw, HardDrive,
@@ -11,13 +11,17 @@ import {
 import { LanguageSheet } from '../components/ui/LanguageSwitcher';
 import { usePreferences, OPTIONS } from '../lib/preferences';
 import { useLanguage, useCourse } from '../lib/language';
-import { COURSES } from '../courses';
 import { db } from '../lib/db';
 import { storageOwner } from '../lib/storageOwner.js';
 import { useOnlineSync } from '../lib/useOnlineSync.js';
 import { StudyHeader } from '../components/study/StudyPage';
 import './SettingsSubpage.css';
 import LanguageFlag from '../components/ui/LanguageFlag';
+import { AuthContext } from '../lib/authContext.js';
+import { isLearningExportResetEnabled } from '../lib/learningExportResetGate.js';
+import { learningExportService } from '../lib/learningExportService.js';
+import { learningResetService } from '../lib/learningResetService.js';
+import ResetLearningDialog from '../components/ResetLearningDialog.jsx';
 
 const GRADIENTS = {
   blue: 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)',
@@ -39,10 +43,6 @@ const DATA_TABLES = [
   { table: 'saved_words', label: 'saved words' }
 ];
 
-/* Everything "Reset everything" wipes, in every language. Includes the
-   drill progress tables, which the reset used to leave behind. */
-const RESET_TABLES = [...DATA_TABLES.map((d) => d.table), 'learned_radicals', 'learned_kana', 'learned_sounds'];
-
 /** Approximate UTF-16 size of the current owner's learning/settings cache. */
 const storageUsed = () => {
   try {
@@ -62,7 +62,6 @@ export default function SettingsSubpage() {
   const {
     prefs,
     setPref,
-    resetPrefs,
     syncStatus: prefSyncStatus,
     syncError: prefSyncError,
     retrySync: prefSyncRetry,
@@ -71,9 +70,18 @@ export default function SettingsSubpage() {
   const { language } = useLanguage();
   const course = useCourse();
 
+  const auth = useContext(AuthContext);
+  const user = auth?.user ?? null;
+  const isCurrent = auth?.isCurrent ?? (() => true);
+
   const [sheet, setSheet] = useState(null); // preference key, or 'language'
   const [notice, setNotice] = useState('');
   const [usage, setUsage] = useState(storageUsed);
+  const [exporting, setExporting] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetPending, setResetPending] = useState(false);
+  const [resetError, setResetError] = useState(null);
+  const [resetLocalCleanupError, setResetLocalCleanupError] = useState(false);
 
   const flash = (message) => {
     setNotice(message);
@@ -94,35 +102,104 @@ export default function SettingsSubpage() {
     flash(`Cleared ${label}.`);
   };
 
-  const exportData = () => {
-    // Every language, not just the one on screen — it is "my data".
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      preferences: prefs,
-      activeLanguage: language.id,
-      data: Object.keys(COURSES).reduce((acc, lang) => ({
-        ...acc,
-        [lang]: RESET_TABLES.reduce((tables, table) => ({ ...tables, [table]: db.getFor(lang, table) }), {})
-      }), {})
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `swipe2study-data-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    flash('Export started.');
+  const exportData = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const isAccountCloud = Boolean(user?.id && isLearningExportResetEnabled());
+      let payload;
+      if (isAccountCloud) {
+        payload = await learningExportService.exportAccountLearningData({
+          accountId: user.id,
+          isCurrent,
+        });
+      } else {
+        payload = learningExportService.exportGuestLearningData();
+      }
+
+      const scope = payload.scope || 'data';
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `swipe2study-${scope}-${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      flash('Export completed.');
+    } catch (err) {
+      flash(err?.message || 'Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const resetEverything = () => {
-    if (!window.confirm('Reset everything? All progress, saved words, history and settings will be erased in every language. This cannot be undone.')) return;
-    Object.keys(COURSES).forEach((lang) => RESET_TABLES.forEach((table) => db.setFor(lang, table, [])));
-    resetPrefs();
-    refreshUsage();
-    flash('Everything has been reset.');
+  const openResetDialog = () => {
+    setResetError(null);
+    setResetLocalCleanupError(false);
+    setResetDialogOpen(true);
+  };
+
+  const handleConfirmReset = async () => {
+    if (resetPending || resetLocalCleanupError) return;
+    setResetPending(true);
+    setResetError(null);
+
+    try {
+      const isAccountCloud = Boolean(user?.id && isLearningExportResetEnabled());
+      let res;
+      if (isAccountCloud) {
+        res = await learningResetService.resetAccountLearning({
+          accountId: user.id,
+          isCurrent,
+        });
+      } else {
+        res = learningResetService.resetGuestLearning();
+      }
+
+      if (res.status === 'local_cleanup_failed') {
+        setResetLocalCleanupError(true);
+        setResetError(res.error || 'Your data was reset on the server, but local cached data could not be completely cleared.');
+      } else if (res.status === 'failed') {
+        setResetError(res.error || 'Learning reset failed. Please try again.');
+      } else {
+        setResetDialogOpen(false);
+        refreshUsage();
+        flash('Learning data has been reset.');
+      }
+    } catch (err) {
+      setResetError(err?.message || 'Learning reset failed. Please try again.');
+    } finally {
+      setResetPending(false);
+    }
+  };
+
+  const handleRetryLocalCleanup = () => {
+    if (resetPending || !resetLocalCleanupError || !user?.id) return;
+    setResetPending(true);
+    setResetError(null);
+
+    try {
+      const res = learningResetService.retryLocalAccountCleanup({
+        accountId: user.id,
+        isCurrent,
+      });
+
+      if (res.status === 'success') {
+        setResetLocalCleanupError(false);
+        setResetDialogOpen(false);
+        refreshUsage();
+        flash('Local learning data has been cleared.');
+      } else {
+        setResetError(res.error || 'Could not clear device storage. Please try again.');
+      }
+    } catch (err) {
+      setResetError(err?.message || 'Could not clear device storage. Please try again.');
+    } finally {
+      setResetPending(false);
+    }
   };
 
   const optionLabel = (key) =>
@@ -332,14 +409,14 @@ export default function SettingsSubpage() {
         <SettingsRow
           icon={Download} iconGradient={GRADIENTS.green}
           title="Export my data"
-          subtitle="Every language, as JSON"
+          subtitle={exporting ? 'Preparing export JSON…' : 'Every language, as JSON'}
           onClick={exportData}
         />
         <SettingsRow
           icon={RotateCcw} iconGradient={GRADIENTS.red}
-          title="Reset everything"
-          subtitle="Erase all progress and settings, every language"
-          onClick={resetEverything}
+          title="Reset learning data"
+          subtitle="Erase all learning progress, every language"
+          onClick={openResetDialog}
           danger
           isLast
         />
@@ -381,6 +458,24 @@ export default function SettingsSubpage() {
           onClose={() => setSheet(null)}
         />
       )}
+
+      <ResetLearningDialog
+        open={resetDialogOpen}
+        pending={resetPending}
+        error={resetError}
+        localCleanupError={resetLocalCleanupError}
+        isGuest={!user}
+        accountLabel={user?.email || ''}
+        onConfirm={handleConfirmReset}
+        onRetryCleanup={handleRetryLocalCleanup}
+        onClose={() => {
+          if (!resetPending) {
+            setResetDialogOpen(false);
+            setResetError(null);
+            setResetLocalCleanupError(false);
+          }
+        }}
+      />
     </div>
   );
 }

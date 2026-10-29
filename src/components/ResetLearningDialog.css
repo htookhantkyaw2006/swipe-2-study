@@ -1,0 +1,185 @@
+/* ==========================================================================
+   Reset Learning Dialog Styles
+   Scoped classes strictly beginning with .reset-learning-dialog
+   ========================================================================== */
+
+.reset-learning-dialog {
+  /* Inherits modal container styles from .app-dialog */
+}
+
+.reset-learning-dialog__container {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.reset-learning-dialog__title {
+  font-size: 1.25rem;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--color-text-navy);
+  margin: 0 0 12px 0;
+  overflow-wrap: anywhere;
+}
+
+.reset-learning-dialog__account {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--color-primary-blue);
+  background-color: var(--color-ghost-blue);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 8px 12px;
+  margin: 0 0 14px 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.reset-learning-dialog__warning {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: #B91C1C;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: var(--radius-btn);
+  padding: 10px 14px;
+  margin: 0 0 14px 0;
+  overflow-wrap: anywhere;
+}
+
+.reset-learning-dialog__scope {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.reset-learning-dialog__section {
+  background-color: var(--color-page-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 10px 14px;
+}
+
+.reset-learning-dialog__section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #DC2626;
+  margin: 0 0 6px 0;
+}
+
+.reset-learning-dialog__section-title--preserved {
+  color: #16A34A;
+}
+
+.reset-learning-dialog__list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text-navy);
+}
+
+.reset-learning-dialog__list li {
+  margin-bottom: 4px;
+}
+
+.reset-learning-dialog__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: var(--radius-btn);
+  color: #B91C1C;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  margin: 0 0 16px 0;
+}
+
+.reset-learning-dialog__error p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.reset-learning-dialog__recovery {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: var(--radius-btn);
+  padding: 12px 14px;
+  margin: 0 0 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reset-learning-dialog__recovery-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #B91C1C;
+  margin: 0;
+}
+
+.reset-learning-dialog__recovery-desc {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.reset-learning-dialog__recovery-btn {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.reset-learning-dialog__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.reset-learning-dialog__btn {
+  padding: 10px 18px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.btn-danger {
+  background-color: #DC2626;
+  color: #ffffff;
+  border: 1px solid #B91C1C;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #B91C1C;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
