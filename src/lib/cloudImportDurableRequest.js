@@ -167,11 +167,11 @@ export async function executeDurableImport(client, storage, {
 
   // Check if there is an existing durable record for this user
   const existingResult = readDurableRecord(storage, ownerId);
-  if (existingResult.error && existingResult.code === 'CORRUPTED_STORAGE') {
+  if (existingResult.error) {
     return {
       outcome: 'storage_error',
       error: existingResult.error,
-      code: 'CORRUPTED_STORAGE',
+      code: existingResult.code || 'STORAGE_UNAVAILABLE',
       record: null,
     };
   }
@@ -194,6 +194,26 @@ export async function executeDurableImport(client, storage, {
         outcome: 'reset_version_mismatch',
         error: record.error,
         code: 'RESET_VERSION_CHANGED',
+        record,
+      };
+    }
+
+    // Reject choice mismatch on unresolved request
+    if (choice && record.choice !== choice) {
+      return {
+        outcome: 'choice_mismatch',
+        error: 'Cannot change choice on an unresolved request.',
+        code: 'CHOICE_MISMATCH',
+        record,
+      };
+    }
+
+    // Reject fingerprint mismatch on unresolved request
+    if (sourceFingerprint && record.sourceFingerprint !== sourceFingerprint) {
+      return {
+        outcome: 'fingerprint_mismatch',
+        error: 'Source fingerprint does not match unresolved request.',
+        code: 'FINGERPRINT_MISMATCH',
         record,
       };
     }

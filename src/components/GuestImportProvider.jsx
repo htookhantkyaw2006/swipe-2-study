@@ -37,6 +37,7 @@ export default function GuestImportProvider({ children, service = guestImportSer
     {children}
     <GuestImportDialog open={allowed && aligned && state.open} summary={state.offer?.summary ?? []}
       pending={state.pending} error={state.error} onChoose={controller.choose}
-      onClose={controller.close} onReload={() => controller.inspect()} />
+      onClose={controller.close} onReload={() => controller.inspect()}
+      isRetry={Boolean(state.offer?.isRetry)} retryChoice={state.offer?.retryChoice ?? null} />
   </GuestImportContext.Provider>;
 }

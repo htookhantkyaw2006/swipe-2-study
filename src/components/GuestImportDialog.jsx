@@ -18,6 +18,9 @@ import './GuestImportDialog.css';
  * - error: string | null (accessible error banner for retries)
  * - onChoose: (choice: 'merge' | 'account-only') => void
  * - onClose: () => void (dismissal or "Decide later" - never implies a choice)
+ * - onReload: () => void
+ * - isRetry: boolean (true when retrying an unresolved durable request)
+ * - retryChoice: 'merge' | 'account-only' | null (the immutable choice of the unresolved request)
  */
 export default function GuestImportDialog({
   open = false,
@@ -27,6 +30,8 @@ export default function GuestImportDialog({
   onChoose,
   onClose,
   onReload,
+  isRetry = false,
+  retryChoice = null,
 }) {
   if (!open) {
     return null;
@@ -39,14 +44,16 @@ export default function GuestImportDialog({
 
   const handleChoose = (choice) => {
     if (pending) return;
+    if (isRetry && retryChoice && choice !== retryChoice) return;
     if (onChoose) onChoose(choice);
   };
 
   const records = Array.isArray(summary) ? summary : [];
+  const dialogLabel = isRetry ? 'Resume guest learning import' : 'Bring your guest learning with you';
 
   return (
     <AppDialog
-      label="Bring your guest learning with you"
+      label={dialogLabel}
       onClose={handleClose}
       className="guest-import-dialog"
     >
@@ -56,7 +63,7 @@ export default function GuestImportDialog({
             <Sparkles size={20} />
           </div>
           <div className="guest-import-dialog__header-text">
-            <h2 className="guest-import-dialog__title">Bring your guest learning with you</h2>
+            <h2 className="guest-import-dialog__title">{dialogLabel}</h2>
           </div>
           <button
             type="button"
@@ -70,7 +77,11 @@ export default function GuestImportDialog({
         </div>
 
         <p className="guest-import-dialog__intro">
-          We found guest study records on this device. Add them to this account’s data here, or keep the account’s current data separate?
+          {isRetry
+            ? (retryChoice === 'merge'
+              ? 'A previous request to merge guest study records was interrupted. You can retry merging your data now or decide later.'
+              : 'A previous request to keep guest records separate was interrupted. You can retry confirming this decision now or decide later.')
+            : 'We found guest study records on this device. Add them to this account’s data here, or keep the account’s current data separate?'}
         </p>
         <p className="guest-import-dialog__device-note">Learning data stays on this device. Cloud sync is not available yet. Your original guest records will be kept.</p>
 
@@ -116,7 +127,9 @@ export default function GuestImportDialog({
             ))
           ) : (
             <div className="guest-import-dialog__summary-empty">
-              No guest study records found on this device.
+              {isRetry && retryChoice === 'account-only'
+                ? 'No records to merge (keeping account data separate).'
+                : 'No guest study records found on this device.'}
             </div>
           )}
         </div>
@@ -126,13 +139,15 @@ export default function GuestImportDialog({
             <button
               type="button"
               className="btn-primary guest-import-dialog__btn guest-import-dialog__btn--merge"
-              disabled={pending}
+              disabled={pending || (isRetry && retryChoice === 'account-only')}
               onClick={() => handleChoose('merge')}
             >
-              Merge guest data
+              {isRetry && retryChoice === 'merge' ? 'Retry merging guest data' : 'Merge guest data'}
             </button>
             <p className="guest-import-dialog__action-hint">
-              Combine guest words and progress with this account’s data on this device. Existing account records take priority.
+              {isRetry && retryChoice === 'account-only'
+                ? 'An unconfirmed request to keep account data separate is pending.'
+                : 'Combine guest words and progress with this account’s data on this device. Existing account records take priority.'}
             </p>
           </div>
 
@@ -140,13 +155,15 @@ export default function GuestImportDialog({
             <button
               type="button"
               className="btn-secondary guest-import-dialog__btn guest-import-dialog__btn--account-only"
-              disabled={pending}
+              disabled={pending || (isRetry && retryChoice === 'merge')}
               onClick={() => handleChoose('account-only')}
             >
-              Use account data only
+              {isRetry && retryChoice === 'account-only' ? 'Retry using account data only' : 'Use account data only'}
             </button>
             <p className="guest-import-dialog__action-hint">
-              Leave guest records separate and keep using this account’s current data on this device.
+              {isRetry && retryChoice === 'merge'
+                ? 'An unconfirmed request to merge guest records is pending.'
+                : 'Leave guest records separate and keep using this account’s current data on this device.'}
             </p>
           </div>
 

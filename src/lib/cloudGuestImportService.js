@@ -83,6 +83,12 @@ export function createCloudGuestImportService({
     // 2. Check durable record status
     const existingDurable = readDurableRecord(storage, account.ownerId);
 
+    if (existingDurable.error) {
+      const error = new Error(existingDurable.error);
+      error.code = existingDurable.code;
+      throw error;
+    }
+
     // If server acknowledged previously: local hydration just succeeded, so mark applied
     if (existingDurable.record?.state === 'server_acknowledged') {
       markDurableApplied(storage, account.ownerId, now);
@@ -108,11 +114,13 @@ export function createCloudGuestImportService({
       const items = existingDurable.record.items || [];
       const summary = buildSummary(items);
       const offer = Object.freeze({
-        status: summary.length ? 'available' : 'nothing-to-import',
+        status: 'available',
         persistence: 'cloud',
         ownerId: account.ownerId,
         expectedResetVersion: existingDurable.record.expectedResetVersion,
         summary: Object.freeze(summary.map(counts => Object.freeze(counts))),
+        isRetry: true,
+        retryChoice: existingDurable.record.choice,
       });
 
       offers.set(offer, {
@@ -122,6 +130,7 @@ export function createCloudGuestImportService({
         items,
         expectedResetVersion: existingDurable.record.expectedResetVersion,
         isRetry: true,
+        retryChoice: existingDurable.record.choice,
       });
 
       return offer;
@@ -185,6 +194,10 @@ export function createCloudGuestImportService({
     }
     const { account, guestSnapshot, fingerprint: sourceFingerprint, expectedResetVersion } = prepared;
     guard(account);
+
+    if (prepared.isRetry && prepared.retryChoice && choice !== prepared.retryChoice) {
+      throw new Error('Cannot change choice on an unresolved request.');
+    }
 
     if (busy.has(account.ownerId)) {
       throw new Error('A guest import decision is already being saved. Please wait.');
@@ -251,6 +264,18 @@ export function createCloudGuestImportService({
           persistence: 'cloud',
           addedRecords,
         };
+      }
+
+      if (result.outcome === 'choice_mismatch') {
+        const err = new Error(result.error || 'Cannot change choice on an unresolved request.');
+        err.code = result.code;
+        throw err;
+      }
+
+      if (result.outcome === 'storage_error') {
+        const err = new Error(result.error || 'Storage error occurred during cloud import.');
+        err.code = result.code;
+        throw err;
       }
 
       if (result.outcome === 'unconfirmed') {

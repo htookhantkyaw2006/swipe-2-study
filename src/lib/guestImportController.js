@@ -14,7 +14,7 @@ function errorMessage(error) {
   if (error?.code === 'CACHE_STORAGE_UNAVAILABLE') return 'Could not confirm the save on this device. Guest records have been kept. Recheck the data and retry.';
   const message = error?.message;
   // Show known service guidance, never arbitrary SDK/server implementation text.
-  if (typeof message === 'string' && /^(?:Stored learning data|Some learning data|Guest learning data|Your account|Your sign-in session|Sign in and finish account|Could not verify your account|Could not identify the guest data|Could not assign a unique learning record|Learning data changed|A guest import decision|Reload the guest import offer|There is no new guest data)/.test(message)) return message;
+  if (typeof message === 'string' && /^(?:Stored (?:learning data|cloud import request)|Storage access failed|Some learning data|Guest learning data|Your account|Your sign-in session|Sign in and finish account|Could not verify your account|Could not identify the guest data|Could not assign a unique learning record|Learning data changed|A guest import decision|Reload the guest import offer|There is no new guest data|Cannot change choice on an unresolved request)/.test(message)) return message;
   return 'Could not check or save guest learning. Guest records have been kept. Please recheck and try again.';
 }
 
