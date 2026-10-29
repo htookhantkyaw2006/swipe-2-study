@@ -59,6 +59,7 @@ before(async () => {
   ]);
   await db.exec(await readFile(new URL('../supabase/migrations/20261028000100_guest_import_foundation.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20261029000100_account_deletion_foundation.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20261029000200_account_deletion_attempt_reservation.sql', import.meta.url), 'utf8'));
 });
 
 after(async () => {
@@ -642,4 +643,359 @@ test('createDeletionHttpHandler: returns Retry-After header and retryAfter body 
   const json = await res.json();
   assert.equal(json.code, 'RATE_LIMITED');
   assert.equal(json.retryAfter, 540);
+});
+
+// ---------------------------------------------------------------------------
+// 5. Deletion Throttling Attempt Reservation & Concurrency Race Fix
+// ---------------------------------------------------------------------------
+test('concurrency race fix: 20 simultaneous handler calls admit at most 5 to password verification; excess 15 are rate-limited with 429', async () => {
+  const RACE_USER = '77777777-7777-4777-8777-777777777777';
+  await db.query('insert into auth.users(id, email) values ($1, $2) on conflict do nothing', [
+    RACE_USER, 'race@example.com',
+  ]);
+
+  const limiter = createDatabaseAttemptLimiter(db, { maxAttempts: 5, windowSeconds: 900 });
+
+  let passwordVerificationsStarted = 0;
+  let releaseGate;
+  const passwordGate = new Promise((resolve) => {
+    releaseGate = resolve;
+  });
+
+  const mockCreateClient = (url, key, options) => {
+    if (options?.global?.headers?.Authorization) {
+      return {
+        auth: {
+          getUser: async () => ({
+            data: {
+              user: {
+                id: RACE_USER,
+                email: 'race@example.com',
+                app_metadata: { provider: 'email' },
+              },
+            },
+            error: null,
+          }),
+        },
+      };
+    }
+
+    return {
+      auth: {
+        signInWithPassword: async () => {
+          passwordVerificationsStarted += 1;
+          await passwordGate;
+          return {
+            data: {
+              user: { id: RACE_USER, email: 'race@example.com' },
+              session: { access_token: 'temp-token' },
+            },
+            error: null,
+          };
+        },
+      },
+    };
+  };
+
+  const handler = createDeletionHttpHandler({
+    adminClient: {
+      storage: {
+        from: () => ({
+          list: () => Promise.resolve({ data: [] }),
+          remove: () => Promise.resolve({ data: [] }),
+        }),
+      },
+      auth: {
+        admin: {
+          deleteUser: () => Promise.resolve({ data: {}, error: null }),
+        },
+      },
+    },
+    dbClient: db,
+    env: TEST_ENV,
+    attemptLimiter: limiter,
+    createClient: mockCreateClient,
+  });
+
+  const requestPromises = Array.from({ length: 20 }, () =>
+    handler(new Request('https://api.example.com/delete-account', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer race-token',
+      },
+      body: JSON.stringify({ password: 'valid-password' }),
+    }))
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  assert.equal(
+    passwordVerificationsStarted,
+    5,
+    'Exactly 5 requests should be admitted to password verification before responses return'
+  );
+
+  releaseGate();
+
+  const responses = await Promise.all(requestPromises);
+
+  const rateLimited = responses.filter((r) => r.status === 429);
+  const admitted = responses.filter((r) => r.status === 200);
+
+  assert.equal(rateLimited.length, 15, 'Excess 15 requests must be rate-limited (429)');
+  assert.equal(admitted.length, 5, 'Admitted 5 requests should succeed (200)');
+
+  for (const res of rateLimited) {
+    const retryHeader = res.headers.get('Retry-After');
+    assert.ok(Number(retryHeader) > 0, 'Must include Retry-After header');
+    const body = await res.json();
+    assert.equal(body.code, 'RATE_LIMITED');
+    assert.ok(body.retryAfter > 0, 'Must include retryAfter in response payload');
+  }
+});
+
+test('fixed-window expiry: capacity resets after window duration elapses', async () => {
+  const EXPIRY_USER = '88888888-8888-4888-8888-888888888888';
+  await db.query('insert into auth.users(id, email) values ($1, $2) on conflict do nothing', [
+    EXPIRY_USER, 'expiry@example.com',
+  ]);
+
+  const limiter = createDatabaseAttemptLimiter(db, { maxAttempts: 2, windowSeconds: 1 });
+
+  const r1 = await limiter.reserve(EXPIRY_USER);
+  assert.equal(r1.allowed, true);
+  assert.equal(r1.attemptCount, 1);
+
+  const r2 = await limiter.reserve(EXPIRY_USER);
+  assert.equal(r2.allowed, true);
+  assert.equal(r2.attemptCount, 2);
+
+  const r3 = await limiter.reserve(EXPIRY_USER);
+  assert.equal(r3.allowed, false);
+  assert.ok(r3.retryAfterSeconds >= 1);
+
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+
+  const r4 = await limiter.reserve(EXPIRY_USER);
+  assert.equal(r4.allowed, true, 'Window expiration should reset reservation capacity');
+  assert.equal(r4.attemptCount, 1);
+});
+
+test('concurrent first reservation: safe concurrent initial row creation with ON CONFLICT', async () => {
+  const CONCURRENT_USER = '99999999-9999-4999-8999-999999999999';
+  await db.query('insert into auth.users(id, email) values ($1, $2) on conflict do nothing', [
+    CONCURRENT_USER, 'concurrent@example.com',
+  ]);
+
+  await db.query('delete from private.account_deletion_attempts where user_id = $1', [CONCURRENT_USER]);
+
+  const limiter = createDatabaseAttemptLimiter(db, { maxAttempts: 3, windowSeconds: 60 });
+
+  const results = await Promise.all(
+    Array.from({ length: 10 }, () => limiter.reserve(CONCURRENT_USER))
+  );
+
+  const allowed = results.filter((r) => r.allowed);
+  const rejected = results.filter((r) => !r.allowed);
+
+  assert.equal(allowed.length, 3, 'Exactly 3 requests should be admitted');
+  assert.equal(rejected.length, 7, 'Remaining 7 requests should be throttled');
+
+  const rowRes = await db.query('select * from private.account_deletion_attempts where user_id = $1', [CONCURRENT_USER]);
+  assert.equal(rowRes.rows.length, 1);
+  assert.equal(rowRes.rows[0].attempt_count, 3);
+});
+
+test('limiter failure: fails closed with 500 LIMITER_UNAVAILABLE before password verification is reached', async () => {
+  const FAIL_USER = 'baaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await db.query('insert into auth.users(id, email) values ($1, $2) on conflict do nothing', [
+    FAIL_USER, 'fail@example.com',
+  ]);
+
+  let passwordVerificationReached = false;
+
+  const failingLimiter = {
+    reserve: async () => {
+      throw new Error('Database connection timed out');
+    },
+  };
+
+  const mockCreateClient = (url, key, options) => {
+    if (options?.global?.headers?.Authorization) {
+      return {
+        auth: {
+          getUser: async () => ({
+            data: {
+              user: {
+                id: FAIL_USER,
+                email: 'fail@example.com',
+                app_metadata: { provider: 'email' },
+              },
+            },
+            error: null,
+          }),
+        },
+      };
+    }
+    return {
+      auth: {
+        signInWithPassword: async () => {
+          passwordVerificationReached = true;
+          return { data: { user: {} }, error: null };
+        },
+      },
+    };
+  };
+
+  const handler = createDeletionHttpHandler({
+    adminClient: {},
+    dbClient: db,
+    env: TEST_ENV,
+    attemptLimiter: failingLimiter,
+    createClient: mockCreateClient,
+  });
+
+  const res = await handler(new Request('https://api.example.com/delete-account', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer fail-token',
+    },
+    body: JSON.stringify({ password: 'any-password' }),
+  }));
+
+  assert.equal(res.status, 500);
+  const json = await res.json();
+  assert.equal(json.code, 'LIMITER_UNAVAILABLE');
+  assert.equal(
+    passwordVerificationReached,
+    false,
+    'Password verification must NEVER be reached when attempt reservation fails'
+  );
+});
+
+test('successful responses do not wipe reservations: prevents race condition reset exploits', async () => {
+  const PERSIST_USER = 'caaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await db.query('insert into auth.users(id, email) values ($1, $2) on conflict do nothing', [
+    PERSIST_USER, 'persist@example.com',
+  ]);
+
+  const limiter = createDatabaseAttemptLimiter(db, { maxAttempts: 2, windowSeconds: 60 });
+
+  const mockCreateClient = (url, key, options) => {
+    if (options?.global?.headers?.Authorization) {
+      return {
+        auth: {
+          getUser: async () => ({
+            data: {
+              user: {
+                id: PERSIST_USER,
+                email: 'persist@example.com',
+                app_metadata: { provider: 'email' },
+              },
+            },
+            error: null,
+          }),
+        },
+      };
+    }
+    return {
+      auth: {
+        signInWithPassword: async () => ({
+          data: {
+            user: { id: PERSIST_USER, email: 'persist@example.com' },
+            session: { access_token: 'temp-token' },
+          },
+          error: null,
+        }),
+      },
+    };
+  };
+
+  const handler = createDeletionHttpHandler({
+    adminClient: {
+      storage: {
+        from: () => ({
+          list: () => Promise.resolve({ data: [] }),
+          remove: () => Promise.resolve({ data: [] }),
+        }),
+      },
+      auth: {
+        admin: {
+          deleteUser: () => Promise.resolve({ data: {}, error: null }),
+        },
+      },
+    },
+    dbClient: db,
+    env: TEST_ENV,
+    attemptLimiter: limiter,
+    createClient: mockCreateClient,
+  });
+
+  const sendReq = () =>
+    handler(new Request('https://api.example.com/delete-account', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer persist-token',
+      },
+      body: JSON.stringify({ password: 'correct-password' }),
+    }));
+
+  const res1 = await sendReq();
+  assert.equal(res1.status, 200);
+
+  const dbCheck1 = await db.query('select attempt_count from private.account_deletion_attempts where user_id = $1', [PERSIST_USER]);
+  assert.equal(dbCheck1.rows[0].attempt_count, 1, 'Attempt 1 reservation must remain recorded after success');
+
+  const res2 = await sendReq();
+  assert.equal(res2.status, 200);
+
+  const dbCheck2 = await db.query('select attempt_count from private.account_deletion_attempts where user_id = $1', [PERSIST_USER]);
+  assert.equal(dbCheck2.rows[0].attempt_count, 2, 'Attempt 2 reservation must remain recorded after success');
+
+  const res3 = await sendReq();
+  assert.equal(res3.status, 429, 'Subsequent requests must be rate-limited; success did not wipe reservations');
+  const json3 = await res3.json();
+  assert.equal(json3.code, 'RATE_LIMITED');
+});
+
+test('exercise actual SQL reservation function: s2s_reserve_deletion_attempt security and behavior', async () => {
+  const SQL_USER = 'daaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await db.query('insert into auth.users(id, email) values ($1, $2) on conflict do nothing', [
+    SQL_USER, 'sqluser@example.com',
+  ]);
+
+  await asRole('authenticated', SQL_USER, async () => {
+    await assert.rejects(
+      async () => {
+        await db.query('select public.s2s_reserve_deletion_attempt($1::uuid, 5, 900)', [SQL_USER]);
+      },
+      /permission denied/i,
+      'Authenticated users must NOT have execute permissions on s2s_reserve_deletion_attempt'
+    );
+  });
+
+  await asRole('anon', null, async () => {
+    await assert.rejects(
+      async () => {
+        await db.query('select public.s2s_reserve_deletion_attempt($1::uuid, 5, 900)', [SQL_USER]);
+      },
+      /permission denied/i,
+      'Anon role must NOT have execute permissions on s2s_reserve_deletion_attempt'
+    );
+  });
+
+  await asRole('service_role', null, async () => {
+    const res = await db.query(
+      'select public.s2s_reserve_deletion_attempt($1::uuid, 3, 60) as result',
+      [SQL_USER]
+    );
+    const data = res.rows[0].result;
+    assert.equal(data.allowed, true);
+    assert.equal(data.attempt_count, 1);
+    assert.equal(data.remaining_attempts, 2);
+    assert.equal(data.retry_after_seconds, 0);
+  });
 });

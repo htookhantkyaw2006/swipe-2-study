@@ -69,10 +69,14 @@ Work Batch B2.1 implements **server-side account deletion only**:
    - The email passed to `auth.signInWithPassword({ email, password })` is taken from the verified JWT user record (`user.email`), never from the caller body.
    - The freshly authenticated user ID returned by Supabase Auth must strictly match the initiating user ID (`IDENTITY_MISMATCH` check).
    - Newly issued session tokens (`access_token`, `refresh_token`) and passwords are never logged, persisted, or returned in HTTP responses.
-3. **Attempt Throttling:**
-   - A server-side attempt limiter enforces a maximum of **5 failed attempts per user ID within a 15-minute sliding window**.
-   - If exceeded, subsequent requests are rejected immediately with `429 RATE_LIMITED` without contacting the Auth service.
-   - Successful password verification resets the failed attempt counter.
+3. **Attempt Throttling & Reservation (Fixed-Window Policy):**
+   - A conservative **fixed-window attempt reservation policy** enforces a maximum of **5 admitted attempts per user ID within a 15-minute fixed window** (`p_window_seconds = 900`).
+   - Note: This is an exact **fixed window**, not a sliding window. Each window begins at `window_started_at` and elapses after 900 seconds, resetting attempt counts for the subsequent window.
+   - **Atomic Reservation Before Verification:** Capacity is atomically reserved via `public.s2s_reserve_deletion_attempt` *before* starting password verification. This closes the concurrency race condition where multiple simultaneous requests could all begin verification before any failures returned.
+   - **Short Database Transaction:** The reservation executes in a single short, row-locking transaction (`INSERT ... ON CONFLICT (user_id) DO NOTHING` followed by `SELECT ... FOR UPDATE`) that commits immediately. A database transaction is **never held open** during the external Supabase Auth network call.
+   - **Reservation Persistence:** Every admitted password-verification start increments `attempt_count`. Successful or late responses do **not** wipe or reset existing reservations (`reset` is never called on success), preventing concurrent bursts or replay exploits from erasing reservations.
+   - **Accurate Retry Timing:** When capacity is exhausted (`attempt_count >= max_attempts` or active `throttled_until`), subsequent requests are rejected immediately with `429 RATE_LIMITED` accompanied by an accurate `Retry-After` header and `retryAfter` body payload indicating seconds until window reset.
+   - **Fail-Closed Guarantee:** If the limiter RPC or database encounters an error, the system fails closed (`500 LIMITER_UNAVAILABLE`) *before* password verification is reached.
 4. **Provider-Only Accounts (OAuth/SSO):**
    - Accounts without an `email` provider (e.g. Google OAuth only) fail closed with `400 UNSUPPORTED_AUTH_PROVIDER`.
    - The server never bypasses verification or assumes Google reauthentication is implemented.

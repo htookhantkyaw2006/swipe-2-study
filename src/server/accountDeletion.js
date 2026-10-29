@@ -25,7 +25,9 @@ export function ownsAvatarPath(userId, path) {
 }
 
 /**
- * In-memory attempt throttling limiter bounded by user ID and sliding window.
+ * In-memory attempt throttling limiter bounded by user ID and fixed window.
+ * Enforces a conservative fixed-window reservation policy where every admitted
+ * password-verification start atomically increments attempt count.
  */
 export function createAttemptLimiter({
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
@@ -44,33 +46,96 @@ export function createAttemptLimiter({
   }
 
   return {
+    reserve: (userId) => {
+      cleanup();
+      const currentTime = now();
+      const record = attempts.get(userId);
+
+      // Start new fixed window if absent or previous fixed window expired
+      if (!record || currentTime >= record.resetAt) {
+        attempts.set(userId, {
+          count: 1,
+          windowStartedAt: currentTime,
+          resetAt: currentTime + windowMs,
+          throttledUntil: null,
+        });
+        return {
+          allowed: true,
+          attemptCount: 1,
+          remainingAttempts: Math.max(0, maxAttempts - 1),
+          retryAfterSeconds: 0,
+        };
+      }
+
+      // Check if throttled
+      if (record.throttledUntil && currentTime < record.throttledUntil) {
+        const retryAfterSeconds = Math.max(1, Math.ceil((record.throttledUntil - currentTime) / 1000));
+        return {
+          allowed: false,
+          attemptCount: record.count,
+          remainingAttempts: 0,
+          retryAfterSeconds,
+        };
+      }
+
+      // Check if capacity reached
+      if (record.count >= maxAttempts) {
+        const retryAfterSeconds = Math.max(1, Math.ceil((record.resetAt - currentTime) / 1000));
+        record.throttledUntil = currentTime + retryAfterSeconds * 1000;
+        return {
+          allowed: false,
+          attemptCount: record.count,
+          remainingAttempts: 0,
+          retryAfterSeconds,
+        };
+      }
+
+      // Admitted
+      record.count += 1;
+      return {
+        allowed: true,
+        attemptCount: record.count,
+        remainingAttempts: Math.max(0, maxAttempts - record.count),
+        retryAfterSeconds: 0,
+      };
+    },
     isThrottled: (userId) => {
       cleanup();
       const record = attempts.get(userId);
       if (!record) return false;
-      if (now() > record.resetAt) {
+      if (now() >= record.resetAt) {
         attempts.delete(userId);
         return false;
       }
+      if (record.throttledUntil && now() < record.throttledUntil) return true;
       return record.count >= maxAttempts;
     },
     getRetryAfter: (userId) => {
       const record = attempts.get(userId);
       if (!record) return 0;
-      const remainingMs = record.resetAt - now();
+      const targetTime = record.throttledUntil || record.resetAt;
+      const remainingMs = targetTime - now();
       return remainingMs > 0 ? Math.ceil(remainingMs / 1000) : 0;
     },
     recordFailure: (userId) => {
       cleanup();
       const current = attempts.get(userId);
       const currentTime = now();
-      if (!current || currentTime > current.resetAt) {
-        attempts.set(userId, { count: 1, resetAt: currentTime + windowMs });
+      if (!current || currentTime >= current.resetAt) {
+        attempts.set(userId, {
+          count: 1,
+          windowStartedAt: currentTime,
+          resetAt: currentTime + windowMs,
+          throttledUntil: null,
+        });
         return { throttled: false, retryAfterSeconds: 0, failedAttempts: 1 };
       }
       current.count += 1;
       const throttled = current.count >= maxAttempts;
-      const retryAfterSeconds = throttled ? Math.ceil((current.resetAt - currentTime) / 1000) : 0;
+      const retryAfterSeconds = throttled ? Math.max(1, Math.ceil((current.resetAt - currentTime) / 1000)) : 0;
+      if (throttled) {
+        current.throttledUntil = currentTime + retryAfterSeconds * 1000;
+      }
       return { throttled, retryAfterSeconds, failedAttempts: current.count };
     },
     reset: (userId) => {
@@ -82,14 +147,64 @@ export function createAttemptLimiter({
 
 /**
  * Shared, durable, atomic attempt throttling limiter backed by PostgreSQL.
- * Uses SELECT ... FOR UPDATE on private.account_deletion_attempts so concurrent
- * failed attempts across multiple serverless/edge instances cannot race or bypass limits.
+ * Uses atomic reservation RPC (public.s2s_reserve_deletion_attempt) with
+ * row-level locking (SELECT ... FOR UPDATE) and safe concurrent first-row insertion
+ * in a short database transaction before password verification begins.
  */
 export function createDatabaseAttemptLimiter(dbClient, {
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
   windowSeconds = Math.ceil(DEFAULT_WINDOW_MS / 1000),
 } = {}) {
   return {
+    async reserve(userId) {
+      if (!UUID_REGEX.test(userId ?? '')) {
+        throw new AccountDeletionError('Invalid user ID for attempt reservation.', 'INVALID_IDENTITY', 400);
+      }
+      if (typeof dbClient.rpc === 'function') {
+        const { data, error } = await dbClient.rpc('s2s_reserve_deletion_attempt', {
+          p_user_id: userId,
+          p_max_attempts: maxAttempts,
+          p_window_seconds: windowSeconds,
+        });
+        if (error) {
+          throw new AccountDeletionError(error.message, 'LIMITER_UNAVAILABLE', 500);
+        }
+        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+        if (!parsed || typeof parsed !== 'object') {
+          throw new AccountDeletionError('Invalid limiter reservation response.', 'LIMITER_UNAVAILABLE', 500);
+        }
+        return {
+          allowed: Boolean(parsed.allowed),
+          attemptCount: Number(parsed.attempt_count ?? 0),
+          remainingAttempts: Number(parsed.remaining_attempts ?? 0),
+          retryAfterSeconds: Number(parsed.retry_after_seconds ?? 0),
+        };
+      }
+      if (typeof dbClient.query === 'function') {
+        try {
+          const res = await dbClient.query(
+            'select public.s2s_reserve_deletion_attempt($1::uuid, $2::int, $3::int) as result',
+            [userId, maxAttempts, windowSeconds]
+          );
+          const raw = res.rows?.[0]?.result;
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (!parsed || typeof parsed !== 'object') {
+            throw new AccountDeletionError('Invalid limiter reservation response.', 'LIMITER_UNAVAILABLE', 500);
+          }
+          return {
+            allowed: Boolean(parsed.allowed),
+            attemptCount: Number(parsed.attempt_count ?? 0),
+            remainingAttempts: Number(parsed.remaining_attempts ?? 0),
+            retryAfterSeconds: Number(parsed.retry_after_seconds ?? 0),
+          };
+        } catch (queryErr) {
+          if (queryErr instanceof AccountDeletionError) throw queryErr;
+          throw new AccountDeletionError(queryErr.message, 'LIMITER_UNAVAILABLE', 500);
+        }
+      }
+      throw new AccountDeletionError('Database client unavailable for attempt reservation.', 'LIMITER_UNAVAILABLE', 500);
+    },
+
     async isThrottled(userId) {
       if (!UUID_REGEX.test(userId ?? '')) return false;
       if (typeof dbClient.rpc === 'function') {
@@ -386,13 +501,56 @@ export async function handleReauthenticationStep({
   const verifiedUser = await verifyCallerIdentity(userClient, authHeader);
   const userId = verifiedUser.id;
 
-  const throttled = await attemptLimiter.isThrottled(userId);
-  if (throttled) {
-    const retryAfter = typeof attemptLimiter.getRetryAfter === 'function'
-      ? await attemptLimiter.getRetryAfter(userId)
-      : null;
+  checkPasswordReauthSupported(verifiedUser);
+
+  // Atomically reserve attempt capacity BEFORE starting password verification.
+  // Enforces capacity in one short database transaction without holding locks during Auth.
+  // Fails closed if the limiter RPC or database is unavailable.
+  let reservation;
+  if (typeof attemptLimiter?.reserve === 'function') {
+    try {
+      reservation = await attemptLimiter.reserve(userId);
+    } catch (limiterErr) {
+      if (limiterErr instanceof AccountDeletionError) throw limiterErr;
+      throw new AccountDeletionError(
+        limiterErr.message || 'Limiter unavailable',
+        'LIMITER_UNAVAILABLE',
+        500
+      );
+    }
+  } else if (attemptLimiter) {
+    // Fallback for custom or legacy mock limiters lacking reserve()
+    let throttled = false;
+    try {
+      throttled = await attemptLimiter.isThrottled(userId);
+    } catch (limiterErr) {
+      throw new AccountDeletionError(
+        limiterErr.message || 'Limiter unavailable',
+        'LIMITER_UNAVAILABLE',
+        500
+      );
+    }
+    if (throttled) {
+      const retryAfter = typeof attemptLimiter.getRetryAfter === 'function'
+        ? await attemptLimiter.getRetryAfter(userId)
+        : null;
+      const error = new AccountDeletionError(
+        'Too many failed deletion attempts. Please wait before retrying.',
+        'RATE_LIMITED',
+        429
+      );
+      if (retryAfter) {
+        error.retryAfter = retryAfter;
+      }
+      throw error;
+    }
+    reservation = { allowed: true };
+  }
+
+  if (reservation && !reservation.allowed) {
+    const retryAfter = reservation.retryAfterSeconds || (typeof attemptLimiter?.getRetryAfter === 'function' ? await attemptLimiter.getRetryAfter(userId) : 0);
     const error = new AccountDeletionError(
-      'Too many failed deletion attempts. Please wait before retrying.',
+      'Too many deletion attempts. Please wait before retrying.',
       'RATE_LIMITED',
       429
     );
@@ -402,8 +560,7 @@ export async function handleReauthenticationStep({
     throw error;
   }
 
-  checkPasswordReauthSupported(verifiedUser);
-
+  // Database transaction was committed during reserve(); NO transaction is held open during this network request.
   try {
     await performPasswordReauth({
       supabaseUrl,
@@ -414,17 +571,23 @@ export async function handleReauthenticationStep({
       createClient,
     });
 
-    await attemptLimiter.reset(userId);
+    // NOTE: Successful responses must NOT erase other concurrent reservations.
+    // Intentionally do NOT call attemptLimiter.reset(userId).
 
     return {
       success: true,
       verifiedUser,
     };
   } catch (error) {
-    if (error.code === 'INVALID_CREDENTIALS' || error.code === 'IDENTITY_MISMATCH') {
-      const failInfo = await attemptLimiter.recordFailure(userId);
-      if (failInfo && typeof failInfo === 'object' && failInfo.retryAfterSeconds) {
-        error.retryAfter = failInfo.retryAfterSeconds;
+    // If using legacy limiter without reserve(), record failure
+    if (!reservation && (error.code === 'INVALID_CREDENTIALS' || error.code === 'IDENTITY_MISMATCH') && typeof attemptLimiter?.recordFailure === 'function') {
+      try {
+        const failInfo = await attemptLimiter.recordFailure(userId);
+        if (failInfo && typeof failInfo === 'object' && failInfo.retryAfterSeconds && !error.retryAfter) {
+          error.retryAfter = failInfo.retryAfterSeconds;
+        }
+      } catch {
+        // Recording failure should not mask the underlying auth failure
       }
     }
     throw error;

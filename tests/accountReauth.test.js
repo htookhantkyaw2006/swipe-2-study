@@ -394,7 +394,7 @@ test('handleReauthenticationStep: throttles after repeated failed password attem
   assert.equal(reauthCalled, false, 'Password verification must not be attempted when throttled');
 });
 
-test('handleReauthenticationStep: successful authentication resets attempt counter', async () => {
+test('handleReauthenticationStep: successful authentication does not wipe attempt reservations', async () => {
   const limiter = createAttemptLimiter({ maxAttempts: 3, windowMs: 60000 });
 
   // Record 2 failed attempts
@@ -440,5 +440,6 @@ test('handleReauthenticationStep: successful authentication resets attempt count
 
   assert.equal(result.success, true);
   assert.equal(result.verifiedUser.id, USER_A);
-  assert.equal(limiter._getAttempts(USER_A), 0, 'Successful reauth resets attempt count');
+  // Successful response must not wipe reservations (total reservations = 2 previous + 1 admitted = 3)
+  assert.equal(limiter._getAttempts(USER_A), 3, 'Successful reauth preserves attempt reservations');
 });

@@ -1,6 +1,34 @@
 # Development log
 
-## Latest — 29 October 2026 — Work batch B2.2: account deletion UI, client coordination and owner cleanup
+## Latest — 29 October 2026 — Fix: deletion attempt reservation concurrency race
+
+- Branched `fix/deletion-attempt-reservation` from completed UI tip `4e897ed` on `feat/account-deletion-ui`.
+- Fixed confirmed race condition in account deletion throttling where concurrent requests could all begin password verification before any failures returned:
+  1. **Additive SQL Migration (`20261029000200_account_deletion_attempt_reservation.sql`)**:
+     - Added `attempt_count` column to `private.account_deletion_attempts`.
+     - Created `public.s2s_reserve_deletion_attempt(p_user_id uuid, p_max_attempts integer, p_window_seconds integer)` RPC (`service_role` only).
+     - Implemented safe concurrent initial row creation (`INSERT ... ON CONFLICT (user_id) DO NOTHING`) and row-locking (`SELECT ... FOR UPDATE`).
+     - Enforced conservative **fixed-window attempt reservation policy** (900s fixed window, max 5 attempts) where every admitted password-verification start atomically increments `attempt_count`.
+     - Evaluated window expiry and calculated accurate retry timing (`retry_after_seconds`).
+     - Short transaction commits immediately; no SQL transaction is held open during external Auth network calls.
+  2. **Server Handler & Limiter Updates (`src/server/accountDeletion.js`)**:
+     - Added `reserve(userId)` to `createDatabaseAttemptLimiter` and `createAttemptLimiter`.
+     - In `handleReauthenticationStep`, invoked `attemptLimiter.reserve(userId)` *before* starting password verification.
+     - Fail closed: if limiter RPC or database encounters an error, throws `500 LIMITER_UNAVAILABLE` before password verification is reached.
+     - Removed `attemptLimiter.reset(userId)` on reauthentication success so successful or late responses never wipe concurrent reservations.
+  3. **Verification & Tests**:
+     - Updated `tests/accountDeletionLifecycle.test.js` to execute `20261029000200_account_deletion_attempt_reservation.sql` in PGlite.
+     - Added 6 focused tests covering:
+       - 20 simultaneous handler calls with paused password verification admit at most 5 calls; releasing responses shows excess 15 requests were rate-limited (429 with `Retry-After`).
+       - Fixed-window expiration resets reservation capacity.
+       - Concurrent first reservation safely handles non-existent initial rows without conflict.
+       - Limiter failure fails closed with 500 before password verification.
+       - Successful responses do not wipe reservations.
+       - Direct SQL security and behavioral test of `s2s_reserve_deletion_attempt` against PGlite.
+     - Updated `tests/accountReauth.test.js` to assert that successful authentication preserves attempt reservations.
+- Validation: **262 Node tests pass** (all existing 256 + 6 new tests; 0 failures), lint **0 errors / 8 existing warnings** preserved, production build passes (`dist/assets/index-B9Rbo7vt.js`, 977 kB in 1.10s), and `git diff --check` is clean.
+
+## 29 October 2026 — Work batch B2.2: account deletion UI, client coordination and owner cleanup
 
 - Branched `feat/account-deletion-ui` from completed server foundation tip `5f46aba` on `feat/account-deletion-server`.
 - Completed all three checkpoints sequentially:
