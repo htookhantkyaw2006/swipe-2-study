@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { useAuth } from '../lib/useAuth.js';
@@ -9,7 +9,7 @@ import './PasswordRecovery.css';
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isConfigured } = useAuth();
+  const { isConfigured, user, loading: authLoading, isTransitioning } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,6 +18,12 @@ export default function Login() {
   const [error, setError] = useState(null);
 
   const returnTo = safeReturnPath(new URLSearchParams(location.search).get('returnTo'));
+
+  useEffect(() => {
+    if (user && !authLoading && !isTransitioning) {
+      navigate(returnTo, { replace: true });
+    }
+  }, [user, authLoading, isTransitioning, navigate, returnTo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -140,7 +146,12 @@ export default function Login() {
             </div>
           </div>
 
-          <Link className="auth-recovery-link" to="/forgot-password">Forgot password?</Link>
+          <Link
+            className="auth-recovery-link"
+            to={returnTo && returnTo !== '/' ? `/forgot-password?returnTo=${encodeURIComponent(returnTo)}` : '/forgot-password'}
+          >
+            Forgot password?
+          </Link>
 
           <button
             type="submit"

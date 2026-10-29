@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { useAuth } from '../lib/useAuth.js';
@@ -8,7 +8,7 @@ import { Mail, Lock, Eye, EyeOff, User, ArrowLeft, Sparkles } from 'lucide-react
 export default function Signup() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isConfigured } = useAuth();
+  const { isConfigured, user, loading: authLoading, isTransitioning } = useAuth();
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -18,6 +18,12 @@ export default function Signup() {
   const [error, setError] = useState(null);
 
   const returnTo = safeReturnPath(new URLSearchParams(location.search).get('returnTo'));
+
+  useEffect(() => {
+    if (user && !authLoading && !isTransitioning) {
+      navigate(returnTo, { replace: true });
+    }
+  }, [user, authLoading, isTransitioning, navigate, returnTo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

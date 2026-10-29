@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Camera, CheckCircle2, RefreshCw, Trash2, UserRound } from 'lucide-react';
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Camera, CheckCircle2, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/useAuth.js';
 import { useProfile } from '../lib/profile.js';
 import { useAvatarUrl } from '../lib/useAvatarUrl.js';
@@ -11,8 +11,6 @@ import { prepareAvatarImage } from '../lib/avatarPreparation.js';
 import Avatar from '../components/ui/Avatar';
 import { StudyHeader } from '../components/study/StudyPage';
 import './EditProfile.css';
-
-
 
 function ProfileEditor({ initialProfile, onReload }) {
   const { user, captureGeneration, isCurrent } = useAuth();
@@ -149,12 +147,44 @@ function ProfileEditor({ initialProfile, onReload }) {
 export default function EditProfile() {
   const { user, loading, isTransitioning } = useAuth();
   const { profile, loading: profileLoading, error, retry } = useProfile({ listen: false });
-  return <div className="study-page edit-profile-page">
-    <StudyHeader title="Edit profile" subtitle="Your name and photo" backTo="/profile" backLabel="Back to profile" />
-    {loading || isTransitioning ? <div className="study-empty" role="status" aria-busy="true"><h2>Connecting your account…</h2></div>
-      : !user ? <div className="study-empty"><UserRound size={32} aria-hidden="true" /><h2>Make yourself at home</h2><p>Sign in to update your name and profile photo.</p><Link className="study-text-link" to="/login?returnTo=%2Fprofile%2Fedit">Sign in</Link></div>
-      : profileLoading ? <div className="study-empty" role="status" aria-busy="true"><h2>Loading your profile…</h2></div>
-      : error || !profile ? <div className="study-empty" role="alert"><h2>Could not load your profile</h2><p>{error || 'Please retry to load your saved details.'}</p><button className="btn-secondary" onClick={retry}><RefreshCw size={17} aria-hidden="true" />Retry profile</button></div>
-      : <ProfileEditor key={user.id} initialProfile={profile} onReload={retry} />}
-  </div>;
+  const location = useLocation();
+
+  if (loading || isTransitioning) {
+    return (
+      <div className="study-page edit-profile-page">
+        <StudyHeader title="Edit profile" subtitle="Your name and photo" backTo="/profile" backLabel="Back to profile" />
+        <div className="study-empty" role="status" aria-busy="true">
+          <div className="auth-spinner" style={{ margin: '0 auto 16px', width: 32, height: 32 }} />
+          <h2>Connecting your account…</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    const returnPath = location.pathname + location.search + location.hash;
+    return <Navigate to={`/login?returnTo=${encodeURIComponent(returnPath)}`} replace />;
+  }
+
+  return (
+    <div className="study-page edit-profile-page">
+      <StudyHeader title="Edit profile" subtitle="Your name and photo" backTo="/profile" backLabel="Back to profile" />
+      {profileLoading ? (
+        <div className="study-empty" role="status" aria-busy="true">
+          <h2>Loading your profile…</h2>
+        </div>
+      ) : error || !profile ? (
+        <div className="study-empty" role="alert">
+          <h2>Could not load your profile</h2>
+          <p>{error || 'Please retry to load your saved details.'}</p>
+          <button className="btn-secondary" onClick={retry}>
+            <RefreshCw size={17} aria-hidden="true" />
+            Retry profile
+          </button>
+        </div>
+      ) : (
+        <ProfileEditor key={user.id} initialProfile={profile} onReload={retry} />
+      )}
+    </div>
+  );
 }

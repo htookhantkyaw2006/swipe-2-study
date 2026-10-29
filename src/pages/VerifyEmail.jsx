@@ -65,7 +65,7 @@ export default function VerifyEmail() {
     <div className="auth-page">
       <div className="auth-card">
         <button
-          onClick={() => navigate('/login')}
+          onClick={() => navigate(returnTo && returnTo !== '/' ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login')}
           className="auth-back-link"
           type="button"
           aria-label="Back to Login"

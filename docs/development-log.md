@@ -1,6 +1,6 @@
 # Development log
 
-## Latest — 29 October 2026 — Work batch B3.1: client-side avatar resizing and compression
+## 29 October 2026 — Work batch B3.1: client-side avatar resizing and compression
 
 - Branched `feat/avatar-processing` from completed fix tip `e4b2841` on `fix/deletion-attempt-reservation`.
 - Implemented **client-side image preparation and compression** for avatar uploads strictly using browser-native APIs without third-party dependencies:

@@ -24,15 +24,27 @@ after(async () => {
   else globalThis.localStorage = oldStorage;
 });
 
-test('safeReturnPath rejects control characters, backslashes, external origins, and protocol-relative URLs', async () => {
+test('safeReturnPath rejects control characters, backslashes, external origins, protocol-relative URLs, and auth loops', async () => {
   const { safeReturnPath } = await server.ssrLoadModule('/src/lib/safeReturnPath.js');
 
   // Valid internal paths
   assert.equal(safeReturnPath('/'), '/');
   assert.equal(safeReturnPath('/profile'), '/profile');
+  assert.equal(safeReturnPath('/profile/edit'), '/profile/edit');
   assert.equal(safeReturnPath('/learn/review'), '/learn/review');
   assert.equal(safeReturnPath('/flashcards/level/1?course=zh'), '/flashcards/level/1?course=zh');
   assert.equal(safeReturnPath('  /settings  '), '/settings');
+
+  // Redirect loops to auth screens - must reject to prevent loops
+  assert.equal(safeReturnPath('/login'), '/');
+  assert.equal(safeReturnPath('/signup'), '/');
+  assert.equal(safeReturnPath('/auth/callback'), '/');
+  assert.equal(safeReturnPath('/verify-email'), '/');
+  assert.equal(safeReturnPath('/forgot-password'), '/');
+  assert.equal(safeReturnPath('/reset-password'), '/');
+  assert.equal(safeReturnPath('/login?returnTo=%2Fprofile'), '/');
+  assert.equal(safeReturnPath('/LOGIN'), '/');
+  assert.equal(safeReturnPath('/login/'), '/');
 
   // Control characters (CR, LF, TAB, NULL, DEL) - must reject
   assert.equal(safeReturnPath('/\t/evil.example'), '/');
@@ -50,6 +62,10 @@ test('safeReturnPath rejects control characters, backslashes, external origins, 
   assert.equal(safeReturnPath('///malicious.com'), '/');
   assert.equal(safeReturnPath('/\\evil.com'), '/');
   assert.equal(safeReturnPath('/evil\\path'), '/');
+  assert.equal(safeReturnPath('/%5cevil.com'), '/');
+  assert.equal(safeReturnPath('/%5Cevil.com'), '/');
+  assert.equal(safeReturnPath('/%2f/evil.com'), '/');
+  assert.equal(safeReturnPath('/%2F%2Fevil.com'), '/');
   assert.equal(safeReturnPath('javascript:alert(1)'), '/');
   assert.equal(safeReturnPath('data:text/html,<script>alert(1)</script>'), '/');
   assert.equal(safeReturnPath(''), '/');
@@ -58,6 +74,11 @@ test('safeReturnPath rejects control characters, backslashes, external origins, 
   assert.equal(safeReturnPath(undefined), '/');
   assert.equal(safeReturnPath(123), '/');
   assert.equal(safeReturnPath({ evil: true }), '/');
+
+  // Custom fallback
+  assert.equal(safeReturnPath('/login', '/profile'), '/profile');
+  assert.equal(safeReturnPath('https://evil.com', '/profile'), '/profile');
+  assert.equal(safeReturnPath('/login', '/signup'), '/');
 });
 
 test('displayName and initialsOf helpers never fabricate an identity or return empty strings', async () => {
