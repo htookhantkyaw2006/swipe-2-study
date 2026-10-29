@@ -84,6 +84,20 @@ export function createAuthCoordinator({
     return false;
   }
 
+  async function checkLocalSessionRemoved(client, currentSignOut) {
+    if (currentSignOut.signedOutGen !== null) {
+      return true;
+    }
+    try {
+      if (!client?.auth?.getSession) return false;
+      const { data: sessionData, error: sessionErr } = await client.auth.getSession();
+      if (sessionErr) return false;
+      return !sessionData?.session?.user;
+    } catch {
+      return false;
+    }
+  }
+
   function getClient() {
     if (authClient) return authClient;
     return getSupabaseClient();
@@ -210,14 +224,36 @@ export function createAuthCoordinator({
           const isMatchingSignOut = Boolean(
             activeSignOut && (generation === activeSignOut.opGen || generation === activeSignOut.signedOutGen)
           );
-          if (activeSignOut && !isMatchingSignOut) {
-            return;
-          }
           const eventGen = nextGeneration();
           if (isMatchingSignOut) {
             activeSignOut.signedOutGen = eventGen;
+            resetToGuest(null);
+            return;
           }
+
+          // Unattributed SIGNED_OUT event:
+          // Fail-closed synchronous teardown invalidates prior verification work and selects guest storage owner immediately.
           resetToGuest(null);
+
+          // Asynchronous reconciliation outside synchronous callback:
+          // Check whether the SDK still maintains an active valid session.
+          Promise.resolve().then(async () => {
+            if (cancelled || !isCurrent(eventGen)) return;
+            try {
+              const { data: sessionData, error: sessionErr } = await client.auth.getSession();
+              if (cancelled || !isCurrent(eventGen)) return;
+              if (sessionErr || !sessionData?.session?.user) {
+                // Confirmed: SDK has no active session. Remain guest.
+                resetToGuest(null);
+                return;
+              }
+              // SDK still reports an active session! Re-verify independently via verifySessionUser.
+              await verifySessionUser(client, eventGen);
+            } catch (ex) {
+              if (cancelled || !isCurrent(eventGen)) return;
+              resetToGuest(ex.message || 'Session verification failed.');
+            }
+          });
           return;
         }
 
@@ -295,6 +331,9 @@ export function createAuthCoordinator({
     try {
       const client = getClient();
       const res = await client.auth.signOut({ scope: 'local' });
+      const confirmedLocal = res?.error
+        ? await checkLocalSessionRemoved(client, currentSignOut)
+        : true;
       if (!isSignOutCurrent(currentSignOut)) {
         return { error: new Error('Account changed during sign out.') };
       }
@@ -302,17 +341,43 @@ export function createAuthCoordinator({
         error = res.error.message;
         publishSnapshot();
         notify();
-        return { error: res.error, confirmedLocal: true };
+        const sdkError = res.error;
+        const guidance = confirmedLocal
+          ? 'Sign-out on this device is complete.'
+          : 'Sign-out could not be confirmed on this device. Please try again.';
+        try {
+          if (sdkError && typeof sdkError === 'object' && !sdkError.guidance) {
+            sdkError.guidance = guidance;
+          }
+        } catch {}
+        return {
+          error: sdkError,
+          confirmedLocal,
+          guidance,
+        };
       }
       return { error: null, confirmedLocal: true };
     } catch (err) {
+      const confirmedLocal = await checkLocalSessionRemoved(getClient(), currentSignOut);
       if (!isSignOutCurrent(currentSignOut)) {
         return { error: new Error('Account changed during sign out.') };
       }
       error = err.message || 'Logout failed.';
       publishSnapshot();
       notify();
-      return { error: err, confirmedLocal: true };
+      const guidance = confirmedLocal
+        ? 'Sign-out on this device is complete.'
+        : 'Sign-out could not be confirmed on this device. Please try again.';
+      try {
+        if (err && typeof err === 'object' && !err.guidance) {
+          err.guidance = guidance;
+        }
+      } catch {}
+      return {
+        error: err,
+        confirmedLocal,
+        guidance,
+      };
     } finally {
       if (activeSignOut === currentSignOut) {
         activeSignOut = null;
@@ -338,16 +403,23 @@ export function createAuthCoordinator({
     try {
       const client = getClient();
       const res = await client.auth.signOut({ scope: 'global' });
+      const confirmedLocal = res?.error
+        ? await checkLocalSessionRemoved(client, currentSignOut)
+        : true;
       if (!isSignOutCurrent(currentSignOut)) {
         return { error: new Error('Account changed during sign out.') };
       }
       if (res?.error) {
-        const message = res.error.message || 'Could not sign out on all devices. You have been signed out on this device.';
+        const message = confirmedLocal
+          ? (res.error.message || 'Could not sign out on all devices. You have been signed out on this device.')
+          : (res.error.message || 'Could not sign out of your session on this device. Please try again.');
         error = message;
         publishSnapshot();
         notify();
         const sdkError = res.error;
-        const guidance = 'Sign-out on other devices could not be confirmed. You have been signed out on this device.';
+        const guidance = confirmedLocal
+          ? 'Sign-out on other devices could not be confirmed. You have been signed out on this device.'
+          : 'Sign-out could not be confirmed on this device. Please try again.';
         try {
           if (sdkError && typeof sdkError === 'object' && !sdkError.guidance) {
             sdkError.guidance = guidance;
@@ -355,7 +427,7 @@ export function createAuthCoordinator({
         } catch {}
         return {
           error: sdkError,
-          confirmedLocal: true,
+          confirmedLocal,
           remoteConfirmed: false,
           guidance,
         };
@@ -366,14 +438,19 @@ export function createAuthCoordinator({
         remoteConfirmed: true,
       };
     } catch (err) {
+      const confirmedLocal = await checkLocalSessionRemoved(getClient(), currentSignOut);
       if (!isSignOutCurrent(currentSignOut)) {
         return { error: new Error('Account changed during sign out.') };
       }
-      const message = err?.message || 'Could not reach the server. You have been signed out on this device. Other sessions may remain active briefly.';
+      const message = confirmedLocal
+        ? (err?.message || 'Could not reach the server. You have been signed out on this device. Other sessions may remain active briefly.')
+        : (err?.message || 'Network error prevented signing out on this device. Please try again.');
       error = message;
       publishSnapshot();
       notify();
-      const guidance = 'Sign-out on other devices could not be confirmed. You have been signed out on this device.';
+      const guidance = confirmedLocal
+        ? 'Sign-out on other devices could not be confirmed. You have been signed out on this device.'
+        : 'Sign-out could not be confirmed on this device. Please try again.';
       try {
         if (err && typeof err === 'object' && !err.guidance) {
           err.guidance = guidance;
@@ -381,7 +458,7 @@ export function createAuthCoordinator({
       } catch {}
       return {
         error: err,
-        confirmedLocal: true,
+        confirmedLocal,
         remoteConfirmed: false,
         guidance,
       };

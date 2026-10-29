@@ -459,16 +459,20 @@ test('Account switch race protection: delayed signOut cannot displace User B or 
   const slowSignOutOp = coordinator.signOutGlobal();
 
   // User B signs in and verifies while User A signout is in flight
+  mockAuthClient.auth.getSession = async () => ({ data: { session: { user: { id: USER_B } } }, error: null });
   mockAuthClient.auth.getUser = async () => ({ data: { user: { id: USER_B } }, error: null });
   await coordinator.retryVerification();
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(coordinator.getState().user?.id, USER_B);
   assert.equal(storageOwner.getOwner(), USER_B);
 
-  // Late SDK SIGNED_OUT event arrives from User A's sign-out
+  // Late unattributed SDK SIGNED_OUT event arrives while SDK maintains valid B session
   authListener('SIGNED_OUT', null);
-  // User B must NOT be displaced by the stale event!
-  assert.equal(coordinator.getState().user?.id, USER_B);
+  // Fail-closed temporary guest during event handling
+  assert.equal(coordinator.getState().user, null, 'Temporary fail-closed guest upon unattributed event');
+  // Asynchronous reconciliation re-verifies active session with SDK
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(coordinator.getState().user?.id, USER_B, 'User B restored via independent session verification');
   assert.equal(storageOwner.getOwner(), USER_B);
 
   // User A's sign-out finishes
@@ -477,7 +481,7 @@ test('Account switch race protection: delayed signOut cannot displace User B or 
 
   // Expected: reports account changed, protects User B
   assert.equal(res.error?.message, 'Account changed during sign out.');
-  assert.equal(coordinator.getState().user?.id, USER_B);
+  assert.equal(coordinator.getState().user?.id, USER_B, 'User B remains verified after A finishes');
   assert.equal(coordinator.getState().error, null, 'User B must not receive User A error');
   assert.equal(storageOwner.getOwner(), USER_B);
 
