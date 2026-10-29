@@ -453,7 +453,7 @@ test('recovery after reload: server ACK followed by local application failure re
 // ---------------------------------------------------------------------------
 test('local conflict protection: db.remove deletion survives later snapshot restore', async () => {
   const storage = createMockStorage();
-  const storageOwner = createStorageOwner({ storage: () => storage });
+  const storageOwner = createStorageOwner({ storage: () => storage, cloudTracking: true });
   storageOwner.setOwner(USER_A);
 
   const oldStorage = globalThis.localStorage;

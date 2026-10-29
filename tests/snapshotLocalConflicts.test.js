@@ -266,7 +266,7 @@ test('Tombstones survive cloud timestamps before, equal to, and after the device
 
 test('Exercise scope.setTable() and createLocalDatabase.update()/remove()', () => {
   const storage = createMemoryStorage();
-  const storageOwner = createStorageOwner({ storage: () => storage });
+  const storageOwner = createStorageOwner({ storage: () => storage, cloudTracking: true });
   storageOwner.setOwner(OWNER_A);
 
   const localDb = createLocalDatabase({

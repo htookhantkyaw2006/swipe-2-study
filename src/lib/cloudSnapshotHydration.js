@@ -1,141 +1,25 @@
 import { readCloudSnapshot } from './cloudImportService.js';
 import { CLOUD_LANGUAGES, CLOUD_KINDS } from './cloudImportRecords.js';
-import { wordOf, readingOf } from './entry.js';
 import { parseLearningRows } from './learningDocument.js';
+import {
+  getSyncStateKey,
+  recordKey,
+  identityOfRow,
+  readSyncState,
+  persistSyncState,
+  recordLocalDeletion,
+  recordLocalDirty,
+} from './cloudSyncState.js';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const KIND_FIELDS = {
-  search_history: 'term',
-  written_chars: 'character',
-  learned_radicals: 'radical',
-  learned_kana: 'kana',
-  learned_sounds: 'sound',
+export {
+  getSyncStateKey,
+  recordKey,
+  identityOfRow,
+  readSyncState,
+  persistSyncState,
+  recordLocalDeletion,
+  recordLocalDirty,
 };
-
-export function getSyncStateKey(ownerId) {
-  if (!ownerId || typeof ownerId !== 'string' || !UUID_REGEX.test(ownerId)) {
-    throw new TypeError('Owner ID must be a valid UUID');
-  }
-  return `s2s_user_${ownerId.toLowerCase()}_cloud_sync_state_v1`;
-}
-
-export function recordKey(language, kind, writtenForm, reading = '') {
-  const normForm = String(writtenForm || '').normalize('NFC').trim();
-  const normReading = String(reading || '').normalize('NFC').trim();
-  return `${language}:${kind}:${normForm}:${normReading}`;
-}
-
-export function identityOfRow(table, row) {
-  if (!row || typeof row !== 'object' || Array.isArray(row)) {
-    throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
-  }
-  const [language, ...rest] = table.split('_');
-  const kind = rest.join('_');
-  if (kind === 'saved_words' || kind === 'review_cards') {
-    const written = wordOf(row);
-    if (typeof written !== 'string' || written.trim().length === 0) {
-      throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
-    }
-    const reading = row.pronunciation ?? readingOf(row) ?? '';
-    if (typeof reading !== 'string') {
-      throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
-    }
-    return recordKey(language, kind, written, reading);
-  }
-  const field = KIND_FIELDS[kind];
-  if (!field) {
-    throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
-  }
-  const written = row[field];
-  if (typeof written !== 'string' || written.trim().length === 0) {
-    throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
-  }
-  return recordKey(language, kind, written, '');
-}
-
-export function readSyncState(storage, ownerId) {
-  const key = getSyncStateKey(ownerId);
-  let raw;
-  try {
-    raw = storage.getItem(key);
-  } catch {
-    return { state: null, error: 'Storage access error' };
-  }
-
-  if (raw === null || raw === undefined) {
-    return { state: null, error: null };
-  }
-
-  if (typeof raw !== 'string' || raw.trim().length === 0) {
-    return { state: null, error: 'Malformed sync state JSON' };
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return { state: null, error: 'Malformed sync state JSON' };
-  }
-
-  if (
-    !parsed ||
-    typeof parsed !== 'object' ||
-    Array.isArray(parsed) ||
-    parsed.schemaVersion !== 1 ||
-    typeof parsed.ownerId !== 'string' ||
-    parsed.ownerId.toLowerCase() !== ownerId.toLowerCase() ||
-    (parsed.records !== undefined && (typeof parsed.records !== 'object' || parsed.records === null || Array.isArray(parsed.records)))
-  ) {
-    return { state: null, error: 'Invalid sync state schema' };
-  }
-
-  return { state: parsed, error: null };
-}
-
-export function persistSyncState(storage, state) {
-  const key = getSyncStateKey(state.ownerId);
-  storage.setItem(key, JSON.stringify(state));
-}
-
-export function recordLocalDeletion(storage, ownerId, language, kind, writtenForm, reading = '', now = () => new Date().toISOString()) {
-  const { state, error } = readSyncState(storage, ownerId);
-  if (error) {
-    throw new Error(`Could not update sync state: ${error}`);
-  }
-  const nextState = state || {
-    schemaVersion: 1,
-    ownerId: ownerId.toLowerCase(),
-    resetVersion: '0',
-    lastServerTime: null,
-    records: {},
-  };
-  const key = recordKey(language, kind, writtenForm, reading);
-  nextState.records[key] = {
-    status: 'deleted',
-    deletedAt: now(),
-  };
-  persistSyncState(storage, nextState);
-}
-
-export function recordLocalDirty(storage, ownerId, language, kind, writtenForm, reading = '', now = () => new Date().toISOString()) {
-  const { state, error } = readSyncState(storage, ownerId);
-  if (error) {
-    throw new Error(`Could not update sync state: ${error}`);
-  }
-  const nextState = state || {
-    schemaVersion: 1,
-    ownerId: ownerId.toLowerCase(),
-    resetVersion: '0',
-    lastServerTime: null,
-    records: {},
-  };
-  const key = recordKey(language, kind, writtenForm, reading);
-  nextState.records[key] = {
-    status: 'dirty',
-    updatedAt: now(),
-  };
-  persistSyncState(storage, nextState);
-}
 
 /**
  * Reconciles local account tables with a verified cloud snapshot.
@@ -338,7 +222,7 @@ export async function restoreAccountSnapshot(client, storageOwner, {
 
   guard();
 
-  const storage = globalThis.localStorage;
+  const storage = storageOwner?.getStorage ? storageOwner.getStorage() : globalThis.localStorage;
 
   // Check sync state metadata validity before invoking RPCs or touching local tables
   const { error: syncStateError } = readSyncState(storage, expectedUserId);
@@ -444,12 +328,35 @@ export async function restoreAccountSnapshot(client, storageOwner, {
     }
 
     if (!hasDiff) {
-      // Up to date; persist updated sync state
-      persistSyncState(storage, nextSyncState);
+      // Up to date; persist updated sync state inside authoritative document
+      try {
+        guard();
+        scope.commitLearningDocument(raw, {
+          ...(value ?? {}),
+          version: 1,
+          revision: (value?.revision ?? 0) + 1,
+          tables: {
+            ...(value?.tables ?? {}),
+            ...localTables,
+          },
+          cloudSync: nextSyncState,
+          guestImport: value?.guestImport ?? {
+            fingerprint: '0'.repeat(64),
+            choice: 'account-only',
+            decidedAt: now(),
+            handled: {},
+          },
+        }, expectedTables);
+      } catch (commitErr) {
+        return { outcome: 'error', error: commitErr?.message || 'Failed to commit snapshot.', changesCount: 0 };
+      }
+      try {
+        persistSyncState(storage, nextSyncState);
+      } catch {}
       return { outcome: 'up_to_date', changesCount: 0, error: null };
     }
 
-    // Atomically commit effective cache
+    // Atomically commit effective cache and authoritative sync state in ONE setItem
     try {
       guard();
       scope.commitLearningDocument(raw, {
@@ -460,6 +367,7 @@ export async function restoreAccountSnapshot(client, storageOwner, {
           ...(value?.tables ?? {}),
           ...reconciledTables,
         },
+        cloudSync: nextSyncState,
         guestImport: value?.guestImport ?? {
           fingerprint: '0'.repeat(64),
           choice: 'account-only',
@@ -468,8 +376,10 @@ export async function restoreAccountSnapshot(client, storageOwner, {
         },
       }, expectedTables);
 
-      // Persist sync state
-      persistSyncState(storage, nextSyncState);
+      // Best effort update of legacy sidecar
+      try {
+        persistSyncState(storage, nextSyncState);
+      } catch {}
 
       return { outcome: 'restored', changesCount, error: null };
     } catch {

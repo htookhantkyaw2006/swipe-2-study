@@ -24,6 +24,14 @@ export function parseLearningDocument(raw) {
     if (!TABLE.test(key) || !Array.isArray(identities)
       || identities.some(identity => typeof identity !== 'string' || !identity)) throw invalid();
   }
+  if (value.cloudSync !== undefined && value.cloudSync !== null) {
+    const cs = value.cloudSync;
+    if (!isObject(cs) || cs.schemaVersion !== 1 || typeof cs.ownerId !== 'string' || !cs.ownerId
+      || typeof cs.resetVersion !== 'string' || !isObject(cs.records)) throw invalid();
+    for (const rec of Object.values(cs.records)) {
+      if (!isObject(rec) || !['synced', 'dirty', 'deleted'].includes(rec.status)) throw invalid();
+    }
+  }
   return value;
 }
 

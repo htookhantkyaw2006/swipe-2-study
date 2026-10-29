@@ -1,4 +1,8 @@
-import { recordLocalDeletion, recordLocalDirty } from './cloudSnapshotHydration.js';
+import {
+  getSyncStateKey,
+  identityOfRow,
+  readSyncState,
+} from './cloudSyncState.js';
 // Local cache isolation is not authorization. Supabase RLS remains authoritative.
 // Only the verified Auth coordinator should select an owner.
 import { parseLearningDocument, parseLearningRows } from './learningDocument.js';
@@ -42,58 +46,10 @@ function rowsEqual(a, b) {
   return true;
 }
 
-function trackTableChanges(target, ownerId, language, table, prevRaw, nextRaw) {
-  if (!ownerId) return;
-  if (prevRaw === nextRaw) return;
-  try {
-    const prevRows = prevRaw ? JSON.parse(prevRaw) : [];
-    const nextRows = nextRaw ? JSON.parse(nextRaw) : [];
-    if (!Array.isArray(prevRows) || !Array.isArray(nextRows)) return;
-
-    const rowKey = row => {
-      const isWord = table === 'saved_words' || table === 'review_cards';
-      const written = String((isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '').normalize('NFC').trim();
-      const reading = String((isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '').normalize('NFC').trim();
-      return `${language}:${table}:${written}:${reading}`;
-    };
-
-    const prevMap = new Map();
-    for (const row of prevRows) {
-      if (row && typeof row === 'object') {
-        prevMap.set(rowKey(row), row);
-      }
-    }
-
-    const nextMap = new Map();
-    for (const row of nextRows) {
-      if (row && typeof row === 'object') {
-        nextMap.set(rowKey(row), row);
-      }
-    }
-
-    for (const [k, row] of prevMap.entries()) {
-      if (!nextMap.has(k)) {
-        const isWord = table === 'saved_words' || table === 'review_cards';
-        const written = (isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '';
-        const reading = (isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '';
-        recordLocalDeletion(target, ownerId, language, table, written, reading);
-      }
-    }
-
-    for (const [k, row] of nextMap.entries()) {
-      const prevRow = prevMap.get(k);
-      const isWord = table === 'saved_words' || table === 'review_cards';
-      const written = (isWord ? (row.phrase || row.character || row.word) : (row.character || row.radical || row.kana || row.sound || row.term)) || '';
-      const reading = (isWord ? (row.reading || row.pronunciation || row.pinyin) : '') || '';
-
-      if (!prevRow || !rowsEqual(prevRow, row)) {
-        recordLocalDirty(target, ownerId, language, table, written, reading);
-      }
-    }
-  } catch {}
-}
-
-export function createStorageOwner({ storage = () => globalThis.localStorage } = {}) {
+export function createStorageOwner({
+  storage = () => globalThis.localStorage,
+  cloudTracking = false,
+} = {}) {
   let activeOwner = null;
   const listeners = new Set();
   const access = (operation, run) => {
@@ -102,13 +58,14 @@ export function createStorageOwner({ storage = () => globalThis.localStorage } =
       if (!target) throw new Error('Storage is unavailable.');
       return run(target);
     } catch (cause) {
+      if (cause instanceof CacheStorageError) throw cause;
       throw new CacheStorageError(operation, cause);
     }
   };
 
   // Capture the owner. A delayed response must not follow an account switch
   // and write account A's response into account B's cache.
-  function scope(forOwner = activeOwner) {
+  function scope(forOwner = activeOwner, { cloudTracking: scopeTracking } = {}) {
     const id = ownerId(forOwner);
     const prefix = id === null ? 's2s_' : `s2s_user_${id}_`;
     const keyFor = name => {
@@ -160,17 +117,170 @@ export function createStorageOwner({ storage = () => globalThis.localStorage } =
     const setTable = (language, table, rows) => {
       const prevRaw = getTable(language, table);
       const name = tableName(language, table);
-      const { raw, value } = readLearningDocument();
-      if (!value || !Object.hasOwn(value.tables, name)) {
-        setItem(name, rows);
-        access('write', target => trackTableChanges(target, id, language, table, prevRaw, rows));
+      if (prevRaw === rows) return;
+      parseLearningRows(rows);
+
+      if (id === null) {
+        // Guest behavior: device-only, no cloud tracking
+        const { raw, value } = readLearningDocument();
+        if (value && Object.hasOwn(value.tables, name)) {
+          commitLearningDocument(raw, {
+            ...value,
+            revision: value.revision + 1,
+            tables: { ...value.tables, [name]: rows },
+          }, { [name]: prevRaw });
+        } else {
+          setItem(name, rows);
+        }
         return;
       }
-      parseLearningRows(rows);
-      commitLearningDocument(raw, {
-        ...value, revision: value.revision + 1, tables: { ...value.tables, [name]: rows },
+
+      // Check whether this account scope is cloud-tracked:
+      // 1. Authoritative embedded cloudSync exists in learning_document_v1, OR
+      // 2. Legacy cloud_sync_state_v1 sidecar exists, OR
+      // 3. Explicit tracking option enabled
+      const { raw, value } = readLearningDocument();
+      let hasSidecar = false;
+      try {
+        const sidecarKey = getSyncStateKey(id);
+        const sidecarRaw = access('read', target => target.getItem(sidecarKey));
+        hasSidecar = sidecarRaw !== null && sidecarRaw !== undefined;
+      } catch {}
+
+      const isTracked = Boolean(scopeTracking || cloudTracking || value?.cloudSync || hasSidecar);
+
+      if (!isTracked) {
+        // Default device-only path: preserve legacy key / document without cloudSync
+        if (value && Object.hasOwn(value.tables, name)) {
+          commitLearningDocument(raw, {
+            ...value,
+            revision: value.revision + 1,
+            tables: { ...value.tables, [name]: rows },
+          }, { [name]: prevRaw });
+        } else {
+          setItem(name, rows);
+        }
+        return;
+      }
+
+      // Tracked account mutation: effective rows and sync state commit together in ONE authoritative setItem
+      access('write', target => {
+        // 1. Read existing sync state (embedded authoritative or legacy sidecar)
+        const { state: syncState, error: syncError } = readSyncState(target, id);
+        if (syncError) {
+          throw new Error(`Could not update sync state: ${syncError}`);
+        }
+
+        const currentSyncState = syncState || {
+          schemaVersion: 1,
+          ownerId: id.toLowerCase(),
+          resetVersion: '0',
+          lastServerTime: null,
+          records: {},
+        };
+
+        // 2. Compute changed records (dirty/deleted)
+        const prevRows = prevRaw ? JSON.parse(prevRaw) : [];
+        const nextRows = JSON.parse(rows);
+        const nextRecords = { ...(currentSyncState.records ?? {}) };
+
+        const prevMap = new Map();
+        for (const row of prevRows) {
+          if (row && typeof row === 'object') {
+            const k = identityOfRow(name, row);
+            prevMap.set(k, row);
+          }
+        }
+
+        const nextMap = new Map();
+        for (const row of nextRows) {
+          if (row && typeof row === 'object') {
+            const k = identityOfRow(name, row);
+            nextMap.set(k, row);
+          }
+        }
+
+        const nowIso = new Date().toISOString();
+
+        // Record deletions
+        for (const k of prevMap.keys()) {
+          if (!nextMap.has(k)) {
+            nextRecords[k] = {
+              status: 'deleted',
+              deletedAt: nowIso,
+            };
+          }
+        }
+
+        // Record dirty updates / additions
+        for (const [k, row] of nextMap.entries()) {
+          const prevRow = prevMap.get(k);
+          if (!prevRow || !rowsEqual(prevRow, row)) {
+            nextRecords[k] = {
+              status: 'dirty',
+              updatedAt: row.updated_at || row.created_at || nowIso,
+            };
+          }
+        }
+
+        const nextCloudSync = {
+          ...currentSyncState,
+          records: nextRecords,
+          updatedAt: nowIso,
+        };
+
+        // 3. Construct next authoritative document
+        let nextDocument;
+        if (value) {
+          nextDocument = {
+            ...value,
+            version: 1,
+            revision: value.revision + 1,
+            tables: {
+              ...value.tables,
+              [name]: rows,
+            },
+            cloudSync: nextCloudSync,
+          };
+        } else {
+          // Migrate legacy tables into authoritative document during first tracked write
+          const migratedTables = {};
+          for (const lang of ['zh', 'ja', 'en']) {
+            for (const kind of ['saved_words', 'review_cards', 'search_history', 'written_chars', 'learned_radicals', 'learned_kana', 'learned_sounds']) {
+              const tName = `${lang}_${kind}`;
+              if (tName === name) {
+                migratedTables[tName] = rows;
+              } else {
+                const legacyVal = target.getItem(keyFor(tName));
+                if (legacyVal !== null) {
+                  migratedTables[tName] = legacyVal;
+                }
+              }
+            }
+          }
+          migratedTables[name] = rows;
+          nextDocument = {
+            version: 1,
+            revision: 1,
+            tables: migratedTables,
+            cloudSync: nextCloudSync,
+            guestImport: {
+              fingerprint: '0'.repeat(64),
+              choice: 'account-only',
+              decidedAt: nowIso,
+              handled: {},
+            },
+          };
+        }
+
+        // 4. Authoritative atomic commit
+        commitLearningDocument(raw, nextDocument, { [name]: prevRaw });
+
+        // 5. Best-effort update of legacy sidecar for non-breaking legacy reader compatibility
+        try {
+          target.setItem(getSyncStateKey(id), JSON.stringify(nextCloudSync));
+        } catch {}
       });
-      access('write', target => trackTableChanges(target, id, language, table, prevRaw, rows));
     };
     return Object.freeze({
       ownerId: id,
@@ -182,6 +292,7 @@ export function createStorageOwner({ storage = () => globalThis.localStorage } =
       setTable,
       readLearningDocument,
       commitLearningDocument,
+      getStorage: () => storage(),
       entries: () => access('read', target => {
         const result = [];
         for (let index = 0; index < target.length; index += 1) {
@@ -209,6 +320,7 @@ export function createStorageOwner({ storage = () => globalThis.localStorage } =
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    getStorage: () => storage(),
     scope,
   });
 }
