@@ -8,7 +8,7 @@ The Course Content CSV Validator is a standalone, offline Node.js command-line u
 It performs **strict structural validation only**:
 - Validates field constraints, lengths, data types, and uniqueness matching the PostgreSQL `public.courses` and `public.vocabulary` schema.
 - Enforces relational consistency across course metadata and levels.
-- Rejects dangerous path traversals, absolute URLs, malformed quoting, and corrupted JSON.
+- Rejects dangerous path traversals, absolute URLs, malformed quoting, corrupted JSON, invalid UTF-8 byte sequences, and prohibited NUL characters.
 - **Scope Boundary**: This tool is an offline structural linter. It does not perform database writes, network calls, environment file reads, automated translations, curriculum approvals, or assume fixed word counts.
 
 ---
@@ -34,11 +34,11 @@ id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burm
 | `meaning_english`| `public.vocabulary.meaning_english`| `text` (max 2000 chars) | At least one | English definition. If omitted while Burmese is present, a warning is emitted. |
 | `meaning_burmese`| `public.vocabulary.meaning_burmese`| `text` (max 2000 chars) | At least one | Burmese definition (Myanmar script). If omitted while English is present, a warning is emitted. |
 | `audio_path` | `public.vocabulary.audio_path` | `text` (max 256 chars) | No (Optional) | Relative Storage object path (e.g. `audio/zh/hsk1/001.mp3`). Must **not** be an absolute URL (`http://`, `https://`), must not contain `..` traversal, query parameters (`?`), or leading slashes. |
-| `examples_json`| `public.vocabulary.examples` | `jsonb` (array <= 3 items) | No (Optional) | JSON array of up to 3 example objects. Blank/empty string defaults to `[]`. Each object must contain `text` and at least one translation (`english` or `burmese`). |
+| `examples_json`| `public.vocabulary.examples` | `jsonb` (array <= 3 items) | No (Optional) | JSON array of up to 3 example objects. Blank/empty string defaults to `[]`. Each object must contain `text` and at least one translation (`english` or `burmese`). Prohibits NUL (`\0`) characters. |
 | `sort_order` | `public.vocabulary.sort_order` | `integer` (4-byte signed) | **Yes** | Display sequence number between `-2147483648` and `2147483647`. |
 
 ### Content Preservation & Duplicate Warnings
-- **Unicode Preservation**: Chinese characters, Japanese kanji/kana, Burmese script (Myanmar Unicode), and tone-marked Latin characters are strictly preserved without normalization loss.
+- **Unicode Preservation**: Chinese characters, Japanese kanji/kana, Burmese script (Myanmar Unicode), tone-marked Latin characters, and valid intentionally encoded U+FFFD characters are strictly preserved without normalization loss.
 - **Duplicate Word Identity Warning**: If multiple rows share the same `(course_id, written_form, reading)`, the validator emits a warning (`DUPLICATE_VOCABULARY_IDENTITY`). It **never** silently merges, rewrites, or discards duplicate rows.
 
 ---
@@ -49,7 +49,9 @@ The parser (`tools/content-csv/parser.mjs`) is an in-memory character state mach
 - **No naive `split(',')`**: Correctly handles commas inside quoted fields.
 - **Multiline Fields**: Line breaks (`\n` and `\r\n`) within quotes are preserved as field content without corrupting row numbers.
 - **Escaped Quotes**: Double quotes (`""`) inside quoted fields are unescaped to single literal quotes (`"`).
+- **Final Quoted-Empty Records**: Preserves explicit quoted empty records (e.g. `""` or `"",,,,,,,,,,`) and reports column count or required field errors, while preserving legitimate blank-line behavior at file boundaries.
 - **UTF-8 BOM**: Byte order mark (`\uFEFF`) at the beginning of the file is automatically stripped.
+- **Encoding Safety**: Validates UTF-8 encoding strictly using `TextDecoder('utf-8', { fatal: true })`, rejecting malformed byte sequences and reporting actionable locations without whole-record dumps.
 - **Input Bounding**: Input size is strictly capped at **10 MiB** (`MAX_INPUT_BYTES = 10485760`). Files exceeding this limit are rejected immediately.
 
 ---
@@ -66,8 +68,11 @@ node tools/content-csv/validate.mjs <input.csv>
 | Code | Meaning | Details |
 | :---: | :--- | :--- |
 | **`0`** | **Valid** | File is structurally valid. All schema rules pass. (Warnings may be present in the report). |
-| **`1`** | **Validation Failure** | File contains one or more structural, syntax, or schema errors. |
-| **`2`** | **Usage / I/O Failure** | Missing arguments, help request, file not found, unreadable file, or file exceeding 10 MiB. |
+| **`1`** | **Validation Failure** | File contains one or more structural, syntax, encoding, or schema errors. |
+| **`2`** | **Usage / I/O Failure** | Missing arguments, multiple input files, unexpected options/flags, file not found, unreadable file, or file exceeding 10 MiB. |
+
+### Stream Draining & Piped Execution
+When standard output is piped (e.g. to child processes, filters, or files), `validate.mjs` ensures complete output buffer draining before exit to prevent truncated JSON reports.
 
 ### JSON Output Format
 
@@ -102,6 +107,8 @@ The CLI writes a single structured JSON report to standard output:
 | Code | Severity | Description |
 | :--- | :---: | :--- |
 | `EMPTY_FILE` | Error | CSV content contains no records or headers. |
+| `MALFORMED_UTF8` | Error | File or input contains malformed or invalid UTF-8 byte sequences or unpaired surrogates. |
+| `NUL_CHARACTER` | Error | Header, raw field, or decoded JSON field contains prohibited NUL (`\0`) character. |
 | `MALFORMED_QUOTING` | Error | Unescaped quote inside unquoted field or trailing character after quote. |
 | `UNCLOSED_QUOTE` | Error | Opening quote was not closed before end of file. |
 | `INCONSISTENT_COLUMN_COUNT` | Error | Row has fewer or more than 11 columns. |
@@ -155,11 +162,16 @@ The CLI writes a single structured JSON report to standard output:
 All fixtures in `tools/content-csv/fixtures/` are synthetic and clearly labeled:
 - `valid-zh-hsk1.csv`: Valid Chinese HSK 1 records with Pinyin, Burmese, and example JSON.
 - `valid-ja-n5.csv`: Valid Japanese N5 records with Kana, Romaji, and Burmese definitions.
+- `valid-ufffd.csv`: Valid Chinese HSK 1 record with intentionally encoded U+FFFD character.
 - `invalid-duplicate-id.csv`: Triggering `DUPLICATE_ID`.
 - `invalid-malformed-csv.csv`: Triggering `UNCLOSED_QUOTE`.
 - `invalid-course-conflict.csv`: Triggering `CONFLICTING_COURSE_METADATA`.
 - `invalid-examples.csv`: Triggering `INVALID_JSON`, `INVALID_EXAMPLE_TEXT`, `TOO_MANY_EXAMPLES`.
 - `invalid-audio-path.csv`: Triggering `UNSAFE_AUDIO_PATH` (URLs, traversal, leading slashes, query strings).
+- `invalid-utf8.csv`: Triggering `MALFORMED_UTF8` due to invalid byte sequence.
+- `invalid-nul-raw.csv`: Triggering `NUL_CHARACTER` in raw CSV column.
+- `invalid-nul-json.csv`: Triggering `NUL_CHARACTER` in decoded JSON example string.
+- `invalid-final-quoted-empty.csv`: Triggering `INCONSISTENT_COLUMN_COUNT` on final quoted-empty record `""`.
 - `warnings-partial-meanings-and-dupes.csv`: Demonstrating warning reporting for missing meanings and duplicate identities.
 
 ---

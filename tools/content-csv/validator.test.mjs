@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { parseCsv, CsvParseError, EXPECTED_HEADERS, MAX_INPUT_BYTES } from './parser.mjs';
@@ -347,4 +348,323 @@ test('CLI: exits with code 2 on missing arguments or non-existent file', () => {
 
 test('input bounding: MAX_INPUT_BYTES constant is 10 MiB', () => {
   assert.equal(MAX_INPUT_BYTES, 10 * 1024 * 1024);
+});
+
+// ---------------------------------------------------------------------------
+// 5. Finding 1 Regressions: CLI Output Truncation with Piped Stdout
+// ---------------------------------------------------------------------------
+test('regression 1: piped stdout does not truncate large JSON reports', async () => {
+  // Generate a large invalid CSV with 1,000 invalid rows to create a ~250KB JSON report
+  const tmpFile = path.join(os.tmpdir(), `large-invalid-${Date.now()}.csv`);
+  const lines = [EXPECTED_HEADERS.join(',')];
+  for (let i = 1; i <= 1000; i++) {
+    // Each row has missing ID, triggering 1000 error objects
+    lines.push(`,zh-hsk1,zh,HSK1,词${i},cí${i},word${i},စကားလုံး${i},,[],${i}`);
+  }
+  fs.writeFileSync(tmpFile, lines.join('\n'));
+
+  try {
+    const child = spawn(process.execPath, [CLI_PATH, tmpFile], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+
+    const exitCode = await new Promise((resolve) => {
+      child.on('close', resolve);
+    });
+
+    assert.equal(exitCode, 1, 'Large invalid CSV must exit with code 1');
+    assert.ok(stdout.length > 50000, `Stdout must be substantial (got ${stdout.length} bytes)`);
+
+    // Verify stdout is complete, valid JSON and not truncated
+    let report;
+    assert.doesNotThrow(() => {
+      report = JSON.parse(stdout);
+    }, 'Piped stdout must be completely drained valid JSON without truncation');
+
+    assert.equal(report.valid, false);
+    assert.equal(report.summary.error_count, 1000);
+    assert.equal(report.errors.length, 1000);
+  } finally {
+    try {
+      fs.unlinkSync(tmpFile);
+    } catch {}
+  }
+});
+
+test('regression 1 passing control: piped stdout outputs complete report on valid CSV', async () => {
+  const child = spawn(process.execPath, [CLI_PATH, path.join(FIXTURES_DIR, 'valid-zh-hsk1.csv')], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let stdout = '';
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk;
+  });
+
+  const exitCode = await new Promise((resolve) => {
+    child.on('close', resolve);
+  });
+
+  assert.equal(exitCode, 0);
+  const report = JSON.parse(stdout);
+  assert.equal(report.valid, true);
+  assert.equal(report.summary.valid_rows, 3);
+});
+
+// ---------------------------------------------------------------------------
+// 6. Finding 2 Regressions: Invalid Text (Malformed UTF-8 & NUL Characters)
+// ---------------------------------------------------------------------------
+test('regression 2: rejects malformed UTF-8 instead of silently replacing bytes', () => {
+  // Test via parseCsv with Buffer containing invalid UTF-8 bytes
+  const header = EXPECTED_HEADERS.join(',') + '\n';
+  const invalidBuf = Buffer.concat([
+    Buffer.from(header, 'utf8'),
+    Buffer.from('zh_1,zh-hsk1,zh,HSK1,'),
+    Buffer.from([0x80, 0x81]),
+    Buffer.from(',zì,char,စာ,,[],1\n'),
+  ]);
+
+  assert.throws(
+    () => parseCsv(invalidBuf),
+    (err) => err instanceof CsvParseError && err.code === 'MALFORMED_UTF8' && err.row === 2
+  );
+
+  // Test CLI execution with invalid-utf8.csv fixture
+  let exitCode = 0;
+  let stdout = '';
+  try {
+    stdout = execFileSync(process.execPath, [CLI_PATH, path.join(FIXTURES_DIR, 'invalid-utf8.csv')], {
+      encoding: 'utf8',
+    });
+  } catch (err) {
+    exitCode = err.status;
+    stdout = err.stdout;
+  }
+
+  assert.equal(exitCode, 1);
+  const report = JSON.parse(stdout);
+  assert.equal(report.valid, false);
+  assert.equal(report.errors.length, 1);
+  assert.equal(report.errors[0].code, 'MALFORMED_UTF8');
+  assert.equal(report.errors[0].row, 2);
+  // Actionable message with byte offset without dumping whole record
+  assert.match(report.errors[0].message, /byte offset/i);
+});
+
+test('regression 2: rejects NUL characters in raw CSV fields with actionable location', () => {
+  // Test validateCsvRows directly
+  const rows = [
+    {
+      rowNumber: 2,
+      fields: ['zh_1', 'zh-hsk1', 'zh', 'HSK1', '字\0', 'zì', 'char', 'စာ', '', '[]', '1'],
+    },
+  ];
+  const res = validateCsvRows(rows);
+  assert.equal(res.valid, false);
+  const nulErr = res.errors.find((e) => e.code === 'NUL_CHARACTER');
+  assert.ok(nulErr, 'Must emit NUL_CHARACTER error');
+  assert.equal(nulErr.row, 2);
+  assert.equal(nulErr.column, 'written_form');
+
+  // Test CLI execution with invalid-nul-raw.csv fixture
+  let exitCode = 0;
+  let stdout = '';
+  try {
+    stdout = execFileSync(process.execPath, [CLI_PATH, path.join(FIXTURES_DIR, 'invalid-nul-raw.csv')], {
+      encoding: 'utf8',
+    });
+  } catch (err) {
+    exitCode = err.status;
+    stdout = err.stdout;
+  }
+
+  assert.equal(exitCode, 1);
+  const report = JSON.parse(stdout);
+  assert.equal(report.valid, false);
+  const cliNulErr = report.errors.find((e) => e.code === 'NUL_CHARACTER');
+  assert.ok(cliNulErr);
+  assert.equal(cliNulErr.column, 'written_form');
+});
+
+test('regression 2: rejects NUL characters in decoded JSON fields', () => {
+  const content = fs.readFileSync(path.join(FIXTURES_DIR, 'invalid-nul-json.csv'), 'utf8');
+  const parsed = parseCsv(content);
+  const res = validateCsvRows(parsed.rows);
+
+  assert.equal(res.valid, false);
+  const nulErr = res.errors.find((e) => e.code === 'NUL_CHARACTER');
+  assert.ok(nulErr, 'Must detect NUL in decoded JSON string');
+  assert.equal(nulErr.row, 2);
+  assert.equal(nulErr.column, 'examples_json');
+  assert.match(nulErr.message, /text/);
+});
+
+test('regression 2 passing control: preserves intentionally encoded valid U+FFFD text', () => {
+  let exitCode = 0;
+  let stdout = '';
+  try {
+    stdout = execFileSync(process.execPath, [CLI_PATH, path.join(FIXTURES_DIR, 'valid-ufffd.csv')], {
+      encoding: 'utf8',
+    });
+  } catch (err) {
+    exitCode = err.status;
+    stdout = err.stdout;
+  }
+
+  assert.equal(exitCode, 0, 'Intentionally encoded valid U+FFFD must not fail validation');
+  const report = JSON.parse(stdout);
+  assert.equal(report.valid, true);
+  assert.equal(report.summary.error_count, 0);
+  assert.equal(report.summary.valid_rows, 1);
+});
+
+// ---------------------------------------------------------------------------
+// 7. Finding 3 Regressions: Final Quoted-Empty Record
+// ---------------------------------------------------------------------------
+test('regression 3: final quoted-empty record is preserved and reports column count error', () => {
+  const header = EXPECTED_HEADERS.join(',');
+
+  // Without trailing newline
+  assert.throws(
+    () => parseCsv(`${header}\n""`),
+    (err) => err instanceof CsvParseError && err.code === 'INCONSISTENT_COLUMN_COUNT' && err.row === 2
+  );
+
+  // With trailing newline
+  assert.throws(
+    () => parseCsv(`${header}\n""\n`),
+    (err) => err instanceof CsvParseError && err.code === 'INCONSISTENT_COLUMN_COUNT' && err.row === 2
+  );
+
+  // Test CLI execution with invalid-final-quoted-empty.csv
+  let exitCode = 0;
+  let stdout = '';
+  try {
+    stdout = execFileSync(process.execPath, [CLI_PATH, path.join(FIXTURES_DIR, 'invalid-final-quoted-empty.csv')], {
+      encoding: 'utf8',
+    });
+  } catch (err) {
+    exitCode = err.status;
+    stdout = err.stdout;
+  }
+
+  assert.equal(exitCode, 1);
+  const report = JSON.parse(stdout);
+  assert.equal(report.valid, false);
+  assert.equal(report.errors[0].code, 'INCONSISTENT_COLUMN_COUNT');
+  assert.equal(report.errors[0].row, 2);
+});
+
+test('regression 3: final quoted-empty full record preserves row and reports required field errors', () => {
+  const header = EXPECTED_HEADERS.join(',');
+  const rowWithQuotedEmptyFirst = `${header}\n"",,,,,,,,,,`;
+  const parsed = parseCsv(rowWithQuotedEmptyFirst);
+  assert.equal(parsed.rows.length, 1);
+
+  const res = validateCsvRows(parsed.rows);
+  assert.equal(res.valid, false);
+  assert.ok(res.errors.some((e) => e.code === 'MISSING_ID'));
+  assert.ok(res.errors.some((e) => e.code === 'MISSING_COURSE_ID'));
+  assert.ok(res.errors.some((e) => e.code === 'INVALID_LANGUAGE'));
+  assert.ok(res.errors.some((e) => e.code === 'MISSING_LEVEL_ID'));
+  assert.ok(res.errors.some((e) => e.code === 'MISSING_WRITTEN_FORM'));
+  assert.ok(res.errors.some((e) => e.code === 'MISSING_READING'));
+  assert.ok(res.errors.some((e) => e.code === 'MISSING_MEANING'));
+  assert.ok(res.errors.some((e) => e.code === 'MISSING_SORT_ORDER'));
+});
+
+test('regression 3 passing control: legitimate trailing blank lines are skipped', () => {
+  const header = EXPECTED_HEADERS.join(',');
+  const validRow = 'zh_1,zh-hsk1,zh,HSK1,字,zì,char,စာ,,[],1';
+
+  // Single trailing newline
+  const p1 = parseCsv(`${header}\n${validRow}\n`);
+  assert.equal(p1.rows.length, 1);
+
+  // Extra trailing blank lines (unquoted)
+  const p2 = parseCsv(`${header}\n${validRow}\n\n`);
+  assert.equal(p2.rows.length, 1);
+
+  // CRLF trailing blank line
+  const p3 = parseCsv(`${header}\r\n${validRow}\r\n\r\n`);
+  assert.equal(p3.rows.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// 8. Finding 4 Regressions: Extra Positional Arguments
+// ---------------------------------------------------------------------------
+test('regression 4: rejects multiple input files with exit code 2 and usage error', () => {
+  let exitCode = 0;
+  let stderr = '';
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        CLI_PATH,
+        path.join(FIXTURES_DIR, 'valid-zh-hsk1.csv'),
+        path.join(FIXTURES_DIR, 'valid-ja-n5.csv'),
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+  } catch (err) {
+    exitCode = err.status;
+    stderr = err.stderr;
+  }
+
+  assert.equal(exitCode, 2, 'Multiple input files must exit with code 2');
+  assert.match(stderr, /Unexpected extra arguments/i);
+  assert.match(stderr, /Usage:/i);
+});
+
+test('regression 4: rejects unexpected options and flags with exit code 2', () => {
+  let exitCode = 0;
+  let stderr = '';
+  try {
+    execFileSync(
+      process.execPath,
+      [CLI_PATH, path.join(FIXTURES_DIR, 'valid-zh-hsk1.csv'), '--extra-flag'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+  } catch (err) {
+    exitCode = err.status;
+    stderr = err.stderr;
+  }
+
+  assert.equal(exitCode, 2);
+  assert.match(stderr, /Unexpected extra arguments/i);
+
+  // Unknown option as first argument
+  let unknownOptExit = 0;
+  let unknownOptStderr = '';
+  try {
+    execFileSync(process.execPath, [CLI_PATH, '--foo-unknown'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    unknownOptExit = err.status;
+    unknownOptStderr = err.stderr;
+  }
+
+  assert.equal(unknownOptExit, 2);
+  assert.match(unknownOptStderr, /Unrecognized option/i);
+});
+
+test('regression 4 passing control: single input file is accepted cleanly', () => {
+  const stdout = execFileSync(
+    process.execPath,
+    [CLI_PATH, path.join(FIXTURES_DIR, 'valid-zh-hsk1.csv')],
+    { encoding: 'utf8' }
+  );
+  const report = JSON.parse(stdout);
+  assert.equal(report.valid, true);
 });

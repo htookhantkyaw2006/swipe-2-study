@@ -1,0 +1,2 @@
+id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burmese,audio_path,examples_json,sort_order
+zh_1,zh-hsk1,zh,HSK1,中,zhōng,Chinese,တရုတ်,,"[{""text"": ""hello\u0000world"", ""english"": ""hi""}]",1

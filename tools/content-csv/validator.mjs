@@ -7,6 +7,8 @@
  *   audio_path (Storage relative path), examples (JSON array <= 3 items), sort_order (integer)
  */
 
+import { EXPECTED_HEADERS } from './parser.mjs';
+
 const MAX_ID_LEN = 150;
 const MAX_COURSE_ID_LEN = 100;
 const MAX_LEVEL_ID_LEN = 100;
@@ -45,6 +47,20 @@ export function validateCsvRows(parsedRows) {
     // 8: audio_path
     // 9: examples_json
     // 10: sort_order
+
+    // 0. Prohibit NUL characters in raw fields
+    for (let c = 0; c < EXPECTED_HEADERS.length; c++) {
+      const colName = EXPECTED_HEADERS[c];
+      const val = f[c];
+      if (typeof val === 'string' && val.includes('\0')) {
+        errors.push({
+          row: rowNum,
+          column: colName,
+          code: 'NUL_CHARACTER',
+          message: `Column '${colName}' contains an illegal NUL (\\0) character.`,
+        });
+      }
+    }
 
     const id = f[0].trim();
     const courseId = f[1].trim();
@@ -402,6 +418,18 @@ function validateExamplesJson(jsonStr, rowNum, errors, warnings) {
         message: `Example ${exNum} must be a JSON object.`,
       });
       return;
+    }
+
+    // Reject NUL characters in decoded JSON fields
+    for (const [key, val] of Object.entries(ex)) {
+      if (typeof val === 'string' && val.includes('\0')) {
+        errors.push({
+          row: rowNum,
+          column: 'examples_json',
+          code: 'NUL_CHARACTER',
+          message: `Example ${exNum}: '${key}' contains an illegal NUL (\\0) character.`,
+        });
+      }
     }
 
     // text: required string

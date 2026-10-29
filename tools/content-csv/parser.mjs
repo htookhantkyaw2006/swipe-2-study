@@ -36,15 +36,64 @@ export class CsvParseError extends Error {
 }
 
 /**
- * Parses raw CSV string into a 2D array of records.
+ * Finds the byte offset and 1-based line number of the first malformed UTF-8 sequence.
+ *
+ * @param {Buffer|Uint8Array} buffer
+ * @returns {{ line: number, byteOffset: number }}
+ */
+export function findMalformedUtf8Location(buffer) {
+  const td = new TextDecoder('utf-8', { fatal: true });
+  let line = 1;
+  for (let i = 0; i < buffer.length; i++) {
+    try {
+      td.decode(buffer.subarray(i, i + 1), { stream: true });
+      if (buffer[i] === 0x0A) {
+        line++;
+      }
+    } catch {
+      return { line, byteOffset: i };
+    }
+  }
+  try {
+    td.decode(); // flush end-of-stream
+  } catch {
+    return { line, byteOffset: Math.max(0, buffer.length - 1) };
+  }
+  return { line: 1, byteOffset: 0 };
+}
+
+/**
+ * Parses raw CSV string or Buffer into a 2D array of records.
  * Does NOT use split(',') — uses a deterministic character state-machine.
  *
- * @param {string} rawContent Raw CSV string
+ * @param {string|Buffer|Uint8Array} rawContent Raw CSV string or buffer
  * @returns {{ headers: string[], rows: Array<{ rowNumber: number, fields: string[] }> }}
  */
 export function parseCsv(rawContent) {
+  if (Buffer.isBuffer(rawContent) || rawContent instanceof Uint8Array) {
+    try {
+      const decoder = new TextDecoder('utf-8', { fatal: true });
+      rawContent = decoder.decode(rawContent);
+    } catch {
+      const loc = findMalformedUtf8Location(rawContent);
+      throw new CsvParseError(
+        `Malformed or invalid UTF-8 byte sequence at byte offset ${loc.byteOffset} (line ${loc.line}).`,
+        'MALFORMED_UTF8',
+        { row: loc.line }
+      );
+    }
+  }
+
   if (typeof rawContent !== 'string') {
-    throw new CsvParseError('Input must be a string.', 'INVALID_INPUT_TYPE', { row: 1 });
+    throw new CsvParseError('Input must be a string or Buffer.', 'INVALID_INPUT_TYPE', { row: 1 });
+  }
+
+  if (typeof rawContent.isWellFormed === 'function' && !rawContent.isWellFormed()) {
+    throw new CsvParseError(
+      'CSV content contains malformed Unicode (unpaired surrogate code units).',
+      'MALFORMED_UTF8',
+      { row: 1 }
+    );
   }
 
   // 1. Strip UTF-8 BOM if present
@@ -58,6 +107,7 @@ export function parseCsv(rawContent) {
   let currentRecord = [];
   let currentField = '';
   let inQuotes = false;
+  let currentRecordHasQuotes = false;
   let recordStartLine = 1;
   let currentLine = 1;
   let charIndex = 0;
@@ -68,6 +118,7 @@ export function parseCsv(rawContent) {
 
     if (inQuotes) {
       if (ch === '"') {
+        currentRecordHasQuotes = true;
         // Look ahead for escaped quote ("")
         if (charIndex + 1 < len && content[charIndex + 1] === '"') {
           currentField += '"';
@@ -102,6 +153,7 @@ export function parseCsv(rawContent) {
 
     // Not in quotes
     if (ch === '"') {
+      currentRecordHasQuotes = true;
       if (currentField.length > 0) {
         throw new CsvParseError(
           `Malformed CSV: Unescaped quote inside unquoted field on line ${currentLine}.`,
@@ -127,9 +179,15 @@ export function parseCsv(rawContent) {
         charIndex++;
       }
       currentRecord.push(currentField);
-      rawRecords.push({ rowNumber: rawRecords.length + 1, startLine: recordStartLine, fields: currentRecord });
+      rawRecords.push({
+        rowNumber: rawRecords.length + 1,
+        startLine: recordStartLine,
+        fields: currentRecord,
+        hasQuotes: currentRecordHasQuotes,
+      });
       currentRecord = [];
       currentField = '';
+      currentRecordHasQuotes = false;
       currentLine++;
       recordStartLine = currentLine;
       charIndex++;
@@ -138,9 +196,15 @@ export function parseCsv(rawContent) {
 
     if (ch === '\n') {
       currentRecord.push(currentField);
-      rawRecords.push({ rowNumber: rawRecords.length + 1, startLine: recordStartLine, fields: currentRecord });
+      rawRecords.push({
+        rowNumber: rawRecords.length + 1,
+        startLine: recordStartLine,
+        fields: currentRecord,
+        hasQuotes: currentRecordHasQuotes,
+      });
       currentRecord = [];
       currentField = '';
+      currentRecordHasQuotes = false;
       currentLine++;
       recordStartLine = currentLine;
       charIndex++;
@@ -159,10 +223,15 @@ export function parseCsv(rawContent) {
     );
   }
 
-  // Push final record if fields remain or last char was not a trailing newline
-  if (currentRecord.length > 0 || currentField.length > 0) {
+  // Push final record if fields remain, last char was not a trailing newline, or record had quotes
+  if (currentRecord.length > 0 || currentField.length > 0 || currentRecordHasQuotes) {
     currentRecord.push(currentField);
-    rawRecords.push({ rowNumber: rawRecords.length + 1, startLine: recordStartLine, fields: currentRecord });
+    rawRecords.push({
+      rowNumber: rawRecords.length + 1,
+      startLine: recordStartLine,
+      fields: currentRecord,
+      hasQuotes: currentRecordHasQuotes,
+    });
   }
 
   if (rawRecords.length === 0) {
@@ -181,8 +250,8 @@ export function parseCsv(rawContent) {
 
   for (let i = 1; i < rawRecords.length; i++) {
     const record = rawRecords[i];
-    // Skip completely empty trailing row (e.g., blank line at end of file)
-    if (record.fields.length === 1 && record.fields[0] === '' && i === rawRecords.length - 1) {
+    // Skip completely empty unquoted trailing row (e.g., blank line at end of file)
+    if (!record.hasQuotes && record.fields.length === 1 && record.fields[0] === '' && i === rawRecords.length - 1) {
       continue;
     }
 
@@ -218,9 +287,16 @@ function validateHeaders(headers) {
     );
   }
 
-  // Check for duplicate header names
+  // Check for duplicate header names and illegal characters (such as NUL)
   const seen = new Set();
   for (const h of headers) {
+    if (h.includes('\0')) {
+      throw new CsvParseError(
+        `Header contains illegal NUL (\\0) character.`,
+        'NUL_CHARACTER',
+        { row: 1, column: h.replaceAll('\0', '') }
+      );
+    }
     if (seen.has(h)) {
       throw new CsvParseError(`Duplicate header '${h}' found in row 1.`, 'DUPLICATE_HEADER', { row: 1, column: h });
     }
