@@ -53,7 +53,7 @@ All authenticated study streaks derive strictly from server-assigned dates evalu
 - Client system clocks, local device timezones, or simulated timestamps cannot spoof or advance confirmed streak records.
 
 ### Streak Calculation Engine
-Authenticated study actions that modify learning data (e.g. `learned_words`, `review_cards`, or `saved_words`) transactionally trigger `private.s2s_record_study_action`:
+Authenticated study actions that modify learning data (e.g. `learned_words` or `review_cards`) transactionally trigger `private.s2s_record_study_action`:
 1. **Day Counting**:
    - Each calendar day in `Asia/Yangon` counts at most once, regardless of how many mutations or swipes occur.
 2. **Consecutive Days**:
@@ -71,3 +71,27 @@ Authenticated study actions that modify learning data (e.g. `learned_words`, `re
 ### Guest Isolation & Metrics Replacement
 - **Guest State**: Guests do not hold a server session or server streak; UI displays honest guest device-local indicators (`isGuest: true`, `—`, "Guest mode (device-local)").
 - **Live UI Updates**: All metric surfaces (Home `LevelCarousel` and `practice-links`, `LessonPicker`, `Library`, and `Profile`) actively subscribe to `storageOwner` events to re-render immediately upon session completion, data mutation, or account transition.
+
+
+## 4. Sync & Progress Integrity Hardening
+
+### In-Flight Acknowledgement Coordination
+- **Local Mutation Identity**: Monotonically increasing `localMutationId` counters are tracked locally on each dirty or deleted mutation.
+- **Latest Operation Type Preservation**: If an item is modified or deleted locally while an older request is in-flight:
+  - If locally deleted, the tombstone retains `status: 'deleted'` and absorbs the new server revision as its `cloudRevision`, preventing an old upsert ACK from converting the tombstone to dirty.
+  - If a second edit occurs with the same timestamp, the newer edit is preserved as `status: 'dirty'` and not marked synced prematurely.
+
+### Request / Response / Reset Validation
+- **Fail Closed**: Corrupted persisted request envelopes in local storage fail closed, preserving raw recovery bytes without overwriting or transmitting new requests.
+- **Exact Generation Matching**: Server responses must match the exact `reset_version` of the transmitted envelope; responses with mismatched generations (e.g. "99" for "0") are rejected.
+- **Reset Classification & Validated Hydration**: Transient concurrency errors (SQLSTATE 40001) are not misclassified as resets. On explicit `RESET_VERSION_CHANGED`, tables are not wiped and no fabricated generation is written until `restoreAccountSnapshot` completes successfully.
+
+### Server Compare-And-Swap (CAS)
+- **Strict Revision Checks**: Updating or deleting an existing server row requires exact matching between `base_revision` and current `revision`. Omitted base revisions or fabricated future revisions (e.g. "999") are rejected with `STALE_REVISION` conflicts, preventing lost updates and force-write bypass.
+
+### Tombstone Format & Identity Mapping
+- **Dual Identity Indexing**: Snapshots emit tombstones containing `item_key`, `language`, `kind`, `written_form`, `reading`, `deleted_at`, and `revision`.
+- **Hydration Reconcilation**: Hydration matches tombstones by both record identity (`recordKey`) and server SHA256 key (`cloudItemKey`). Remotely deleted items that were previously synced are cleanly removed from local tables, while genuinely pending local offline edits (`status: 'dirty'`) are preserved.
+
+### Qualifying Study Activity
+- **No Bookmark Streaks**: Dictionary bookmarks (`saved_words`) and search history do not count toward study streaks. Only accepted qualifying study actions (`learned_words`, `review_cards`, character drills) transactionally record study activity.

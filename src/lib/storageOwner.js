@@ -215,10 +215,12 @@ export function createStorageOwner({
         // Record deletions
         for (const k of prevMap.keys()) {
           if (!nextMap.has(k)) {
+            const prevRec = currentSyncState.records?.[k] ?? {};
             nextRecords[k] = {
-              ...(currentSyncState.records?.[k] ?? {}),
+              ...prevRec,
               status: 'deleted',
               deletedAt: nowIso,
+              localMutationId: (prevRec.localMutationId || 0) + 1,
             };
           }
         }
@@ -227,10 +229,12 @@ export function createStorageOwner({
         for (const [k, row] of nextMap.entries()) {
           const prevRow = prevMap.get(k);
           if (!prevRow || !rowsEqual(prevRow, row)) {
+            const prevRec = currentSyncState.records?.[k] ?? {};
             nextRecords[k] = {
-              ...(currentSyncState.records?.[k] ?? {}),
+              ...prevRec,
               status: 'dirty',
               updatedAt: row.updated_at || row.created_at || nowIso,
+              localMutationId: (prevRec.localMutationId || 0) + 1,
             };
           }
         }

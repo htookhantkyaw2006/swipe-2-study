@@ -3,7 +3,6 @@ import { storageOwner as defaultStorageOwner } from './storageOwner.js';
 import { wordOf, readingOf } from './entry.js';
 import { readSyncState, mirrorSyncStateToSidecar } from './cloudSyncState.js';
 import { restoreAccountSnapshot } from './cloudSnapshotHydration.js';
-import { decimalVersion, CLOUD_LANGUAGES } from './cloudImportRecords.js';
 import {
   readPendingSyncRequest,
   writePendingSyncRequest,
@@ -18,6 +17,25 @@ const SUPPORTED_KINDS = ['saved_words', 'review_cards', 'learned_words'];
 
 export function isSupportedSyncKind(kind) {
   return SUPPORTED_KINDS.includes(kind);
+}
+
+function rowsEqual(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.hasOwn(b, key)) return false;
+    const valA = a[key];
+    const valB = b[key];
+    if (typeof valA === 'object' && valA !== null && typeof valB === 'object' && valB !== null) {
+      if (JSON.stringify(valA) !== JSON.stringify(valB)) return false;
+    } else if (valA !== valB) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function extractRowData(row) {
@@ -97,6 +115,13 @@ export function createOnlineSyncService({
 
     // 1. Check for existing pending request envelope (retry case)
     const pendingRes = readPendingSyncRequest(storage, accountId);
+    if (pendingRes.error) {
+      return {
+        status: 'failed',
+        error: `Corrupt pending sync request: ${pendingRes.error}`,
+        pendingCount: countPending(accountId),
+      };
+    }
     let envelope = pendingRes.request;
 
     if (!envelope) {
@@ -139,7 +164,9 @@ export function createOnlineSyncService({
             observed_at: rec.deletedAt || now(),
           });
           itemsSnapshot[itemKey] = {
+            op: 'delete',
             status: 'deleted',
+            localMutationId: rec.localMutationId ?? 0,
             timestamp: rec.deletedAt || '',
           };
         } else if (rec.status === 'dirty') {
@@ -159,6 +186,7 @@ export function createOnlineSyncService({
           });
 
           if (row) {
+            const rowData = extractRowData(row);
             mutations.push({
               op: 'upsert',
               language,
@@ -168,11 +196,14 @@ export function createOnlineSyncService({
               client_id: itemKey,
               base_revision: rec.cloudRevision ? String(rec.cloudRevision) : undefined,
               observed_at: row.updated_at || row.created_at || rec.updatedAt || now(),
-              data: extractRowData(row),
+              data: rowData,
             });
             itemsSnapshot[itemKey] = {
+              op: 'upsert',
               status: 'dirty',
+              localMutationId: rec.localMutationId ?? 0,
               timestamp: rec.updatedAt || row.updated_at || row.created_at || '',
+              rowData,
             };
           }
         }
@@ -241,39 +272,33 @@ export function createOnlineSyncService({
     if (rpcError) {
       const msg = rpcError.message || String(rpcError);
 
-      if (msg.includes('RESET_VERSION_CHANGED') || rpcError.code === '40001') {
-        // Reset detected on server: discard stale pending envelope and reload
-        clearPendingSyncRequest(storage, accountId, envelope.requestId);
-
-        // Invalidate old learning cache
-        const doc = scope.readLearningDocument();
-        if (doc.value) {
-          const wipedTables = { ...(doc.value.tables || {}) };
-          for (const lang of CLOUD_LANGUAGES) {
-            for (const kind of SUPPORTED_KINDS) {
-              wipedTables[`${lang}_${kind}`] = '[]';
-            }
-          }
-          scope.commitLearningDocument(doc.raw, {
-            ...doc.value,
-            revision: (doc.value.revision || 0) + 1,
-            tables: wipedTables,
-            cloudSync: {
-              schemaVersion: 1,
-              ownerId: accountId.toLowerCase(),
-              resetVersion: '1',
-              records: {},
-              updatedAt: now(),
-            },
+      if (msg.includes('RESET_VERSION_CHANGED')) {
+        let restoreResult;
+        try {
+          restoreResult = await restoreAccountSnapshot(client, storageOwner, {
+            expectedUserId: accountId,
+            isCurrent,
+            now,
           });
+        } catch (restoreErr) {
+          return {
+            status: 'failed',
+            error: `Reset reload failed: ${restoreErr?.message || restoreErr}`,
+            pendingCount: countPending(accountId),
+          };
         }
 
-        // Hydrate from new generation
-        await restoreAccountSnapshot(client, storageOwner, {
-          expectedUserId: accountId,
-          isCurrent,
-          now,
-        });
+        const outcome = restoreResult?.outcome || restoreResult?.status;
+        if (!restoreResult || (outcome !== 'restored' && outcome !== 'up_to_date')) {
+          return {
+            status: 'failed',
+            error: 'Reset reload failed: snapshot restoration did not complete.',
+            pendingCount: countPending(accountId),
+          };
+        }
+
+        // Successfully hydrated from server: clear stale pending request envelope
+        clearPendingSyncRequest(storage, accountId, envelope.requestId);
 
         return {
           status: 'reset_reloaded',
@@ -290,14 +315,37 @@ export function createOnlineSyncService({
     }
 
     // 5. Validate server response
-    if (!data || data.status !== 'committed' || data.user_id !== envelope.ownerId
-      || data.request_id !== envelope.requestId || !decimalVersion(data.reset_version)
-      || !Array.isArray(data.acknowledged)) {
+    if (
+      !data ||
+      data.status !== 'committed' ||
+      data.user_id !== envelope.ownerId ||
+      data.request_id !== envelope.requestId ||
+      String(data.reset_version) !== String(envelope.resetVersion) ||
+      !Array.isArray(data.acknowledged) ||
+      data.acknowledged.length !== envelope.mutations.length
+    ) {
       return {
         status: 'failed',
         error: 'Invalid response from sync server.',
         pendingCount: envelope.mutations.length,
       };
+    }
+
+    for (let i = 0; i < envelope.mutations.length; i++) {
+      const mut = envelope.mutations[i];
+      const ack = data.acknowledged[i];
+      if (
+        !ack ||
+        typeof ack !== 'object' ||
+        ack.client_id !== mut.client_id ||
+        !['applied', 'deleted', 'conflict'].includes(ack.status)
+      ) {
+        return {
+          status: 'failed',
+          error: 'Invalid acknowledgements from sync server.',
+          pendingCount: envelope.mutations.length,
+        };
+      }
     }
 
     // 6. Commit acknowledgements to local authoritative document
@@ -322,18 +370,57 @@ export function createOnlineSyncService({
 
         if (!current) continue;
 
-        const currentTimestamp = current.status === 'deleted' ? current.deletedAt : current.updatedAt;
-        const snapTimestamp = snap?.timestamp;
+        let hasNewerLocalChange = false;
 
-        // Check if item was modified locally while request was in-flight
-        if (snap && currentTimestamp !== snapTimestamp) {
-          // Newer local edit happened while in-flight!
-          // Leave it dirty, but update base revision so the next batch builds on server revision
-          if (ack.status === 'applied') {
+        if (snap) {
+          if (snap.status !== current.status) {
+            hasNewerLocalChange = true;
+          } else if (
+            current.localMutationId !== undefined &&
+            snap.localMutationId !== undefined &&
+            current.localMutationId !== snap.localMutationId
+          ) {
+            hasNewerLocalChange = true;
+          } else if (current.status === 'deleted') {
+            if (current.deletedAt !== snap.timestamp) {
+              hasNewerLocalChange = true;
+            }
+          } else if (current.status === 'dirty') {
+            const parsed = parseItemKey(itemKey);
+            if (parsed) {
+              const rawTable = scope.getTable(parsed.language, parsed.kind);
+              let rows = [];
+              try {
+                rows = rawTable ? JSON.parse(rawTable) : [];
+              } catch {}
+              const currentRow = rows.find(r => {
+                const w = wordOf(r);
+                const red = r.pronunciation ?? readingOf(r) ?? '';
+                return w === parsed.written && (red === parsed.reading || (!parsed.reading && !red));
+              });
+              if (!currentRow || !rowsEqual(extractRowData(currentRow), snap.rowData)) {
+                hasNewerLocalChange = true;
+              }
+            }
+          }
+        }
+
+        if (hasNewerLocalChange) {
+          // A newer local edit or deletion happened while this request was in-flight!
+          // Preserve the latest operation type and clear only the acknowledged mutation:
+          if (current.status === 'deleted') {
+            nextRecords[itemKey] = {
+              ...current,
+              status: 'deleted',
+              cloudRevision: ack.status === 'applied' ? String(ack.revision) : current.cloudRevision,
+              cloudItemKey: ack.item_key || current.cloudItemKey,
+            };
+          } else if (current.status === 'dirty') {
             nextRecords[itemKey] = {
               ...current,
               status: 'dirty',
-              cloudRevision: String(ack.revision),
+              cloudRevision: ack.status === 'applied' ? String(ack.revision) : current.cloudRevision,
+              cloudItemKey: ack.item_key || current.cloudItemKey,
             };
           }
           continue;
@@ -342,9 +429,11 @@ export function createOnlineSyncService({
         // Unmodified: apply acknowledgement
         if (ack.status === 'applied') {
           nextRecords[itemKey] = {
+            ...current,
             status: 'synced',
             cloudRevision: String(ack.revision),
-            updatedAt: currentTimestamp || now(),
+            cloudItemKey: ack.item_key || current.cloudItemKey,
+            updatedAt: current.updatedAt || now(),
           };
         } else if (ack.status === 'deleted') {
           // Confirmed server tombstone: remove local deletion record

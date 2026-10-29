@@ -36,6 +36,7 @@ function createMemoryStorage(initial = {}) {
 function createMockSupabaseClient({
   mutationsHandler = async () => ({ data: { status: 'committed', user_id: OWNER_A, request_id: 'test', reset_version: '0', acknowledged: [] }, error: null }),
   snapshotHandler = async () => ({ data: { schema_version: 1, user_id: OWNER_A, reset_version: '0', server_time: new Date().toISOString(), items: [], tombstones: [] }, error: null }),
+  userId = OWNER_A,
 } = {}) {
   let callCount = 0;
   const calls = [];
@@ -43,6 +44,10 @@ function createMockSupabaseClient({
   return {
     getCallCount: () => callCount,
     getCalls: () => calls,
+    auth: {
+      getUser: async () => ({ data: { user: { id: userId } }, error: null }),
+      getSession: async () => ({ data: { session: { user: { id: userId } } }, error: null }),
+    },
     rpc: async (fn, params) => {
       callCount++;
       calls.push({ fn, params });
@@ -618,6 +623,15 @@ test('BigInt precision: revisions exceeding Number.MAX_SAFE_INTEGER retain preci
 
   db.insert('saved_words', { phrase: '高精度', reading: 'gāo jīng dù' });
   const key = recordKey('zh', 'saved_words', '高精度', 'gāo jīng dù');
+
+  // Seed initial resetVersion with large BigInt string
+  const doc = storageOwner.scope(OWNER_A).readLearningDocument();
+  const currentSync = doc.value?.cloudSync || readSyncState(storage, OWNER_A).state;
+  currentSync.resetVersion = largeResetVersion;
+  storageOwner.scope(OWNER_A).commitLearningDocument(doc.raw, {
+    ...doc.value,
+    cloudSync: currentSync,
+  });
 
   const mockClient = createMockSupabaseClient({
     mutationsHandler: async (params) => {

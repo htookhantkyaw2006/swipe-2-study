@@ -236,10 +236,12 @@ export function recordLocalDeletion(storage, ownerId, language, kind, writtenFor
     records: {},
   };
   const key = recordKey(language, kind, writtenForm, reading);
+  const prevRec = nextState.records[key] ?? {};
   nextState.records[key] = {
-    ...(nextState.records[key] ?? {}),
+    ...prevRec,
     status: 'deleted',
     deletedAt: now(),
+    localMutationId: (prevRec.localMutationId || 0) + 1,
   };
   nextState.updatedAt = now();
   persistSyncState(storage, nextState);
@@ -258,10 +260,12 @@ export function recordLocalDirty(storage, ownerId, language, kind, writtenForm, 
     records: {},
   };
   const key = recordKey(language, kind, writtenForm, reading);
+  const prevRec = nextState.records[key] ?? {};
   nextState.records[key] = {
-    ...(nextState.records[key] ?? {}),
+    ...prevRec,
     status: 'dirty',
     updatedAt: now(),
+    localMutationId: (prevRec.localMutationId || 0) + 1,
   };
   nextState.updatedAt = now();
   persistSyncState(storage, nextState);

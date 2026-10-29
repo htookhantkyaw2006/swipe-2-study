@@ -77,6 +77,7 @@ before(async () => {
   await db.exec(await readFile(new URL('../supabase/migrations/20261029000300_online_sync_foundation.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20261029000400_learned_words_sync.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20261029000500_study_streaks_yangon.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20261029000600_sync_progress_hardening.sql', import.meta.url), 'utf8'));
 });
 
 after(async () => {

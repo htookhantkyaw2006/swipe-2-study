@@ -49,12 +49,18 @@ export function reconcileSnapshotWithLocal({
   const nextRecords = isResetMismatch ? {} : { ...(syncState?.records ?? {}) };
 
   // Map server tombstones if provided
-  const serverTombstones = new Map();
+  const serverTombstonesByRecordKey = new Map();
+  const serverTombstonesByItemKey = new Map();
   if (Array.isArray(snapshot.tombstones)) {
     for (const t of snapshot.tombstones) {
       if (t && typeof t === 'object') {
-        const k = recordKey(t.language, t.kind, t.written_form, t.reading);
-        serverTombstones.set(k, t);
+        if (t.item_key) {
+          serverTombstonesByItemKey.set(t.item_key, t);
+        }
+        if (t.written_form) {
+          const k = recordKey(t.language, t.kind, t.written_form, t.reading);
+          serverTombstonesByRecordKey.set(k, t);
+        }
       }
     }
   }
@@ -154,6 +160,7 @@ export function reconcileSnapshotWithLocal({
             nextRecords[itemKey] = {
               status: 'synced',
               cloudRevision: item.revision,
+              cloudItemKey: item.item_key,
               updatedAt: item.updated_at,
             };
             continue;
@@ -180,6 +187,7 @@ export function reconcileSnapshotWithLocal({
           nextRecords[itemKey] = {
             status: 'synced',
             cloudRevision: item.revision,
+            cloudItemKey: item.item_key,
             updatedAt: item.updated_at,
           };
           continue;
@@ -189,16 +197,37 @@ export function reconcileSnapshotWithLocal({
       // 2. Process local rows not in cloud snapshot (e.g. offline creations or pre-existing caches)
       for (const [key, row] of localMap.entries()) {
         if (!seenKeys.has(key)) {
-          if (nextRecords[key]?.status === 'deleted') {
+          const tracked = nextRecords[key];
+          if (tracked?.status === 'deleted') {
             continue; // Tombstone exists, keep deleted!
           }
-          if (serverTombstones.has(key) && nextRecords[key]?.status !== 'dirty') {
-            // Deleted on server and not edited locally since: do not resurrect!
+
+          // Check if there is a server tombstone for this local row
+          const tombstone = serverTombstonesByRecordKey.get(key)
+            || (tracked?.cloudItemKey ? serverTombstonesByItemKey.get(tracked.cloudItemKey) : null);
+
+          if (tombstone) {
+            if (tracked?.status === 'dirty') {
+              // Genuinely pending local mutation: preserve local row!
+              mergedRows.push(row);
+              continue;
+            }
+            // Remotely deleted and not edited locally since:
+            // Do NOT keep in mergedRows! Do NOT resurrect!
+            nextRecords[key] = {
+              status: 'deleted',
+              cloudRevision: tombstone.revision,
+              cloudItemKey: tombstone.item_key,
+              deletedAt: tombstone.deleted_at || now(),
+            };
+            changesCount++;
             continue;
           }
-          // Retain local item! Never discard local data!
+
+          // Retain local item! Offline creation or pre-existing cache
           mergedRows.push(row);
           nextRecords[key] = {
+            ...(tracked || {}),
             status: 'dirty',
             updatedAt: row.updated_at || row.created_at || now(),
           };
