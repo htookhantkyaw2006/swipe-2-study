@@ -14,7 +14,7 @@ import {
   publishStagedContent,
   rollbackContent,
 } from '../tools/content-csv/contentImportEngine.mjs';
-import { runCli } from '../tools/content-csv/content-manager.mjs';
+import { runCli, parseCliArgs } from '../tools/content-csv/content-manager.mjs';
 
 const db = new PGlite();
 const alice = '11111111-1111-4111-8111-111111111111';
@@ -67,6 +67,9 @@ before(async () => {
 
   const contentMigration = await readFile(new URL('../supabase/migrations/20261030000100_content_publication_foundation.sql', import.meta.url), 'utf8');
   await db.exec(contentMigration);
+
+  const hardeningMigration = await readFile(new URL('../supabase/migrations/20261030000200_content_publication_hardening.sql', import.meta.url), 'utf8');
+  await db.exec(hardeningMigration);
 });
 
 after(async () => {
@@ -233,16 +236,25 @@ test('3. Diff calculation and dry-run detection', async () => {
   assert.equal(diff.counts.unchanged, 1);
   assert.equal(diff.counts.retired, 0);
 
-  // Test retirement detection: omit zh_002 from incoming
+  // Test omission preserves items: omitting zh_002 without retiredIds does NOT retire it
+  const diffOmitted = calculateContentDiff({
+    currentItems: current,
+    incomingItems: [incoming[0]],
+  });
+  assert.equal(diffOmitted.counts.retired, 0);
+  assert.equal(diffOmitted.counts.omitted_preserved, 1);
+
+  // Test explicit retirement detection: passing retiredIds retires zh_002
   const diffWithRetirement = calculateContentDiff({
     currentItems: current,
     incomingItems: [incoming[0]],
+    retiredIds: ['zh_002'],
   });
   assert.equal(diffWithRetirement.counts.retired, 1);
   assert.equal(diffWithRetirement.retired[0].id, 'zh_002');
 });
 
-test('4. Ambiguous identity change detection and rejection', async () => {
+test('4. Natural identity change detection and rejection', async () => {
   const current = [
     {
       id: 'zh_001',
@@ -280,7 +292,7 @@ test('4. Ambiguous identity change detection and rejection', async () => {
   });
   assert.equal(compatibility.valid, false);
   assert.equal(compatibility.ambiguousChanges.length, 1);
-  assert.match(compatibility.errors[0], /AMBIGUOUS/i);
+  assert.match(compatibility.errors[0], /NATURAL_IDENTITY_CHANGE/i);
 });
 
 test('5. Staging isolation: staging does not alter published content', async () => {
@@ -419,7 +431,7 @@ test('7. Atomic publication & explicit retirement', async () => {
   });
   assert.equal(anonVocab.length, 2);
 
-  // Now publish v2 which updates zh_hsk1_001 and omits zh_hsk1_002 (retires it)
+  // First verify omission preserves items: publish v2 omitting zh_hsk1_002 without retiredIds
   const itemsV2 = [
     {
       id: 'zh_hsk1_001',
@@ -451,7 +463,7 @@ test('7. Atomic publication & explicit retirement', async () => {
     },
   ];
 
-  const stageV2 = await stageContent({
+  const stageV2Preserve = await stageContent({
     db,
     courseId: 'zh-hsk1',
     incomingItems: itemsV2,
@@ -459,25 +471,52 @@ test('7. Atomic publication & explicit retirement', async () => {
     operator: 'tester',
   });
 
-  const publishV2 = await publishStagedContent({
+  const publishV2Preserve = await publishStagedContent({
     db,
     courseId: 'zh-hsk1',
-    stageId: stageV2.stage_id,
+    stageId: stageV2Preserve.stage_id,
     operator: 'tester',
-    reason: 'Version 2 with updated meanings and retired item',
+    reason: 'Version 2 with preserved omitted item',
     backupDir: TEST_BACKUP_DIR,
   });
 
-  assert.equal(publishV2.version, 2);
-  assert.equal(publishV2.inserted, 1); // zh_hsk1_003
-  assert.equal(publishV2.updated, 1);  // zh_hsk1_001
-  assert.equal(publishV2.retired, 1);  // zh_hsk1_002 retired
-  assert.equal(publishV2.total_active, 2);
+  assert.equal(publishV2Preserve.version, 2);
+  assert.equal(publishV2Preserve.inserted, 1); // zh_hsk1_003
+  assert.equal(publishV2Preserve.updated, 1);  // zh_hsk1_001
+  assert.equal(publishV2Preserve.retired, 0, 'Omitted item must NOT be retired without explicit intent');
+  assert.equal(publishV2Preserve.total_active, 3, 'All 3 items must be active');
 
-  // Backup of v1 was created before v2 was applied
-  assert.ok(publishV2.backup?.backupPath);
+  // zh_hsk1_002 was omitted but remains active!
+  const preservedRow = await query('select id, is_active from public.vocabulary where id = $1', ['zh_hsk1_002']);
+  assert.equal(preservedRow.rows[0].is_active, true);
 
-  // zh_hsk1_002 is still in the database (is_active = false)
+  // Now publish v3 with explicit retirement of zh_hsk1_002 via retiredIds
+  const stageV3 = await stageContent({
+    db,
+    courseId: 'zh-hsk1',
+    incomingItems: itemsV2,
+    rawBuffer: Buffer.from(JSON.stringify(itemsV2) + 'v3'),
+    operator: 'tester',
+    retiredIds: ['zh_hsk1_002'],
+  });
+
+  const publishV3 = await publishStagedContent({
+    db,
+    courseId: 'zh-hsk1',
+    stageId: stageV3.stage_id,
+    operator: 'tester',
+    reason: 'Version 3 with explicitly retired item',
+    backupDir: TEST_BACKUP_DIR,
+  });
+
+  assert.equal(publishV3.version, 3);
+  assert.equal(publishV3.retired, 1);  // zh_hsk1_002 explicitly retired
+  assert.equal(publishV3.total_active, 2);
+
+  // Backup of v2 was created before v3 was applied
+  assert.ok(publishV3.backup?.backupPath);
+
+  // zh_hsk1_002 is now in the database with is_active = false
   const retiredRow = await query('select id, is_active from public.vocabulary where id = $1', ['zh_hsk1_002']);
   assert.equal(retiredRow.rows[0].is_active, false);
 
@@ -491,7 +530,7 @@ test('7. Atomic publication & explicit retirement', async () => {
 });
 
 test('8. Content rollback to prior version', async () => {
-  // Course is at version 2. Rollback to version 1.
+  // Course is at version 3. Rollback to version 1.
   const rollbackResult = await rollbackContent({
     db,
     courseId: 'zh-hsk1',
@@ -628,4 +667,182 @@ test('10. Operator CLI flags and write protection', async () => {
   assert.equal(dryRunReport.valid, true);
   assert.equal(dryRunReport.course_id, 'ja-n5');
   assert.equal(dryRunReport.database_modified, false);
+});
+
+test('11. Cross-course ID conflict rejected at staging and publication', async () => {
+  // zh_hsk1_001 exists in zh-hsk1. Try staging it under ja-n5.
+  const crossCourseItem = [
+    {
+      id: 'zh_hsk1_001',
+      course_id: 'ja-n5',
+      language: 'ja',
+      level_id: 'N5',
+      written_form: '中',
+      reading: 'なか',
+      meaning_english: 'middle',
+      meaning_burmese: 'အလယ်',
+      audio_path: null,
+      examples: [],
+      sort_order: 1,
+      is_active: true,
+    },
+  ];
+
+  // Engine validation rejects
+  const validation = validateIdentityCompatibility({
+    currentItems: [{ id: 'zh_hsk1_001', course_id: 'zh-hsk1', written_form: '中', reading: 'zhōng' }],
+    incomingItems: crossCourseItem,
+  });
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors[0], /CROSS_COURSE_ID_CONFLICT/i);
+
+  // Staging RPC rejects
+  await assert.rejects(
+    async () => {
+      await stageContent({
+        db,
+        courseId: 'ja-n5',
+        incomingItems: crossCourseItem,
+        rawBuffer: Buffer.from(JSON.stringify(crossCourseItem)),
+      });
+    },
+    /CROSS_COURSE_ID_CONFLICT/i
+  );
+});
+
+test('12. Natural identity modification (written_form or reading) rejected', async () => {
+  // Try changing only written_form
+  const changedWritten = [
+    {
+      id: 'zh_hsk1_001',
+      course_id: 'zh-hsk1',
+      language: 'zh',
+      level_id: 'HSK1',
+      written_form: '中心',
+      reading: 'zhōng',
+      meaning_english: 'center',
+      meaning_burmese: 'အလယ်',
+      audio_path: null,
+      examples: [],
+      sort_order: 10,
+      is_active: true,
+    },
+  ];
+
+  await assert.rejects(
+    async () => {
+      await stageContent({
+        db,
+        courseId: 'zh-hsk1',
+        incomingItems: changedWritten,
+        rawBuffer: Buffer.from(JSON.stringify(changedWritten)),
+      });
+    },
+    /NATURAL_IDENTITY_CHANGE/i
+  );
+
+  // Try changing only reading
+  const changedReading = [
+    {
+      id: 'zh_hsk1_001',
+      course_id: 'zh-hsk1',
+      language: 'zh',
+      level_id: 'HSK1',
+      written_form: '中',
+      reading: 'zhòng',
+      meaning_english: 'hit',
+      meaning_burmese: 'ထိမှန်',
+      audio_path: null,
+      examples: [],
+      sort_order: 10,
+      is_active: true,
+    },
+  ];
+
+  await assert.rejects(
+    async () => {
+      await stageContent({
+        db,
+        courseId: 'zh-hsk1',
+        incomingItems: changedReading,
+        rawBuffer: Buffer.from(JSON.stringify(changedReading)),
+      });
+    },
+    /NATURAL_IDENTITY_CHANGE/i
+  );
+});
+
+test('13. Stale stage version rejected at publication', async () => {
+  const currentStatus = await fetchCourseStatus({ db, courseId: 'zh-hsk1' });
+  const currentVer = currentStatus.content_version;
+
+  // Stage content with current version
+  const validItems = [
+    {
+      id: 'zh_hsk1_001',
+      course_id: 'zh-hsk1',
+      language: 'zh',
+      level_id: 'HSK1',
+      written_form: '中',
+      reading: 'zhōng',
+      meaning_english: 'middle',
+      meaning_burmese: 'အလယ်',
+      audio_path: null,
+      examples: [],
+      sort_order: 10,
+      is_active: true,
+    },
+  ];
+
+  const stage = await stageContent({
+    db,
+    courseId: 'zh-hsk1',
+    incomingItems: validItems,
+    rawBuffer: Buffer.from(JSON.stringify(validItems)),
+  });
+
+  // Advance course version behind the scenes
+  await query('update public.courses set content_version = $1 where id = $2', [currentVer + 5, 'zh-hsk1']);
+
+  // Publishing stale stage fails closed
+  await assert.rejects(
+    async () => {
+      await publishStagedContent({
+        db,
+        courseId: 'zh-hsk1',
+        stageId: stage.stage_id,
+        backupDir: TEST_BACKUP_DIR,
+      });
+    },
+    /STALE_STAGE_VERSION/i
+  );
+
+  // Restore course version
+  await query('update public.courses set content_version = $1 where id = $2', [currentVer, 'zh-hsk1']);
+});
+
+test('14. CLI argument parsing safety: extra positional args, invalid target, and retire-ids', () => {
+  // Test extra positional argument
+  assert.throws(
+    () => parseCliArgs(['dry-run', 'some/path.csv', 'extra_argument']),
+    /Unexpected extra argument 'extra_argument'/
+  );
+
+  // Test invalid target
+  assert.throws(
+    () => parseCliArgs(['stage', 'some/path.csv', '--target', 'bogus-target']),
+    /Invalid target 'bogus-target'/
+  );
+
+  // Test valid target
+  const validTargetFlags = parseCliArgs(['stage', 'some/path.csv', '--target', 'staging']);
+  assert.equal(validTargetFlags.target, 'staging');
+
+  // Test --retire-ids parsing
+  const retireFlags = parseCliArgs(['stage', 'some/path.csv', '--target', 'local', '--retire-ids', 'zh_001,zh_002']);
+  assert.deepEqual(retireFlags.retireIds, ['zh_001', 'zh_002']);
+
+  // Test --retire shorthand
+  const retireShortFlags = parseCliArgs(['dry-run', 'some/path.csv', '--retire', 'zh_003']);
+  assert.deepEqual(retireShortFlags.retireIds, ['zh_003']);
 });

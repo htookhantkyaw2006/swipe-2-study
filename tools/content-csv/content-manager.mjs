@@ -84,7 +84,7 @@ function safeExit(exitCode, message = '', stream = process.stdout) {
   }
 }
 
-function parseCliArgs(argv) {
+export function parseCliArgs(argv) {
   const flags = {
     command: null,
     csvPath: null,
@@ -97,6 +97,7 @@ function parseCliArgs(argv) {
     toVersion: null,
     outDir: null,
     json: false,
+    retireIds: [],
   };
 
   const positional = [];
@@ -111,6 +112,13 @@ function parseCliArgs(argv) {
       flags.target = argv[++i];
     } else if (arg.startsWith('--target=')) {
       flags.target = arg.slice(9);
+    } else if (arg === '--retire-ids' || arg === '--retire') {
+      const val = argv[++i] || '';
+      flags.retireIds = val.split(',').map((s) => s.trim()).filter(Boolean);
+    } else if (arg.startsWith('--retire-ids=')) {
+      flags.retireIds = arg.slice(13).split(',').map((s) => s.trim()).filter(Boolean);
+    } else if (arg.startsWith('--retire=')) {
+      flags.retireIds = arg.slice(9).split(',').map((s) => s.trim()).filter(Boolean);
     } else if (arg === '--operator') {
       flags.operator = argv[++i];
     } else if (arg.startsWith('--operator=')) {
@@ -169,6 +177,15 @@ function parseCliArgs(argv) {
     } else {
       flags.csvPath = firstPos;
     }
+  }
+
+  if (positional.length > 1) {
+    throw new Error(`Unexpected extra argument '${positional[1]}'`);
+  }
+
+  const VALID_TARGETS = new Set(['production', 'staging', 'local', 'test']);
+  if (flags.target && !VALID_TARGETS.has(flags.target.toLowerCase())) {
+    throw new Error(`Invalid target '${flags.target}'. Must be one of: production, staging, local, test.`);
   }
 
   return flags;
@@ -310,7 +327,7 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
     if (db) {
       try {
         currentItems = await fetchCurrentCourseContent({ db, courseId });
-        diff = calculateContentDiff({ currentItems, incomingItems });
+        diff = calculateContentDiff({ currentItems, incomingItems, retiredIds: flags.retireIds });
         identityValidation = validateIdentityCompatibility({ currentItems, incomingItems });
       } catch (err) {
         safeExit(1, `Error querying database for dry-run comparison: ${err.message}\n`, process.stderr);
@@ -381,6 +398,38 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
       return;
     }
 
+    // Verify target matches configured database environment
+    const configuredTarget = process.env.OPERATOR_TARGET || process.env.TARGET_ENV;
+    if (configuredTarget && configuredTarget.toLowerCase() !== flags.target.toLowerCase()) {
+      safeExit(
+        2,
+        `Error: Target mismatch: CLI requested --target '${flags.target}', but environment is configured for '${configuredTarget}'.\n`,
+        process.stderr
+      );
+      return;
+    }
+
+    const url = process.env.OPERATOR_SUPABASE_URL || process.env.SUPABASE_URL;
+    if (url) {
+      const isLocal = url.includes('localhost') || url.includes('127.0.0.1') || url.includes(':54321');
+      if (flags.target.toLowerCase() === 'production' && isLocal) {
+        safeExit(
+          2,
+          `Error: Target mismatch: CLI requested --target 'production', but database URL points to local instance '${url}'.\n`,
+          process.stderr
+        );
+        return;
+      }
+      if ((flags.target.toLowerCase() === 'local' || flags.target.toLowerCase() === 'test') && !isLocal && url.includes('.supabase.co')) {
+        safeExit(
+          2,
+          `Error: Target mismatch: CLI requested --target '${flags.target}', but database URL points to remote instance '${url}'.\n`,
+          process.stderr
+        );
+        return;
+      }
+    }
+
     if (!db) {
       safeExit(
         2,
@@ -439,6 +488,7 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
         incomingItems,
         rawBuffer: fileData.rawBuffer,
         operator: flags.operator,
+        retiredIds: flags.retireIds,
         metadata: {
           target: flags.target,
           filename: path.basename(flags.csvPath),
@@ -529,6 +579,7 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
         incomingItems,
         rawBuffer: fileData.rawBuffer,
         operator: flags.operator,
+        retiredIds: flags.retireIds,
         metadata: {
           target: flags.target,
           filename: path.basename(flags.csvPath),

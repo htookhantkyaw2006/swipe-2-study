@@ -64,11 +64,13 @@ export function isContentEqual(current, incoming) {
 
 /**
  * Calculates diff between current database items and incoming staged items.
- * Detects inserted, updated, unchanged, retired, and ambiguous identity changes.
+ * Detects inserted, updated, unchanged, retired (explicit only), and natural identity changes.
+ * Omission from incoming list alone preserves items and does NOT retire them.
  */
-export function calculateContentDiff({ currentItems = [], incomingItems = [] }) {
+export function calculateContentDiff({ currentItems = [], incomingItems = [], retiredIds = [] }) {
   const currentMap = new Map(currentItems.map((item) => [item.id, item]));
   const incomingMap = new Map(incomingItems.map((item) => [item.id, item]));
+  const retiredSet = new Set(retiredIds);
 
   const inserted = [];
   const updated = [];
@@ -82,8 +84,8 @@ export function calculateContentDiff({ currentItems = [], incomingItems = [] }) 
     } else {
       const cur = currentMap.get(inc.id);
 
-      // Verify stable identity: existing ID cannot change both written_form and reading to an unrelated word
-      if (cur.written_form !== inc.written_form && (cur.reading || '') !== (inc.reading || '')) {
+      // Verify stable identity: existing ID cannot change written_form OR reading
+      if (cur.written_form !== inc.written_form || (cur.reading || '') !== (inc.reading || '')) {
         ambiguousChanges.push({
           id: inc.id,
           current: { written_form: cur.written_form, reading: cur.reading },
@@ -101,10 +103,18 @@ export function calculateContentDiff({ currentItems = [], incomingItems = [] }) 
     }
   }
 
-  // Explicit retirement: active current items missing from incoming list
+  // Explicit retirement ONLY: items explicitly identified in retiredIds
   for (const cur of currentItems) {
-    if (cur.is_active && !incomingMap.has(cur.id)) {
+    if (retiredSet.has(cur.id) && cur.is_active) {
       retired.push(cur);
+    }
+  }
+
+  // Omitted items that are not in retiredSet remain active and preserved
+  let omittedPreservedCount = 0;
+  for (const cur of currentItems) {
+    if (!incomingMap.has(cur.id) && !retiredSet.has(cur.id) && cur.is_active) {
+      omittedPreservedCount++;
     }
   }
 
@@ -114,6 +124,7 @@ export function calculateContentDiff({ currentItems = [], incomingItems = [] }) 
       updated: updated.length,
       unchanged: unchanged.length,
       retired: retired.length,
+      omitted_preserved: omittedPreservedCount,
       total_incoming: incomingItems.length,
       total_current: currentItems.length,
     },
@@ -126,22 +137,40 @@ export function calculateContentDiff({ currentItems = [], incomingItems = [] }) 
 }
 
 /**
- * Validates identity compatibility, rejecting ambiguous identity alterations.
+ * Validates identity compatibility, rejecting cross-course ID reuse, duplicate IDs,
+ * and natural identity alterations.
  */
 export function validateIdentityCompatibility({ currentItems = [], incomingItems = [] }) {
-  const diff = calculateContentDiff({ currentItems, incomingItems });
-  if (diff.ambiguousChanges.length > 0) {
-    const errorDetails = diff.ambiguousChanges.map(
-      (c) =>
-        `AMBIGUOUS_IDENTITY_CHANGE: Item ID '${c.id}' cannot change written_form from '${c.current.written_form}' to '${c.incoming.written_form}' and reading from '${c.current.reading}' to '${c.incoming.reading}'.`
-    );
-    return {
-      valid: false,
-      errors: errorDetails,
-      ambiguousChanges: diff.ambiguousChanges,
-    };
+  const errors = [];
+  const seenIds = new Set();
+  const currentMap = new Map(currentItems.map((item) => [item.id, item]));
+
+  for (const inc of incomingItems) {
+    if (seenIds.has(inc.id)) {
+      errors.push(`DUPLICATE_VOCABULARY_ID: Item ID '${inc.id}' appears multiple times in input.`);
+    }
+    seenIds.add(inc.id);
+
+    const cur = currentMap.get(inc.id);
+    if (cur) {
+      if (cur.course_id && inc.course_id && cur.course_id !== inc.course_id) {
+        errors.push(
+          `CROSS_COURSE_ID_CONFLICT: Item ID '${inc.id}' belongs to course '${cur.course_id}', cannot be used by course '${inc.course_id}'.`
+        );
+      }
+      if (cur.written_form !== inc.written_form || (cur.reading || '') !== (inc.reading || '')) {
+        errors.push(
+          `NATURAL_IDENTITY_CHANGE: Item ID '${inc.id}' cannot change written_form from '${cur.written_form}' to '${inc.written_form}' or reading from '${cur.reading}' to '${inc.reading}'.`
+        );
+      }
+    }
   }
-  return { valid: true, errors: [], ambiguousChanges: [] };
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    ambiguousChanges: errors.length > 0 ? errors : [],
+  };
 }
 
 /**
@@ -257,17 +286,29 @@ export async function fetchCourseStatus({ db, courseId }) {
 /**
  * Stages content into private.content_stages via public.s2s_stage_course_content.
  */
-export async function stageContent({ db, courseId, incomingItems, rawBuffer, operator = 'operator', metadata = {} }) {
+export async function stageContent({
+  db,
+  courseId,
+  incomingItems,
+  rawBuffer,
+  operator = 'operator',
+  metadata = {},
+  retiredIds = [],
+}) {
   if (!SUPPORTED_COURSES.has(courseId)) {
     throw new Error(`Unsupported course '${courseId}'. Only 'zh-hsk1' and 'ja-n5' are permitted.`);
   }
 
   const checksum = computeSha256(rawBuffer);
+  const stageMetadata = {
+    ...metadata,
+    ...(retiredIds.length > 0 ? { retired_ids: retiredIds } : {}),
+  };
 
   if (typeof db.query === 'function') {
     const res = await db.query(
       'select public.s2s_stage_course_content($1, $2, $3::jsonb, $4::jsonb, $5) as result',
-      [courseId, checksum, JSON.stringify(incomingItems), JSON.stringify(metadata), operator]
+      [courseId, checksum, JSON.stringify(incomingItems), JSON.stringify(stageMetadata), operator]
     );
     return res.rows[0]?.result;
   }
@@ -277,7 +318,7 @@ export async function stageContent({ db, courseId, incomingItems, rawBuffer, ope
       p_course_id: courseId,
       p_source_checksum: checksum,
       p_items: incomingItems,
-      p_metadata: metadata,
+      p_metadata: stageMetadata,
       p_operator: operator,
     });
     if (error) {

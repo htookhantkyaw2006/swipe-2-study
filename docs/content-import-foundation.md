@@ -5,11 +5,13 @@
 The Content Import and Publication Foundation provides an operator-controlled, two-phase publication workflow for language curriculum datasets. The foundation is strictly constrained to **Chinese HSK 1** (`zh-hsk1`) and **Japanese JLPT N5** (`ja-n5`).
 
 ### Key Architectural Principles
-- **Decoupled Learner Progress**: Learner progress records in `public.user_items` and client offline caches are keyed by natural identity:
+- **Explicit Retirement (No Hard Deletes)**: Vocabulary items are **never automatically retired upon omission**. Partial or subset CSV imports preserve omitted items as active. Retirement requires explicit operator intent via `--retire-ids <id1,id2>`. Retired items are set to `is_active = false` (never hard-deleted), ensuring existing study bookmarks and history cards remain readable by clients.
+- **Natural Identity Protection**: Learner progress records in `public.user_items` and client offline caches are keyed by natural identity:
   $$\text{Record Key} = \text{SHA-256}(\text{language} \parallel \text{kind} \parallel \text{written\_form} \parallel \text{reading})$$
-  Curriculum vocabulary entries in `public.vocabulary` have explicit stable IDs (`id`). Because learner progress connects via natural keys, curriculum metadata updates (definitions, example sentences, audio paths, sort orders) never sever or rewrite existing learner progress.
+  Because learner progress connects via natural keys, neither `written_form` nor `reading` may change for an existing curriculum ID. Attempting to modify either fails closed (`NATURAL_IDENTITY_CHANGE`). Non-identifying metadata updates (definitions, example sentences, audio paths, sort orders) never sever or rewrite existing learner progress.
+- **Course Isolation**: Item IDs are strictly isolated per course. Reusing an existing ID across courses fails closed (`CROSS_COURSE_ID_CONFLICT`).
+- **Stale Stage Protection**: Staged content records the target `stage_version`. If a concurrent publication advances the course version, publishing a stale stage fails closed (`STALE_STAGE_VERSION`).
 - **Two-Phase Publication (Stage $\rightarrow$ Publish)**: Content is parsed, validated against schema constraints, and staged into `private.content_stages`. An incomplete or interrupted staging process never affects the currently published curriculum.
-- **Explicit Retirement (No Hard Deletes)**: Vocabulary items present in a previous version but omitted in a newer CSV are marked `is_active = false`. They are **never hard-deleted**, ensuring existing study bookmarks and history cards remain readable by clients.
 - **Pre-Update Recoverable Backups**: Before applying any publish or rollback mutation, an automated export of the current state is written to disk. If writing the backup file fails, the entire operation fails closed and aborts before touching the database.
 - **RLS & Privilege Isolation**:
   - `public.courses` and `public.vocabulary` are read-only for public clients (`anon`, `authenticated`) and only expose published courses (`is_published = true`).
@@ -121,19 +123,23 @@ node tools/content-csv/content-manager.mjs status zh-hsk1
 
 ---
 
-## 4. Stable Identity Rules & Ambiguous Changes
+## 4. Stable Natural Identity Rules & Protection
 
-Each vocabulary record must maintain stable identity:
+Each vocabulary record must maintain stable natural identity:
 - **Valid Content Updates**:
   - Updating `meaning_english` or `meaning_burmese`.
   - Adding or modifying `examples` JSON.
   - Adding or changing `audio_path`.
   - Reordering items via `sort_order`.
-  - Correcting pronunciation `reading` while retaining `written_form` (or vice-versa).
-- **Ambiguous Identity Change (Rejected)**:
-  - If an incoming row reuses an existing `id` but changes **BOTH** `written_form` and `reading` to an entirely different word (e.g., ID `zh_hsk1_001` changed from `中 (zhōng)` to `大 (dà)`).
-  - Both the operator tool and the database stored function reject this with error `AMBIGUOUS_IDENTITY_CHANGE`.
-  - To introduce a new word, assign a new stable ID.
+- **Natural Identity Changes (Strictly Rejected)**:
+  - If an incoming row reuses an existing `id` but changes `written_form` OR `reading` (e.g., changing pinyin reading from `zhōng` to `zhòng`, or changing kanji from `日` to `月`).
+  - Both the operator tool and the database stored function reject this with error `NATURAL_IDENTITY_CHANGE`.
+  - Because learner progress is linked to `written_form:reading`, modifying either would detach learner records.
+  - To introduce a new word or alternate pronunciation, assign a new stable content ID.
+- **Cross-Course ID Conflicts (Strictly Rejected)**:
+  - If an incoming row uses an ID that already exists in another course (e.g., an N5 item using an existing HSK1 ID `zh_hsk1_001`), the operation fails closed with `CROSS_COURSE_ID_CONFLICT`.
+- **Explicit Retirement**:
+  - Words omitted from CSV files remain active. To deactivate an obsolete word, use `--retire-ids <id1,id2>`. Both CLI diffing and database publication track retired items explicitly.
 
 ---
 
