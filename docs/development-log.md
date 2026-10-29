@@ -1,5 +1,59 @@
 # Development log
 
+## Latest — 29 October 2026 — Work batch B3.3: Google sign-in readiness and OAuth staging configuration
+
+- Branched `feat/google-signin-readiness` from completed B3.2 tip `ec10452` on `feat/auth-route-readiness`.
+- Implemented **Google sign-in readiness, OAuth gating, and staging preparation** strictly preserving the shared Supabase client and single-exchange PKCE ownership:
+  1. **Google Auth Provider Helper (`src/lib/googleAuth.js`)**:
+     - Explicit feature gate `isGoogleAuthEnabled(env)`: requires `VITE_GOOGLE_AUTH_ENABLED === 'true'` AND configured backend (`isSupabaseConfigured()`). Default is disabled (`false`).
+     - Safe callback URL construction `getTrustedCallbackUrl(returnTo, origin)`: enforces application origin (`window.location.origin`), strictly points to `/auth/callback`, and sanitizes `returnTo` using `safeReturnPath` to prevent open-redirect attacks.
+     - OAuth initiation `initiateGoogleSignIn(client, { returnTo, origin, skipBrowserRedirect })`: calls `client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })` with zero extra scopes (`email profile` standard default).
+     - Robust error handling: maps SDK error objects, missing client exceptions, and aborts cleanly.
+  2. **UI Integration (`src/pages/Login.jsx`, `src/pages/Signup.jsx`, `src/index.css`)**:
+     - Accessible text-based button ("Continue with Google") adhering to brand styling (`.auth-provider-btn`, `.auth-divider`) without redrawing or inventing Google trademarks.
+     - Button only rendered when `isGoogleAuthEnabled()` evaluates to `true`.
+     - Mutual exclusion with email credentials (`loading || googleLoading`), with accessible progress text ("Connecting to Google…") and `aria-busy="true"`.
+     - Re-enables button if provider window is cancelled, user navigates back, or initiation fails.
+     - Clears previous error messages on initiation; renders actionable failure alerts.
+  3. **Callback Handling & Generation Guard (`src/pages/AuthCallback.jsx`)**:
+     - Preserved single-exchange PKCE ownership via `inspectAuthCallbackSession(auth)`: delegates code exchange entirely to SDK client auto-detection.
+     - Documented same-browser/same-origin requirement of PKCE flow.
+     - Added mount generation tracking (`mountGen` + `isCurrent(mountGen)`): account switch, sign-out, or component unmount during in-flight code exchange immediately invalidates the stale resolution, cancels navigation, and prevents leaking Account B into Account A's target path.
+  4. **Staging Guide (`docs/google-signin-staging-guide.md`)**:
+     - Step-by-step 4-part configuration guide: Google Cloud Console OAuth 2.0 Web Client, Supabase Dashboard Provider Settings, Redirect Allowlist, and Frontend Environment Flag.
+     - ASCII sequence diagram detailing authorization code flow with PKCE.
+     - Explicit warnings on client secret handling (NEVER in frontend/VITE/Git) and provider reauthentication boundary for account deletion (`UNSUPPORTED_AUTH_PROVIDER` for OAuth-only users without password).
+  5. **Verification & Tests**:
+     - Added `tests/googleAuth.test.js` (8 focused test suites, 24 test assertions) covering:
+       - Feature flag disabled by default & Supabase readiness checks.
+       - Trusted callback URL construction, malicious `returnTo` rejection, and origin validation.
+       - Clean initiation options (zero extra scopes, redirectTo).
+       - Error handling for SDK failures and exceptions.
+       - UI gate on Login & Signup.
+       - Cancellation and missing code handling.
+       - Single-exchange session inspection.
+       - Generation guards on account switch during in-flight exchange.
+     - Updated `tests/runBrowserRouteCheck.mjs` running headless Chrome to verify `getTrustedCallbackUrl` and `isGoogleAuthEnabled` in a real browser engine.
+- Validation: **292 Node tests pass** (all 284 existing + 8 new Google auth suites; 0 failures), lint **0 errors / 8 existing warnings** preserved, production build passes (`dist/assets/index-DnPULnNQ.js`, 984 kB in 945ms), and headless Chrome checks pass.
+
+## 29 October 2026 — Work batch B3.2: route readiness, protected-route guards, and safe returnTo navigation
+
+- Branched `feat/auth-route-readiness` from completed B3.1 tip `d961d79` on `feat/avatar-processing`.
+- Implemented **protected-route guards, route access matrix, and safe post-login navigation**:
+  1. **Route Matrix & Protected Route Component (`src/components/ProtectedRoute.jsx`)**:
+     - Gated account-only routes (e.g. `/profile/edit`) behind `ProtectedRoute`.
+     - Neutral connecting state during loading without flashing guest UI or account data.
+     - Clean redirect to `/login?returnTo=...` preserving intended destination.
+  2. **Safe Return Path Utility (`src/lib/safeReturnPath.js`)**:
+     - Sanitized `returnTo` against open redirects (`//evil.com`, `https://evil.com`, `/%5cevil.com`), javascript schemes, and auth loop routes (`/login`, `/signup`, `/auth/callback`).
+  3. **Form and Callback Integration (`src/pages/Login.jsx`, `src/pages/Signup.jsx`, `src/pages/ForgotPassword.jsx`, `src/pages/VerifyEmail.jsx`, `src/pages/AuthCallback.jsx`)**:
+     - Preserved `returnTo` parameter across sign-in, sign-up, verification, and recovery links.
+     - Verified signed-in user visiting `/login` or `/signup` automatically redirects to safe `returnTo`.
+  4. **Documentation & Tests**:
+     - Created `docs/auth-route-readiness.md`.
+     - Added `tests/authRouteReadiness.test.js` (6 test suites) and headless Chrome verification in `tests/runBrowserRouteCheck.mjs`.
+- Validation: **284 Node tests pass** (all 278 existing + 6 new route readiness suites; 0 failures), lint **0 errors / 8 existing warnings** preserved, production build passes, and headless Chrome checks pass.
+
 ## 29 October 2026 — Work batch B3.1: client-side avatar resizing and compression
 
 - Branched `feat/avatar-processing` from completed fix tip `e4b2841` on `fix/deletion-attempt-reservation`.

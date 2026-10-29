@@ -401,6 +401,53 @@ button {
   cursor: not-allowed;
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 18px 0 14px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.auth-divider span {
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  color: var(--color-secondary-blue);
+  text-transform: lowercase;
+}
+
+.auth-provider-btn {
+  width: 100%;
+  font-weight: 600;
+  padding: 12px;
+  font-size: 0.9375rem;
+  border-radius: var(--radius-btn);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background-color: #FFFFFF;
+  border: 1.5px solid var(--color-border);
+  color: var(--color-text-navy);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.auth-provider-btn:hover:not(:disabled) {
+  background-color: var(--color-ghost-blue);
+  border-color: var(--color-primary-blue);
+}
+
+.auth-provider-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .auth-footer {
   text-align: center;
   margin-top: 20px;

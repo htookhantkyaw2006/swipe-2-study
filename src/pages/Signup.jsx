@@ -3,18 +3,21 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { useAuth } from '../lib/useAuth.js';
 import { safeReturnPath } from '../lib/safeReturnPath.js';
+import { isGoogleAuthEnabled, initiateGoogleSignIn } from '../lib/googleAuth.js';
 import { Mail, Lock, Eye, EyeOff, User, ArrowLeft, Sparkles } from 'lucide-react';
 
 export default function Signup() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isConfigured, user, loading: authLoading, isTransitioning } = useAuth();
+  const googleEnabled = isGoogleAuthEnabled();
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const returnTo = safeReturnPath(new URLSearchParams(location.search).get('returnTo'));
@@ -27,7 +30,7 @@ export default function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return;
+    if (loading || googleLoading) return;
     setError(null);
 
     const trimmedName = displayName.trim();
@@ -84,6 +87,23 @@ export default function Signup() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    if (loading || googleLoading) return;
+    setError(null);
+    setGoogleLoading(true);
+    try {
+      const client = getSupabaseClient();
+      const { error: signInError } = await initiateGoogleSignIn(client, { returnTo });
+      if (signInError) {
+        setError(signInError.message || 'Could not initiate Google sign-in. Please try again.');
+      }
+    } catch (err) {
+      setError(err?.message || 'Could not initiate Google sign-in. Please try again.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   if (!isConfigured) {
     return (
       <div className="auth-page">
@@ -99,6 +119,8 @@ export default function Signup() {
     );
   }
 
+  const busy = loading || googleLoading;
+
   return (
     <div className="auth-page">
       <div className="auth-card">
@@ -108,6 +130,7 @@ export default function Signup() {
           className="auth-back-link"
           type="button"
           aria-label="Back to Home"
+          disabled={busy}
         >
           <ArrowLeft size={18} />
           <span>Home</span>
@@ -145,7 +168,7 @@ export default function Signup() {
                 autoComplete="name"
                 maxLength={100}
                 required
-                disabled={loading}
+                disabled={busy}
               />
             </div>
           </div>
@@ -163,7 +186,7 @@ export default function Signup() {
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 required
-                disabled={loading}
+                disabled={busy}
               />
             </div>
           </div>
@@ -182,7 +205,7 @@ export default function Signup() {
                 autoComplete="new-password"
                 minLength={6}
                 required
-                disabled={loading}
+                disabled={busy}
               />
               <button
                 type="button"
@@ -190,6 +213,7 @@ export default function Signup() {
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
+                disabled={busy}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -199,11 +223,27 @@ export default function Signup() {
           <button
             type="submit"
             className="btn-primary auth-submit"
-            disabled={loading}
+            disabled={busy}
           >
             {loading ? 'Creating account…' : 'Create Account'}
           </button>
         </form>
+
+        {googleEnabled && (
+          <>
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary auth-provider-btn"
+              onClick={handleGoogleSignIn}
+              disabled={busy}
+            >
+              {googleLoading ? 'Connecting to Google…' : 'Continue with Google'}
+            </button>
+          </>
+        )}
 
         {/* Footer links */}
         <div className="auth-footer">
@@ -220,6 +260,7 @@ export default function Signup() {
           type="button"
           className="btn-secondary auth-guest"
           onClick={() => navigate('/')}
+          disabled={busy}
         >
           Continue as Guest
         </button>

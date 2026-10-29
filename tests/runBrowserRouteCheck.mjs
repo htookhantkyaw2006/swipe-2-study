@@ -34,6 +34,18 @@ export async function runBrowserRouteVerification() {
         res.end(fs.readFileSync(filePath));
         return;
       }
+      if (req.url === '/src/lib/googleAuth.js' || req.url === '/googleAuth.js') {
+        const filePath = path.resolve(__dirname, '../src/lib/googleAuth.js');
+        res.writeHead(200, { 'Content-Type': 'application/javascript' });
+        res.end(fs.readFileSync(filePath));
+        return;
+      }
+      if (req.url === '/src/lib/supabaseConfig.js' || req.url === '/supabaseConfig.js') {
+        const filePath = path.resolve(__dirname, '../src/lib/supabaseConfig.js');
+        res.writeHead(200, { 'Content-Type': 'application/javascript' });
+        res.end(fs.readFileSync(filePath));
+        return;
+      }
 
       if (req.url === '/report' && req.method === 'POST') {
         let body = '';
@@ -48,7 +60,7 @@ export async function runBrowserRouteVerification() {
           try {
             const report = JSON.parse(body);
             if (report.success) {
-              console.log('✓ Real Browser Route & Navigation Defense Verification Passed:');
+              console.log('✓ Real Browser Route & Google Auth Defense Verification Passed:');
               for (const r of report.results) {
                 console.log(`    - ${r.test}: ${JSON.stringify(r)}`);
               }
@@ -70,9 +82,10 @@ export async function runBrowserRouteVerification() {
 <html>
 <head><meta charset="utf-8"><title>Browser Route Readiness Verification</title></head>
 <body>
-  <h1>Running Real Browser Navigation Defense Verification...</h1>
+  <h1>Running Real Browser Navigation & Google OAuth Readiness Verification...</h1>
   <script type="module">
     import { safeReturnPath } from '/src/lib/safeReturnPath.js';
+    import { getTrustedCallbackUrl, isGoogleAuthEnabled } from '/src/lib/googleAuth.js';
 
     async function run() {
       const results = [];
@@ -130,6 +143,21 @@ export async function runBrowserRouteVerification() {
       assert(safeReturnPath('https://evil.com', '/saved') === '/saved', 'Custom fallback on attack');
       assert(safeReturnPath('/login', '/signup') === '/', 'Auth fallback safely defaults to /');
       results.push({ test: 'custom-safe-fallback', passed: true });
+
+      // 5. Trusted Google OAuth callback URL construction in real browser
+      const browserOrigin = window.location.origin;
+      const callback1 = getTrustedCallbackUrl('/profile/edit');
+      assert(callback1 === browserOrigin + '/auth/callback?returnTo=%2Fprofile%2Fedit', 'Trusted callback matches origin');
+      const callbackAttack = getTrustedCallbackUrl('https://evil.example.com');
+      assert(callbackAttack === browserOrigin + '/auth/callback', 'Attack URL not leaked into callback parameter');
+      const callbackLoop = getTrustedCallbackUrl('/login');
+      assert(callbackLoop === browserOrigin + '/auth/callback', 'Auth loop not leaked into callback parameter');
+      results.push({ test: 'real-browser-google-callback-url', passed: true });
+
+      // 6. Google Auth gate validation in real browser
+      assert(isGoogleAuthEnabled({}) === false, 'Disabled by default');
+      assert(isGoogleAuthEnabled({ VITE_GOOGLE_AUTH_ENABLED: 'true' }) === false, 'Disabled without Supabase');
+      results.push({ test: 'real-browser-google-auth-gate', passed: true });
 
       await fetch('/report', {
         method: 'POST',

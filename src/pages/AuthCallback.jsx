@@ -10,16 +10,21 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 /* ---------------------------------------------------------------
    AUTH CALLBACK
    ---------------------------------------------------------------
-   Handles verification redirects for Supabase PKCE and email confirmation.
+   Handles verification redirects for Supabase PKCE and OAuth (including Google).
    Coordinates with the Supabase client's detectSessionInUrl initialization.
+   PKCE requires the callback to occur in the exact same browser profile
+   and origin where sign-in was initiated (same-browser/same-origin requirement)
+   so the code_verifier stored in localStorage can be retrieved.
    Does NOT redirect on an arbitrary timer; only navigates after the user
-   is genuinely verified by the Auth coordinator.
+   is genuinely verified by the centralized Auth coordinator.
+   Invalidates callback resolution if an account switch or sign-out occurs.
    --------------------------------------------------------------- */
 
 export default function AuthCallback() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading: authLoading, isTransitioning, error: authError } = useAuth();
+  const { user, loading: authLoading, isTransitioning, error: authError, captureGeneration, isCurrent } = useAuth();
+  const [mountGen] = useState(() => (captureGeneration ? captureGeneration() : 0));
 
   const [timedOut, setTimedOut] = useState(false);
   const [callbackCheck, setCallbackCheck] = useState({ pending: true, error: null });
@@ -31,16 +36,20 @@ export default function AuthCallback() {
     (async () => {
       try {
         const error = await inspectAuthCallbackSession(getSupabaseClient().auth);
-        if (!cancelled) setCallbackCheck({ pending: false, error });
+        if (!cancelled && (isCurrent ? isCurrent(mountGen) : true)) {
+          setCallbackCheck({ pending: false, error });
+        }
       } catch {
-        if (!cancelled) setCallbackCheck({
-          pending: false,
-          error: 'Sign-in is unavailable. Return to Sign In and try again.',
-        });
+        if (!cancelled && (isCurrent ? isCurrent(mountGen) : true)) {
+          setCallbackCheck({
+            pending: false,
+            error: 'Sign-in is unavailable. Return to Sign In and try again.',
+          });
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [mountGen, isCurrent]);
 
   const returnTo = useMemo(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -70,12 +79,12 @@ export default function AuthCallback() {
     return () => clearTimeout(timer);
   }, [canNavigate, displayError]);
 
-  // 4. Success navigation: ONLY navigate after user is verified and transition completes
+  // 4. Success navigation: ONLY navigate after user is verified, transition completes, and session generation matches
   useEffect(() => {
-    if (canNavigate) {
+    if (canNavigate && (isCurrent ? isCurrent(mountGen) : true)) {
       navigate(returnTo, { replace: true });
     }
-  }, [canNavigate, navigate, returnTo]);
+  }, [canNavigate, navigate, returnTo, isCurrent, mountGen]);
 
   return (
     <div className="auth-page">
