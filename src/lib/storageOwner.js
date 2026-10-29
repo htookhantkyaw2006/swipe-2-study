@@ -2,6 +2,8 @@ import {
   getSyncStateKey,
   identityOfRow,
   readSyncState,
+  isCloudTable,
+  mirrorSyncStateToSidecar,
 } from './cloudSyncState.js';
 // Local cache isolation is not authorization. Supabase RLS remains authoritative.
 // Only the verified Auth coordinator should select an owner.
@@ -120,10 +122,10 @@ export function createStorageOwner({
       if (prevRaw === rows) return;
       parseLearningRows(rows);
 
-      if (id === null) {
-        // Guest behavior: device-only, no cloud tracking
+      if (id === null || !isCloudTable(language, table)) {
+        // Device-only write behavior: guest or non-cloud table (e.g. flashcards)
         const { raw, value } = readLearningDocument();
-        if (value && Object.hasOwn(value.tables, name)) {
+        if (value) {
           commitLearningDocument(raw, {
             ...value,
             revision: value.revision + 1,
@@ -137,21 +139,22 @@ export function createStorageOwner({
 
       // Check whether this account scope is cloud-tracked:
       // 1. Authoritative embedded cloudSync exists in learning_document_v1, OR
-      // 2. Legacy cloud_sync_state_v1 sidecar exists, OR
-      // 3. Explicit tracking option enabled
+      // 2. Explicit tracking option enabled, OR
+      // 3. Legacy cloud_sync_state_v1 sidecar exists
       const { raw, value } = readLearningDocument();
-      let hasSidecar = false;
-      try {
+      let isTracked = Boolean(scopeTracking || cloudTracking || value?.cloudSync);
+
+      if (!isTracked) {
+        // Only inspect the legacy sidecar if authoritative tracking is not already known.
+        // A failure to determine tracking status must stop the mutation before any write.
         const sidecarKey = getSyncStateKey(id);
         const sidecarRaw = access('read', target => target.getItem(sidecarKey));
-        hasSidecar = sidecarRaw !== null && sidecarRaw !== undefined;
-      } catch {}
-
-      const isTracked = Boolean(scopeTracking || cloudTracking || value?.cloudSync || hasSidecar);
+        isTracked = sidecarRaw !== null && sidecarRaw !== undefined;
+      }
 
       if (!isTracked) {
         // Default device-only path: preserve legacy key / document without cloudSync
-        if (value && Object.hasOwn(value.tables, name)) {
+        if (value) {
           commitLearningDocument(raw, {
             ...value,
             revision: value.revision + 1,
@@ -277,9 +280,7 @@ export function createStorageOwner({
         commitLearningDocument(raw, nextDocument, { [name]: prevRaw });
 
         // 5. Best-effort update of legacy sidecar for non-breaking legacy reader compatibility
-        try {
-          target.setItem(getSyncStateKey(id), JSON.stringify(nextCloudSync));
-        } catch {}
+        mirrorSyncStateToSidecar(target, nextCloudSync);
       });
     };
     return Object.freeze({

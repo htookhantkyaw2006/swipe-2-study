@@ -96,7 +96,7 @@ s2s_user_<ownerId>_learning_document_v1
 ## 5. Storage Resolution Consistency
 
 - All synchronization operations (`restoreAccountSnapshot`) resolve storage via `storageOwner.getStorage()`, falling back to `globalThis.localStorage` only when no custom storage provider is configured.
-- Metadata helpers (`recordKey`, `identityOfRow`, `validateSyncState`, `readSyncState`, `persistSyncState`, `recordLocalDirty`, `recordLocalDeletion`) are factored into `src/lib/cloudSyncState.js` to prevent circular dependencies between `storageOwner.js` and `cloudSnapshotHydration.js`.
+- Metadata helpers (`recordKey`, `identityOfRow`, `validateSyncState`, `readSyncState`, `persistSyncState`, `recordLocalDirty`, `recordLocalDeletion`, `mirrorSyncStateToSidecar`, `isCloudTable`) are factored into `src/lib/cloudSyncState.js` to prevent circular dependencies between `storageOwner.js` and `cloudSnapshotHydration.js`.
 
 ---
 
@@ -111,7 +111,38 @@ s2s_user_<ownerId>_learning_document_v1
 
 ---
 
-## 7. Test Coverage and Fixture Updates
+## 7. Follow-Up Review Findings and Hardening
+
+During audit of the atomic cache implementation, four critical defects were identified and resolved:
+
+### Finding 1: Single Authoritative Commit per Restore
+- **Defect**: `restoreAccountSnapshot()` called `scope.commitLearningDocument()` and subsequently invoked `persistSyncState()`, which re-serialized and re-wrote `learning_document_v1`, causing two document writes per restore.
+- **Fix**: Replaced post-commit `persistSyncState` with `mirrorSyncStateToSidecar()`. Exactly one document write occurs for both changed and up-to-date snapshot restorations.
+
+### Finding 2: Propagation of Authoritative and Legacy Write Failures
+- **Defect**: `persistSyncState()` silently swallowed document write errors inside a `try { ... } catch {}` block and proceeded to write the sidecar, masking failures in `recordLocalDirty()` and `recordLocalDeletion()`.
+- **Fix**:
+  - `persistSyncState()` validates state schema and strictly propagates authoritative write errors.
+  - Readback verification checks (`storage.getItem(key) === expected`) ensure unconfirmed writes throw actionable save confirmation errors.
+  - Corrupt authoritative documents halt persistence without modifying storage or falling back to the sidecar.
+  - When no document exists, legacy sidecar write errors propagate honestly.
+  - Sidecar mirror updates only execute after a confirmed authoritative commit.
+
+### Finding 3: Fail-Closed Sync Tracking Detection
+- **Defect**: When checking whether an account scope was tracked, errors reading the sidecar were caught and swallowed, causing `isTracked` to evaluate to `false` and silently downgrading to device-only mode.
+- **Fix**:
+  - Authoritative embedded metadata (`value?.cloudSync`) bypasses sidecar inspection entirely.
+  - When sidecar inspection is required, storage read errors propagate immediately and halt the mutation with zero storage writes.
+
+### Finding 4: Scoped Cloud Mutation Tracking & Non-Cloud Tables
+- **Defect**: `identityOfRow` was applied indiscriminately to all tables, throwing unsupported format errors when writing device-only tables such as `flashcards` (seeded by `seedCourse()`).
+- **Fix**:
+  - Cloud mutation tracking is strictly restricted to supported cloud languages (`zh`, `ja`, `en`) and kinds (`saved_words`, `review_cards`, `search_history`, `written_chars`, `learned_radicals`, `learned_kana`, `learned_sounds`) via `isCloudTable()`.
+  - Non-cloud tables (e.g. `flashcards`) retain device-only behavior, updating table storage while preserving existing cloud metadata without injecting invalid sync records.
+
+---
+
+## 8. Test Coverage and Fixture Updates
 
 - **`tests/atomicAccountCache.test.js`**:
   - Confirmed Failure A reproduction: `localDb.remove()` with metadata failure throws and leaves table and metadata untouched.
@@ -124,5 +155,15 @@ s2s_user_<ownerId>_learning_document_v1
   - Multi-owner (Owner A, Owner B, Guest) isolation.
   - Repeated restore passes preserve dirty edits and tombstones.
   - Concurrent modification detection via optimistic concurrency checks.
+- **`tests/atomicAccountCacheFollowUp.test.js`**:
+  - Exactly one authoritative document write verified for changed and up-to-date restores.
+  - Authoritative document write failures propagate in `recordLocalDeletion` and `recordLocalDirty`.
+  - Standalone legacy sidecar write failures propagate in `persistSyncState`.
+  - Confirmed authoritative commits tolerate sidecar mirror failures.
+  - Unconfirmed readback failures throw actionable save confirmation errors.
+  - Corrupt authoritative documents halt `persistSyncState` without touching the sidecar.
+  - Storage read errors during tracking detection halt mutations with zero storage writes.
+  - Authoritative embedded metadata does not read the sidecar.
+  - Non-cloud tables (e.g. `flashcards`) succeed on tracked and guest accounts without touching sync records.
 - **Fixture Updates**:
   - `tests/snapshotLocalConflicts.test.js` and `tests/cloudIntegrationFollowUp.test.js` pass `cloudTracking: true` when instantiating `createStorageOwner` to test mutation tracking on fresh storage scopes without existing sidecars.

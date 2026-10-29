@@ -7,6 +7,7 @@ import {
   identityOfRow,
   readSyncState,
   persistSyncState,
+  mirrorSyncStateToSidecar,
   recordLocalDeletion,
   recordLocalDirty,
 } from './cloudSyncState.js';
@@ -17,6 +18,7 @@ export {
   identityOfRow,
   readSyncState,
   persistSyncState,
+  mirrorSyncStateToSidecar,
   recordLocalDeletion,
   recordLocalDirty,
 };
@@ -350,9 +352,8 @@ export async function restoreAccountSnapshot(client, storageOwner, {
       } catch (commitErr) {
         return { outcome: 'error', error: commitErr?.message || 'Failed to commit snapshot.', changesCount: 0 };
       }
-      try {
-        persistSyncState(storage, nextSyncState);
-      } catch {}
+      // Best-effort mirror update to legacy sidecar for backward compatibility
+      mirrorSyncStateToSidecar(storage, nextSyncState);
       return { outcome: 'up_to_date', changesCount: 0, error: null };
     }
 
@@ -377,9 +378,7 @@ export async function restoreAccountSnapshot(client, storageOwner, {
       }, expectedTables);
 
       // Best effort update of legacy sidecar
-      try {
-        persistSyncState(storage, nextSyncState);
-      } catch {}
+      mirrorSyncStateToSidecar(storage, nextSyncState);
 
       return { outcome: 'restored', changesCount, error: null };
     } catch {

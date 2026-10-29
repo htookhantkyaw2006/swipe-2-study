@@ -1,6 +1,24 @@
 import { wordOf, readingOf } from './entry.js';
+import { parseLearningDocument } from './learningDocument.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const CLOUD_LANGUAGES = ['zh', 'ja', 'en'];
+
+export const CLOUD_KINDS = [
+  'saved_words',
+  'review_cards',
+  'search_history',
+  'written_chars',
+  'learned_radicals',
+  'learned_kana',
+  'learned_sounds',
+];
+
+export function isCloudTable(language, table) {
+  return CLOUD_LANGUAGES.includes(language) && CLOUD_KINDS.includes(table);
+}
+
 export const KIND_FIELDS = {
   search_history: 'term',
   written_chars: 'character',
@@ -150,28 +168,58 @@ export function readSyncState(storage, ownerId) {
   return { state: parsed, error: null };
 }
 
-export function persistSyncState(storage, state) {
-  const ownerId = state.ownerId.toLowerCase();
-  const docKey = `s2s_user_${ownerId}_learning_document_v1`;
-  const sidecarKey = getSyncStateKey(ownerId);
-
-  // Update embedded cloudSync if authoritative document exists
+export function mirrorSyncStateToSidecar(storage, state) {
+  if (!storage || !state || typeof state !== 'object' || typeof state.ownerId !== 'string') {
+    return;
+  }
   try {
-    const raw = storage.getItem(docKey);
-    if (raw) {
-      const doc = JSON.parse(raw);
-      if (doc && typeof doc === 'object' && !Array.isArray(doc) && doc.version === 1) {
-        doc.cloudSync = state;
-        doc.revision = (doc.revision || 0) + 1;
-        storage.setItem(docKey, JSON.stringify(doc));
-      }
-    }
-  } catch {}
-
-  // Update legacy sidecar
-  try {
+    const sidecarKey = getSyncStateKey(state.ownerId);
     storage.setItem(sidecarKey, JSON.stringify(state));
-  } catch {}
+  } catch {
+    // Best-effort mirror write only; failures do not invalidate confirmed authoritative state
+  }
+}
+
+export function persistSyncState(storage, state) {
+  if (!state || typeof state !== 'object' || typeof state.ownerId !== 'string') {
+    throw new TypeError('Invalid sync state: missing or invalid ownerId');
+  }
+  const ownerId = state.ownerId.toLowerCase();
+  const validation = validateSyncState(state, ownerId);
+  if (!validation.valid) {
+    throw new Error(`Invalid sync state schema: ${validation.error}`);
+  }
+
+  const docKey = `s2s_user_${ownerId}_learning_document_v1`;
+  const raw = storage.getItem(docKey);
+
+  if (raw !== null && raw !== undefined) {
+    // Authoritative document exists: update embedded cloudSync and bump revision
+    const doc = parseLearningDocument(raw);
+    const nextDoc = {
+      ...doc,
+      revision: (doc.revision || 0) + 1,
+      cloudSync: state,
+    };
+    const nextRaw = JSON.stringify(nextDoc);
+    parseLearningDocument(nextRaw);
+    storage.setItem(docKey, nextRaw);
+    if (storage.getItem(docKey) !== nextRaw) {
+      throw new Error('The local save could not be confirmed.');
+    }
+
+    // Only update compatibility mirror after confirmed authoritative commit
+    mirrorSyncStateToSidecar(storage, state);
+    return;
+  }
+
+  // Standalone legacy mode: required sidecar persistence failure must propagate
+  const sidecarKey = getSyncStateKey(ownerId);
+  const sidecarRaw = JSON.stringify(state);
+  storage.setItem(sidecarKey, sidecarRaw);
+  if (storage.getItem(sidecarKey) !== sidecarRaw) {
+    throw new Error('The local save could not be confirmed.');
+  }
 }
 
 export function recordLocalDeletion(storage, ownerId, language, kind, writtenForm, reading = '', now = () => new Date().toISOString()) {
@@ -191,6 +239,7 @@ export function recordLocalDeletion(storage, ownerId, language, kind, writtenFor
     status: 'deleted',
     deletedAt: now(),
   };
+  nextState.updatedAt = now();
   persistSyncState(storage, nextState);
 }
 
@@ -211,5 +260,6 @@ export function recordLocalDirty(storage, ownerId, language, kind, writtenForm, 
     status: 'dirty',
     updatedAt: now(),
   };
+  nextState.updatedAt = now();
   persistSyncState(storage, nextState);
 }
