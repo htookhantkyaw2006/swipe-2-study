@@ -45,6 +45,19 @@ export function createPreferencesSyncService({
 
     checkCurrent();
 
+    const storage = storageOwner.getStorage?.() || globalThis.localStorage;
+
+    // 1. Recover validated persisted pending edits during initial hydration.
+    // Preserve corrupt bytes and surface recovery errors.
+    const { state: persistedPending, error: pendingReadError, corrupt } = readPendingPreferences(storage, accountId);
+    if (corrupt || pendingReadError) {
+      return {
+        status: 'failed',
+        error: `Recovery error reading pending preferences: ${pendingReadError || 'Corrupt pending record'}`,
+        corrupt: true,
+      };
+    }
+
     const client = getClient();
     let data;
     let queryError = null;
@@ -67,8 +80,6 @@ export function createPreferencesSyncService({
       return { status: 'account_changed' };
     }
 
-    const storage = storageOwner.getStorage?.() || globalThis.localStorage;
-
     if (queryError) {
       return {
         status: 'failed',
@@ -80,20 +91,39 @@ export function createPreferencesSyncService({
     const cloudSettings = data?.settings ? sanitizeSettings(data.settings, DEFAULTS) : { ...DEFAULTS };
     const cloudActiveLanguage = sanitizeActiveLanguage(data?.active_language, 'zh');
 
-    // Merge: local edits made while restore was pending take precedence over cloud values
+    // Merge: local edits (both persisted pending from before reload, and in-flight local edits)
+    // take precedence over cloud values
     const mergedSettings = { ...cloudSettings };
+    const allChangedKeys = new Set();
+
+    if (persistedPending?.settings && typeof persistedPending.settings === 'object') {
+      const keys = persistedPending.changedKeys || Object.keys(persistedPending.settings);
+      for (const key of keys) {
+        if (Object.hasOwn(persistedPending.settings, key)) {
+          mergedSettings[key] = persistedPending.settings[key];
+          allChangedKeys.add(key);
+        }
+      }
+    }
+
     if (pendingLocalEdits?.settings && typeof pendingLocalEdits.settings === 'object') {
       const changedKeys = pendingLocalEdits.changedKeys || Object.keys(pendingLocalEdits.settings);
       for (const key of changedKeys) {
         if (Object.hasOwn(pendingLocalEdits.settings, key)) {
           mergedSettings[key] = pendingLocalEdits.settings[key];
+          allChangedKeys.add(key);
         }
       }
     }
 
     let mergedActiveLanguage = cloudActiveLanguage;
+    if (persistedPending?.activeLanguage && (persistedPending.changedKeys?.includes('activeLanguage') || !persistedPending.changedKeys)) {
+      mergedActiveLanguage = sanitizeActiveLanguage(persistedPending.activeLanguage, cloudActiveLanguage);
+      allChangedKeys.add('activeLanguage');
+    }
     if (pendingLocalEdits?.activeLanguage && pendingLocalEdits.changedKeys?.includes('activeLanguage')) {
-      mergedActiveLanguage = sanitizeActiveLanguage(pendingLocalEdits.activeLanguage, cloudActiveLanguage);
+      mergedActiveLanguage = sanitizeActiveLanguage(pendingLocalEdits.activeLanguage, mergedActiveLanguage);
+      allChangedKeys.add('activeLanguage');
     }
 
     // Persist merged effective state to local storage for this owner
@@ -108,10 +138,12 @@ export function createPreferencesSyncService({
       };
     }
 
-    // If there were no pending edits, clear any pending record
+    // If there are pending local edits, keep them in pending state and inform controller
     const hasPendingLocalEdits = Boolean(
-      pendingLocalEdits?.changedKeys && pendingLocalEdits.changedKeys.length > 0
+      (persistedPending && persistedPending.status !== 'saved') ||
+      (pendingLocalEdits?.changedKeys && pendingLocalEdits.changedKeys.length > 0)
     );
+
     if (!hasPendingLocalEdits) {
       clearPendingPreferences(storage, accountId);
     }
@@ -121,6 +153,8 @@ export function createPreferencesSyncService({
       settings: mergedSettings,
       activeLanguage: mergedActiveLanguage,
       hasPendingLocalEdits,
+      persistedMutationId: persistedPending?.localMutationId || 0,
+      changedKeys: Array.from(allChangedKeys),
       lastSyncedAt: data?.updated_at || now(),
     };
   }
@@ -213,6 +247,15 @@ export function createPreferencesSyncService({
 
     if (mutationError) {
       const msg = mutationError.message || 'Failed to save preferences to cloud.';
+      const currentPending = readPendingPreferences(storage, accountId).state;
+      if (currentPending && typeof currentPending.localMutationId === 'number' && currentPending.localMutationId > localMutationId) {
+        return {
+          status: 'pending',
+          newerPending: true,
+          error: msg,
+        };
+      }
+
       try {
         writePendingPreferences(storage, accountId, {
           ownerId: accountId,
@@ -233,10 +276,35 @@ export function createPreferencesSyncService({
       };
     }
 
+    // Validate save confirmation response shape
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      const msg = 'Preferences save confirmation missing or malformed.';
+      const currentPending = readPendingPreferences(storage, accountId).state;
+      if (!currentPending || currentPending.localMutationId <= localMutationId) {
+        try {
+          writePendingPreferences(storage, accountId, {
+            ownerId: accountId,
+            localMutationId,
+            settings: inScopeSettings,
+            activeLanguage: sanitizedActiveLanguage,
+            changedKeys: Array.from(changedKeys),
+            status: 'failed',
+            error: msg,
+            updatedAt: now(),
+          });
+        } catch {
+          // non-fatal
+        }
+      }
+      return {
+        status: 'failed',
+        error: msg,
+      };
+    }
+
     // Check if a newer local mutation occurred while this request was in flight
     const currentPending = readPendingPreferences(storage, accountId).state;
     if (currentPending && typeof currentPending.localMutationId === 'number' && currentPending.localMutationId > localMutationId) {
-      // Preserve newer pending mutation; do NOT mark as saved or clear
       return {
         status: 'pending',
         newerPending: true,
@@ -244,7 +312,7 @@ export function createPreferencesSyncService({
     }
 
     // Exact mutation acknowledged: clear pending state
-    clearPendingPreferences(storage, accountId);
+    clearPendingPreferences(storage, accountId, localMutationId);
 
     return {
       status: 'saved',
@@ -263,7 +331,7 @@ export function createPreferencesSyncService({
     const storage = storageOwner.getStorage?.() || globalThis.localStorage;
     const { state } = readPendingPreferences(storage, accountId);
     if (!state || state.status !== 'failed') {
-      return { status: 'saved' };
+      return { status: 'failed', error: 'No failed pending preferences to retry.' };
     }
 
     return await savePreferences({

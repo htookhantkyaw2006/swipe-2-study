@@ -11,6 +11,7 @@ import {
 import {
   readPendingPreferences,
   writePendingPreferences,
+  getPendingPreferencesKey,
 } from '../src/lib/preferencesSyncStorage.js';
 import { createPreferencesSyncService } from '../src/lib/preferencesSyncService.js';
 import { createPreferencesSyncController } from '../src/lib/preferencesSyncController.js';
@@ -604,4 +605,269 @@ test('Gate-Off Behavior: when gate is disabled, verified accounts make ZERO clou
   });
 
   assert.equal(mockClient.getCallCount(), 0, 'Gate-off must never make network calls');
+});
+
+
+// ---------------------------------------------------------------------------
+// 12. Data Integrity Regressions (Checkpoint 1)
+// ---------------------------------------------------------------------------
+test('Regression: savePreferences failure must NOT write older mutation over newer pending edit', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  let resolveSave1;
+  const deferredSave1 = new Promise((resolve) => { resolveSave1 = resolve; });
+
+  const mockClient = createMockSupabaseClient({
+    upsertHandler: async () => {
+      await deferredSave1;
+      return { data: null, error: { message: 'Network offline' } };
+    },
+  });
+
+  const service = createPreferencesSyncService({
+    storageOwner,
+    getClient: () => mockClient,
+  });
+
+  const save1Promise = service.savePreferences({
+    accountId: OWNER_A,
+    isCurrent: () => true,
+    settings: { dailyGoal: 10 },
+    activeLanguage: 'zh',
+    localMutationId: 1,
+    changedKeys: ['dailyGoal'],
+  });
+
+  writePendingPreferences(storage, OWNER_A, {
+    ownerId: OWNER_A,
+    localMutationId: 2,
+    settings: { dailyGoal: 50 },
+    activeLanguage: 'zh',
+    changedKeys: ['dailyGoal'],
+    status: 'saving',
+    error: null,
+    updatedAt: new Date().toISOString(),
+  });
+
+  resolveSave1();
+  await save1Promise;
+
+  const pending = readPendingPreferences(storage, OWNER_A).state;
+  assert.equal(pending.localMutationId, 2, 'Pending state must retain newer mutation 2');
+  assert.equal(pending.settings.dailyGoal, 50, 'Pending state must retain dailyGoal: 50 from mutation 2');
+});
+
+test('Regression: restorePreferences after reload must recover persisted pending edits and NOT clear them', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  writePendingPreferences(storage, OWNER_A, {
+    ownerId: OWNER_A,
+    localMutationId: 5,
+    settings: { dailyGoal: 50 },
+    activeLanguage: 'zh',
+    changedKeys: ['dailyGoal'],
+    status: 'failed',
+    error: 'Network offline',
+    updatedAt: new Date().toISOString(),
+  });
+
+  const mockClient = createMockSupabaseClient({
+    queryHandler: async () => ({
+      data: {
+        settings: { dailyGoal: 20 },
+        active_language: 'zh',
+        updated_at: '2026-01-01T12:00:00.000Z',
+      },
+      error: null,
+    }),
+  });
+
+  const service = createPreferencesSyncService({
+    storageOwner,
+    getClient: () => mockClient,
+  });
+
+  const res = await service.restorePreferences({
+    accountId: OWNER_A,
+    isCurrent: () => true,
+  });
+
+  assert.equal(res.settings.dailyGoal, 50, 'Persisted pending edit must take precedence over cloud value');
+  assert.equal(res.hasPendingLocalEdits, true, 'Must report hasPendingLocalEdits true so changes sync to cloud');
+  const pending = readPendingPreferences(storage, OWNER_A).state;
+  assert.ok(pending, 'Pending record must NOT be deleted');
+  assert.equal(pending.settings.dailyGoal, 50);
+});
+
+test('Regression: controller.retry after failed initial restore must retry restore, not claim saved', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  let restoreAttempts = 0;
+  let restoreSuccess = false;
+
+  const mockClient = createMockSupabaseClient({
+    queryHandler: async () => {
+      restoreAttempts++;
+      if (!restoreSuccess) {
+        return { data: null, error: { message: 'Cloud query timed out' } };
+      }
+      return {
+        data: {
+          settings: { dailyGoal: 50 },
+          active_language: 'ja',
+          updated_at: '2026-01-01T12:00:00.000Z',
+        },
+        error: null,
+      };
+    },
+  });
+
+  let restoredValues = null;
+  const controller = createPreferencesSyncController({
+    service: createPreferencesSyncService({
+      storageOwner,
+      getClient: () => mockClient,
+    }),
+    allowOnline: true,
+    onRestoreApplied: (data) => {
+      restoredValues = data;
+    },
+  });
+
+  await controller.setAccount({ id: OWNER_A, generation: 1 });
+  assert.equal(controller.getState().status, 'failed');
+  assert.equal(restoreAttempts, 1);
+
+  restoreSuccess = true;
+  await controller.retry();
+
+  assert.equal(restoreAttempts, 2, 'Retry must re-attempt restore');
+  assert.equal(controller.getState().status, 'saved');
+  assert.ok(restoredValues, 'Restored values must be applied');
+  assert.equal(restoredValues.settings.dailyGoal, 50);
+});
+
+test('Regression: savePreferences must validate response and fail closed on null/malformed response', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  const mockClient = createMockSupabaseClient({
+    upsertHandler: async () => ({
+      data: null,
+      error: null,
+    }),
+  });
+
+  const service = createPreferencesSyncService({
+    storageOwner,
+    getClient: () => mockClient,
+  });
+
+  const res = await service.savePreferences({
+    accountId: OWNER_A,
+    isCurrent: () => true,
+    settings: { dailyGoal: 50 },
+    activeLanguage: 'zh',
+    localMutationId: 1,
+    changedKeys: ['dailyGoal'],
+  });
+
+  assert.equal(res.status, 'failed', 'Null save response must be marked failed');
+  const pending = readPendingPreferences(storage, OWNER_A).state;
+  assert.ok(pending, 'Pending record must NOT be cleared on invalid save confirmation');
+  assert.equal(pending.status, 'failed');
+});
+
+test('Regression: corrupt pending state must fail closed, preserve corrupt bytes, and surface recovery error', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  const key = getPendingPreferencesKey(OWNER_A);
+  const corruptBytes = '{"ownerId": "' + OWNER_A + '", invalid-json';
+  storage.setItem(key, corruptBytes);
+
+  const mockClient = createMockSupabaseClient();
+  const service = createPreferencesSyncService({
+    storageOwner,
+    getClient: () => mockClient,
+  });
+
+  const res = await service.restorePreferences({
+    accountId: OWNER_A,
+    isCurrent: () => true,
+  });
+
+  assert.equal(res.status, 'failed', 'Corrupt pending state must fail restore');
+  assert.match(res.error, /recover/i, 'Must surface recovery error');
+  assert.equal(storage.getItem(key), corruptBytes, 'Corrupt bytes must be preserved');
+});
+
+test('Regression: out-of-order network arrival must NOT leave older edit as final cloud state', async () => {
+  const storage = createMemoryStorage();
+  const storageOwner = createStorageOwner({ storage: () => storage });
+  storageOwner.setOwner(OWNER_A);
+
+  let resolveSave1Arrival;
+  const deferredSave1Arrival = new Promise((resolve) => { resolveSave1Arrival = resolve; });
+
+  const recordedCloudPayloads = [];
+
+  const mockClient = createMockSupabaseClient({
+    queryHandler: async () => ({
+      data: { settings: { dailyGoal: 10 }, active_language: 'zh', updated_at: '2026-01-01T00:00:00.000Z' },
+      error: null,
+    }),
+    upsertHandler: async ({ payload }) => {
+      if (payload.settings.dailyGoal === 20) {
+        await deferredSave1Arrival;
+      }
+      recordedCloudPayloads.push(JSON.parse(JSON.stringify(payload)));
+      return {
+        data: {
+          settings: payload.settings,
+          active_language: payload.active_language,
+          updated_at: new Date().toISOString(),
+        },
+        error: null,
+      };
+    },
+  });
+
+  const controller = createPreferencesSyncController({
+    service: createPreferencesSyncService({
+      storageOwner,
+      getClient: () => mockClient,
+    }),
+    allowOnline: true,
+  });
+
+  await controller.setAccount({ id: OWNER_A, generation: 1 });
+
+  const edit1Promise = controller.onLocalChange({
+    settings: { dailyGoal: 20 },
+    activeLanguage: 'zh',
+    changedKey: 'dailyGoal',
+  });
+
+  const edit2Promise = controller.onLocalChange({
+    settings: { dailyGoal: 50 },
+    activeLanguage: 'zh',
+    changedKey: 'dailyGoal',
+  });
+
+  resolveSave1Arrival();
+  await Promise.all([edit1Promise, edit2Promise]);
+
+  const lastPayload = recordedCloudPayloads[recordedCloudPayloads.length - 1];
+  assert.equal(lastPayload.settings.dailyGoal, 50, 'Final cloud state must NOT be older mutation 20');
+  assert.equal(controller.getState().status, 'saved');
+  assert.equal(readPendingPreferences(storage, OWNER_A).state, null);
 });

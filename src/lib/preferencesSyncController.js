@@ -17,6 +17,9 @@ export function createPreferencesSyncController({
   let state = Object.freeze(initial());
   let operationToken = 0;
   let localMutationCounter = 0;
+  let lastFailedOperation = null; // null | 'restore' | 'save'
+  let inFlightSavePromise = null;
+  let queuedSave = null;
   let pendingRestoreEdits = {
     settings: {},
     activeLanguage: null,
@@ -46,11 +49,145 @@ export function createPreferencesSyncController({
 
   function cancel() {
     operationToken++;
+    inFlightSavePromise = null;
+    queuedSave = null;
+    lastFailedOperation = null;
     pendingRestoreEdits = { settings: {}, activeLanguage: null, changedKeys: [] };
   }
 
   const isCurrentOperation = (token, accountId, generation) =>
     operationToken === token && state.accountId === accountId && state.generation === generation;
+
+  async function executeSave(saveArgs, token) {
+    const { accountId, generation } = state;
+    publish({ status: 'saving', error: null });
+
+    try {
+      const res = await service.savePreferences({
+        accountId,
+        isCurrent: () => isCurrentOperation(token, accountId, generation),
+        ...saveArgs,
+      });
+
+      if (!isCurrentOperation(token, accountId, generation)) return res;
+
+      if (res.status === 'failed') {
+        lastFailedOperation = 'save';
+        publish({ status: 'failed', error: res.error });
+      } else if (res.status === 'saved') {
+        lastFailedOperation = null;
+        publish({ status: 'saved', lastSyncedAt: res.lastSyncedAt, error: null });
+      }
+      return res;
+    } catch (err) {
+      if (!isCurrentOperation(token, accountId, generation)) return;
+      lastFailedOperation = 'save';
+      publish({
+        status: 'failed',
+        error: err?.message || 'Failed to save preferences to cloud.',
+      });
+    }
+  }
+
+  async function coordinateSave(saveArgs, token) {
+    if (inFlightSavePromise) {
+      queuedSave = saveArgs;
+      publish({ status: 'saving', error: null });
+      return inFlightSavePromise;
+    }
+
+    let currentArgs = saveArgs;
+    inFlightSavePromise = (async () => {
+      try {
+        while (currentArgs && isCurrentOperation(token, state.accountId, state.generation)) {
+          const nextToRun = currentArgs;
+          currentArgs = null;
+          queuedSave = null;
+          await executeSave(nextToRun, token);
+          if (queuedSave && isCurrentOperation(token, state.accountId, state.generation)) {
+            currentArgs = queuedSave;
+            queuedSave = null;
+          }
+        }
+      } finally {
+        inFlightSavePromise = null;
+      }
+    })();
+
+    return inFlightSavePromise;
+  }
+
+  async function performRestore(token, accountId, generation) {
+    publish({
+      status: 'restoring',
+      isHydrated: false,
+      error: null,
+    });
+
+    try {
+      const res = await service.restorePreferences({
+        accountId,
+        isCurrent: () => isCurrentOperation(token, accountId, generation),
+        pendingLocalEdits: pendingRestoreEdits,
+      });
+
+      if (!isCurrentOperation(token, accountId, generation)) return;
+
+      if (res.status === 'failed') {
+        lastFailedOperation = 'restore';
+        publish({
+          status: 'failed',
+          error: res.error,
+          isHydrated: true,
+        });
+        return;
+      }
+
+      lastFailedOperation = null;
+
+      if (res.persistedMutationId && res.persistedMutationId > localMutationCounter) {
+        localMutationCounter = res.persistedMutationId;
+      }
+
+      // Notify caller of restored values
+      if (typeof onRestoreApplied === 'function' && res.settings) {
+        onRestoreApplied({
+          settings: res.settings,
+          activeLanguage: res.activeLanguage,
+        });
+      }
+
+      // If local edits were made while restore was pending or persisted un-synced edits exist, save them
+      if (res.hasPendingLocalEdits) {
+        publish({
+          status: 'saving',
+          isHydrated: true,
+        });
+        const nextMutationId = ++localMutationCounter;
+        await coordinateSave({
+          settings: res.settings,
+          activeLanguage: res.activeLanguage,
+          localMutationId: nextMutationId,
+          changedKeys: res.changedKeys || pendingRestoreEdits.changedKeys,
+        }, token);
+      } else {
+        publish({
+          status: 'saved',
+          lastSyncedAt: res.lastSyncedAt,
+          error: null,
+          isHydrated: true,
+        });
+      }
+    } catch (err) {
+      if (!isCurrentOperation(token, accountId, generation)) return;
+      lastFailedOperation = 'restore';
+      publish({
+        status: 'failed',
+        error: err?.message || 'Preferences restore failed.',
+        isHydrated: true,
+      });
+    }
+  }
 
   async function setAccount(account) {
     const accountId = account?.id ?? null;
@@ -62,6 +199,9 @@ export function createPreferencesSyncController({
 
     operationToken++;
     localMutationCounter = 0;
+    lastFailedOperation = null;
+    inFlightSavePromise = null;
+    queuedSave = null;
     pendingRestoreEdits = { settings: {}, activeLanguage: null, changedKeys: [] };
 
     if (!accountId || !allowOnline) {
@@ -84,69 +224,7 @@ export function createPreferencesSyncController({
       isHydrated: false,
     });
 
-    // Perform initial restore on verified sign-in
-    try {
-      const res = await service.restorePreferences({
-        accountId,
-        isCurrent: () => isCurrentOperation(token, accountId, generation),
-        pendingLocalEdits: pendingRestoreEdits,
-      });
-
-      if (!isCurrentOperation(token, accountId, generation)) return;
-
-      if (res.status === 'failed') {
-        publish({
-          status: 'failed',
-          error: res.error,
-          isHydrated: true,
-        });
-        return;
-      }
-
-      // Notify caller of restored values
-      if (typeof onRestoreApplied === 'function' && res.settings) {
-        onRestoreApplied({
-          settings: res.settings,
-          activeLanguage: res.activeLanguage,
-        });
-      }
-
-      // If local edits were made while restore was pending, immediately save them to cloud
-      if (res.hasPendingLocalEdits) {
-        publish({
-          status: 'saving',
-          isHydrated: true,
-        });
-        const saveRes = await service.savePreferences({
-          accountId,
-          isCurrent: () => isCurrentOperation(token, accountId, generation),
-          settings: res.settings,
-          activeLanguage: res.activeLanguage,
-          localMutationId: ++localMutationCounter,
-          changedKeys: pendingRestoreEdits.changedKeys,
-        });
-        if (!isCurrentOperation(token, accountId, generation)) return;
-        if (saveRes.status === 'failed') {
-          publish({ status: 'failed', error: saveRes.error });
-        } else {
-          publish({ status: 'saved', lastSyncedAt: saveRes.lastSyncedAt, error: null });
-        }
-      } else {
-        publish({
-          status: 'saved',
-          lastSyncedAt: res.lastSyncedAt,
-          error: null,
-          isHydrated: true,
-        });
-      }
-    } catch (err) {
-      if (!isCurrentOperation(token, accountId, generation)) return;
-      publish({
-        status: 'failed',
-        error: err?.message || 'Preferences restore failed.',
-        isHydrated: true,
-      });
-    }
+    await performRestore(token, accountId, generation);
   }
 
   async function onLocalChange({
@@ -175,33 +253,12 @@ export function createPreferencesSyncController({
       return;
     }
 
-    publish({ status: 'saving', error: null });
-
-    try {
-      const res = await service.savePreferences({
-        accountId: state.accountId,
-        isCurrent: () => isCurrentOperation(token, state.accountId, state.generation),
-        settings,
-        activeLanguage,
-        localMutationId: mutationId,
-        changedKeys: changedKey ? [changedKey] : [],
-      });
-
-      if (!isCurrentOperation(token, state.accountId, state.generation)) return;
-
-      if (res.status === 'failed') {
-        publish({ status: 'failed', error: res.error });
-      } else if (res.status === 'saved') {
-        publish({ status: 'saved', lastSyncedAt: res.lastSyncedAt, error: null });
-      }
-      // If res.status === 'pending' (newer edit in flight), keep status as is
-    } catch (err) {
-      if (!isCurrentOperation(token, state.accountId, state.generation)) return;
-      publish({
-        status: 'failed',
-        error: err?.message || 'Failed to save preferences to cloud.',
-      });
-    }
+    await coordinateSave({
+      settings,
+      activeLanguage,
+      localMutationId: mutationId,
+      changedKeys: changedKey ? [changedKey] : [],
+    }, token);
   }
 
   async function retry() {
@@ -210,6 +267,11 @@ export function createPreferencesSyncController({
     }
 
     const token = operationToken;
+
+    if (lastFailedOperation === 'restore') {
+      return await performRestore(token, state.accountId, state.generation);
+    }
+
     publish({ status: 'saving', error: null });
 
     try {
@@ -221,12 +283,15 @@ export function createPreferencesSyncController({
       if (!isCurrentOperation(token, state.accountId, state.generation)) return;
 
       if (res.status === 'failed') {
+        lastFailedOperation = 'save';
         publish({ status: 'failed', error: res.error });
       } else if (res.status === 'saved') {
+        lastFailedOperation = null;
         publish({ status: 'saved', lastSyncedAt: res.lastSyncedAt, error: null });
       }
     } catch (err) {
       if (!isCurrentOperation(token, state.accountId, state.generation)) return;
+      lastFailedOperation = 'save';
       publish({
         status: 'failed',
         error: err?.message || 'Preferences retry failed.',
