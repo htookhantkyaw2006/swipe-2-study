@@ -1,0 +1,4 @@
+id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burmese,audio_path,examples_json,sort_order
+ja_n5_001,ja-n5,ja,N5,私,わたし,"I; me",ကျွန်တော် / ကျွန်မ,audio/ja/n5/001.mp3,"[{""text"": ""私は学生です。"", ""reading"": ""Watashi wa gakusei desu."", ""english"": ""I am a student."", ""burmese"": ""ကျွန်တော်/မ ကျောင်းသားပါ။""}]",10
+ja_n5_002,ja-n5,ja,N5,日本,にほん,Japan,ဂျပန်နိုင်ငံ,audio/ja/n5/002.mp3,"[{""text"": ""日本へ行きます。"", ""reading"": ""Nihon e ikimasu."", ""english"": ""I am going to Japan."", ""burmese"": ""ဂျပန်ကို သွားမယ်။""}]",20
+ja_n5_003,ja-n5,ja,N5,学生,がくせい,student,ကျောင်းသား,,[],30

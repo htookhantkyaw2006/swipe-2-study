@@ -1,0 +1,5 @@
+id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burmese,audio_path,examples_json,sort_order
+zh_hsk1_001,zh-hsk1,zh,HSK1,中,zhōng,middle,အလယ်,https://evil.com/audio.mp3,[],10
+zh_hsk1_002,zh-hsk1,zh,HSK1,国,guó,country,နိုင်ငံ,audio/../secret.mp3,[],20
+zh_hsk1_003,zh-hsk1,zh,HSK1,人,rén,person,လူ,/leading/slash.mp3,[],30
+zh_hsk1_004,zh-hsk1,zh,HSK1,大,dà,big,ကြီး,audio/track.mp3?query=1,[],40
