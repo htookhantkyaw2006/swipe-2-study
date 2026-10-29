@@ -1,5 +1,11 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useSyncExternalStore } from 'react';
 import { storageOwner } from './storageOwner.js';
+import { AuthContext } from './authContext.js';
+import { getActiveLanguageId, setActiveLanguageId, subscribeActiveLanguage } from './activeLanguage.js';
+import { preferencesSyncService } from './preferencesSyncService.js';
+import { createPreferencesSyncController } from './preferencesSyncController.js';
+import { isPreferencesSyncEnabled } from './preferencesSyncGate.js';
+import { DEFAULTS, OPTIONS, SPEECH_RATES, readPreferences } from './preferencesDefaults.js';
 
 /* ---------------------------------------------------------------
    PREFERENCES
@@ -9,96 +15,72 @@ import { storageOwner } from './storageOwner.js';
 
    Stored as a single JSON blob so adding a key needs no migration —
    unknown keys fall back to DEFAULTS on read.
-
-   `readPreferences()` is a non-hook escape hatch for plain modules
-   that run outside React (see lib/speech.js).
    --------------------------------------------------------------- */
 
-export const DEFAULTS = {
-  // Learning
-  dailyGoal: 20,
-  cardsPerSession: 10,
-  cardOrder: 'sequential', // sequential | shuffle
-
-  // Display
-  showPinyin: true,
-  showBurmese: true,
-  translationLanguage: 'both', // english | burmese | both
-
-  // Audio
-  autoPlayAudio: false,
-  speechRate: 'normal', // slow | normal | fast
-
-  // Per language, because accents are language-specific codes: a
-  // Taiwan choice for Chinese must survive a trip to Japanese.
-  // Missing entries fall back to the course's default accent.
-  accentByLanguage: {}
-};
-
-/** Option lists for the pickers, kept next to the defaults they describe. */
-export const OPTIONS = {
-  dailyGoal: [
-    { value: 10, label: '10 cards' },
-    { value: 20, label: '20 cards' },
-    { value: 30, label: '30 cards' },
-    { value: 50, label: '50 cards' }
-  ],
-  cardsPerSession: [
-    { value: 5, label: '5 cards' },
-    { value: 10, label: '10 cards' },
-    { value: 20, label: '20 cards' },
-    { value: 30, label: '30 cards' }
-  ],
-  cardOrder: [
-    { value: 'sequential', label: 'Sequential' },
-    { value: 'shuffle', label: 'Shuffle' }
-  ],
-  translationLanguage: [
-    { value: 'english', label: 'English only' },
-    { value: 'burmese', label: 'Burmese only' },
-    { value: 'both', label: 'Both' }
-  ],
-  speechRate: [
-    { value: 'slow', label: 'Slow' },
-    { value: 'normal', label: 'Normal' },
-    { value: 'fast', label: 'Fast' }
-  ]
-  // Accent options live on each course (course.speech.accents).
-};
-
-/** Numeric speechSynthesis rates for the three speed labels. */
-export const SPEECH_RATES = { slow: 0.6, normal: 1, fast: 1.4 };
-
-/* Before languages, the accent was a single `accent` key and could only
-   be Chinese. Carry it into the per-language map so nobody loses it. */
-const upgrade = (stored) => {
-  const { accent, ...rest } = stored;
-  if (accent && !rest.accentByLanguage?.zh) {
-    rest.accentByLanguage = { ...(rest.accentByLanguage || {}), zh: accent };
-  }
-  return rest;
-};
-
-export function readPreferences() {
-  try {
-    const raw = storageOwner.scope().getItem('preferences');
-    if (!raw) return { ...DEFAULTS };
-    return { ...DEFAULTS, ...upgrade(JSON.parse(raw)) };
-  } catch {
-    // Blocked storage or malformed JSON — defaults keep the app usable.
-    return { ...DEFAULTS };
-  }
-}
+export { DEFAULTS, OPTIONS, SPEECH_RATES, readPreferences };
 
 // Same reasoning as LanguageContext in language.jsx: keep one context
 // object across development hot swaps.
 const PreferencesContext = import.meta.hot?.data.PreferencesContext ?? createContext(null);
 if (import.meta.hot) import.meta.hot.data.PreferencesContext = PreferencesContext;
 
-export function PreferencesProvider({ children }) {
+export function PreferencesProvider({
+  children,
+  syncService = preferencesSyncService,
+  allowOnline = isPreferencesSyncEnabled(),
+  controller: injectedController = null,
+}) {
   const [prefs, setPrefs] = useState(readPreferences);
   // Pin delayed callbacks to the owner whose provider created them.
   const [scope] = useState(() => storageOwner.scope());
+
+  // Read optional auth context safely without throwing if unprovided
+  const auth = useContext(AuthContext);
+
+  const ready = Boolean(
+    auth?.user?.id && !auth?.loading && !auth?.isTransitioning && !auth?.error
+    && !auth?.passwordRecoveryUserId && Number.isSafeInteger(auth?.generation)
+  );
+  const ownerId = ready ? auth.user.id : null;
+  const generation = ready ? auth.generation : null;
+
+  const [controller] = useState(() => {
+    if (injectedController) return injectedController;
+    return createPreferencesSyncController({
+      service: syncService,
+      allowOnline,
+      onRestoreApplied: ({ settings, activeLanguage }) => {
+        if (settings) {
+          setPrefs({ ...DEFAULTS, ...settings });
+        }
+        if (activeLanguage) {
+          setActiveLanguageId(activeLanguage);
+        }
+      },
+    });
+  });
+
+  const syncState = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
+
+  useEffect(() => () => controller.cancel(), [controller]);
+
+  // Connect active account to controller
+  useEffect(() => {
+    controller.setAccount(ownerId ? { id: ownerId, generation } : null);
+  }, [controller, ownerId, generation]);
+
+  // Subscribe to external language switcher updates to sync activeLanguage change
+  useEffect(() => {
+    return subscribeActiveLanguage((langId) => {
+      if (ownerId && allowOnline) {
+        controller.onLocalChange({
+          settings: prefs,
+          activeLanguage: langId,
+          changedKey: 'activeLanguage',
+        });
+      }
+    });
+  }, [controller, ownerId, allowOnline, prefs]);
 
   const persist = useCallback((next) => {
     try {
@@ -112,17 +94,46 @@ export function PreferencesProvider({ children }) {
     setPrefs((prev) => {
       const next = { ...prev, [key]: value };
       persist(next);
+      if (ownerId && allowOnline) {
+        controller.onLocalChange({
+          settings: next,
+          activeLanguage: getActiveLanguageId(),
+          changedKey: key,
+        });
+      }
       return next;
     });
-  }, [persist]);
+  }, [persist, controller, ownerId, allowOnline]);
 
   const resetPrefs = useCallback(() => {
-    setPrefs({ ...DEFAULTS });
-    persist({ ...DEFAULTS });
-  }, [persist]);
+    const next = { ...DEFAULTS };
+    setPrefs(next);
+    persist(next);
+    if (ownerId && allowOnline) {
+      controller.onLocalChange({
+        settings: next,
+        activeLanguage: getActiveLanguageId(),
+        changedKey: 'reset',
+      });
+    }
+  }, [persist, controller, ownerId, allowOnline]);
+
+  const retrySync = useCallback(() => {
+    return controller.retry();
+  }, [controller]);
+
+  const value = {
+    prefs,
+    setPref,
+    resetPrefs,
+    syncStatus: syncState.status,
+    syncError: syncState.error,
+    lastSyncedAt: syncState.lastSyncedAt,
+    retrySync,
+  };
 
   return (
-    <PreferencesContext.Provider value={{ prefs, setPref, resetPrefs }}>
+    <PreferencesContext.Provider value={value}>
       {children}
     </PreferencesContext.Provider>
   );

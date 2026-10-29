@@ -37,6 +37,25 @@ let current = readStored();
 let currentOwner = storageOwner.getOwner();
 reflect(current);
 
+const listeners = new Set();
+
+export function subscribeActiveLanguage(fn) {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+function notifyActiveLanguage(id) {
+  for (const fn of listeners) {
+    try {
+      fn(id);
+    } catch {
+      // ignore subscriber errors
+    }
+  }
+}
+
 export function getActiveLanguageId() {
   if (currentOwner !== storageOwner.getOwner()) {
     currentOwner = storageOwner.getOwner();
@@ -56,5 +75,6 @@ export function setActiveLanguageId(id) {
   } catch {
     // Persisting is best-effort; the in-memory choice still applies.
   }
+  notifyActiveLanguage(id);
   return true;
 }

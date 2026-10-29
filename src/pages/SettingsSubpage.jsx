@@ -59,7 +59,14 @@ const formatBytes = (bytes) => {
 };
 
 export default function SettingsSubpage() {
-  const { prefs, setPref, resetPrefs } = usePreferences();
+  const {
+    prefs,
+    setPref,
+    resetPrefs,
+    syncStatus: prefSyncStatus,
+    syncError: prefSyncError,
+    retrySync: prefSyncRetry,
+  } = usePreferences();
   const { status: syncStatus, error: syncError, retry: syncRetry, sync: syncManual } = useOnlineSync();
   const { language } = useLanguage();
   const course = useCourse();
@@ -254,6 +261,30 @@ export default function SettingsSubpage() {
 
       {/* ---------------- Data & Storage ---------------- */}
       <SettingsGroup title="Data & Storage">
+        <SettingsRow
+          icon={prefSyncStatus === 'failed' ? CloudOff : (prefSyncStatus === 'syncing' || prefSyncStatus === 'restoring' ? RefreshCw : Cloud)}
+          iconGradient={
+            prefSyncStatus === 'saved' ? GRADIENTS.green
+            : prefSyncStatus === 'syncing' || prefSyncStatus === 'restoring' ? GRADIENTS.blue
+            : prefSyncStatus === 'failed' ? GRADIENTS.red
+            : GRADIENTS.slate
+          }
+          title="Preferences sync"
+          subtitle={
+            prefSyncStatus === 'saved' ? 'Settings saved to your account'
+            : prefSyncStatus === 'syncing' || prefSyncStatus === 'restoring' ? 'Saving preferences to account...'
+            : prefSyncStatus === 'failed' ? `Sync failed · ${prefSyncError || 'Tap to retry'}`
+            : 'Preferences stored on this device'
+          }
+          value={
+            prefSyncStatus === 'saved' ? 'Saved'
+            : prefSyncStatus === 'syncing' || prefSyncStatus === 'restoring' ? 'Syncing...'
+            : prefSyncStatus === 'failed' ? 'Retry'
+            : 'Local only'
+          }
+          onClick={prefSyncStatus === 'failed' ? prefSyncRetry : undefined}
+          danger={prefSyncStatus === 'failed'}
+        />
         <SettingsRow
           icon={syncStatus === 'failed' || syncStatus === 'conflict' ? CloudOff : (syncStatus === 'syncing' ? RefreshCw : Cloud)}
           iconGradient={

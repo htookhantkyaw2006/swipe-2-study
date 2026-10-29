@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { LANGUAGES, getCourse, isActiveCourse } from '../courses';
-import { getActiveLanguageId, setActiveLanguageId } from './activeLanguage';
+import { getActiveLanguageId, setActiveLanguageId, subscribeActiveLanguage } from './activeLanguage';
 import { seedCourse } from './seed';
 
 /* ---------------------------------------------------------------
@@ -35,6 +35,16 @@ export function LanguageProvider({ children }) {
     seedCourse(id);
     return id;
   });
+
+  useEffect(() => {
+    return subscribeActiveLanguage((newId) => {
+      setLanguageId((prev) => {
+        if (prev === newId) return prev;
+        seedCourse(newId);
+        return newId;
+      });
+    });
+  }, []);
 
   const setLanguage = useCallback((id) => {
     if (!isActiveCourse(id)) return false;
