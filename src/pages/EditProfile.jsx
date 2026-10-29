@@ -6,28 +6,13 @@ import { useProfile } from '../lib/profile.js';
 import { useAvatarUrl } from '../lib/useAvatarUrl.js';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { notifyProfileChanged } from '../lib/profileEvents.js';
-import { saveProfile, retryAvatarCleanup, validateAvatarFile, validateDisplayName } from '../lib/profileService.js';
+import { saveProfile, retryAvatarCleanup, validateDisplayName } from '../lib/profileService.js';
+import { prepareAvatarImage } from '../lib/avatarPreparation.js';
 import Avatar from '../components/ui/Avatar';
 import { StudyHeader } from '../components/study/StudyPage';
 import './EditProfile.css';
 
-async function checkImage(file) {
-  const invalid = await validateAvatarFile(file);
-  if (invalid) return invalid;
-  let image, objectUrl;
-  try {
-    if (typeof createImageBitmap === 'function') image = await createImageBitmap(file);
-    else {
-      image = new Image();
-      objectUrl = URL.createObjectURL(file);
-      image.src = objectUrl;
-      await image.decode();
-    }
-    const width = image.width || image.naturalWidth, height = image.height || image.naturalHeight;
-    return !width || !height || width > 4096 || height > 4096 ? 'Choose a photo no larger than 4096 × 4096 pixels.' : null;
-  } catch { return 'This image could not be opened. Choose another photo.'; }
-  finally { image?.close?.(); if (objectUrl) URL.revokeObjectURL(objectUrl); }
-}
+
 
 function ProfileEditor({ initialProfile, onReload }) {
   const { user, captureGeneration, isCurrent } = useAuth();
@@ -41,6 +26,7 @@ function ProfileEditor({ initialProfile, onReload }) {
   const [nameError, setNameError] = useState('');
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [busyPhase, setBusyPhase] = useState('');
   const [checkingPhoto, setCheckingPhoto] = useState(false);
   const [reloadRequired, setReloadRequired] = useState(false);
   const [cleanupPath, setCleanupPath] = useState(null);
@@ -71,11 +57,11 @@ function ProfileEditor({ initialProfile, onReload }) {
     const sequence = ++selection.current;
     const gen = captureGeneration();
     setCheckingPhoto(true); setPhotoError(''); setSaved(false);
-    const invalid = await checkImage(selected);
+    const result = await prepareAvatarImage(selected);
     if (!alive.current || sequence !== selection.current || !isCurrent(gen)) return;
     setCheckingPhoto(false);
-    if (invalid) { setFile(null); setRemovePhoto(false); setPhotoError(invalid); return; }
-    setFile(selected); setRemovePhoto(false);
+    if (result.error) { setFile(null); setRemovePhoto(false); setPhotoError(result.error); return; }
+    setFile(result.file); setRemovePhoto(false);
   };
   const remove = () => {
     selection.current += 1; setCheckingPhoto(false); setPhotoError(''); setSaved(false);
@@ -91,10 +77,21 @@ function ProfileEditor({ initialProfile, onReload }) {
     setNameError(invalid || ''); setFormError(''); setSaved(false);
     if (invalid) { nameRef.current?.focus(); return; }
     if (!dirty) return;
-    locked.current = true; setBusy(true);
+    locked.current = true; setBusy(true); setBusyPhase('preparing');
     const gen = captureGeneration();
     try {
-      const result = await saveProfile(getSupabaseClient(), { userId, baseProfile: base, displayName: name, file, removeAvatar: removePhoto, isCurrent: () => isCurrent(gen) });
+      let fileToUpload = file;
+      if (fileToUpload) {
+        const prep = await prepareAvatarImage(fileToUpload);
+        if (prep.error) {
+          setFormError(prep.error);
+          return;
+        }
+        fileToUpload = prep.file;
+      }
+      setBusyPhase('saving');
+      if (!alive.current || !isCurrent(gen)) return;
+      const result = await saveProfile(getSupabaseClient(), { userId, baseProfile: base, displayName: name, file: fileToUpload, removeAvatar: removePhoto, isCurrent: () => isCurrent(gen) });
       // A save can finish after navigation. Notify any currently mounted owner view.
       if (result.profile && isCurrent(gen)) notifyProfileChanged(userId);
       if (!alive.current || !isCurrent(gen)) return;
@@ -104,7 +101,7 @@ function ProfileEditor({ initialProfile, onReload }) {
       setBase(result.profile); setName(result.profile.display_name); setFile(null); setRemovePhoto(false);
       setPhotoError(''); setSaved(true); setWarning(result.warning || ''); setCleanupPath(result.cleanupPath || null);
     } catch { if (alive.current && isCurrent(gen)) setFormError('Could not save your profile. Please retry.'); }
-    finally { locked.current = false; if (alive.current) setBusy(false); }
+    finally { locked.current = false; if (alive.current) { setBusy(false); setBusyPhase(''); } }
   };
   const cleanup = async () => {
     if (!cleanupPath || cleanupLocked.current || locked.current) return;
@@ -127,11 +124,11 @@ function ProfileEditor({ initialProfile, onReload }) {
       <h2 id="edit-photo-title">Make it yours</h2>
       <p>Add a photo so your learning space feels like you.</p>
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={choosePhoto} hidden aria-label="Choose profile photo" disabled={disabled || reloadRequired} />
-      <div className="edit-profile__photo-actions"><button type="button" className="btn-secondary" onClick={() => inputRef.current?.click()} disabled={disabled || reloadRequired}><Camera size={18} aria-hidden="true" />{checkingPhoto ? 'Checking photo…' : 'Choose photo'}</button>
+      <div className="edit-profile__photo-actions"><button type="button" className="btn-secondary" onClick={() => inputRef.current?.click()} disabled={disabled || reloadRequired}><Camera size={18} aria-hidden="true" />{checkingPhoto ? 'Preparing photo…' : 'Choose photo'}</button>
         {(file || base.avatar_path) && !removePhoto && <button type="button" className="edit-profile__remove" onClick={remove} disabled={disabled || reloadRequired}><Trash2 size={17} aria-hidden="true" />Remove photo</button>}
         {(file || removePhoto) && <button type="button" className="edit-profile__undo" onClick={undoPhoto} disabled={disabled}>Undo photo change</button>}
       </div>
-      <p className="edit-profile__help" id="photo-guidance">JPEG, PNG or WebP · Up to 1 MB<br />Maximum 4096 × 4096 pixels</p>
+      <p className="edit-profile__help" id="photo-guidance">JPEG, PNG or WebP · Up to 8 MB<br />Resized automatically up to 512 × 512 pixels</p>
       {(file || removePhoto) && <p className="edit-profile__draft">{removePhoto ? 'Photo will be removed when you save.' : 'Your new photo is ready to save.'}</p>}
       {photoError && <p className="edit-profile__error" role="alert">{photoError}</p>}
       {!file && !removePhoto && photo.error && <div className="edit-profile__notice" role="status"><p>{photo.error}</p><button type="button" onClick={photo.retry} disabled={disabled}><RefreshCw size={16} aria-hidden="true" />Retry photo</button></div>}
@@ -144,7 +141,7 @@ function ProfileEditor({ initialProfile, onReload }) {
       {saved && <div className="edit-profile__success" role="status"><CheckCircle2 size={20} aria-hidden="true" /><p>Profile updated.</p></div>}
       {formError && <div className="edit-profile__notice edit-profile__notice--error" role="alert"><p>{formError}</p>{reloadRequired && <><p>Reloading discards the edits shown here and loads your saved profile.</p><button type="button" onClick={onReload} disabled={disabled}><RefreshCw size={16} aria-hidden="true" />Reload saved profile</button></>}</div>}
       {warning && <div className="edit-profile__notice" role="status"><p>{warning}</p>{cleanupPath && <button type="button" onClick={cleanup} disabled={disabled}><RefreshCw size={16} aria-hidden="true" />{cleaning ? 'Deleting previous photo…' : 'Retry photo cleanup'}</button>}</div>}
-      <div className="edit-profile__actions"><button className="btn-primary" type="submit" disabled={disabled || !dirty || reloadRequired}>{busy ? 'Saving profile…' : 'Save changes'}</button><Link className="btn-secondary" to="/profile" aria-disabled={busy} onClick={event => { if (busy) event.preventDefault(); }}>Back to profile</Link></div>
+      <div className="edit-profile__actions"><button className="btn-primary" type="submit" disabled={disabled || !dirty || reloadRequired}>{busy ? (busyPhase === 'preparing' ? 'Preparing photo…' : 'Saving profile…') : 'Save changes'}</button><Link className="btn-secondary" to="/profile" aria-disabled={busy} onClick={event => { if (busy) event.preventDefault(); }}>Back to profile</Link></div>
     </section>
   </form>;
 }

@@ -12,10 +12,18 @@ leaves BottomNav, Layout, global theme CSS and sidebar behavior untouched.
 - Display names are trimmed, required, and limited to 100 Unicode code points,
   matching PostgreSQL's character limit. Burmese, CJK and emoji are accepted;
   ASCII control characters are rejected. Email/password changes are separate.
-- Avatars accept JPEG/PNG/WebP up to 1,048,576 bytes. The client checks signature,
-  MIME, browser decoding and maximum 4096 × 4096 dimensions. SVG, mislabeled,
-  undecodable and oversized files are rejected. Client checks complement the
-  existing Storage policies; they are not server-side content inspection.
+- Avatars accept source JPEG/PNG/WebP up to 8 MiB (8,388,608 bytes) and up to 16 megapixels.
+  The client prepares the image before upload using browser-native image/canvas APIs:
+  * Rejects SVG, arbitrary files, disguised extensions, and corrupt/undecodable files via magic byte inspection.
+  * Rejects source images exceeding 16 megapixels before allocating canvas buffers.
+  * Scales image dimensions to fit within a 512×512 bounding box, preserving aspect ratio, without upscaling.
+  * Compresses output using bounded quality iterations (max 4 attempts) to ensure the prepared file is <= 1 MiB (1,048,576 bytes) compatible with Storage bucket rules.
+  * Generates matching filename extension and MIME type based on actual encoded format (never trusting source extension).
+  * Handles EXIF orientation natively via browser-native `imageOrientation: 'from-image'`.
+  * Browser EXIF Limitation: Modern browsers (Chrome 52+, Safari 15+, Firefox 93+, Edge 79+) handle EXIF orientation natively; legacy engines lacking `imageOrientation` support fall back to raw storage orientation without throwing.
+  * Temporary resources (object URLs, ImageBitmap, canvas pixel buffers) are released promptly.
+  * Failed preparation leaves existing avatar completely unchanged (zero Storage/DB operations).
+  * Generation/owner-switch guards abort upload if account switches during preparation.
 - Choosing/removing a photo stages a change. A local object-URL preview, undo,
   save/loading/error/confirmation states and retry controls are provided.
   Unmounting releases the preview URL. A failed image falls back to the existing

@@ -1,6 +1,39 @@
 # Development log
 
-## Latest — 29 October 2026 — Fix: deletion attempt reservation concurrency race
+## Latest — 29 October 2026 — Work batch B3.1: client-side avatar resizing and compression
+
+- Branched `feat/avatar-processing` from completed fix tip `e4b2841` on `fix/deletion-attempt-reservation`.
+- Implemented **client-side image preparation and compression** for avatar uploads strictly using browser-native APIs without third-party dependencies:
+  1. **Core Preparation Helper (`src/lib/avatarPreparation.js`)**:
+     - Magic byte inspection (`detectRasterMimeType`) enforces real JPEG, PNG, or WebP raster formats. Rejects SVGs, disguised extensions, text, executables, and corrupt data.
+     - Enforces source file size limit of 8 MiB (`MAX_SOURCE_BYTES = 8388608`).
+     - Megapixel safety gate (`MAX_SOURCE_PIXELS = 16777216`): rejects images > 16 megapixels before allocating any canvas buffer.
+     - Dimension scaling (`calculateTargetDimensions`): fits image within a 512×512 bounding box, preserves aspect ratio, and strictly prevents upscaling of smaller images.
+     - Bounded compression loop: iterates through quality levels (0.85, 0.70, 0.50, 0.35) producing an output file <= 1 MiB (`MAX_OUTPUT_BYTES = 1048576`) compatible with existing bucket limits. Fails clearly if output cannot meet the limit after 4 attempts.
+     - Browser-native orientation: applies `imageOrientation: 'from-image'` via `createImageBitmap`. Documented browser limitations for legacy engines lacking the dictionary option.
+     - Extension matching: derives file extension directly from actual output MIME type (`avatar.webp`, `avatar.jpg`, `avatar.png`), never trusting the original filename extension.
+     - Strict resource cleanup: revokes temporary object URLs, closes `ImageBitmap` instances, and zeroes canvas dimensions to free pixel buffers. Never logs or persists raw source image data.
+  2. **EditProfile Integration (`src/pages/EditProfile.jsx`)**:
+     - Integrated `prepareAvatarImage` into both photo selection (`choosePhoto`) and the save flow (`save`).
+     - Added accessible busy phases (`busyPhase = 'preparing' | 'saving'`): displays "Preparing photo…" during image processing and "Saving profile…" during upload/CAS commit.
+     - Prevents duplicate submission via lock guards and disabled button states during preparation.
+     - Failed preparation halts the save flow and leaves the current profile avatar unchanged (zero Storage/DB operations).
+     - Verified-owner/generation guards prevent network uploads if an account switch occurs during preparation.
+     - Preserves confirmed replacement cleanup order: old avatar is deleted only after the new profile reference is committed.
+  3. **Verification & Tests**:
+     - Added `tests/avatarPreparation.test.js` (16 Node test cases) covering:
+       - Magic byte raster detection & rejection of SVG/corrupt files.
+       - Target dimension calculation, aspect ratio preservation, and no-upscaling guarantees.
+       - 8 MiB source size and 16 megapixel limits.
+       - Bounded compression quality reductions and clear error reporting.
+       - Extension and MIME type alignment.
+       - Resource release (`ImageBitmap.close`, `URL.revokeObjectURL`).
+       - Save flow integration: preparation failure preserves old avatar with zero DB/Storage mutations.
+       - Owner switching before upload halts and preserves Account B.
+     - Created `tests/runBrowserAvatarCheck.mjs` executing headless Chrome to verify real browser canvas decoding, non-square 800×400-to-512×256 scaling, 240×160 no-upscaling, EXIF `imageOrientation: 'from-image'`, and SVG rejection in a real browser engine.
+- Validation: **278 Node tests pass** (all 262 existing + 16 new avatar preparation tests; 0 failures), lint **0 errors / 8 existing warnings** preserved, production build passes (`dist/assets/index-CCsugVfV.js`, 980 kB in 1.01s), and `git diff --check` is clean.
+
+## 29 October 2026 — Fix: deletion attempt reservation concurrency race
 
 - Branched `fix/deletion-attempt-reservation` from completed UI tip `4e897ed` on `feat/account-deletion-ui`.
 - Fixed confirmed race condition in account deletion throttling where concurrent requests could all begin password verification before any failures returned:
