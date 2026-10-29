@@ -70,6 +70,7 @@ export async function sendDeletionRequest({
   client,
   password,
   initiatingUserId,
+  isCurrent = null,
   supabaseUrl = null,
   fetcher = globalThis.fetch,
 }) {
@@ -97,10 +98,25 @@ export async function sendDeletionRequest({
     };
   }
 
-  let session;
+  const checkCurrent = () => {
+    if (typeof isCurrent === 'function') {
+      return Boolean(isCurrent());
+    }
+    return true;
+  };
+
+  // Guard before authorization check
+  if (!checkCurrent()) {
+    return {
+      status: 'error',
+      code: 'OPERATION_CANCELLED',
+      message: 'Account changed before authorization check.',
+    };
+  }
+
+  let sessionRes;
   try {
-    const sessionRes = await client.auth.getSession();
-    session = sessionRes?.data?.session;
+    sessionRes = await client.auth.getSession();
   } catch {
     return {
       status: 'unconfirmed',
@@ -109,12 +125,81 @@ export async function sendDeletionRequest({
     };
   }
 
+  // Fail closed if getSession returned an error (even alongside stale data)
+  if (sessionRes?.error) {
+    return {
+      status: 'unauthenticated',
+      code: 'SESSION_ERROR',
+      message: sessionRes.error.message || 'Session lookup failed.',
+    };
+  }
+
+  // Guard after session lookup
+  if (!checkCurrent()) {
+    return {
+      status: 'error',
+      code: 'OPERATION_CANCELLED',
+      message: 'Account changed during session lookup.',
+    };
+  }
+
+  const session = sessionRes?.data?.session;
   const accessToken = session?.access_token;
-  if (!accessToken) {
+  if (!accessToken || typeof accessToken !== 'string' || !accessToken.trim()) {
     return {
       status: 'unauthenticated',
       code: 'UNAUTHENTICATED',
       message: 'You must be signed in to delete your account.',
+    };
+  }
+
+  // Require session identity to match initiating owner if session user is present
+  const sessionUserId = session?.user?.id;
+  if (sessionUserId && sessionUserId !== initiatingUserId) {
+    return {
+      status: 'error',
+      code: 'OWNER_MISMATCH',
+      message: 'Active session does not match the initiating account.',
+    };
+  }
+
+  // Capture the token and independently verify its user using token-specific getUser(token)
+  const capturedToken = accessToken;
+  if (typeof client.auth?.getUser === 'function') {
+    let verifyRes;
+    try {
+      verifyRes = await client.auth.getUser(capturedToken);
+    } catch {
+      return {
+        status: 'unauthenticated',
+        code: 'VERIFICATION_FAILED',
+        message: 'Unable to verify account token.',
+      };
+    }
+
+    if (verifyRes?.error || !verifyRes?.data?.user) {
+      return {
+        status: 'unauthenticated',
+        code: 'UNAUTHENTICATED',
+        message: verifyRes?.error?.message || 'Unable to verify account token.',
+      };
+    }
+
+    if (verifyRes.data.user.id !== initiatingUserId) {
+      return {
+        status: 'error',
+        code: 'OWNER_MISMATCH',
+        message: 'Verified token does not match the initiating account.',
+      };
+    }
+  }
+
+  // Guard after asynchronous verification and immediately before dispatch
+  if (!checkCurrent()) {
+    return {
+      status: 'error',
+      code: 'OPERATION_CANCELLED',
+      message: 'Account changed before dispatch.',
     };
   }
 
@@ -139,7 +224,7 @@ export async function sendDeletionRequest({
     response = await fetcher(endpoint, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${capturedToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ password }),
@@ -307,6 +392,12 @@ export function createAccountDeletionController({
     const initiatingGen = authCoordinator.captureGeneration ? authCoordinator.captureGeneration() : 0;
     const client = authCoordinator.getClient ? authCoordinator.getClient() : null;
 
+    const isOperationCurrent = () => {
+      const genOk = authCoordinator.isCurrent ? authCoordinator.isCurrent(initiatingGen) : true;
+      const currentUser = authCoordinator?.getUser?.() ?? authCoordinator?.getState?.()?.user ?? null;
+      return genOk && currentUser?.id === initiatingUserId;
+    };
+
     pending = true;
     error = null;
     localCleanupError = false;
@@ -318,6 +409,7 @@ export function createAccountDeletionController({
         client,
         password,
         initiatingUserId,
+        isCurrent: isOperationCurrent,
         supabaseUrl,
         fetcher,
       });

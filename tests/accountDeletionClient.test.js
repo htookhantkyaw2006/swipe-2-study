@@ -158,7 +158,8 @@ test('sendDeletionRequest: rejects invalid owner, missing password, or unauthent
 test('sendDeletionRequest: strictly validates confirmed deletion response shape', async () => {
   const mockClient = {
     auth: {
-      getSession: () => Promise.resolve({ data: { session: { access_token: 'valid-jwt' } } }),
+      getSession: () => Promise.resolve({ data: { session: { access_token: 'valid-jwt', user: { id: USER_A } } }, error: null }),
+      getUser: (_token) => Promise.resolve({ data: { user: { id: USER_A } }, error: null }),
     },
   };
 
@@ -215,7 +216,8 @@ test('sendDeletionRequest: strictly validates confirmed deletion response shape'
 test('sendDeletionRequest: maps all server error codes and network errors honestly', async () => {
   const mockClient = {
     auth: {
-      getSession: () => Promise.resolve({ data: { session: { access_token: 'valid-jwt' } } }),
+      getSession: () => Promise.resolve({ data: { session: { access_token: 'valid-jwt', user: { id: USER_A } } }, error: null }),
+      getUser: (_token) => Promise.resolve({ data: { user: { id: USER_A } }, error: null }),
     },
   };
 
@@ -318,7 +320,8 @@ test('createAccountDeletionController: confirmed deletion clears local data and 
     isCurrent: (gen) => gen === 1,
     getClient: () => ({
       auth: {
-        getSession: () => Promise.resolve({ data: { session: { access_token: 'jwt' } } }),
+        getSession: () => Promise.resolve({ data: { session: { access_token: 'jwt', user: { id: USER_A } } }, error: null }),
+        getUser: (_token) => Promise.resolve({ data: { user: { id: USER_A } }, error: null }),
       },
     }),
     signOut: () => {
@@ -389,7 +392,8 @@ test('createAccountDeletionController: account switch while deletion in-flight d
     isCurrent: (gen) => gen === currentGen,
     getClient: () => ({
       auth: {
-        getSession: () => Promise.resolve({ data: { session: { access_token: 'jwt-a' } } }),
+        getSession: () => Promise.resolve({ data: { session: { access_token: 'jwt-a', user: { id: USER_A } } }, error: null }),
+        getUser: (_token) => Promise.resolve({ data: { user: { id: USER_A } }, error: null }),
       },
     }),
     signOut: () => {
@@ -466,7 +470,10 @@ test('createAccountDeletionController: local cleanup failure allows retry withou
     captureGeneration: () => 1,
     isCurrent: () => true,
     getClient: () => ({
-      auth: { getSession: () => Promise.resolve({ data: { session: { access_token: 'jwt' } } }) },
+      auth: {
+        getSession: () => Promise.resolve({ data: { session: { access_token: 'jwt', user: { id: USER_A } } }, error: null }),
+        getUser: (_token) => Promise.resolve({ data: { user: { id: USER_A } }, error: null }),
+      },
     }),
     signOut: () => Promise.resolve({ error: null }),
   };

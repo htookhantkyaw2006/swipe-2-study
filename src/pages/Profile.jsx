@@ -106,6 +106,10 @@ export default function Profile() {
     if (deletingAccount || loggingOut || globalSigningOut || busy) return;
     const initiatingUserId = user?.id;
     const initiatingGen = captureGeneration ? captureGeneration() : 0;
+    const isOperationCurrent = () => {
+      const genOk = isCurrent ? isCurrent(initiatingGen) : true;
+      return genOk && user?.id === initiatingUserId;
+    };
     setDeletingAccount(true);
     setDeletionError(null);
     setLocalCleanupError(false);
@@ -116,6 +120,7 @@ export default function Profile() {
         client,
         password,
         initiatingUserId,
+        isCurrent: isOperationCurrent,
       });
 
       // Guard against account switch during in-flight request
