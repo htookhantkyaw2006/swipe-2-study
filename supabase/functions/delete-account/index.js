@@ -16,19 +16,33 @@ const getEnv = () => {
   };
 };
 
-const env = getEnv();
+let cachedAdminClient = null;
+let cachedKey = null;
 
-// Administrative client for privileged Storage cleanup, durable throttling, and Auth user deletion
-const adminClient = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  : null;
+const getAdminClient = () => {
+  const currentEnv = getEnv();
+  const url = currentEnv.SUPABASE_URL;
+  const key = currentEnv.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+
+  if (!cachedAdminClient || cachedKey !== key) {
+    cachedAdminClient = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    cachedKey = key;
+  }
+  return cachedAdminClient;
+};
 
 export const handler = createDeletionHttpHandler({
-  adminClient,
-  env,
+  getAdminClient,
+  getEnv,
 });
 
 // Default export / serve entry point for Deno / Supabase Edge Runtime
 export default handler;
+
+// If executed directly in standalone Deno CLI
+if (typeof Deno !== 'undefined' && typeof Deno.serve === 'function' && import.meta?.main) {
+  Deno.serve(handler);
+}

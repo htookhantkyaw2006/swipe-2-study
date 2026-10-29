@@ -1,6 +1,31 @@
 # Development log
 
-## Latest — 29 October 2026 — Work batch B3.3: Google sign-in readiness and OAuth staging configuration
+## Latest — 29 October 2026 — Work batch B3.4: staging preflight and integration readiness
+
+- Branched `feat/staging-preflight` from completed B3.3 tip `aba6024` on `feat/google-signin-readiness`.
+- Executed **staging preflight analysis, migration inventory, Edge Function HTTP boundary fixes, and runbook creation**:
+  1. **Local Configuration & Migration Inventory**:
+     - Audited feature flags (`VITE_ACCOUNT_DELETION_ENABLED`, `VITE_GOOGLE_AUTH_ENABLED`, `VITE_CLOUD_IMPORT_STAGING`) all disabled by default.
+     - Audited required frontend environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`) and server environment variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`).
+     - Documented application callback endpoints (`/auth/callback`, `/reset-password`, `/verify-email`, `/login`, `/signup`).
+     - Established migration dependency order: `20261027000100_backend_foundation.sql` -> `20261028000100_guest_import_foundation.sql` -> `20261029000100_account_deletion_foundation.sql` -> `20261029000200_account_deletion_attempt_reservation.sql`.
+     - Prepared read-only SQL inspection queries to safely reconcile migration history, schemas, tables, RPCs, and RLS policies before any hosted execution.
+  2. **Deletion HTTP Boundary & CORS Remediation**:
+     - Identified concrete HTTP integration defect: `createDeletionHttpHandler` in `src/server/accountDeletion.js` lacked browser cross-origin `OPTIONS` preflight handling (returned 405) and omitted CORS headers on all responses.
+     - Remediated `createDeletionHttpHandler`:
+       * Handled browser cross-origin `OPTIONS` preflight with 200 `ok` and standard Supabase CORS headers.
+       * Attached `DELETION_CORS_HEADERS` (`Access-Control-Allow-Origin: *`, `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type`, `Access-Control-Expose-Headers: Retry-After, Content-Type`) to all responses (200 success, 400/401/405/429/500 errors).
+       * Exposed `Retry-After` header so browser client `sendDeletionRequest` can read server rate-limit timing across CORS boundaries.
+       * Preserved strict authentication & reauthentication requirements for deletion regardless of CORS.
+       * Updated Edge Function entry point in `supabase/functions/delete-account/index.js` to support lazy administrative client evaluation and added `supabase/functions/deno.json` import map for Deno runtime resolution.
+  3. **Verification & Tests**:
+     - Added `tests/accountDeletionHttpBoundary.test.js` (9 test suites) validating OPTIONS preflight, zero mutation on preflight, 405 on non-POST methods, 200 with CORS headers, 400/401 with CORS headers, 429 rate limit with exposed Retry-After header, browser client `sendDeletionRequest` integration, and Edge Function `index.js` callable export.
+  4. **Staging Acceptance Runbook (`docs/staging-acceptance.md`)**:
+     - Created 8-stage executable runbook covering staging ownership verification, read-only schema inspection, sequential migration application, Edge Function deployment with server-only secrets, email/redirect configuration, isolated cloud import testing, disposable account deletion testing, and isolated Google OAuth testing.
+     - Included a compact two-user/two-browser acceptance checklist with explicit status labels (`[Locally Passed]`, `[Hosted Pending]`, `[Owner Setup Required]`).
+- Validation: **301 Node tests pass** (all 292 existing + 9 new HTTP boundary tests; 0 failures), lint **0 errors / 8 existing warnings** preserved, production build passes (`dist/assets/index-DnPULnNQ.js`, 984 kB in 2.47s), and headless Chrome checks pass.
+
+## 29 October 2026 — Work batch B3.3: Google sign-in readiness and OAuth staging configuration
 
 - Branched `feat/google-signin-readiness` from completed B3.2 tip `ec10452` on `feat/auth-route-readiness`.
 - Implemented **Google sign-in readiness, OAuth gating, and staging preparation** strictly preserving the shared Supabase client and single-exchange PKCE ownership:

@@ -905,25 +905,54 @@ export async function reconcilePendingDeletion({
   };
 }
 
+export const DELETION_CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Expose-Headers': 'Retry-After, Content-Type',
+};
+
 /**
  * Standard Web Request / Response HTTP Handler suitable for Supabase Edge Functions.
  */
 export function createDeletionHttpHandler({
   adminClient,
-  dbClient = adminClient,
-  env = typeof process !== 'undefined' ? process.env : {},
+  getAdminClient,
+  dbClient,
+  getDbClient,
+  env: staticEnv,
+  getEnv,
   attemptLimiter,
   createClient = defaultCreateClient,
+  corsHeaders = DELETION_CORS_HEADERS,
 }) {
-  const effectiveLimiter = attemptLimiter || (dbClient ? createDatabaseAttemptLimiter(dbClient) : createAttemptLimiter());
-
   return async function handleRequest(request) {
+    // 1. Browser cross-origin preflight handling
+    if (request.method === 'OPTIONS') {
+      return new Response('ok', {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+        },
+      });
+    }
+
+    // 2. Disallow any non-POST methods (GET, PUT, DELETE, etc.)
     if (request.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'Method not allowed. Use POST.', code: 'METHOD_NOT_ALLOWED' }), {
         status: 405,
-        headers: { 'Content-Type': 'application/json', Allow: 'POST' },
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          Allow: 'POST, OPTIONS',
+        },
       });
     }
+
+    const env = typeof getEnv === 'function' ? getEnv() : (staticEnv || (typeof process !== 'undefined' ? process.env : {}));
+    const resolvedAdminClient = typeof getAdminClient === 'function' ? getAdminClient() : adminClient;
+    const resolvedDbClient = typeof getDbClient === 'function' ? getDbClient() : (dbClient || resolvedAdminClient);
+    const effectiveLimiter = attemptLimiter || (resolvedDbClient ? createDatabaseAttemptLimiter(resolvedDbClient) : createAttemptLimiter());
 
     const authHeader = request.headers.get('Authorization') || request.headers.get('authorization');
     let rawBody;
@@ -932,23 +961,31 @@ export function createDeletionHttpHandler({
     } catch {
       return new Response(JSON.stringify({ error: 'Could not read request body.', code: 'INVALID_PAYLOAD' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
       });
     }
 
     // User client initialized with caller's token header
     const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
     const supabaseAnonKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: authHeader ? { Authorization: authHeader } : {} },
-    });
 
     try {
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new AccountDeletionError('Server configuration is incomplete.', 'SERVER_CONFIG_ERROR', 500);
+      }
+
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: authHeader ? { Authorization: authHeader } : {} },
+      });
+
       const result = await executeAccountDeletion({
         userClient,
-        adminClient,
-        dbClient,
+        adminClient: resolvedAdminClient,
+        dbClient: resolvedDbClient,
         authHeader,
         rawBody,
         env,
@@ -958,13 +995,19 @@ export function createDeletionHttpHandler({
 
       return new Response(JSON.stringify(result), {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
       });
     } catch (err) {
       const status = err.status || 500;
       const code = err.code || 'INTERNAL_SERVER_ERROR';
       const errorMsg = err.message || 'An unexpected error occurred during account deletion.';
-      const headers = { 'Content-Type': 'application/json' };
+      const headers = {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+      };
       if (code === 'RATE_LIMITED' && err.retryAfter) {
         headers['Retry-After'] = String(err.retryAfter);
       }
