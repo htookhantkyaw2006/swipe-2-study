@@ -217,5 +217,11 @@ test('Real Browser: mounted AuthCallback effect lifecycle survives same-owner re
     const unmount = outcome.results.find((r) => r.test === 'unmount-while-pending-clean');
     assert.ok(unmount, 'unmount-while-pending-clean must be tested');
     assert.equal(unmount.passed, true);
+
+    // 8. Fresh legitimate callback for different account is not blocked by stale sessionStorage
+    const freshCallback = outcome.results.find((r) => r.test === 'fresh-callback-not-blocked-by-stale-session-storage');
+    assert.ok(freshCallback, 'fresh-callback-not-blocked-by-stale-session-storage must be tested');
+    assert.equal(freshCallback.passed, true);
+    assert.equal(freshCallback.path, '/library');
   }
 });

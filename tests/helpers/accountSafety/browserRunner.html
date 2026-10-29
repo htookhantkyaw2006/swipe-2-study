@@ -393,6 +393,40 @@
         results.push({ test: 'unmount-while-pending-clean', passed: true });
       }
 
+      // -------------------------------------------------------------
+      // Test 8: Fresh callback for User B is NOT blocked by stale s2s_callback_owner
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        // Simulate stale sessionStorage left behind by an earlier attempt or failed session
+        sessionStorage.setItem('s2s_callback_owner', 'user-a');
+        sessionStorage.setItem('s2s_callback_attempt', '?code=stale-code-a&returnTo=%2Fold-path');
+
+        const client = createMockAuthClient({ initialUser: { id: 'user-b' } });
+        const coordinator = createMockCoordinator(client, { id: 'user-b' });
+        coordinator.initialize();
+        await sleep(50);
+
+        let lastLocation = null;
+        renderComponent(
+          createElement(MemoryRouter, { initialEntries: ['/auth/callback?code=fresh-code-b&returnTo=%2Flibrary'] },
+            createElement(AuthProvider, { coordinator },
+              createElement(LocationRecorder, { onLocation: (loc) => { lastLocation = loc; } }),
+              createElement(Routes, null,
+                createElement(Route, { path: '/auth/callback', element: createElement(AuthCallback, { auth: client.auth }) }),
+                createElement(Route, { path: '/library', element: createElement('div', { id: 'destination-fresh-b' }, 'Library Page B') })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        assert(lastLocation?.pathname === '/library', 'Fresh callback for User B should navigate to /library, got: ' + lastLocation?.pathname);
+        assert(document.getElementById('destination-fresh-b')?.textContent === 'Library Page B', 'Destination rendered for User B');
+        assert(sessionStorage.getItem('s2s_callback_owner') === null, 'Stale callback owner must be cleared from storage');
+        results.push({ test: 'fresh-callback-not-blocked-by-stale-session-storage', passed: true, path: lastLocation.pathname });
+      }
+
       unmountComponent();
       return results;
     }

@@ -21,20 +21,36 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
    USER_UPDATED) while failing closed on account switches or sign-outs.
    --------------------------------------------------------------- */
 
-function getStoredCallbackOwner() {
+const CALLBACK_OWNER_KEY = 's2s_callback_owner';
+const CALLBACK_ATTEMPT_KEY = 's2s_callback_attempt';
+
+function getStoredCallbackOwner(currentAttemptId) {
   try {
-    return sessionStorage.getItem('s2s_callback_owner');
+    const storedOwner = sessionStorage.getItem(CALLBACK_OWNER_KEY);
+    if (!storedOwner) return null;
+
+    const storedAttempt = sessionStorage.getItem(CALLBACK_ATTEMPT_KEY);
+    // If there is no stored attempt key or the stored attempt does not match the
+    // current URL attempt, the stored owner is stale from an earlier callback attempt.
+    if (!storedAttempt || !currentAttemptId || storedAttempt !== currentAttemptId) {
+      sessionStorage.removeItem(CALLBACK_OWNER_KEY);
+      sessionStorage.removeItem(CALLBACK_ATTEMPT_KEY);
+      return null;
+    }
+    return storedOwner;
   } catch {
     return null;
   }
 }
 
-function setStoredCallbackOwner(id) {
+function setStoredCallbackOwner(id, attemptId) {
   try {
-    if (id) {
-      sessionStorage.setItem('s2s_callback_owner', id);
+    if (id && attemptId) {
+      sessionStorage.setItem(CALLBACK_OWNER_KEY, id);
+      sessionStorage.setItem(CALLBACK_ATTEMPT_KEY, attemptId);
     } else {
-      sessionStorage.removeItem('s2s_callback_owner');
+      sessionStorage.removeItem(CALLBACK_OWNER_KEY);
+      sessionStorage.removeItem(CALLBACK_ATTEMPT_KEY);
     }
   } catch {}
 }
@@ -54,16 +70,19 @@ export default function AuthCallback({ client: propClient, auth: propAuth } = {}
   } = authContext;
   const [mountGen] = useState(() => (captureGeneration ? captureGeneration() : 0));
 
+  const currentAttemptId = location.search ? location.search : (location.hash || location.pathname);
+
   // Durable binding to the initiating owner:
   // Preserves initiating user identity across session transitions to guarantee
   // that a stale callback link initiated by Account A cannot redirect Account B.
-  const storedOwner = getStoredCallbackOwner();
+  // Validates currentAttemptId so stale storage from an earlier attempt is ignored.
+  const storedOwner = getStoredCallbackOwner(currentAttemptId);
   const initiatingUserIdRef = useRef(storedOwner || user?.id || null);
   if (!initiatingUserIdRef.current && user?.id) {
     initiatingUserIdRef.current = user.id;
-    setStoredCallbackOwner(user.id);
+    setStoredCallbackOwner(user.id, currentAttemptId);
   } else if (initiatingUserIdRef.current && !storedOwner) {
-    setStoredCallbackOwner(initiatingUserIdRef.current);
+    setStoredCallbackOwner(initiatingUserIdRef.current, currentAttemptId);
   }
 
   // Ref tracking latest auth state for asynchronous completion checks
@@ -77,7 +96,7 @@ export default function AuthCallback({ client: propClient, auth: propAuth } = {}
   // - Fail closed if user signed out, switched accounts, or is transitioning.
   const isLifecycleValid = useCallback(() => {
     const current = authStateRef.current;
-    const boundUserId = initiatingUserIdRef.current || getStoredCallbackOwner();
+    const boundUserId = initiatingUserIdRef.current || getStoredCallbackOwner(currentAttemptId);
 
     // Fail closed on explicit logout or guest state
     if (boundUserId && (!current.user || current.isGuest)) {
@@ -109,7 +128,7 @@ export default function AuthCallback({ client: propClient, auth: propAuth } = {}
     );
 
     return isSameOwner;
-  }, [isCurrent, mountGen]);
+  }, [isCurrent, mountGen, currentAttemptId]);
 
   const isLifecycleValidRef = useRef(isLifecycleValid);
   isLifecycleValidRef.current = isLifecycleValid;
@@ -203,13 +222,19 @@ export default function AuthCallback({ client: propClient, auth: propAuth } = {}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
               <button
                 className="btn-primary auth-submit"
-                onClick={() => navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`, { replace: true })}
+                onClick={() => {
+                  setStoredCallbackOwner(null);
+                  navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
+                }}
               >
                 Go to Sign In
               </button>
               <button
                 className="btn-secondary auth-submit"
-                onClick={() => navigate(`/verify-email?returnTo=${encodeURIComponent(returnTo)}`, { replace: true })}
+                onClick={() => {
+                  setStoredCallbackOwner(null);
+                  navigate(`/verify-email?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
+                }}
               >
                 <RefreshCw size={14} style={{ marginRight: 6 }} />
                 Resend verification email
@@ -217,7 +242,10 @@ export default function AuthCallback({ client: propClient, auth: propAuth } = {}
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => navigate('/', { replace: true })}
+                onClick={() => {
+                  setStoredCallbackOwner(null);
+                  navigate('/', { replace: true });
+                }}
                 style={{ width: '100%', marginTop: '4px', fontSize: '0.875rem' }}
               >
                 Continue as Guest
