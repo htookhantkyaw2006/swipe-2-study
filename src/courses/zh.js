@@ -15,16 +15,28 @@ import { writingChars } from '../data/writingChars';
    as it did; a new language starts at zero instead of inheriting them.
    --------------------------------------------------------------- */
 
+export const HSK_PALETTE = {
+  1: { gradientStart: '#7DD3FC', gradientEnd: '#0369A1', shadow: 'rgba(3, 105, 161, 0.4)' },
+  2: { gradientStart: '#FCA5A5', gradientEnd: '#DC2626', shadow: 'rgba(220, 38, 38, 0.4)' },
+  3: { gradientStart: '#FDBA74', gradientEnd: '#EA580C', shadow: 'rgba(234, 88, 12, 0.4)' },
+  4: { gradientStart: '#FDE047', gradientEnd: '#CA8A04', shadow: 'rgba(202, 138, 4, 0.4)' },
+  5: { gradientStart: '#86EFAC', gradientEnd: '#15803D', shadow: 'rgba(21, 128, 61, 0.4)' },
+  6: { gradientStart: '#67E8F9', gradientEnd: '#0E7490', shadow: 'rgba(14, 116, 144, 0.4)' },
+  7: { gradientStart: '#60A5FA', gradientEnd: '#1E3A8A', shadow: 'rgba(30, 58, 138, 0.4)' },
+  8: { gradientStart: '#C4B5FD', gradientEnd: '#5B21B6', shadow: 'rgba(91, 33, 182, 0.4)' },
+  9: { gradientStart: '#6B7280', gradientEnd: '#171717', shadow: 'rgba(23, 23, 23, 0.4)' }
+};
+
 const levels = [
-  { num: 1, words: 150,  phrases: 300,  tier: 'BEGINNER',     gradientStart: '#7DD3FC', gradientEnd: '#0369A1', shadow: 'rgba(3, 105, 161, 0.4)',  demo: { completed: 150, review: 41, phraseProgress: 100 } },
-  { num: 2, words: 200,  phrases: 200,  tier: 'BEGINNER',     gradientStart: '#FCA5A5', gradientEnd: '#DC2626', shadow: 'rgba(220, 38, 38, 0.4)',  demo: { completed: 63,  review: 12, phraseProgress: 85 } },
-  { num: 3, words: 500,  phrases: 500,  tier: 'BEGINNER',     gradientStart: '#FDBA74', gradientEnd: '#EA580C', shadow: 'rgba(234, 88, 12, 0.4)',  demo: { completed: 0,   review: 0,  phraseProgress: 42 } },
-  { num: 4, words: 1000, phrases: 1000, tier: 'INTERMEDIATE', gradientStart: '#FDE047', gradientEnd: '#CA8A04', shadow: 'rgba(202, 138, 4, 0.4)',  demo: { completed: 0,   review: 0,  phraseProgress: 12 } },
-  { num: 5, words: 1600, phrases: 1600, tier: 'INTERMEDIATE', gradientStart: '#86EFAC', gradientEnd: '#15803D', shadow: 'rgba(21, 128, 61, 0.4)',  demo: { completed: 0,   review: 0,  phraseProgress: 0 } },
-  { num: 6, words: 1800, phrases: 1800, tier: 'INTERMEDIATE', gradientStart: '#67E8F9', gradientEnd: '#0E7490', shadow: 'rgba(14, 116, 144, 0.4)', demo: { completed: 0,   review: 0,  phraseProgress: 0 } },
-  { num: 7, words: 1866, phrases: 1866, tier: 'ADVANCED',     gradientStart: '#60A5FA', gradientEnd: '#1E3A8A', shadow: 'rgba(30, 58, 138, 0.4)',  demo: { completed: 0,   review: 0,  phraseProgress: 0 } },
-  { num: 8, words: 1867, phrases: 1867, tier: 'ADVANCED',     gradientStart: '#C4B5FD', gradientEnd: '#5B21B6', shadow: 'rgba(91, 33, 182, 0.4)',  demo: { completed: 0,   review: 0,  phraseProgress: 0 } },
-  { num: 9, words: 1867, phrases: 1867, tier: 'ADVANCED',     gradientStart: '#6B7280', gradientEnd: '#171717', shadow: 'rgba(23, 23, 23, 0.4)',   demo: { completed: 0,   review: 0,  phraseProgress: 0 } }
+  { num: 1, words: 150,  phrases: 300,  tier: 'BEGINNER',     ...HSK_PALETTE[1], demo: { completed: 150, review: 41, phraseProgress: 100 } },
+  { num: 2, words: 200,  phrases: 200,  tier: 'BEGINNER',     ...HSK_PALETTE[2], demo: { completed: 63,  review: 12, phraseProgress: 85 } },
+  { num: 3, words: 500,  phrases: 500,  tier: 'BEGINNER',     ...HSK_PALETTE[3], demo: { completed: 0,   review: 0,  phraseProgress: 42 } },
+  { num: 4, words: 1000, phrases: 1000, tier: 'INTERMEDIATE', ...HSK_PALETTE[4], demo: { completed: 0,   review: 0,  phraseProgress: 12 } },
+  { num: 5, words: 1600, phrases: 1600, tier: 'INTERMEDIATE', ...HSK_PALETTE[5], demo: { completed: 0,   review: 0,  phraseProgress: 0 } },
+  { num: 6, words: 1800, phrases: 1800, tier: 'INTERMEDIATE', ...HSK_PALETTE[6], demo: { completed: 0,   review: 0,  phraseProgress: 0 } },
+  { num: 7, words: 1866, phrases: 1866, tier: 'ADVANCED',     ...HSK_PALETTE[7], demo: { completed: 0,   review: 0,  phraseProgress: 0 } },
+  { num: 8, words: 1867, phrases: 1867, tier: 'ADVANCED',     ...HSK_PALETTE[8], demo: { completed: 0,   review: 0,  phraseProgress: 0 } },
+  { num: 9, words: 1867, phrases: 1867, tier: 'ADVANCED',     ...HSK_PALETTE[9], demo: { completed: 0,   review: 0,  phraseProgress: 0 } }
 ].map((l) => ({
   ...l,
   id: `HSK${l.num}`,
@@ -149,6 +161,8 @@ export default {
   },
 
   copy: {
+    nowLearning: 'NOW LEARNING',
+    startSwiping: 'Start swiping',
     coursesTitle: 'HSK Courses',
     pathPill: 'HSK 1-9 Learning Path',
     pickerHeadline: 'Choose an HSK level',

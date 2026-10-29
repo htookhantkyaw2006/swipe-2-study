@@ -1,10 +1,10 @@
 .lesson-layout, .lesson-overview, .lesson-content { display: grid; gap: 24px; min-width: 0; }
 .lesson-overview, .lesson-content { align-content: start; }
-.lesson-hero { min-width: 0; border-radius: 24px; padding: 24px; background: var(--color-primary-blue); color: white; box-shadow: var(--shadow-raised); }
+.lesson-hero { min-width: 0; border-radius: 24px; padding: 24px; background: linear-gradient(135deg, var(--card-gradient-start, var(--color-primary-blue)), var(--card-gradient-end, var(--color-text-navy))); color: white; box-shadow: var(--shadow-raised); }
 .lesson-hero h2 { color: white; font-size: 2.25rem; line-height: 1.2; margin: 12px 0 8px; }
 .lesson-hero > p:last-of-type { font-size: 0.9375rem; }
 .lesson-hero__progress { margin-top: 24px; }
-.lesson-hero__progress-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.8125rem; font-weight: 600; }
+.lesson-hero__progress-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.8125rem; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
 .lesson-hero__progress progress { display: block; width: 100%; height: 6px; appearance: none; border: 0; border-radius: 99px; background: rgba(255,255,255,0.22); margin: 8px 0; overflow: hidden; }
 .lesson-hero__progress progress::-webkit-progress-bar { background: rgba(255,255,255,0.22); border-radius: 99px; }
 .lesson-hero__progress progress::-webkit-progress-value { background: white; border-radius: 99px; }

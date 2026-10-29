@@ -32,12 +32,26 @@ export default function LevelCarousel() {
   const percent = progress.percent;
   const changeLevel = delta => setActiveIndex(index => Math.max(0, Math.min(course.levels.length - 1, index + delta)));
 
+  const cardStyle = {
+    '--card-gradient-start': level.gradientStart,
+    '--card-gradient-end': level.gradientEnd,
+    '--level-accent': level.gradientEnd,
+    '--level-btn-color': level.btnColor || level.gradientEnd,
+    background: `linear-gradient(135deg, ${level.gradientStart} 0%, ${level.gradientEnd} 100%)`,
+    boxShadow: level.shadow ? `0 14px 34px ${level.shadow}` : undefined,
+  };
+
+  const wordCountText = course.id === 'zh'
+    ? `${completed.toLocaleString()} / ${level.words.toLocaleString()} completed`
+    : `${level.words.toLocaleString()} words to explore`;
+
   return (
     <div className="course-browser" aria-label={`${course.name} flashcard levels`}>
       <article
         className="featured-course"
         aria-roledescription="slide"
         aria-label={`${level.name}, ${activeIndex + 1} of ${course.levels.length}`}
+        style={cardStyle}
         onTouchStart={event => setTouchStart(event.touches[0].clientX)}
         onTouchEnd={event => {
           if (touchStart === null) return;
@@ -47,24 +61,44 @@ export default function LevelCarousel() {
         }}
       >
         <div className="course-card-heading">
-          <span className="course-category"><Layers size={15} aria-hidden="true" /> {course.levelSystem} FLASHCARDS</span>
+          <span className="course-category">
+            <Layers size={15} aria-hidden="true" /> {course.copy.nowLearning || `${course.levelSystem} FLASHCARDS`}
+          </span>
           <span className="course-tier">{level.tier}</span>
         </div>
         <div className="course-card-body">
-          <div className="course-card-copy"><p className="course-kicker">{level.kicker}</p><h3>{level.name}</h3><p className="course-word-count">{level.words.toLocaleString()} words to explore</p></div>
+          <div className="course-card-copy">
+            <p className="course-kicker">{level.kicker}</p>
+            <h3>{level.name}</h3>
+            <p className="course-word-count">{wordCountText}</p>
+          </div>
           <div className="course-card-art" aria-hidden="true">
             <div className="course-art-back" />
-            <div className="course-art-front"><span>{course.copy.flashcardsWatermark}</span><span className="course-art-label">{level.name}</span></div>
+            <div className="course-art-front" style={{ color: level.btnColor || level.gradientEnd }}>
+              <span>{course.copy.flashcardsWatermark}</span>
+              <span className="course-art-label">{level.name}</span>
+            </div>
             <span className="course-art-spark">✦</span>
           </div>
         </div>
         <div className="course-progress">
-          <div className="course-progress-label"><span>Progress</span><span>{completed.toLocaleString()} / {level.words.toLocaleString()}</span></div>
+          <div className="course-progress-label">
+            <span>Progress</span>
+            <span>{percent}%</span>
+          </div>
           <div className="course-progress-track" aria-hidden="true"><span style={{ width: `${percent}%` }} /></div>
         </div>
         <div className="course-card-actions">
-          <button className="course-study-button" onClick={() => navigate(`/learn/level/${level.id}`)}>Open level <ArrowRight size={17} aria-hidden="true" /></button>
-          <button className="course-all-button" onClick={() => navigate('/learn')}>All levels <ChevronRight size={17} aria-hidden="true" /></button>
+          <button
+            className="course-study-button"
+            style={{ color: level.btnColor || level.gradientEnd }}
+            onClick={() => navigate(`/learn/level/${level.id}`)}
+          >
+            {course.copy.startSwiping || 'Open level'} <ArrowRight size={17} aria-hidden="true" />
+          </button>
+          <button className="course-all-button" onClick={() => navigate('/learn')}>
+            All levels <ChevronRight size={17} aria-hidden="true" />
+          </button>
         </div>
       </article>
       <div className="course-browser-controls">

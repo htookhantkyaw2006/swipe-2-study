@@ -46,10 +46,23 @@ export default function LessonPicker() {
       <StudyHeader title={level.name} subtitle={`${course.name} · Vocabulary course`} backTo="/learn" backLabel="Back to courses" />
       <div className="lesson-layout">
         <aside className="lesson-overview" aria-label={`${level.name} course overview`}>
-          <section className="lesson-hero">
+          <section
+            className="lesson-hero"
+            style={{
+              '--card-gradient-start': level.gradientStart,
+              '--card-gradient-end': level.gradientEnd,
+              '--level-accent': level.gradientEnd,
+              background: `linear-gradient(135deg, ${level.gradientStart} 0%, ${level.gradientEnd} 100%)`,
+              boxShadow: level.shadow ? `0 14px 34px ${level.shadow}` : undefined,
+            }}
+          >
             <p className="study-eyebrow">{level.tier}</p>
             <h2>{level.name}</h2>
-            <p>{level.words.toLocaleString()} vocabulary words</p>
+            <p>
+              {course.id === 'zh'
+                ? `${completed.toLocaleString()} / ${level.words.toLocaleString()} completed`
+                : `${level.words.toLocaleString()} vocabulary words`}
+            </p>
             <div className="lesson-hero__progress">
               <div className="lesson-hero__progress-label"><span>Course progress</span><span>{percent}%</span></div>
               <progress aria-label="Course progress" value={completed} max={level.words} />
