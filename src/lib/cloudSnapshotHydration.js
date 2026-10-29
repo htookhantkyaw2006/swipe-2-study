@@ -1,6 +1,7 @@
 import { readCloudSnapshot } from './cloudImportService.js';
 import { CLOUD_LANGUAGES, CLOUD_KINDS } from './cloudImportRecords.js';
 import { wordOf, readingOf } from './entry.js';
+import { parseLearningRows } from './learningDocument.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KIND_FIELDS = {
@@ -25,31 +26,70 @@ export function recordKey(language, kind, writtenForm, reading = '') {
 }
 
 export function identityOfRow(table, row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
+  }
   const [language, ...rest] = table.split('_');
   const kind = rest.join('_');
   if (kind === 'saved_words' || kind === 'review_cards') {
     const written = wordOf(row);
+    if (typeof written !== 'string' || written.trim().length === 0) {
+      throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
+    }
     const reading = row.pronunciation ?? readingOf(row) ?? '';
+    if (typeof reading !== 'string') {
+      throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
+    }
     return recordKey(language, kind, written, reading);
   }
   const field = KIND_FIELDS[kind];
+  if (!field) {
+    throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
+  }
   const written = row[field];
+  if (typeof written !== 'string' || written.trim().length === 0) {
+    throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
+  }
   return recordKey(language, kind, written, '');
 }
 
 export function readSyncState(storage, ownerId) {
   const key = getSyncStateKey(ownerId);
+  let raw;
   try {
-    const raw = storage.getItem(key);
-    if (!raw) return { state: null, error: null };
-    const parsed = JSON.parse(raw);
-    if (parsed.schemaVersion !== 1 || parsed.ownerId !== ownerId.toLowerCase()) {
-      return { state: null, error: 'Invalid sync state schema' };
-    }
-    return { state: parsed, error: null };
+    raw = storage.getItem(key);
   } catch {
     return { state: null, error: 'Storage access error' };
   }
+
+  if (raw === null || raw === undefined) {
+    return { state: null, error: null };
+  }
+
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    return { state: null, error: 'Malformed sync state JSON' };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { state: null, error: 'Malformed sync state JSON' };
+  }
+
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    Array.isArray(parsed) ||
+    parsed.schemaVersion !== 1 ||
+    typeof parsed.ownerId !== 'string' ||
+    parsed.ownerId.toLowerCase() !== ownerId.toLowerCase() ||
+    (parsed.records !== undefined && (typeof parsed.records !== 'object' || parsed.records === null || Array.isArray(parsed.records)))
+  ) {
+    return { state: null, error: 'Invalid sync state schema' };
+  }
+
+  return { state: parsed, error: null };
 }
 
 export function persistSyncState(storage, state) {
@@ -58,7 +98,10 @@ export function persistSyncState(storage, state) {
 }
 
 export function recordLocalDeletion(storage, ownerId, language, kind, writtenForm, reading = '', now = () => new Date().toISOString()) {
-  const { state } = readSyncState(storage, ownerId);
+  const { state, error } = readSyncState(storage, ownerId);
+  if (error) {
+    throw new Error(`Could not update sync state: ${error}`);
+  }
   const nextState = state || {
     schemaVersion: 1,
     ownerId: ownerId.toLowerCase(),
@@ -75,7 +118,10 @@ export function recordLocalDeletion(storage, ownerId, language, kind, writtenFor
 }
 
 export function recordLocalDirty(storage, ownerId, language, kind, writtenForm, reading = '', now = () => new Date().toISOString()) {
-  const { state } = readSyncState(storage, ownerId);
+  const { state, error } = readSyncState(storage, ownerId);
+  if (error) {
+    throw new Error(`Could not update sync state: ${error}`);
+  }
   const nextState = state || {
     schemaVersion: 1,
     ownerId: ownerId.toLowerCase(),
@@ -102,6 +148,10 @@ export function reconcileSnapshotWithLocal({
   syncState,
   now = () => new Date().toISOString(),
 }) {
+  if (!localTables || typeof localTables !== 'object' || Array.isArray(localTables)) {
+    throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
+  }
+
   const reconciledTables = { ...localTables };
   let changesCount = 0;
 
@@ -133,12 +183,16 @@ export function reconcileSnapshotWithLocal({
       const cloudItems = cloudByTable[tableName] || [];
       const localRowsRaw = localTables[tableName];
       let localRows = [];
-      if (localRowsRaw) {
-        try {
-          localRows = typeof localRowsRaw === 'string' ? JSON.parse(localRowsRaw) : localRowsRaw;
-          if (!Array.isArray(localRows)) localRows = [];
-        } catch {
-          localRows = [];
+      if (localRowsRaw !== undefined && localRowsRaw !== null) {
+        if (typeof localRowsRaw === 'string') {
+          localRows = parseLearningRows(localRowsRaw);
+        } else if (Array.isArray(localRowsRaw)) {
+          if (localRowsRaw.some(row => !row || typeof row !== 'object' || Array.isArray(row))) {
+            throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
+          }
+          localRows = localRowsRaw;
+        } else {
+          throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
         }
       }
 
@@ -284,6 +338,18 @@ export async function restoreAccountSnapshot(client, storageOwner, {
 
   guard();
 
+  const storage = globalThis.localStorage;
+
+  // Check sync state metadata validity before invoking RPCs or touching local tables
+  const { error: syncStateError } = readSyncState(storage, expectedUserId);
+  if (syncStateError) {
+    return {
+      outcome: 'error',
+      error: 'Could not verify current sync status. Your local data has been preserved.',
+      changesCount: 0,
+    };
+  }
+
   // 1. Fetch snapshot from cloud
   const snapshotRes = await readCloudSnapshot(client, {
     expectedUserId,
@@ -302,34 +368,71 @@ export async function restoreAccountSnapshot(client, storageOwner, {
 
   const snapshot = snapshotRes.snapshot;
   const scope = storageOwner.scope(expectedUserId);
-  const storage = globalThis.localStorage;
 
   // 2. Atomic reconciliation loop with retry on concurrent edits
   for (let attempt = 0; attempt < 3; attempt++) {
     guard();
-    const { raw, value } = scope.readLearningDocument();
+
+    let raw, value;
+    try {
+      const doc = scope.readLearningDocument();
+      raw = doc.raw;
+      value = doc.value;
+    } catch (docErr) {
+      return {
+        outcome: 'error',
+        error: docErr?.message || 'Stored learning data has an unsupported format. It has been kept for recovery.',
+        changesCount: 0,
+      };
+    }
 
     // Read current local tables
     const localTables = {};
     const expectedTables = {};
-    for (const language of CLOUD_LANGUAGES) {
-      for (const kind of CLOUD_KINDS) {
-        const name = `${language}_${kind}`;
-        const tableRaw = scope.getTable(language, kind);
-        localTables[name] = tableRaw ?? '[]';
-        expectedTables[name] = tableRaw;
+    try {
+      for (const language of CLOUD_LANGUAGES) {
+        for (const kind of CLOUD_KINDS) {
+          const name = `${language}_${kind}`;
+          const tableRaw = scope.getTable(language, kind);
+          localTables[name] = tableRaw ?? '[]';
+          expectedTables[name] = tableRaw;
+        }
       }
+    } catch (tableErr) {
+      return {
+        outcome: 'error',
+        error: tableErr?.message || 'Stored learning data has an unsupported format. It has been kept for recovery.',
+        changesCount: 0,
+      };
     }
 
-    const { state: syncState } = readSyncState(storage, expectedUserId);
+    const { state: syncState, error: loopSyncError } = readSyncState(storage, expectedUserId);
+    if (loopSyncError) {
+      return {
+        outcome: 'error',
+        error: 'Could not verify current sync status. Your local data has been preserved.',
+        changesCount: 0,
+      };
+    }
 
     // Perform conflict-safe 3-way reconciliation
-    const { reconciledTables, nextSyncState, changesCount } = reconcileSnapshotWithLocal({
-      localTables,
-      snapshot,
-      syncState,
-      now,
-    });
+    let reconciliation;
+    try {
+      reconciliation = reconcileSnapshotWithLocal({
+        localTables,
+        snapshot,
+        syncState,
+        now,
+      });
+    } catch (reconcileErr) {
+      return {
+        outcome: 'error',
+        error: reconcileErr?.message || 'Stored learning data has an unsupported format. It has been kept for recovery.',
+        changesCount: 0,
+      };
+    }
+
+    const { reconciledTables, nextSyncState, changesCount } = reconciliation;
 
     // Check if tables actually changed
     let hasDiff = false;
