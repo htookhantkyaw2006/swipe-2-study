@@ -1,0 +1,4 @@
+id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burmese,audio_path,examples_json,sort_order
+zh_hsk1_001,zh-hsk1,zh,HSK1,中,zhōng,middle,,audio/zh/hsk1/001.mp3,[],10
+zh_hsk1_002,zh-hsk1,zh,HSK1,国,guó,,နိုင်ငံ,audio/zh/hsk1/002.mp3,[],20
+zh_hsk1_003,zh-hsk1,zh,HSK1,中,zhōng,center,အလယ်ဗဟို,audio/zh/hsk1/003.mp3,[],30

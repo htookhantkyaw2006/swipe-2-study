@@ -1,0 +1,4 @@
+id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burmese,audio_path,examples_json,sort_order
+zh_hsk1_001,zh-hsk1,zh,HSK1,中,zhōng,middle; center; China,အလယ်; အလယ်ဗဟို; တရုတ်,audio/zh/hsk1/001.mp3,"[{""text"": ""我是中国人。"", ""reading"": ""Wǒ shì Zhōngguó rén."", ""english"": ""I am Chinese."", ""burmese"": ""ကျွန်တော်/မ တရုတ်လူမျိုးပါ။""}]",10
+zh_hsk1_002,zh-hsk1,zh,HSK1,你好,nǐ hǎo,hello,မင်္ဂလာပါ,,"[{""text"": ""你好，我是学生。"", ""reading"": ""Nǐ hǎo, wǒ shì xuéshēng."", ""english"": ""Hello, I am a student."", ""burmese"": ""မင်္ဂလာပါ၊ ကျွန်တော်/မက ကျောင်းသားပါ။""}]",20
+zh_hsk1_003,zh-hsk1,zh,HSK1,谢谢,xiè xie,thank you,ကျေးဇူးတင်ပါတယ်,audio/zh/hsk1/003.mp3,[],30
