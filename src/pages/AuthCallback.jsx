@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/useAuth.js';
 import { safeReturnPath } from '../lib/safeReturnPath.js';
@@ -17,17 +17,116 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
    so the code_verifier stored in localStorage can be retrieved.
    Does NOT redirect on an arbitrary timer; only navigates after the user
    is genuinely verified by the centralized Auth coordinator.
-   Invalidates callback resolution if an account switch or sign-out occurs.
+   Survives routine same-owner verification updates (TOKEN_REFRESHED,
+   USER_UPDATED) while failing closed on account switches or sign-outs.
    --------------------------------------------------------------- */
 
-export default function AuthCallback() {
+function getStoredCallbackOwner() {
+  try {
+    return sessionStorage.getItem('s2s_callback_owner');
+  } catch {
+    return null;
+  }
+}
+
+function setStoredCallbackOwner(id) {
+  try {
+    if (id) {
+      sessionStorage.setItem('s2s_callback_owner', id);
+    } else {
+      sessionStorage.removeItem('s2s_callback_owner');
+    }
+  } catch {}
+}
+
+export default function AuthCallback({ client: propClient, auth: propAuth } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading: authLoading, isTransitioning, error: authError, captureGeneration, isCurrent } = useAuth();
+  const authContext = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    isTransitioning,
+    error: authError,
+    captureGeneration,
+    isCurrent,
+    isGuest,
+  } = authContext;
   const [mountGen] = useState(() => (captureGeneration ? captureGeneration() : 0));
+
+  // Durable binding to the initiating owner:
+  // Preserves initiating user identity across session transitions to guarantee
+  // that a stale callback link initiated by Account A cannot redirect Account B.
+  const storedOwner = getStoredCallbackOwner();
+  const initiatingUserIdRef = useRef(storedOwner || user?.id || null);
+  if (!initiatingUserIdRef.current && user?.id) {
+    initiatingUserIdRef.current = user.id;
+    setStoredCallbackOwner(user.id);
+  } else if (initiatingUserIdRef.current && !storedOwner) {
+    setStoredCallbackOwner(initiatingUserIdRef.current);
+  }
+
+  // Ref tracking latest auth state for asynchronous completion checks
+  const authStateRef = useRef({ user, isGuest, isTransitioning, isCurrent });
+  authStateRef.current = { user, isGuest, isTransitioning, isCurrent };
+
+  // Check whether the callback attempt remains valid:
+  // - If session generation matches mount generation, nothing changed -> valid
+  // - If generation advanced: survive routine same-owner verification updates
+  //   (TOKEN_REFRESHED, USER_UPDATED) for the initiating owner.
+  // - Fail closed if user signed out, switched accounts, or is transitioning.
+  const isLifecycleValid = useCallback(() => {
+    const current = authStateRef.current;
+    const boundUserId = initiatingUserIdRef.current || getStoredCallbackOwner();
+
+    // Fail closed on explicit logout or guest state
+    if (boundUserId && (!current.user || current.isGuest)) {
+      return false;
+    }
+
+    // Fail closed on account switch / replacement
+    if (boundUserId && current.user?.id && current.user.id !== boundUserId) {
+      return false;
+    }
+
+    // Guard against in-flight transition
+    if (current.isTransitioning) {
+      return false;
+    }
+
+    // 1. Generation unchanged: completely valid if owner matches
+    const genCurrent = current.isCurrent ? current.isCurrent(mountGen) : (isCurrent ? isCurrent(mountGen) : true);
+    if (genCurrent && (!boundUserId || current.user?.id === boundUserId)) {
+      return true;
+    }
+
+    // 2. Generation advanced: valid ONLY if same verified owner
+    const isSameOwner = Boolean(
+      boundUserId &&
+      current.user?.id === boundUserId &&
+      !current.isGuest &&
+      !current.isTransitioning
+    );
+
+    return isSameOwner;
+  }, [isCurrent, mountGen]);
+
+  const isLifecycleValidRef = useRef(isLifecycleValid);
+  isLifecycleValidRef.current = isLifecycleValid;
 
   const [timedOut, setTimedOut] = useState(false);
   const [callbackCheck, setCallbackCheck] = useState({ pending: true, error: null });
+
+  const authTargetRef = useRef(null);
+  authTargetRef.current = propAuth?.initialize
+    ? propAuth
+    : propAuth?.auth?.initialize
+      ? propAuth.auth
+      : propClient?.auth?.initialize
+        ? propClient.auth
+        : authContext?.client?.auth?.initialize
+          ? authContext.client.auth
+          : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -35,12 +134,13 @@ export default function AuthCallback() {
     // still the only owner of the one-time PKCE exchange.
     (async () => {
       try {
-        const error = await inspectAuthCallbackSession(getSupabaseClient().auth);
-        if (!cancelled && (isCurrent ? isCurrent(mountGen) : true)) {
+        const authTarget = authTargetRef.current || getSupabaseClient().auth;
+        const error = await inspectAuthCallbackSession(authTarget);
+        if (!cancelled && isLifecycleValidRef.current()) {
           setCallbackCheck({ pending: false, error });
         }
       } catch {
-        if (!cancelled && (isCurrent ? isCurrent(mountGen) : true)) {
+        if (!cancelled && isLifecycleValidRef.current()) {
           setCallbackCheck({
             pending: false,
             error: 'Sign-in is unavailable. Return to Sign In and try again.',
@@ -49,7 +149,7 @@ export default function AuthCallback() {
       }
     })();
     return () => { cancelled = true; };
-  }, [mountGen, isCurrent]);
+  }, []);
 
   const returnTo = useMemo(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -79,12 +179,13 @@ export default function AuthCallback() {
     return () => clearTimeout(timer);
   }, [canNavigate, displayError]);
 
-  // 4. Success navigation: ONLY navigate after user is verified, transition completes, and session generation matches
+  // 4. Success navigation: ONLY navigate after user is verified, transition completes, and session remains valid
   useEffect(() => {
-    if (canNavigate && (isCurrent ? isCurrent(mountGen) : true)) {
+    if (canNavigate && isLifecycleValid()) {
+      setStoredCallbackOwner(null);
       navigate(returnTo, { replace: true });
     }
-  }, [canNavigate, navigate, returnTo, isCurrent, mountGen]);
+  }, [canNavigate, navigate, returnTo, isLifecycleValid]);
 
   return (
     <div className="auth-page">

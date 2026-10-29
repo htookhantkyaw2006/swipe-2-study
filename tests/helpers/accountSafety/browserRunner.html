@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Account Safety Browser Verification</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React, { createElement } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
+    import { AuthProvider } from '/src/lib/auth.jsx';
+    import { createAuthCoordinator } from '/src/lib/authCoordinator.js';
+    import AuthCallback from '/src/pages/AuthCallback.jsx';
+
+    const rootElement = document.getElementById('root');
+    let reactRoot = null;
+    const testLogs = [];
+    const origLog = console.log;
+    console.log = (...args) => { testLogs.push(args.join(' ')); origLog(...args); };
+
+    function renderComponent(ui) {
+      if (!reactRoot) {
+        reactRoot = createRoot(rootElement);
+      }
+      reactRoot.render(ui);
+    }
+
+    function unmountComponent() {
+      if (reactRoot) {
+        reactRoot.unmount();
+        reactRoot = null;
+        rootElement.innerHTML = '';
+      }
+      try { sessionStorage.clear(); } catch {}
+    }
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    function createMockAuthClient({ initialUser = { id: 'user-a' } } = {}) {
+      let authListeners = new Set();
+      let pendingInitialize = null;
+      let currentUser = initialUser;
+      let currentToken = initialUser ? 'token-' + initialUser.id : 'guest';
+
+      const auth = {
+        onAuthStateChange: (listener) => {
+          authListeners.add(listener);
+          return {
+            data: {
+              subscription: {
+                unsubscribe: () => authListeners.delete(listener),
+              },
+            },
+          };
+        },
+        emit: (event, session) => {
+          for (const listener of authListeners) {
+            listener(event, session);
+          }
+        },
+        initialize: () => {
+          if (pendingInitialize) return pendingInitialize.promise;
+          return Promise.resolve({ error: null });
+        },
+        deferInitialize: () => {
+          let resolve, reject;
+          const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+          pendingInitialize = { promise, resolve, reject };
+          return pendingInitialize;
+        },
+        getSession: async () => {
+          if (!currentUser) return { data: { session: null }, error: null };
+          return {
+            data: {
+              session: {
+                access_token: currentToken,
+                user: currentUser,
+              },
+            },
+            error: null,
+          };
+        },
+        getUser: async (token) => {
+          if (!currentUser) return { data: null, error: { message: 'No session' } };
+          return { data: { user: currentUser }, error: null };
+        },
+        signOut: async () => {
+          currentUser = null;
+          currentToken = null;
+          return { error: null };
+        },
+        setCurrentUser: (u) => {
+          currentUser = u;
+          currentToken = u ? 'token-' + u.id : null;
+        },
+      };
+
+      return { auth };
+    }
+
+    function createMockCoordinator(client, initialUser = { id: 'user-a' }) {
+      let currentOwner = initialUser ? initialUser.id : null;
+      const storageOwner = {
+        getOwner: () => currentOwner,
+        setOwner: (id) => { currentOwner = id; },
+      };
+      return createAuthCoordinator({
+        authClient: client,
+        isConfigured: true,
+        storageOwner,
+      });
+    }
+
+    function LocationRecorder({ onLocation }) {
+      const location = useLocation();
+      React.useEffect(() => {
+        onLocation(location);
+      }, [location, onLocation]);
+      return null;
+    }
+
+    async function runAllTests() {
+      const results = [];
+      function assert(cond, msg) { if (!cond) throw new Error(msg); }
+
+      // -------------------------------------------------------------
+      // Test 1: Successful control (no refresh) reaches destination
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        const client = createMockAuthClient({ initialUser: { id: 'user-a' } });
+        const coordinator = createMockCoordinator(client, { id: 'user-a' });
+        coordinator.initialize();
+        await sleep(50);
+
+        let lastLocation = null;
+        renderComponent(
+          createElement(MemoryRouter, { initialEntries: ['/auth/callback?code=test-code&returnTo=%2Flibrary'] },
+            createElement(AuthProvider, { coordinator },
+              createElement(LocationRecorder, { onLocation: (loc) => { lastLocation = loc; } }),
+              createElement(Routes, null,
+                createElement(Route, { path: '/auth/callback', element: createElement(AuthCallback, { auth: client.auth }) }),
+                createElement(Route, { path: '/library', element: createElement('div', { id: 'destination' }, 'Library Page') })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        assert(lastLocation?.pathname === '/library', 'Control should navigate to /library, got: ' + lastLocation?.pathname);
+        assert(document.getElementById('destination')?.textContent === 'Library Page', 'Destination element should exist');
+        results.push({ test: 'successful-control-no-refresh', passed: true, path: lastLocation.pathname });
+      }
+
+      // -------------------------------------------------------------
+      // Test 2: Same-owner TOKEN_REFRESHED arrives during initialization
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        const client = createMockAuthClient({ initialUser: { id: 'user-a' } });
+        const coordinator = createMockCoordinator(client, { id: 'user-a' });
+        coordinator.initialize();
+        await sleep(50);
+
+        const initDeferred = client.auth.deferInitialize();
+        let lastLocation = null;
+
+        renderComponent(
+          createElement(MemoryRouter, { initialEntries: ['/auth/callback?code=test-code&returnTo=%2Flibrary'] },
+            createElement(AuthProvider, { coordinator },
+              createElement(LocationRecorder, { onLocation: (loc) => { lastLocation = loc; } }),
+              createElement(Routes, null,
+                createElement(Route, { path: '/auth/callback', element: createElement(AuthCallback, { auth: client.auth }) }),
+                createElement(Route, { path: '/library', element: createElement('div', { id: 'destination-refresh' }, 'Library Page Refreshed') })
+              )
+            )
+          )
+        );
+
+        await sleep(50);
+        // Assert still on callback page while initialize is pending
+        assert(lastLocation?.pathname === '/auth/callback', 'Should be on /auth/callback while pending');
+
+        // Emit TOKEN_REFRESHED for same User A
+        client.auth.emit('TOKEN_REFRESHED', {
+          session: { user: { id: 'user-a' }, access_token: 'new-token-a' },
+          user: { id: 'user-a' },
+        });
+        await sleep(50);
+
+        // Resolve initialize successfully
+        initDeferred.resolve({ error: null });
+        await sleep(150);
+
+        assert(lastLocation?.pathname === '/library', 'Must navigate to /library after same-owner TOKEN_REFRESHED, got: ' + lastLocation?.pathname);
+        assert(document.getElementById('destination-refresh')?.textContent === 'Library Page Refreshed', 'Destination rendered');
+        results.push({ test: 'same-owner-token-refreshed', passed: true, path: lastLocation.pathname });
+      }
+
+      // -------------------------------------------------------------
+      // Test 3: Same-owner USER_UPDATED arrives during initialization
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        const client = createMockAuthClient({ initialUser: { id: 'user-a' } });
+        const coordinator = createMockCoordinator(client, { id: 'user-a' });
+        coordinator.initialize();
+        await sleep(50);
+
+        const initDeferred = client.auth.deferInitialize();
+        let lastLocation = null;
+
+        renderComponent(
+          createElement(MemoryRouter, { initialEntries: ['/auth/callback?code=test-code&returnTo=%2Flibrary'] },
+            createElement(AuthProvider, { coordinator },
+              createElement(LocationRecorder, { onLocation: (loc) => { lastLocation = loc; } }),
+              createElement(Routes, null,
+                createElement(Route, { path: '/auth/callback', element: createElement(AuthCallback, { auth: client.auth }) }),
+                createElement(Route, { path: '/library', element: createElement('div', { id: 'destination-update' }, 'Library Page Updated') })
+              )
+            )
+          )
+        );
+
+        await sleep(50);
+        assert(lastLocation?.pathname === '/auth/callback', 'Should be on /auth/callback while pending');
+
+        // Emit USER_UPDATED for same User A
+        client.auth.emit('USER_UPDATED', {
+          session: { user: { id: 'user-a', user_metadata: { name: 'Learner A' } }, access_token: 'token-a-upd' },
+          user: { id: 'user-a', user_metadata: { name: 'Learner A' } },
+        });
+        await sleep(50);
+
+        // Resolve initialize successfully
+        initDeferred.resolve({ error: null });
+        await sleep(150);
+
+        assert(lastLocation?.pathname === '/library', 'Must navigate to /library after same-owner USER_UPDATED, got: ' + lastLocation?.pathname);
+        assert(document.getElementById('destination-update')?.textContent === 'Library Page Updated', 'Destination rendered');
+        results.push({ test: 'same-owner-user-updated', passed: true, path: lastLocation.pathname });
+      }
+
+      // -------------------------------------------------------------
+      // Test 4: Initialization failure (inspectAuthCallbackSession error) displays visible failure
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        const client = createMockAuthClient({ initialUser: null });
+        const coordinator = createMockCoordinator(client, null);
+        client.auth.initialize = async () => ({ error: { code: 'bad_code_verifier' } });
+
+        let lastLocation = null;
+        renderComponent(
+          createElement(MemoryRouter, { initialEntries: ['/auth/callback?code=test-code&returnTo=%2Flibrary'] },
+            createElement(AuthProvider, { coordinator },
+              createElement(LocationRecorder, { onLocation: (loc) => { lastLocation = loc; } }),
+              createElement(Routes, null,
+                createElement(Route, { path: '/auth/callback', element: createElement(AuthCallback, { auth: client.auth }) }),
+                createElement(Route, { path: '/library', element: createElement('div', { id: 'destination-fail' }, 'Should Not Render') })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        assert(lastLocation?.pathname === '/auth/callback', 'Must NOT navigate on initialization failure');
+        assert(document.getElementById('destination-fail') === null, 'Destination must not render');
+        assert(document.querySelector('.auth-title')?.textContent === 'Verification issue', 'Must display Verification issue heading');
+        assert(document.querySelector('.auth-error') !== null, 'Must display auth-error container');
+        results.push({ test: 'initialization-failure-visible', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 5: Logout during verification -> callback stays fail-closed
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        const client = createMockAuthClient({ initialUser: { id: 'user-a' } });
+        const coordinator = createMockCoordinator(client, { id: 'user-a' });
+        coordinator.initialize();
+        await sleep(50);
+
+        const initDeferred = client.auth.deferInitialize();
+        let lastLocation = null;
+
+        renderComponent(
+          createElement(MemoryRouter, { initialEntries: ['/auth/callback?code=test-code&returnTo=%2Flibrary'] },
+            createElement(AuthProvider, { coordinator },
+              createElement(LocationRecorder, { onLocation: (loc) => { lastLocation = loc; } }),
+              createElement(Routes, null,
+                createElement(Route, { path: '/auth/callback', element: createElement(AuthCallback, { auth: client.auth }) }),
+                createElement(Route, { path: '/library', element: createElement('div', { id: 'destination-logout' }, 'Should Not Render') })
+              )
+            )
+          )
+        );
+
+        await sleep(50);
+        // User signs out while initialize is in flight
+        client.auth.setCurrentUser(null);
+        client.auth.emit('SIGNED_OUT', null);
+        await sleep(50);
+
+        // Resolve initialize
+        initDeferred.resolve({ error: null });
+        await sleep(150);
+
+        assert(lastLocation?.pathname === '/auth/callback', 'Must NOT navigate after logout');
+        assert(document.getElementById('destination-logout') === null, 'Destination must not render');
+        results.push({ test: 'logout-during-verification-fail-closed', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 6: Account replacement -> User B does NOT navigate to User A's returnTo
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        const client = createMockAuthClient({ initialUser: { id: 'user-a' } });
+        const coordinator = createMockCoordinator(client, { id: 'user-a' });
+        coordinator.initialize();
+        await sleep(50);
+
+        const initDeferred = client.auth.deferInitialize();
+        let lastLocation = null;
+
+        renderComponent(
+          createElement(MemoryRouter, { initialEntries: ['/auth/callback?code=test-code&returnTo=%2Fsecret-a'] },
+            createElement(AuthProvider, { coordinator },
+              createElement(LocationRecorder, { onLocation: (loc) => { lastLocation = loc; } }),
+              createElement(Routes, null,
+                createElement(Route, { path: '/auth/callback', element: createElement(AuthCallback, { auth: client.auth }) }),
+                createElement(Route, { path: '/secret-a', element: createElement('div', { id: 'secret-a-dest' }, 'Secret A') })
+              )
+            )
+          )
+        );
+
+        await sleep(100);
+        assert(document.querySelector('.auth-title')?.textContent === 'Verifying your account…', 'AuthCallback must be mounted');
+        assert(lastLocation?.pathname === '/auth/callback', 'Should be on /auth/callback while pending');
+
+        // User B replaces User A while initialize is in flight
+        client.auth.setCurrentUser({ id: 'user-b' });
+        client.auth.emit('SIGNED_IN', {
+          session: { user: { id: 'user-b' }, access_token: 'token-b' },
+          user: { id: 'user-b' },
+        });
+        await sleep(100);
+
+        // Resolve initialize
+        initDeferred.resolve({ error: null });
+        await sleep(150);
+
+        assert(lastLocation?.pathname === '/auth/callback', 'Must NOT navigate to User A destination when replaced by User B');
+        assert(document.getElementById('secret-a-dest') === null, 'User A secret destination must not render');
+        results.push({ test: 'account-replacement-fail-closed', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 7: Unmount while pending -> clean abort without error
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        const client = createMockAuthClient({ initialUser: { id: 'user-a' } });
+        const coordinator = createMockCoordinator(client, { id: 'user-a' });
+        coordinator.initialize();
+        await sleep(50);
+
+        const initDeferred = client.auth.deferInitialize();
+
+        renderComponent(
+          createElement(MemoryRouter, { initialEntries: ['/auth/callback?code=test-code&returnTo=%2Flibrary'] },
+            createElement(AuthProvider, { coordinator },
+              createElement(Routes, null,
+                createElement(Route, { path: '/auth/callback', element: createElement(AuthCallback, { auth: client.auth }) })
+              )
+            )
+          )
+        );
+
+        await sleep(50);
+        // Unmount while pending
+        unmountComponent();
+        await sleep(20);
+
+        // Resolve initialize after unmount
+        initDeferred.resolve({ error: null });
+        await sleep(50);
+
+        results.push({ test: 'unmount-while-pending-clean', passed: true });
+      }
+
+      unmountComponent();
+      return results;
+    }
+
+    runAllTests()
+      .then((results) => {
+        fetch('/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, results }),
+        });
+      })
+      .catch((err) => {
+        fetch('/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: err.stack || err.message, logs: testLogs }),
+        });
+      });
+  </script>
+</body>
+</html>

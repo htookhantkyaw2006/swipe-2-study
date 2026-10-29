@@ -164,7 +164,7 @@ test('Token-specific verification returns B or error: zero deletion HTTP request
         },
         error: null,
       }),
-      getUser: async (_token) => {
+      getUser: async (token) => {
         assert.equal(token, 'token-claims-b');
         return { data: { user: { id: USER_B } }, error: null };
       },
@@ -354,7 +354,7 @@ test('Stable verified A succeeds using exactly the captured A token', async () =
         },
         error: null,
       }),
-      getUser: async (_token) => {
+      getUser: async (token) => {
         assert.equal(token, CAPTURED_TOKEN_A, 'getUser must receive captured token');
         return { data: { user: { id: USER_A } }, error: null };
       },
