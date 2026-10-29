@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   Target, Languages, Shuffle, Layers, Volume2, Gauge, Mic,
   Type, Bell, Flame, Trash2, Download, RotateCcw, HardDrive,
-  FileText, ShieldCheck, Star, MessageSquare, Info, BookOpen
+  FileText, ShieldCheck, Star, MessageSquare, Info, BookOpen,
+  Cloud, CloudOff, RefreshCw
 } from 'lucide-react';
 import {
   SettingsGroup, SettingsRow, ToggleSwitch, OptionSheet
@@ -13,6 +14,7 @@ import { useLanguage, useCourse } from '../lib/language';
 import { COURSES } from '../courses';
 import { db } from '../lib/db';
 import { storageOwner } from '../lib/storageOwner.js';
+import { useOnlineSync } from '../lib/useOnlineSync.js';
 import { StudyHeader } from '../components/study/StudyPage';
 import './SettingsSubpage.css';
 import LanguageFlag from '../components/ui/LanguageFlag';
@@ -58,6 +60,7 @@ const formatBytes = (bytes) => {
 
 export default function SettingsSubpage() {
   const { prefs, setPref, resetPrefs } = usePreferences();
+  const { status: syncStatus, error: syncError, retry: syncRetry, sync: syncManual } = useOnlineSync();
   const { language } = useLanguage();
   const course = useCourse();
 
@@ -251,6 +254,35 @@ export default function SettingsSubpage() {
 
       {/* ---------------- Data & Storage ---------------- */}
       <SettingsGroup title="Data & Storage">
+        <SettingsRow
+          icon={syncStatus === 'failed' || syncStatus === 'conflict' ? CloudOff : (syncStatus === 'syncing' ? RefreshCw : Cloud)}
+          iconGradient={
+            syncStatus === 'saved' ? GRADIENTS.green
+            : syncStatus === 'syncing' ? GRADIENTS.blue
+            : syncStatus === 'failed' ? GRADIENTS.red
+            : syncStatus === 'conflict' ? GRADIENTS.orange
+            : GRADIENTS.slate
+          }
+          title="Cloud sync"
+          subtitle={
+            syncStatus === 'saved' ? 'All learning data saved to cloud'
+            : syncStatus === 'syncing' ? 'Saving changes to cloud...'
+            : syncStatus === 'failed' ? `Sync failed · ${syncError || 'Tap to retry'}`
+            : syncStatus === 'conflict' ? 'Sync conflict · Tap to resolve'
+            : 'Changes stored on this device'
+          }
+          value={
+            syncStatus === 'saved' ? 'Cloud saved'
+            : syncStatus === 'syncing' ? 'Syncing...'
+            : syncStatus === 'failed' || syncStatus === 'conflict' ? 'Retry'
+            : 'Local only'
+          }
+          onClick={
+            syncStatus === 'failed' || syncStatus === 'conflict' ? syncRetry
+            : (syncStatus === 'local' ? syncManual : undefined)
+          }
+          danger={syncStatus === 'failed' || syncStatus === 'conflict'}
+        />
         <SettingsRow
           icon={HardDrive} iconGradient={GRADIENTS.slate}
           title="Storage used"

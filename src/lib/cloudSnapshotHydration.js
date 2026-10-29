@@ -1,6 +1,7 @@
 import { readCloudSnapshot } from './cloudImportService.js';
 import { CLOUD_LANGUAGES, CLOUD_KINDS } from './cloudImportRecords.js';
 import { parseLearningRows } from './learningDocument.js';
+import { clearPendingSyncRequest } from './onlineSyncRequest.js';
 import {
   getSyncStateKey,
   recordKey,
@@ -42,10 +43,21 @@ export function reconcileSnapshotWithLocal({
   let changesCount = 0;
 
   const currentResetVersion = snapshot.reset_version;
-  const isResetMismatch = syncState && syncState.resetVersion !== currentResetVersion;
+  const isResetMismatch = Boolean(syncState && syncState.resetVersion && syncState.resetVersion !== currentResetVersion);
 
   // Next sync state
   const nextRecords = isResetMismatch ? {} : { ...(syncState?.records ?? {}) };
+
+  // Map server tombstones if provided
+  const serverTombstones = new Map();
+  if (Array.isArray(snapshot.tombstones)) {
+    for (const t of snapshot.tombstones) {
+      if (t && typeof t === 'object') {
+        const k = recordKey(t.language, t.kind, t.written_form, t.reading);
+        serverTombstones.set(k, t);
+      }
+    }
+  }
 
   // Map snapshot items by table
   const cloudByTable = {};
@@ -69,7 +81,7 @@ export function reconcileSnapshotWithLocal({
       const cloudItems = cloudByTable[tableName] || [];
       const localRowsRaw = localTables[tableName];
       let localRows = [];
-      if (localRowsRaw !== undefined && localRowsRaw !== null) {
+      if (!isResetMismatch && localRowsRaw !== undefined && localRowsRaw !== null) {
         if (typeof localRowsRaw === 'string') {
           localRows = parseLearningRows(localRowsRaw);
         } else if (Array.isArray(localRowsRaw)) {
@@ -179,6 +191,10 @@ export function reconcileSnapshotWithLocal({
         if (!seenKeys.has(key)) {
           if (nextRecords[key]?.status === 'deleted') {
             continue; // Tombstone exists, keep deleted!
+          }
+          if (serverTombstones.has(key) && nextRecords[key]?.status !== 'dirty') {
+            // Deleted on server and not edited locally since: do not resurrect!
+            continue;
           }
           // Retain local item! Never discard local data!
           mergedRows.push(row);
@@ -319,6 +335,10 @@ export async function restoreAccountSnapshot(client, storageOwner, {
     }
 
     const { reconciledTables, nextSyncState, changesCount } = reconciliation;
+
+    if (syncState && syncState.resetVersion && syncState.resetVersion !== snapshot.reset_version) {
+      clearPendingSyncRequest(storage, expectedUserId);
+    }
 
     // Check if tables actually changed
     let hasDiff = false;

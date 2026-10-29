@@ -9,6 +9,7 @@ import { LanguageProvider } from './lib/language.jsx'
 import { PreferencesProvider } from './lib/preferences.jsx'
 import StorageOwnerBoundary from './components/StorageOwnerBoundary.jsx'
 import { AuthProvider } from './lib/auth.jsx'
+import OnlineSyncProvider from './components/OnlineSyncProvider.jsx'
 import { recoveryLink } from './lib/recoveryLink.js'
 import './responsive-tools.css'
 import GuestImportProvider from './components/GuestImportProvider.jsx'
@@ -27,13 +28,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <AuthProvider>
       <StorageOwnerBoundary>
         <PreferencesProvider>
-          <LanguageProvider>
-            <BrowserRouter>
-              <GuestImportProvider>
-                <CourseShell />
-              </GuestImportProvider>
-            </BrowserRouter>
-          </LanguageProvider>
+          <OnlineSyncProvider>
+            <LanguageProvider>
+              <BrowserRouter>
+                <GuestImportProvider>
+                  <CourseShell />
+                </GuestImportProvider>
+              </BrowserRouter>
+            </LanguageProvider>
+          </OnlineSyncProvider>
         </PreferencesProvider>
       </StorageOwnerBoundary>
     </AuthProvider>

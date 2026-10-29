@@ -53,7 +53,14 @@ export function createStorageOwner({
   cloudTracking = false,
 } = {}) {
   let activeOwner = null;
+  let isCloudTrackingEnabled = Boolean(cloudTracking);
   const listeners = new Set();
+  const changeListeners = new Set();
+  const notifyChange = (detail) => {
+    for (const listener of changeListeners) {
+      try { listener(detail); } catch { /* ignore subscriber error */ }
+    }
+  };
   const access = (operation, run) => {
     try {
       const target = storage();
@@ -142,7 +149,7 @@ export function createStorageOwner({
       // 2. Explicit tracking option enabled, OR
       // 3. Legacy cloud_sync_state_v1 sidecar exists
       const { raw, value } = readLearningDocument();
-      let isTracked = Boolean(scopeTracking || cloudTracking || value?.cloudSync);
+      let isTracked = Boolean(scopeTracking || isCloudTrackingEnabled || value?.cloudSync);
 
       if (!isTracked) {
         // Only inspect the legacy sidecar if authoritative tracking is not already known.
@@ -209,6 +216,7 @@ export function createStorageOwner({
         for (const k of prevMap.keys()) {
           if (!nextMap.has(k)) {
             nextRecords[k] = {
+              ...(currentSyncState.records?.[k] ?? {}),
               status: 'deleted',
               deletedAt: nowIso,
             };
@@ -220,6 +228,7 @@ export function createStorageOwner({
           const prevRow = prevMap.get(k);
           if (!prevRow || !rowsEqual(prevRow, row)) {
             nextRecords[k] = {
+              ...(currentSyncState.records?.[k] ?? {}),
               status: 'dirty',
               updatedAt: row.updated_at || row.created_at || nowIso,
             };
@@ -281,6 +290,9 @@ export function createStorageOwner({
 
         // 5. Best-effort update of legacy sidecar for non-breaking legacy reader compatibility
         mirrorSyncStateToSidecar(target, nextCloudSync);
+
+        // 6. Notify subscribers of successful table mutation
+        notifyChange({ ownerId: id, language, table });
       });
     };
     return Object.freeze({
@@ -321,6 +333,15 @@ export function createStorageOwner({
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    subscribeChange: listener => {
+      changeListeners.add(listener);
+      return () => changeListeners.delete(listener);
+    },
+    setCloudTracking: val => {
+      isCloudTrackingEnabled = Boolean(val);
+    },
+    isCloudTracking: () => isCloudTrackingEnabled,
+    notifyChange,
     getStorage: () => storage(),
     scope,
   });

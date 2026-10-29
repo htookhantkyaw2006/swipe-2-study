@@ -236,6 +236,7 @@ export function recordLocalDeletion(storage, ownerId, language, kind, writtenFor
   };
   const key = recordKey(language, kind, writtenForm, reading);
   nextState.records[key] = {
+    ...(nextState.records[key] ?? {}),
     status: 'deleted',
     deletedAt: now(),
   };
@@ -257,6 +258,7 @@ export function recordLocalDirty(storage, ownerId, language, kind, writtenForm, 
   };
   const key = recordKey(language, kind, writtenForm, reading);
   nextState.records[key] = {
+    ...(nextState.records[key] ?? {}),
     status: 'dirty',
     updatedAt: now(),
   };
