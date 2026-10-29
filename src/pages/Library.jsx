@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, User, LayoutGrid, List } from 'lucide-react';
 import { db } from '../lib/db';
+import { storageOwner } from '../lib/storageOwner.js';
+import { getCourseProgress } from '../lib/vocabularyProgress.js';
 import { useCourse } from '../lib/language';
 import { StudySearch } from '../components/study/StudyPage';
 import LearningIcon from '../components/ui/LearningIcon';
@@ -23,11 +25,33 @@ export default function Library() {
   const course = useCourse();
   const [isGrid, setIsGrid] = useState(true);
   const [query, setQuery] = useState('');
-  const savedCount = db.get('saved_words').length;
-  const reviewCount = db.get('review_cards').length;
-  const cardCount = db.get('flashcards').length;
+  const [, setDataVersion] = useState(0);
+
+  useEffect(() => {
+    const unsubChange = storageOwner.subscribeChange(() => setDataVersion(v => v + 1));
+    const unsubOwner = storageOwner.subscribe(() => setDataVersion(v => v + 1));
+    return () => {
+      unsubChange?.();
+      unsubOwner?.();
+    };
+  }, []);
+
+  let savedCount = 0;
+  let reviewCount = 0;
+  let cardCount = 0;
+  let learnedCount = 0;
+  try {
+    savedCount = db.get('saved_words').length;
+    reviewCount = db.get('review_cards').length;
+    cardCount = db.get('flashcards').length;
+    const progress = getCourseProgress(db, course);
+    learnedCount = progress.uniqueLearnedCount;
+  } catch {
+    // Keep safe defaults
+  }
+
   const coreTools = [
-    { key: 'cards', title: 'Flashcards', subtitle: 'Build your vocabulary', path: '/learn' },
+    { key: 'cards', title: 'Flashcards', subtitle: learnedCount > 0 ? `${learnedCount} words mastered` : 'Build your vocabulary', path: '/learn' },
     { key: 'review', title: 'Review', subtitle: `${reviewCount} ${reviewCount === 1 ? 'word' : 'words'} to revisit`, path: '/learn/review' },
     { key: 'saved', title: 'Saved Words', subtitle: `${savedCount} bookmarked ${savedCount === 1 ? 'word' : 'words'}`, path: '/saved' },
     { key: 'dictionary', title: 'Dictionary', subtitle: course.copy.dictionarySubtitle, path: '/dictionary' },
@@ -51,6 +75,7 @@ export default function Library() {
       </section>
       <div className="library-counts" aria-label="Current course collections">
         <Link to="/learn"><LearningIcon kind="cards" className="library-counts__art" /><strong>{cardCount}</strong><span>Cards available</span></Link>
+        <Link to="/learn"><LearningIcon kind="cards" className="library-counts__art" /><strong>{learnedCount}</strong><span>Learned words</span></Link>
         <Link to="/saved"><LearningIcon kind="saved" className="library-counts__art" /><strong>{savedCount}</strong><span>Saved words</span></Link>
         <Link to="/learn/review"><LearningIcon kind="review" className="library-counts__art" /><strong>{reviewCount}</strong><span>To review</span></Link>
       </div>

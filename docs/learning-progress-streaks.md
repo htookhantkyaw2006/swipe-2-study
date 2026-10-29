@@ -44,3 +44,30 @@ Where bundled starter vocabulary contains a subset of official exam curriculum (
 - **Idempotency & Replay Safety**: Replay receipts and optimistic revision checks prevent stale overwrites and out-of-order resurrection.
 - **Learning Reset**: `s2s_reset_learning` wipes learning records and tombstones while advancing `reset_version`. Stale client envelopes are rejected with `RESET_VERSION_CHANGED` and cleanly reloaded without touching profiles or preferences.
 
+
+## 3. Server-Confirmed Asia/Yangon Streaks
+
+### Server Date & Timezone Integrity
+All authenticated study streaks derive strictly from server-assigned dates evaluated in **`Asia/Yangon`** (UTC+6:30, fixed offset with no daylight saving time):
+- Evaluated on PostgreSQL as `timezone('Asia/Yangon', now())::date`.
+- Client system clocks, local device timezones, or simulated timestamps cannot spoof or advance confirmed streak records.
+
+### Streak Calculation Engine
+Authenticated study actions that modify learning data (e.g. `learned_words`, `review_cards`, or `saved_words`) transactionally trigger `private.s2s_record_study_action`:
+1. **Day Counting**:
+   - Each calendar day in `Asia/Yangon` counts at most once, regardless of how many mutations or swipes occur.
+2. **Consecutive Days**:
+   - If the previous recorded study date was yesterday (`last_study_date = today_yangon - 1`), `current_streak` increments by 1.
+   - `longest_streak` is updated to `max(longest_streak, current_streak)`.
+3. **Same Day**:
+   - If `last_study_date = today_yangon`, the day is already counted; `current_streak` remains unchanged.
+4. **Missed Day / Break**:
+   - If `last_study_date < today_yangon - 1`, a missed day occurred; `current_streak` resets to 1 upon the new action.
+5. **Passive Queries**:
+   - When queried via `s2s_get_study_streak` before any study action today:
+     - If studied yesterday (`today_yangon - 1`), yesterday extends through today: `current_streak` is preserved, but `today_studied` reports `false`.
+     - If studied prior to yesterday (`< today_yangon - 1`), active streak reports `0` and `today_studied` reports `false`.
+
+### Guest Isolation & Metrics Replacement
+- **Guest State**: Guests do not hold a server session or server streak; UI displays honest guest device-local indicators (`isGuest: true`, `—`, "Guest mode (device-local)").
+- **Live UI Updates**: All metric surfaces (Home `LevelCarousel` and `practice-links`, `LessonPicker`, `Library`, and `Profile`) actively subscribe to `storageOwner` events to re-render immediately upon session completion, data mutation, or account transition.

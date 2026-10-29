@@ -1,19 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, ChevronRight, Layers } from 'lucide-react';
 import { useCourse } from '../../lib/language';
+import { db } from '../../lib/db';
+import { getLevelProgress } from '../../lib/vocabularyProgress';
+import { storageOwner } from '../../lib/storageOwner';
 
 export default function LevelCarousel() {
   const course = useCourse();
   const navigate = useNavigate();
   const [activeIndex, setActiveIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
+  const [, setTick] = useState(0);
+
+  // Active view refreshes on table mutations and owner switches
+  useEffect(() => {
+    const unsubChange = storageOwner.subscribeChange(() => setTick(t => t + 1));
+    const unsubOwner = storageOwner.subscribe(() => setTick(t => t + 1));
+    return () => {
+      unsubChange?.();
+      unsubOwner?.();
+    };
+  }, []);
+
   const level = course.levels[activeIndex] || course.levels[0];
   if (!level) return null;
 
-  // Existing course progress is demo content until real tracking is delivered.
-  const completed = level.demo?.completed ?? 0;
-  const percent = level.words ? Math.min(100, Math.max(0, completed / level.words * 100)) : 0;
+  // Real progress derived from learner records
+  const progress = getLevelProgress(db, level.id, course);
+  const completed = progress.uniqueLearned;
+  const percent = progress.percent;
   const changeLevel = delta => setActiveIndex(index => Math.max(0, Math.min(course.levels.length - 1, index + delta)));
 
   return (
@@ -43,7 +59,7 @@ export default function LevelCarousel() {
           </div>
         </div>
         <div className="course-progress">
-          <div className="course-progress-label"><span>Sample progress</span><span>{completed.toLocaleString()} / {level.words.toLocaleString()}</span></div>
+          <div className="course-progress-label"><span>Progress</span><span>{completed.toLocaleString()} / {level.words.toLocaleString()}</span></div>
           <div className="course-progress-track" aria-hidden="true"><span style={{ width: `${percent}%` }} /></div>
         </div>
         <div className="course-card-actions">

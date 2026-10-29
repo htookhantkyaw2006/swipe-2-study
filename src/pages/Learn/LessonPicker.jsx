@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Layers, Compass, ChevronRight, RotateCw, CheckCircle2, Bookmark, Volume2 } from 'lucide-react';
 import { useCourse } from '../../lib/language';
@@ -7,11 +7,25 @@ import { kanaOf, sayOf } from '../../lib/entry';
 import { filterStudyWords, wordDetails } from '../../lib/studyWords';
 import { speak } from '../../lib/speech';
 import { StudyHeader, StudySearch } from '../../components/study/StudyPage';
+import { getLevelProgress } from '../../lib/vocabularyProgress';
+import { storageOwner } from '../../lib/storageOwner';
 import './LessonPicker.css';
 
 export default function LessonPicker() {
   const { levelId } = useParams();
   const course = useCourse();
+  const [, setTick] = useState(0);
+
+  // Active view refreshes on table mutations and owner switches
+  useEffect(() => {
+    const unsubChange = storageOwner.subscribeChange(() => setTick(t => t + 1));
+    const unsubOwner = storageOwner.subscribe(() => setTick(t => t + 1));
+    return () => {
+      unsubChange?.();
+      unsubOwner?.();
+    };
+  }, []);
+
   // Keep legacy numeric links such as /learn/level/1 working.
   const level = course.levels.find(item => item.id === levelId)
     || course.levels.find(item => String(item.num) === String(levelId).replace(/\D/g, ''))
@@ -21,8 +35,11 @@ export default function LessonPicker() {
   const visibleWords = filterStudyWords(words, query);
   const reviewCount = db.get('review_cards').length;
   const savedCount = db.get('saved_words').length;
-  const completed = level.demo.completed;
-  const percent = Math.min(100, Math.floor(completed / level.words * 100));
+
+  // Real progress derived from learner records
+  const progress = getLevelProgress(db, level.id, course);
+  const completed = progress.uniqueLearned;
+  const percent = progress.percent;
 
   return (
     <div className="study-page lesson-page">
@@ -34,8 +51,8 @@ export default function LessonPicker() {
             <h2>{level.name}</h2>
             <p>{level.words.toLocaleString()} vocabulary words</p>
             <div className="lesson-hero__progress">
-              <div className="lesson-hero__progress-label"><span>Sample progress</span><span>{percent}%</span></div>
-              <progress aria-label="Sample course progress" value={completed} max={level.words} />
+              <div className="lesson-hero__progress-label"><span>Course progress</span><span>{percent}%</span></div>
+              <progress aria-label="Course progress" value={completed} max={level.words} />
               <p>{completed.toLocaleString()} of {level.words.toLocaleString()} words</p>
             </div>
           </section>
@@ -61,7 +78,7 @@ export default function LessonPicker() {
         <div className="lesson-content">
           <section className="lesson-practice" aria-label="Flashcard practice">
             <Link className="lesson-practice__tile" to="/learn/review"><RotateCw size={21} aria-hidden="true" /><strong>Review</strong><span>{reviewCount} to review</span></Link>
-            <div className="lesson-practice__tile"><CheckCircle2 size={21} aria-hidden="true" /><strong>{completed.toLocaleString()}</strong><span>Sample mastered</span></div>
+            <div className="lesson-practice__tile"><CheckCircle2 size={21} aria-hidden="true" /><strong>{completed.toLocaleString()}</strong><span>Mastered</span></div>
             <Link className="lesson-practice__tile" to="/saved"><Bookmark size={21} aria-hidden="true" /><strong>Saved</strong><span>{savedCount} saved words</span></Link>
           </section>
           <section className="lesson-browser" aria-labelledby="lesson-browser-title">

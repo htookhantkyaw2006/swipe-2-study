@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Bookmark, RotateCw, LogOut, Trash2, Languages, Target, Volume2, Crown, User, LogIn, AlertCircle, RefreshCw, ChevronRight, MessageSquare, FolderInput } from 'lucide-react';
+import { Settings, Bookmark, RotateCw, Flame, CheckCircle2, LogOut, Trash2, Languages, Target, Volume2, Crown, User, LogIn, AlertCircle, RefreshCw, ChevronRight, MessageSquare, FolderInput } from 'lucide-react';
 import { usePreferences, OPTIONS } from '../lib/preferences';
 import { useLanguage } from '../lib/language';
 import { useAuth } from '../lib/useAuth.js';
@@ -14,6 +14,8 @@ import { getSupabaseClient } from '../lib/supabase.js';
 import { isAccountDeletionEnabled } from '../lib/accountDeletionGate.js';
 import { sendDeletionRequest, removeOwnerLocalData, UNCONFIRMED_DELETION_GUIDANCE } from '../lib/accountDeletionClient.js';
 import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
+import { useStudyStreak } from '../lib/studyStreak.js';
+import { getLearnedWords } from '../lib/vocabularyProgress.js';
 import DeleteAccountDialog from '../components/DeleteAccountDialog.jsx';
 import '../components/study/StudyPage.css';
 import './Profile.css';
@@ -46,14 +48,35 @@ export default function Profile() {
   const [localCleanupError, setLocalCleanupError] = useState(false);
   const [deletionNotice, setDeletionNotice] = useState('');
   const [, retryCollections] = useState(0);
+  const [, setCollectionVersion] = useState(0);
+  const streak = useStudyStreak();
+
+  useEffect(() => {
+    const unsubOwner = storageOwner.subscribe(() => setCollectionVersion(v => v + 1));
+    const unsubChange = storageOwner.subscribeChange(() => setCollectionVersion(v => v + 1));
+    return () => {
+      unsubOwner?.();
+      unsubChange?.();
+    };
+  }, []);
+
   const busy = authLoading || isTransitioning;
   const name = user ? displayName(profile, user) : 'Guest Learner';
   let savedCount = null;
   let reviewCount = null;
+  let learnedCount = null;
   let collectionError = false;
   try {
     savedCount = db.get('saved_words').length;
     reviewCount = db.get('review_cards').length;
+    const learnedRows = getLearnedWords(db, language.id);
+    const uniqueLearned = new Set();
+    for (const row of learnedRows) {
+      if (row.status === 'known' && (row.character || row.written)) {
+        uniqueLearned.add(`${row.character || row.written}:${row.pronunciation || ''}`.toLowerCase());
+      }
+    }
+    learnedCount = uniqueLearned.size;
   } catch { collectionError = true; }
 
   const handleLogout = async () => {
@@ -211,8 +234,30 @@ export default function Profile() {
           </section>
           <section className="profile-collection" aria-label={`${language.name} collections`}>
             <h2>{language.name} collections</h2>
-            <div className="profile-counts"><Link to="/saved"><Bookmark size={20} aria-hidden="true" /><strong>{savedCount ?? '—'}</strong><span>Saved words</span></Link><Link to="/learn/review"><RotateCw size={20} aria-hidden="true" /><strong>{reviewCount ?? '—'}</strong><span>To review</span></Link></div>
+            <div className="profile-counts">
+              <Link to="/saved"><Bookmark size={20} aria-hidden="true" /><strong>{savedCount ?? '—'}</strong><span>Saved words</span></Link>
+              <Link to="/learn/review"><RotateCw size={20} aria-hidden="true" /><strong>{reviewCount ?? '—'}</strong><span>To review</span></Link>
+              <Link to="/learn"><CheckCircle2 size={20} aria-hidden="true" /><strong>{learnedCount ?? '—'}</strong><span>Learned words</span></Link>
+            </div>
             {collectionError && <ProfileError onRetry={() => retryCollections(attempt => attempt + 1)} label="Retry learning collections">Learning data could not be read on this device. Stored records have been kept.</ProfileError>}
+          </section>
+          <section className="profile-streak-section" aria-label="Study streak">
+            <h2>Study streak</h2>
+            <div className="profile-streak-box">
+              <Flame size={24} aria-hidden="true" style={{ color: streak.todayStudied ? '#EA580C' : 'var(--color-text-muted)' }} />
+              <div className="profile-streak-info">
+                <strong>{streak.isGuest ? '—' : `${streak.currentStreak} ${streak.currentStreak === 1 ? 'day' : 'days'}`}</strong>
+                <p>
+                  {streak.isGuest
+                    ? 'Guest mode (device-local)'
+                    : streak.todayStudied
+                      ? 'Confirmed today · Asia/Yangon'
+                      : streak.hasPendingSync
+                        ? 'Pending sync · Asia/Yangon'
+                        : 'Study today to keep streak'}
+                </p>
+              </div>
+            </div>
           </section>
           <div className="profile-plan"><span className="profile-setting__icon"><Crown size={22} aria-hidden="true" /></span><div><strong>Free plan</strong><p>Learn at your own pace.</p></div><Link className="study-text-link" to="/premium">View plans</Link></div>
         </aside>

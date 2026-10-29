@@ -9,6 +9,7 @@ import {
   writePendingSyncRequest,
   clearPendingSyncRequest,
 } from './onlineSyncRequest.js';
+import { writeStreakState } from './studyStreak.js';
 
 const RESERVED = new Set(['id', 'user_id', 'item_key', 'revision', 'reset_version', 'created_at', 'updated_at', 'language']);
 const IDENTITY_KEYS = new Set(['phrase', 'word', 'character', 'reading', 'pronunciation', 'pinyin', 'kana']);
@@ -380,6 +381,18 @@ export function createOnlineSyncService({
       // Successful commit: clear pending request envelope
       clearPendingSyncRequest(storage, accountId, envelope.requestId);
       mirrorSyncStateToSidecar(storage, nextSyncState);
+
+      if (data.streak && typeof data.streak === 'object') {
+        writeStreakState(storage, accountId, {
+          currentStreak: data.streak.current_streak ?? 0,
+          longestStreak: data.streak.longest_streak ?? 0,
+          todayStudied: Boolean(data.streak.today_studied),
+          lastStudyDate: data.streak.last_study_date ?? null,
+          timezone: data.streak.timezone || 'Asia/Yangon',
+          isGuest: false,
+          updatedAt: now(),
+        });
+      }
     } catch (err) {
       return {
         status: 'failed',

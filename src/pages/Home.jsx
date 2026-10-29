@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, Layers } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Layers, Flame } from 'lucide-react';
 import LevelCarousel from '../components/ui/LevelCarousel';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import Avatar from '../components/ui/Avatar';
@@ -11,12 +11,15 @@ import { useAuth } from '../lib/useAuth.js';
 import { useProfile, displayName } from '../lib/profile.js';
 import { useAvatarUrl } from '../lib/useAvatarUrl.js';
 import { db } from '../lib/db';
+import { storageOwner } from '../lib/storageOwner.js';
+import { useStudyStreak } from '../lib/studyStreak.js';
 
 export default function Home() {
   const { user, isGuest, loading: authLoading } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const photo = useAvatarUrl(profile?.avatar_path);
   const course = useCourse();
+  const streak = useStudyStreak();
   const [counts, setCounts] = useState({ review: null, saved: null, error: false });
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -24,12 +27,22 @@ export default function Home() {
     ? displayName(profileLoading ? null : profile, user)
     : 'Guest Learner';
 
-  useEffect(() => {
+  const updateCounts = () => {
     try {
       setCounts({ review: db.get('review_cards').length, saved: db.get('saved_words').length, error: false });
     } catch {
       setCounts({ review: null, saved: null, error: true });
     }
+  };
+
+  useEffect(() => {
+    updateCounts();
+    const unsubChange = storageOwner.subscribeChange(updateCounts);
+    const unsubOwner = storageOwner.subscribe(updateCounts);
+    return () => {
+      unsubChange?.();
+      unsubOwner?.();
+    };
   }, []);
 
   return (
@@ -65,6 +78,14 @@ export default function Home() {
             <div className="practice-panel-heading"><span className="section-eyebrow">MAKE IT STICK</span><Layers size={19} aria-hidden="true" /></div>
             <h2 id="practice-heading">A word worth revisiting.</h2><p>Your review queue and saved words, all in one place.</p>
             <div className="practice-links">
+              <div className="practice-link practice-link--streak">
+                <Flame size={20} className="practice-art" aria-hidden="true" style={{ color: streak.todayStudied ? '#EA580C' : 'var(--color-text-muted)' }} />
+                <span>
+                  <strong>{isGuest ? 'Study streak' : `${streak.currentStreak} day streak`}</strong>
+                  <span>{isGuest ? 'Guest mode (device-local)' : streak.todayStudied ? 'Confirmed today · Asia/Yangon' : streak.hasPendingSync ? 'Pending sync · Asia/Yangon' : 'Study today to keep streak'}</span>
+                </span>
+                <span className="practice-count">{isGuest ? '—' : streak.currentStreak}</span>
+              </div>
               <Link to="/learn/review" className="practice-link"><LearningIcon kind="review" className="practice-art" /><span><strong>Review queue</strong><span>Go over your cards</span></span><span className="practice-count">{counts.review ?? '—'}</span><ArrowRight size={16} aria-hidden="true" /></Link>
               <Link to="/saved" className="practice-link"><LearningIcon kind="saved" className="practice-art" /><span><strong>Saved words</strong><span>Keep them close</span></span><span className="practice-count">{counts.saved ?? '—'}</span><ArrowRight size={16} aria-hidden="true" /></Link>
             </div>

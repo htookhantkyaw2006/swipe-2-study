@@ -400,6 +400,22 @@ export async function restoreAccountSnapshot(client, storageOwner, {
       // Best effort update of legacy sidecar
       mirrorSyncStateToSidecar(storage, nextSyncState);
 
+      if (snapshot.streak && typeof snapshot.streak === 'object') {
+        try {
+          storage.setItem(`s2s_user_${expectedUserId.toLowerCase()}_study_streak_v1`, JSON.stringify({
+            currentStreak: snapshot.streak.current_streak ?? 0,
+            longestStreak: snapshot.streak.longest_streak ?? 0,
+            todayStudied: Boolean(snapshot.streak.today_studied),
+            lastStudyDate: snapshot.streak.last_study_date ?? null,
+            timezone: snapshot.streak.timezone || 'Asia/Yangon',
+            isGuest: false,
+            updatedAt: now(),
+          }));
+        } catch {
+          // non-fatal streak cache write
+        }
+      }
+
       return { outcome: 'restored', changesCount, error: null };
     } catch {
       if (attempt === 2) {
