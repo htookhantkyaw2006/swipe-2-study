@@ -144,7 +144,7 @@ export function reconcileSnapshotWithLocal({
             if (item.kind === 'saved_words') {
               row.phrase = item.written_form;
               row.reading = item.reading;
-            } else if (item.kind === 'review_cards') {
+            } else if (item.kind === 'review_cards' || item.kind === 'learned_words') {
               row.character = item.written_form;
               row.pronunciation = item.reading;
             } else {
@@ -169,7 +169,7 @@ export function reconcileSnapshotWithLocal({
           if (item.kind === 'saved_words') {
             row.phrase = item.written_form;
             row.reading = item.reading;
-          } else if (item.kind === 'review_cards') {
+          } else if (item.kind === 'review_cards' || item.kind === 'learned_words') {
             row.character = item.written_form;
             row.pronunciation = item.reading;
           } else {

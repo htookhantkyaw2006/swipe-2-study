@@ -13,7 +13,7 @@ import {
 const RESERVED = new Set(['id', 'user_id', 'item_key', 'revision', 'reset_version', 'created_at', 'updated_at', 'language']);
 const IDENTITY_KEYS = new Set(['phrase', 'word', 'character', 'reading', 'pronunciation', 'pinyin', 'kana']);
 
-const SUPPORTED_KINDS = ['saved_words', 'review_cards'];
+const SUPPORTED_KINDS = ['saved_words', 'review_cards', 'learned_words'];
 
 export function isSupportedSyncKind(kind) {
   return SUPPORTED_KINDS.includes(kind);

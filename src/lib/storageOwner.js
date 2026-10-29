@@ -258,7 +258,7 @@ export function createStorageOwner({
           // Migrate legacy tables into authoritative document during first tracked write
           const migratedTables = {};
           for (const lang of ['zh', 'ja', 'en']) {
-            for (const kind of ['saved_words', 'review_cards', 'search_history', 'written_chars', 'learned_radicals', 'learned_kana', 'learned_sounds']) {
+            for (const kind of ['saved_words', 'review_cards', 'search_history', 'written_chars', 'learned_radicals', 'learned_kana', 'learned_sounds', 'learned_words']) {
               const tName = `${lang}_${kind}`;
               if (tName === name) {
                 migratedTables[tName] = rows;

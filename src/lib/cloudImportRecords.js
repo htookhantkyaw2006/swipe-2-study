@@ -1,7 +1,7 @@
 import { readingOf, wordOf } from './entry.js';
 
 export const CLOUD_KINDS = Object.freeze(['saved_words', 'review_cards', 'search_history',
-  'written_chars', 'learned_radicals', 'learned_kana', 'learned_sounds']);
+  'written_chars', 'learned_radicals', 'learned_kana', 'learned_sounds', 'learned_words']);
 export const CLOUD_LANGUAGES = Object.freeze(['zh', 'ja', 'en']);
 const FIELDS = { search_history: 'term', written_chars: 'character', learned_radicals: 'radical', learned_kana: 'kana', learned_sounds: 'sound' };
 const RESERVED = new Set(['id', 'user_id', 'item_key', 'revision', 'reset_version', 'created_at', 'updated_at', 'language']);
@@ -22,7 +22,7 @@ export function validateCloudItem(item) {
     || Object.keys(item.data).some(key => RESERVED.has(key))
     || new TextEncoder().encode(JSON.stringify(item.data)).length > 16384
     || !validTimestamp(item.observed_at)) throw invalid();
-  const fields = ['english', 'burmese', 'definition', 'burmese_definition', 'kana', 'part_of_speech', 'level', 'lesson_name'];
+  const fields = ['english', 'burmese', 'definition', 'burmese_definition', 'kana', 'part_of_speech', 'level', 'lesson_name', 'status', 'last_action', 'last_reviewed_at', 'card_id'];
   for (const key of fields) if (item.data[key] !== undefined && (typeof item.data[key] !== 'string' || item.data[key].length > 10000)) throw invalid();
   if (item.data.examples !== undefined) {
     if (!Array.isArray(item.data.examples) || item.data.examples.length > 3) throw invalid();
@@ -31,11 +31,15 @@ export function validateCloudItem(item) {
       for (const key of ['text', 'chinese', 'reading', 'pinyin', 'english', 'burmese']) if (example[key] !== undefined && (typeof example[key] !== 'string' || example[key].length > 10000)) throw invalid();
     }
   }
-  if (!['saved_words', 'review_cards'].includes(item.kind) && item.reading !== '') throw invalid();
-  if (item.kind.startsWith('learned_') && ['seen', 'correct', 'wrong', 'streak'].some(key => item.data[key] !== undefined)) {
+  if (!['saved_words', 'review_cards', 'learned_words'].includes(item.kind) && item.reading !== '') throw invalid();
+  if (['learned_radicals', 'learned_kana', 'learned_sounds'].includes(item.kind) && ['seen', 'correct', 'wrong', 'streak'].some(key => item.data[key] !== undefined)) {
     const { seen, correct, wrong, streak } = item.data;
-    if ([seen, correct, wrong, streak].some(value => !Number.isSafeInteger(value) || value < 0)
-      || seen !== correct + wrong || streak > correct) throw invalid();
+    if ([seen, correct, wrong, streak].some(value => !Number.isSafeInteger(value) || value < 0) || seen !== correct + wrong || streak > correct) throw invalid();
+
+  }
+  if (item.kind === 'learned_words' && item.data.seen !== undefined) {
+    if (!Number.isSafeInteger(item.data.seen) || item.data.seen < 0) throw invalid();
+
   }
 }
 
@@ -61,7 +65,7 @@ export function buildCloudImportItems(tables) {
       // A user may review/bookmark a word originating in a seeded course.
       // Course provenance alone is not evidence that the learning record is fake.
       if (row.is_sample === true || row.isSample === true || row.demo === true) continue;
-      const isWord = kind === 'saved_words' || kind === 'review_cards';
+      const isWord = kind === 'saved_words' || kind === 'review_cards' || kind === 'learned_words';
       const written = isWord ? wordOf(row) : row[FIELDS[kind]];
       const reading = isWord ? (row.pronunciation ?? readingOf(row)) : '';
       if (!text(written) || !text(reading, true)) throw invalid();
@@ -89,7 +93,7 @@ export function cloudSnapshotTables(snapshot) {
   for (const item of snapshot.items) {
     const row = { ...JSON.parse(JSON.stringify(item.data)), id: item.item_key, created_at: item.created_at, updated_at: item.updated_at };
     if (item.kind === 'saved_words') { row.phrase = item.written_form; row.reading = item.reading; }
-    else if (item.kind === 'review_cards') { row.character = item.written_form; row.pronunciation = item.reading; }
+    else if (item.kind === 'review_cards' || item.kind === 'learned_words') { row.character = item.written_form; row.pronunciation = item.reading; }
     else row[FIELDS[item.kind]] = item.written_form;
     tables[`${item.language}_${item.kind}`].push(row);
   }

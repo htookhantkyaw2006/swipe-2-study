@@ -7,8 +7,9 @@ import { speak } from '../../lib/speech';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
 import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
-import { readSessionCards, sameStudyWord } from '../../lib/studyWords';
+import { readSessionCards } from '../../lib/studyWords';
 import { phraseCards } from '../../lib/phraseCards';
+import { recordWordAction } from '../../lib/vocabularyProgress';
 import './SwipeSession.css';
 
 const ShuffleDeck = ({ reducedMotion }) => (
@@ -214,12 +215,13 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     actionLocked.current = true;
     setAdvancing(true);
     setExitData({ direction });
-    // Phrase practice does not write into the vocabulary review queue.
-    if (!isPhrases && direction === 'right' && isReview) {
-      db.set('review_cards', db.get('review_cards').filter(c => !sameStudyWord(c, swipedCard)));
-    } else if (!isPhrases && direction === 'left' && !isReview) {
-      const reviewCards = db.get('review_cards');
-      if (!reviewCards.some(c => sameStudyWord(c, swipedCard))) db.set('review_cards', [...reviewCards, swipedCard]);
+    // Phrase practice does not write into vocabulary progress or review queue.
+    if (!isPhrases) {
+      recordWordAction(db, {
+        card: swipedCard,
+        direction,
+        levelId: levelId || swipedCard.level || cards[0]?.level || course.levels[0].id,
+      });
     }
     setFlipped(false);
     setHasFlippedOnce(false);

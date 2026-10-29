@@ -13,6 +13,7 @@ export const CLOUD_KINDS = [
   'learned_radicals',
   'learned_kana',
   'learned_sounds',
+  'learned_words',
 ];
 
 export function isCloudTable(language, table) {
@@ -46,7 +47,7 @@ export function identityOfRow(table, row) {
   }
   const [language, ...rest] = table.split('_');
   const kind = rest.join('_');
-  if (kind === 'saved_words' || kind === 'review_cards') {
+  if (kind === 'saved_words' || kind === 'review_cards' || kind === 'learned_words') {
     const written = wordOf(row);
     if (typeof written !== 'string' || written.trim().length === 0) {
       throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');

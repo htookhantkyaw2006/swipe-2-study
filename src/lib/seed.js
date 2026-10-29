@@ -2,7 +2,7 @@ import { db } from './db';
 import { getCourse } from '../courses';
 import { getActiveLanguageId } from './activeLanguage';
 
-const generateId = () => Math.random().toString(36).substring(2, 15);
+
 
 /**
  * Put a course's starter vocabulary into its flashcards table.
@@ -19,7 +19,7 @@ export function seedCourse(courseId) {
 
   const now = new Date().toISOString();
   const seeded = course.vocabulary.map((card, i) => ({
-    id: generateId(),
+    id: card.id || `${course.id}_${(card.level || course.levels[0].id).toLowerCase()}_${i + 1}`,
     created_at: now,
     language: course.id,
     level: course.levels[0].id,
