@@ -23,12 +23,23 @@ export function PublishedContentProvider({ children, client = null, enabledOverr
 
   // In-memory cache of published courses: { [courseId]: { status, items, version, error, isPublished } }
   const [cache, setCache] = useState({});
+  const cacheRef = useRef({});
   const inFlightRef = useRef(new Map());
   const requestTokensRef = useRef(new Map());
 
   const getCourseState = useCallback((courseId) => {
-    return cache[courseId] || DEFAULT_STATE;
+    return cacheRef.current[courseId] || cache[courseId] || DEFAULT_STATE;
   }, [cache]);
+
+  const updateCourseState = useCallback((courseId, statePatch) => {
+    setCache((prev) => {
+      const current = prev[courseId] || DEFAULT_STATE;
+      const next = typeof statePatch === 'function' ? statePatch(current) : { ...current, ...statePatch };
+      const nextCache = { ...prev, [courseId]: next };
+      cacheRef.current = nextCache;
+      return nextCache;
+    });
+  }, []);
 
   const loadCourse = useCallback(async (courseId, { force = false } = {}) => {
     if (!enabled) {
@@ -39,8 +50,8 @@ export function PublishedContentProvider({ children, client = null, enabledOverr
       return { ...DEFAULT_STATE, status: 'unpublished' };
     }
 
-    const current = cache[courseId];
-    if (!force && current && (current.status === 'loaded' || current.status === 'unpublished')) {
+    const current = cacheRef.current[courseId];
+    if (!force && current && (current.status === 'loaded' || current.status === 'unpublished' || current.status === 'error')) {
       return current;
     }
 
@@ -53,22 +64,19 @@ export function PublishedContentProvider({ children, client = null, enabledOverr
     const nextToken = (requestTokensRef.current.get(courseId) || 0) + 1;
     requestTokensRef.current.set(courseId, nextToken);
 
-    setCache((prev) => ({
-      ...prev,
-      [courseId]: {
-        ...(prev[courseId] || DEFAULT_STATE),
-        status: 'loading',
-        error: null,
-      },
-    }));
+    updateCourseState(courseId, {
+      status: 'loading',
+      error: null,
+    });
 
-    const fetchPromise = (async () => {
+    let fetchPromise;
+    fetchPromise = (async () => {
       try {
         const result = await fetchPublishedCourseContent(courseId, { client });
 
         // Guard against stale response
         if (requestTokensRef.current.get(courseId) !== nextToken) {
-          return cache[courseId] || DEFAULT_STATE;
+          return cacheRef.current[courseId] || DEFAULT_STATE;
         }
 
         const nextState = {
@@ -79,16 +87,12 @@ export function PublishedContentProvider({ children, client = null, enabledOverr
           isPublished: result.isPublished,
         };
 
-        setCache((prev) => ({
-          ...prev,
-          [courseId]: nextState,
-        }));
-
+        updateCourseState(courseId, nextState);
         return nextState;
       } catch (err) {
         // Guard against stale error
         if (requestTokensRef.current.get(courseId) !== nextToken) {
-          return cache[courseId] || DEFAULT_STATE;
+          return cacheRef.current[courseId] || DEFAULT_STATE;
         }
 
         const errorState = {
@@ -99,20 +103,18 @@ export function PublishedContentProvider({ children, client = null, enabledOverr
           isPublished: false,
         };
 
-        setCache((prev) => ({
-          ...prev,
-          [courseId]: errorState,
-        }));
-
+        updateCourseState(courseId, errorState);
         return errorState;
       } finally {
-        inFlightRef.current.delete(courseId);
+        if (inFlightRef.current.get(courseId) === fetchPromise) {
+          inFlightRef.current.delete(courseId);
+        }
       }
     })();
 
     inFlightRef.current.set(courseId, fetchPromise);
     return fetchPromise;
-  }, [enabled, client, cache]);
+  }, [enabled, client, updateCourseState]);
 
   const retry = useCallback((courseId) => {
     return loadCourse(courseId, { force: true });

@@ -70,7 +70,9 @@ export function mapVocabularyToCard(vocab, courseData, index = 0) {
  * Returns:
  *   { isPublished: boolean, version: number | null, items: Card[], courseId: string }
  */
-export async function fetchPublishedCourseContent(courseId, { client = null, pageSize = 1000 } = {}) {
+export const MAX_PUBLICATION_RETRIES = 3;
+
+export async function fetchPublishedCourseContent(courseId, { client = null, pageSize = 1000, maxRetries = MAX_PUBLICATION_RETRIES } = {}) {
   if (!SUPPORTED_PUBLISHED_COURSES[courseId]) {
     throw new Error(`Unsupported published course '${courseId}'. Only 'zh-hsk1' and 'ja-n5' are permitted.`);
   }
@@ -80,63 +82,102 @@ export async function fetchPublishedCourseContent(courseId, { client = null, pag
     throw new Error('Supabase client is required to fetch published content.');
   }
 
-  // 1. Verify course exists and is published in public.courses
-  const { data: courseData, error: courseError } = await dbClient
-    .from('courses')
-    .select('id, language, level_id, title, is_published, content_version')
-    .eq('id', courseId)
-    .maybeSingle();
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    attempt++;
 
-  if (courseError) {
-    throw new Error(`Failed to query course '${courseId}': ${courseError.message}`);
-  }
+    // 1. Verify course exists and is published in public.courses
+    const { data: courseData, error: courseError } = await dbClient
+      .from('courses')
+      .select('id, language, level_id, title, is_published, content_version, updated_at')
+      .eq('id', courseId)
+      .maybeSingle();
 
-  if (!courseData || !courseData.is_published) {
+    if (courseError) {
+      throw new Error(`Failed to query course '${courseId}': ${courseError.message}`);
+    }
+
+    if (!courseData || !courseData.is_published) {
+      return {
+        isPublished: false,
+        version: null,
+        items: [],
+        courseId,
+      };
+    }
+
+    // 2. Fetch active vocabulary items with complete pagination and publication consistency checks
+    const allRows = [];
+    let from = 0;
+    let inconsistent = false;
+
+    while (true) {
+      const { data: rows, error: vocabError } = await dbClient
+        .from('vocabulary')
+        .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active')
+        .eq('course_id', courseId)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + pageSize - 1);
+
+      if (vocabError) {
+        throw new Error(`Failed to query vocabulary for course '${courseId}': ${vocabError.message}`);
+      }
+
+      if (rows && rows.length > 0) {
+        allRows.push(...rows);
+      }
+
+      // Check if course publication changed concurrently (publish or rollback)
+      const { data: verifyCourse, error: verifyError } = await dbClient
+        .from('courses')
+        .select('id, is_published, content_version, updated_at')
+        .eq('id', courseId)
+        .maybeSingle();
+
+      if (verifyError) {
+        throw new Error(`Failed to verify course publication status: ${verifyError.message}`);
+      }
+
+      const initialVer = String(courseData.content_version ?? '');
+      const currentVer = String(verifyCourse?.content_version ?? '');
+      const initialUpdated = String(courseData.updated_at ?? '');
+      const currentUpdated = String(verifyCourse?.updated_at ?? '');
+
+      if (
+        !verifyCourse ||
+        !verifyCourse.is_published ||
+        initialVer !== currentVer ||
+        (initialUpdated && currentUpdated && initialUpdated !== currentUpdated)
+      ) {
+        inconsistent = true;
+        break;
+      }
+
+      if (!rows || rows.length < pageSize) {
+        break;
+      }
+      from += pageSize;
+    }
+
+    if (inconsistent) {
+      if (attempt > maxRetries) {
+        throw new Error('Course publication changed concurrently during retrieval. Please retry.');
+      }
+      continue;
+    }
+
+    const items = allRows.map((vocab, index) => mapVocabularyToCard(vocab, courseData, index));
+
     return {
-      isPublished: false,
-      version: null,
-      items: [],
+      isPublished: true,
+      version: Number(courseData.content_version),
+      items,
       courseId,
     };
   }
 
-  // 2. Fetch active vocabulary items with complete pagination
-  const allRows = [];
-  let from = 0;
-
-  while (true) {
-    const { data: rows, error: vocabError } = await dbClient
-      .from('vocabulary')
-      .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active')
-      .eq('course_id', courseId)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-      .order('id', { ascending: true })
-      .range(from, from + pageSize - 1);
-
-    if (vocabError) {
-      throw new Error(`Failed to query vocabulary for course '${courseId}': ${vocabError.message}`);
-    }
-
-    if (!rows || rows.length === 0) {
-      break;
-    }
-
-    allRows.push(...rows);
-
-    if (rows.length < pageSize) {
-      break;
-    }
-    from += pageSize;
-  }
-
-  const items = allRows.map((vocab, index) => mapVocabularyToCard(vocab, courseData, index));
-
-  return {
-    isPublished: true,
-    version: Number(courseData.content_version),
-    items,
-    courseId,
-  };
+  throw new Error('Course publication changed concurrently during retrieval. Please retry.');
 }
 

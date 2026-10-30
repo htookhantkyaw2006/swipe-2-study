@@ -664,7 +664,7 @@ test('9. Stale response guard and course-switch race protection', async () => {
   const res = await fetchPublishedCourseContent('zh-hsk1', { client: mockClient });
   assert.equal(res.isPublished, true);
   assert.equal(res.items.length, 1);
-  assert.equal(callCount, 1);
+  assert.equal(callCount, 2); // Initial course read + post-page consistency verification
 
   // Test request token stale response discarding logic
   const requestTokens = new Map();

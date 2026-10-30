@@ -50,14 +50,15 @@ export default function LessonPicker() {
   const reviewCount = db.get('review_cards').length;
   const savedCount = db.get('saved_words').length;
 
-  const totalWords = isPublishedLevel
-    ? (publishedCourse.isLoaded ? publishedCourse.items.length : 0)
-    : (publishedCourse.enabled ? 0 : level.words);
+  const curriculumTarget = isPublishedLevel
+    ? (publishedCourse.isLoaded ? publishedCourse.items : 0)
+    : (publishedCourse.enabled ? 0 : null);
 
-  // Real progress derived from learner records
-  const progress = getLevelProgress(db, level.id, course, null, isPublishedLevel ? totalWords : (publishedCourse.enabled ? 0 : null));
+  // Real progress derived from learner records intersected with active curriculum
+  const progress = getLevelProgress(db, level.id, course, null, curriculumTarget);
   const completed = progress.uniqueLearned;
-  const percent = totalWords > 0 ? Math.min(100, Math.floor((completed / totalWords) * 100)) : 0;
+  const totalWords = progress.words;
+  const percent = progress.percent;
 
   const playWordAudio = (word) => {
     if (word?.audio_path && typeof Audio !== 'undefined') {

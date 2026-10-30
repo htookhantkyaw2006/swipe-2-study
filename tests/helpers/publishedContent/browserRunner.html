@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Published Content Browser Verification</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React, { createElement, useState, useEffect } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter, Routes, Route } from 'react-router-dom';
+    import { LanguageProvider } from '/src/lib/language.jsx';
+    import { PublishedContentProvider, usePublishedCourse } from '/src/lib/publishedContentContext.jsx';
+    import LessonPicker from '/src/pages/Learn/LessonPicker.jsx';
+    import { db } from '/src/lib/db.js';
+    import { recordWordAction, resetVocabularyProgress } from '/src/lib/vocabularyProgress.js';
+
+    const rootElement = document.getElementById('root');
+    let reactRoot = null;
+    const testLogs = [];
+    const origLog = console.log;
+    console.log = (...args) => { testLogs.push(args.join(' ')); origLog(...args); };
+
+    function renderComponent(ui) {
+      if (!reactRoot) {
+        reactRoot = createRoot(rootElement);
+      }
+      reactRoot.render(ui);
+    }
+
+    function unmountComponent() {
+      if (reactRoot) {
+        reactRoot.unmount();
+        reactRoot = null;
+        rootElement.innerHTML = '';
+      }
+    }
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    function assert(cond, msg) {
+      if (!cond) throw new Error(msg || 'Assertion failed');
+    }
+
+    async function runTests() {
+      const results = [];
+
+      try {
+        // -------------------------------------------------------------
+        // Test 1: Real React provider + LessonPicker learning route smoke test
+        // -------------------------------------------------------------
+        const syntheticItems = [
+          {
+            id: 'zh_hsk1_001',
+            course_id: 'zh-hsk1',
+            written_form: '中',
+            reading: 'zhōng',
+            meaning_english: 'center; China',
+            meaning_burmese: 'အလယ်',
+            audio_path: 'audio/zh/hsk1/001.mp3',
+            examples: [],
+            sort_order: 10,
+            is_active: true,
+          },
+          {
+            id: 'zh_hsk1_002',
+            course_id: 'zh-hsk1',
+            written_form: '大',
+            reading: 'dà',
+            meaning_english: 'big',
+            meaning_burmese: 'ကြီး',
+            audio_path: 'audio/zh/hsk1/002.mp3',
+            examples: [],
+            sort_order: 20,
+            is_active: true,
+          },
+        ];
+
+        const mockClient = {
+          from: (table) => {
+            const builder = {
+              select: () => builder,
+              eq: () => builder,
+              order: () => builder,
+              range: async () => ({ data: syntheticItems, error: null }),
+              maybeSingle: async () => ({
+                data: {
+                  id: 'zh-hsk1',
+                  language: 'zh',
+                  level_id: 'HSK1',
+                  title: 'Chinese HSK 1',
+                  is_published: true,
+                  content_version: 1,
+                  updated_at: '2026-10-30T00:00:00.000Z',
+                },
+                error: null,
+              }),
+            };
+            return builder;
+          },
+        };
+
+        resetVocabularyProgress(db, 'zh');
+
+        renderComponent(
+          createElement(
+            LanguageProvider,
+            null,
+            createElement(
+              PublishedContentProvider,
+              { client: mockClient, enabledOverride: true },
+              createElement(
+                MemoryRouter,
+                { initialEntries: ['/learn/level/HSK1'] },
+                createElement(
+                  Routes,
+                  null,
+                  createElement(Route, { path: '/learn/level/:levelId', element: createElement(LessonPicker) })
+                )
+              )
+            )
+          )
+        );
+
+        // Allow React effects and state updates to settle
+        await sleep(150);
+
+        const wordList = document.querySelector('.lesson-word-list');
+        assert(Boolean(wordList), 'Real React LessonPicker rendered .lesson-word-list');
+
+        const words = document.querySelectorAll('.lesson-word');
+        assert(words.length === 2, `Expected 2 lesson words in DOM, found ${words.length}`);
+        assert(document.body.textContent.includes('中'), 'DOM contains character 中');
+        assert(document.body.textContent.includes('大'), 'DOM contains character 大');
+        assert(document.body.textContent.includes('0 / 2 completed'), 'Hero shows 0 / 2 completed');
+
+        results.push({ test: 'browser-react-hsk1-route-smoke', passed: true });
+        unmountComponent();
+
+        // -------------------------------------------------------------
+        // Test 2: Curriculum completion regression in real React route:
+        // One retired learned word + one active unlearned word = 0/1 completed, NOT 1/1
+        // -------------------------------------------------------------
+        resetVocabularyProgress(db, 'zh');
+        // Record retired word '大' (zh_hsk1_002) as learned
+        recordWordAction(db, {
+          card: { id: 'zh_hsk1_002', character: '大', pronunciation: 'dà', level: 'HSK1' },
+          direction: 'right',
+        });
+
+        // Current active curriculum contains only '中' (zh_hsk1_001)
+        const activeOnlyOne = [syntheticItems[0]];
+        const singleItemClient = {
+          from: () => {
+            const builder = {
+              select: () => builder,
+              eq: () => builder,
+              order: () => builder,
+              range: async () => ({ data: activeOnlyOne, error: null }),
+              maybeSingle: async () => ({
+                data: {
+                  id: 'zh-hsk1',
+                  language: 'zh',
+                  level_id: 'HSK1',
+                  title: 'Chinese HSK 1',
+                  is_published: true,
+                  content_version: 2,
+                  updated_at: '2026-10-30T01:00:00.000Z',
+                },
+                error: null,
+              }),
+            };
+            return builder;
+          },
+        };
+
+        renderComponent(
+          createElement(
+            LanguageProvider,
+            null,
+            createElement(
+              PublishedContentProvider,
+              { client: singleItemClient, enabledOverride: true },
+              createElement(
+                MemoryRouter,
+                { initialEntries: ['/learn/level/HSK1'] },
+                createElement(
+                  Routes,
+                  null,
+                  createElement(Route, { path: '/learn/level/:levelId', element: createElement(LessonPicker) })
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+
+        assert(document.body.textContent.includes('0 / 1 completed'), 'Retired learned word + active unlearned word must show 0 / 1 completed, not 1/1');
+        results.push({ test: 'browser-react-curriculum-completion-regression', passed: true });
+        unmountComponent();
+
+        // -------------------------------------------------------------
+        // Test 3: Failure loop prevention: repeated renders after error do NOT re-fetch
+        // -------------------------------------------------------------
+        let fetchCount = 0;
+        const failingClient = {
+          from: () => {
+            const builder = {
+              select: () => builder,
+              eq: () => builder,
+              order: () => builder,
+              range: async () => ({ data: null, error: { message: 'Network offline' } }),
+              maybeSingle: async () => {
+                fetchCount++;
+                return { data: null, error: { message: 'Network offline' } };
+              },
+            };
+            return builder;
+          },
+        };
+
+        function ReRenderHarness() {
+          const [tick, setTick] = useState(0);
+          const courseState = usePublishedCourse('HSK1');
+
+          useEffect(() => {
+            if (tick < 4) {
+              const timer = setTimeout(() => setTick((t) => t + 1), 20);
+              return () => clearTimeout(timer);
+            }
+          }, [tick]);
+
+          return createElement('div', { id: 'render-harness', 'data-tick': tick, 'data-status': courseState.status },
+            `Tick: ${tick}, Status: ${courseState.status}`
+          );
+        }
+
+        renderComponent(
+          createElement(
+            LanguageProvider,
+            null,
+            createElement(
+              PublishedContentProvider,
+              { client: failingClient, enabledOverride: true },
+              createElement(ReRenderHarness)
+            )
+          )
+        );
+
+        await sleep(250);
+
+        const harnessEl = document.getElementById('render-harness');
+        assert(harnessEl.getAttribute('data-tick') === '4', 'Harness re-rendered 4 times');
+        assert(harnessEl.getAttribute('data-status') === 'error', 'Harness status is error');
+        assert(fetchCount === 1, `Failed load must remain failed; expected fetchCount === 1, but got ${fetchCount}`);
+
+        results.push({ test: 'browser-react-failure-loop-prevention', passed: true });
+        unmountComponent();
+
+        fetch('/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, results, logs: testLogs }),
+        });
+      } catch (err) {
+        fetch('/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: err.stack || err.message, logs: testLogs }),
+        });
+      }
+    }
+
+    runTests();
+  </script>
+</body>
+</html>
+

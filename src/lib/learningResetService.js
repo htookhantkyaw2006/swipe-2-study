@@ -1,6 +1,6 @@
 import { CLOUD_LANGUAGES } from './cloudImportRecords.js';
 import { readSyncState, mirrorSyncStateToSidecar } from './cloudSyncState.js';
-import { clearPendingSyncRequest } from './onlineSyncRequest.js';
+import { clearPendingSyncRequest, readPendingSyncRequest } from './onlineSyncRequest.js';
 import { writeStreakState } from './studyStreak.js';
 import { getSupabaseClient } from './supabase.js';
 import { storageOwner as defaultStorageOwner } from './storageOwner.js';
@@ -21,13 +21,26 @@ export const ALL_LEARNING_KINDS = Object.freeze([
   'learned_words',
 ]);
 
+export function parseResetVersionBigInt(val) {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!/^\d+$/.test(s)) return null;
+  try {
+    return BigInt(s);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Clears local learning tables and document for a verified account.
  * Updates the authoritative learning document with empty tables and the new reset generation,
  * clears pending sync envelopes, and resets the streak cache.
  *
- * Repeat-safe: If the document is already at newResetVersion, preserves any post-reset
- * learning that was created after the confirmed server reset.
+ * Generation-aware:
+ * - If current document generation > target reset generation: NEVER downgrades or wipes newer generation.
+ * - If current document generation === target reset generation: PRESERVES post-reset rows, matching-generation pending requests, and newer streak state.
+ * - Clears only demonstrably pre-reset state.
  */
 export function performLocalAccountLearningReset(
   accountId,
@@ -35,6 +48,11 @@ export function performLocalAccountLearningReset(
   storageOwner = defaultStorageOwner,
   now = () => new Date().toISOString()
 ) {
+  const targetGen = parseResetVersionBigInt(newResetVersion);
+  if (targetGen === null) {
+    throw new TypeError(`Invalid reset generation: ${newResetVersion}`);
+  }
+
   const storage = storageOwner.getStorage?.() || globalThis.localStorage;
   const scope = storageOwner.scope(accountId);
 
@@ -46,51 +64,83 @@ export function performLocalAccountLearningReset(
   }
 
   const currentDocResetVersion = doc.value?.cloudSync?.resetVersion;
-  const alreadyAdvanced = currentDocResetVersion !== undefined && String(currentDocResetVersion) === String(newResetVersion);
+  const currentDocGen = parseResetVersionBigInt(currentDocResetVersion);
 
-  if (!alreadyAdvanced) {
-    const emptyTables = {};
-    for (const lang of CLOUD_LANGUAGES) {
-      for (const kind of ALL_LEARNING_KINDS) {
-        emptyTables[`${lang}_${kind}`] = '[]';
+  // 1. If document is strictly newer than the reset confirmation, never downgrade or wipe newer generation
+  if (currentDocGen !== null && currentDocGen > targetGen) {
+    // Clear only demonstrably pre-reset pending sync requests
+    const { request } = readPendingSyncRequest(storage, accountId);
+    if (request) {
+      const reqGen = parseResetVersionBigInt(request.resetVersion);
+      if (reqGen !== null && reqGen < targetGen) {
+        clearPendingSyncRequest(storage, accountId, request.requestId);
       }
     }
-
-    const nextCloudSync = {
-      schemaVersion: 1,
-      ownerId: accountId.toLowerCase(),
-      resetVersion: String(newResetVersion),
-      records: {},
-      lastServerTime: now(),
-      updatedAt: now(),
-    };
-
-    const nextValue = {
-      ...(doc.value || {}),
-      version: 1,
-      revision: (doc.value?.revision || 0) + 1,
-      tables: {
-        ...(doc.value?.tables || {}),
-        ...emptyTables,
-      },
-      cloudSync: nextCloudSync,
-      guestImport: doc.value?.guestImport ?? {
-        fingerprint: '0'.repeat(64),
-        choice: 'account-only',
-        decidedAt: now(),
-        handled: {},
-      },
-    };
-
-    // Atomically commit document
-    scope.commitLearningDocument(doc.raw, nextValue, {});
-    mirrorSyncStateToSidecar(storage, nextCloudSync);
+    return;
   }
 
-  // 2. Clear pending sync requests
-  clearPendingSyncRequest(storage, accountId);
+  // 2. If document is already at target reset generation, preserve post-reset rows, matching requests, and newer streak state
+  if (currentDocGen !== null && currentDocGen === targetGen) {
+    const { request } = readPendingSyncRequest(storage, accountId);
+    if (request) {
+      const reqGen = parseResetVersionBigInt(request.resetVersion);
+      if (reqGen !== null && reqGen < targetGen) {
+        clearPendingSyncRequest(storage, accountId, request.requestId);
+      }
+    }
+    return;
+  }
 
-  // 3. Reset streak cache
+  // 3. Genuine reset: advance document from older generation to target generation
+  const emptyTables = {};
+  for (const lang of CLOUD_LANGUAGES) {
+    for (const kind of ALL_LEARNING_KINDS) {
+      emptyTables[`${lang}_${kind}`] = '[]';
+    }
+  }
+
+  const nextCloudSync = {
+    schemaVersion: 1,
+    ownerId: accountId.toLowerCase(),
+    resetVersion: String(targetGen),
+    records: {},
+    lastServerTime: now(),
+    updatedAt: now(),
+  };
+
+  const nextValue = {
+    ...(doc.value || {}),
+    version: 1,
+    revision: (doc.value?.revision || 0) + 1,
+    tables: {
+      ...(doc.value?.tables || {}),
+      ...emptyTables,
+    },
+    cloudSync: nextCloudSync,
+    guestImport: doc.value?.guestImport ?? {
+      fingerprint: '0'.repeat(64),
+      choice: 'account-only',
+      decidedAt: now(),
+      handled: {},
+    },
+  };
+
+  // Atomically commit document
+  scope.commitLearningDocument(doc.raw, nextValue, {});
+  mirrorSyncStateToSidecar(storage, nextCloudSync);
+
+  // Clear demonstrably pre-reset pending sync requests
+  const { request } = readPendingSyncRequest(storage, accountId);
+  if (request) {
+    const reqGen = parseResetVersionBigInt(request.resetVersion);
+    if (reqGen === null || reqGen < targetGen) {
+      clearPendingSyncRequest(storage, accountId);
+    }
+  } else {
+    clearPendingSyncRequest(storage, accountId);
+  }
+
+  // Reset streak cache for genuine reset
   writeStreakState(storage, accountId, {
     currentStreak: 0,
     longestStreak: 0,
@@ -101,7 +151,7 @@ export function performLocalAccountLearningReset(
     updatedAt: now(),
   });
 
-  // 4. Clean any legacy individual table keys
+  // Clean any legacy individual table keys
   for (const lang of CLOUD_LANGUAGES) {
     for (const kind of ALL_LEARNING_KINDS) {
       try {
@@ -270,7 +320,8 @@ export function createLearningResetService({
       resData.request_id === pending.requestId &&
       String(resData.previous_reset_version) === String(pending.expectedResetVersion) &&
       resData.items_reset === true &&
-      typeof resData.reset_version === 'string'
+      typeof resData.reset_version === 'string' &&
+      /^\d+$/.test(resData.reset_version)
     );
 
     if (!isResponseValid) {
@@ -354,9 +405,18 @@ export function createLearningResetService({
       };
     }
 
+    const resetVersion = pending.serverResult?.reset_version;
+    const validatedGen = parseResetVersionBigInt(resetVersion);
+    if (validatedGen === null) {
+      return {
+        status: 'failed',
+        error: `Invalid server reset version in pending record: ${resetVersion}`,
+      };
+    }
+
     let cleanupSucceeded = false;
     try {
-      performLocalAccountLearningReset(accountId, pending.serverResult.reset_version, storageOwner, now);
+      performLocalAccountLearningReset(accountId, validatedGen, storageOwner, now);
       cleanupSucceeded = true;
     } catch {
       cleanupSucceeded = false;

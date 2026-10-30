@@ -176,7 +176,7 @@ export function getCourseProgress(database, course, language = null) {
   };
 }
 
-export function getLevelProgress(database, levelId, course, language = null, totalTargetOverride = null) {
+export function getLevelProgress(database, levelId, course, language = null, targetOverrideOrItems = null) {
   const courseProgress = getCourseProgress(database, course, language);
   const base = courseProgress.levels[levelId] || {
     id: levelId,
@@ -188,17 +188,111 @@ export function getLevelProgress(database, levelId, course, language = null, tot
     percent: 0,
   };
 
-  if (totalTargetOverride !== null && totalTargetOverride !== undefined) {
-    const totalTarget = totalTargetOverride;
-    const percent = totalTarget > 0 ? Math.min(100, Math.floor((base.uniqueLearned / totalTarget) * 100)) : 0;
+  // If loaded curriculum items are provided, calculate completion by intersecting
+  // learner records with the currently loaded curriculum using stable and natural identity.
+  const curriculumItems = Array.isArray(targetOverrideOrItems)
+    ? targetOverrideOrItems
+    : targetOverrideOrItems && typeof targetOverrideOrItems === 'object' && Array.isArray(targetOverrideOrItems.items)
+      ? targetOverrideOrItems.items
+      : null;
+
+  if (curriculumItems !== null) {
+    const lang = language || course?.id;
+    const learnedWords = getLearnedWords(database, lang);
+
+    const knownIds = new Set();
+    const seenIds = new Set();
+    const knownNaturalKeys = new Set();
+    const seenNaturalKeys = new Set();
+
+    for (const row of learnedWords) {
+      if (!row || typeof row !== 'object') continue;
+      const written = wordOf(row);
+      const reading = (row.pronunciation ?? readingOf(row) ?? '').trim().toLowerCase();
+      const naturalKey = written ? `${written}:${reading}` : null;
+
+      if (row.id) {
+        knownIds.add(String(row.id));
+        seenIds.add(String(row.id));
+      }
+      if (row.card_id) {
+        knownIds.add(String(row.card_id));
+        seenIds.add(String(row.card_id));
+      }
+
+      if ((row.seen || 0) >= 1) {
+        if (row.id) seenIds.add(String(row.id));
+        if (naturalKey) seenNaturalKeys.add(naturalKey);
+      }
+      if (row.status === 'known') {
+        if (row.id) knownIds.add(String(row.id));
+        if (naturalKey) knownNaturalKeys.add(naturalKey);
+      } else {
+        if (row.id) knownIds.delete(String(row.id));
+        if (naturalKey) knownNaturalKeys.delete(naturalKey);
+      }
+    }
+
+    let activeLearned = 0;
+    let activeSeen = 0;
+
+    for (const item of curriculumItems) {
+      if (!item || typeof item !== 'object') continue;
+      const itemId = item.id ? String(item.id) : null;
+      const written = item.character || item.written_form || wordOf(item);
+      const reading = (item.pronunciation ?? item.reading ?? readingOf(item) ?? '').trim().toLowerCase();
+      const naturalKey = written ? `${written}:${reading}` : null;
+
+      const isKnown = Boolean(
+        (itemId && (knownIds.has(itemId) || knownIds.has(`pw_${itemId}`))) ||
+        (naturalKey && knownNaturalKeys.has(naturalKey))
+      );
+
+      const isSeen = Boolean(
+        isKnown ||
+        (itemId && (seenIds.has(itemId) || seenIds.has(`pw_${itemId}`))) ||
+        (naturalKey && seenNaturalKeys.has(naturalKey))
+      );
+
+      if (isKnown) activeLearned++;
+      if (isSeen) activeSeen++;
+    }
+
+    const totalTarget = curriculumItems.length;
+    const percent = totalTarget > 0 ? Math.min(100, Math.floor((activeLearned / totalTarget) * 100)) : 0;
+
     return {
       ...base,
       words: totalTarget,
+      uniqueLearned: activeLearned,
+      uniqueSeen: activeSeen,
       percent,
+      historicalLearned: base.uniqueLearned,
+      historicalSeen: base.uniqueSeen,
     };
   }
 
-  return base;
+  if (targetOverrideOrItems !== null && targetOverrideOrItems !== undefined) {
+    const totalTarget = typeof targetOverrideOrItems === 'number' ? targetOverrideOrItems : 0;
+    const uniqueLearned = totalTarget === 0 ? 0 : base.uniqueLearned;
+    const uniqueSeen = totalTarget === 0 ? 0 : base.uniqueSeen;
+    const percent = totalTarget > 0 ? Math.min(100, Math.floor((uniqueLearned / totalTarget) * 100)) : 0;
+    return {
+      ...base,
+      words: totalTarget,
+      uniqueLearned,
+      uniqueSeen,
+      percent,
+      historicalLearned: base.uniqueLearned,
+      historicalSeen: base.uniqueSeen,
+    };
+  }
+
+  return {
+    ...base,
+    historicalLearned: base.uniqueLearned,
+    historicalSeen: base.uniqueSeen,
+  };
 }
 
 export function resetVocabularyProgress(database, language = null) {

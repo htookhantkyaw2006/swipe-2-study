@@ -71,12 +71,15 @@ export function createPreferencesSyncController({
 
       if (!isCurrentOperation(token, accountId, generation)) return res;
 
-      if (res.status === 'failed') {
+      if (res?.status === 'failed') {
         lastFailedOperation = 'save';
         publish({ status: 'failed', error: res.error });
-      } else if (res.status === 'saved') {
+      } else if (res?.status === 'saved') {
         lastFailedOperation = null;
         publish({ status: 'saved', lastSyncedAt: res.lastSyncedAt, error: null });
+      } else if (res?.status === 'pending' || res?.newerPending) {
+        // Newer pending mutation is already queued/persisted and will run next in loop
+        lastFailedOperation = null;
       }
       return res;
     } catch (err) {
@@ -90,6 +93,22 @@ export function createPreferencesSyncController({
   }
 
   async function coordinateSave(saveArgs, token) {
+    const { accountId } = state;
+    if (!accountId) return;
+
+    // Persist newest validated owner-scoped pending intent immediately,
+    // before waiting for earlier in-flight save.
+    if (typeof service.recordPendingPreferences === 'function') {
+      try {
+        service.recordPendingPreferences({
+          accountId,
+          ...saveArgs,
+        });
+      } catch {
+        // Non-fatal or caught during executeSave
+      }
+    }
+
     if (inFlightSavePromise) {
       queuedSave = saveArgs;
       publish({ status: 'saving', error: null });

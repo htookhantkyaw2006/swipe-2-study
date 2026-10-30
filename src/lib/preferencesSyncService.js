@@ -160,6 +160,35 @@ export function createPreferencesSyncService({
   }
 
   /**
+   * Persists the newest validated owner-scoped pending intent immediately,
+   * before network transmission or while waiting for an earlier save.
+   */
+  function recordPendingPreferences({
+    accountId,
+    settings,
+    activeLanguage,
+    localMutationId = 1,
+    changedKeys = [],
+  } = {}) {
+    if (!accountId) return false;
+    const sanitizedSettings = sanitizeSettings(settings, DEFAULTS);
+    const sanitizedActiveLanguage = sanitizeActiveLanguage(activeLanguage, 'zh');
+    const inScopeSettings = filterInScopePreferences(sanitizedSettings);
+    const storage = storageOwner.getStorage?.() || globalThis.localStorage;
+
+    return writePendingPreferences(storage, accountId, {
+      ownerId: accountId,
+      localMutationId,
+      settings: inScopeSettings,
+      activeLanguage: sanitizedActiveLanguage,
+      changedKeys: Array.from(changedKeys),
+      status: 'saving',
+      error: null,
+      updatedAt: now(),
+    });
+  }
+
+  /**
    * Persists preferences and active language to the cloud for a verified account.
    * Records a dedicated pending state and preserves newer edits when an earlier save completes.
    */
@@ -198,15 +227,12 @@ export function createPreferencesSyncService({
 
     // Record dedicated owner-scoped pending state before network transmission
     try {
-      writePendingPreferences(storage, accountId, {
-        ownerId: accountId,
-        localMutationId,
+      recordPendingPreferences({
+        accountId,
         settings: inScopeSettings,
         activeLanguage: sanitizedActiveLanguage,
-        changedKeys: Array.from(changedKeys),
-        status: 'saving',
-        error: null,
-        updatedAt: now(),
+        localMutationId,
+        changedKeys,
       });
     } catch (storageErr) {
       return {
@@ -348,6 +374,7 @@ export function createPreferencesSyncService({
     restorePreferences,
     savePreferences,
     retrySave,
+    recordPendingPreferences,
   });
 }
 

@@ -33,12 +33,15 @@ export default function LevelCarousel() {
   const isInScope = publishedContent.enabled && Boolean(publishedCourseId);
   const publishedState = publishedCourseId ? publishedContent.getCourseState(publishedCourseId) : null;
   const isLoaded = publishedState?.status === 'loaded';
-  const availableCount = isLoaded ? publishedState.items.length : (publishedContent.enabled ? 0 : level.words);
+  const curriculumTarget = isInScope
+    ? (isLoaded ? publishedState.items : 0)
+    : (publishedContent.enabled ? 0 : null);
 
-  // Real progress derived from learner records
-  const progress = getLevelProgress(db, level.id, course, null, isInScope ? availableCount : (publishedContent.enabled ? 0 : null));
+  // Real progress derived from learner records intersected with active curriculum
+  const progress = getLevelProgress(db, level.id, course, null, curriculumTarget);
   const completed = progress.uniqueLearned;
-  const percent = availableCount > 0 ? Math.min(100, Math.floor((completed / availableCount) * 100)) : 0;
+  const availableCount = progress.words;
+  const percent = progress.percent;
   const changeLevel = delta => setActiveIndex(index => Math.max(0, Math.min(course.levels.length - 1, index + delta)));
 
   const cardStyle = {
