@@ -1,8 +1,61 @@
 import { useEffect } from 'react';
 
 /**
+ * Checks whether a hostname corresponds to a local or development environment.
+ *
+ * @param {string} hostname
+ * @returns {boolean}
+ */
+function isLocalOrDevHostname(hostname) {
+  if (!hostname || typeof hostname !== 'string') return true;
+  const h = hostname.toLowerCase().trim();
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  if (h === '127.0.0.1' || h.startsWith('127.')) return true;
+  if (h === '0.0.0.0' || h === '[::1]' || h === '::1' || h === '::') return true;
+  if (h.endsWith('.local') || h.endsWith('.test') || h.endsWith('.example') || h.endsWith('.invalid')) return true;
+  return false;
+}
+
+/**
+ * Parses and returns a clean origin from a candidate URL string.
+ * Strictly rejects invalid schemes, embedded credentials, and local/development origins.
+ * Drops any pathname, search query, or hash.
+ *
+ * @param {string} candidate
+ * @returns {string|null}
+ */
+export function parseCleanOrigin(candidate) {
+  if (!candidate || typeof candidate !== 'string') return null;
+  const trimmed = candidate.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(trimmed);
+    // Web schemes only
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+    // Reject embedded credentials
+    if (url.username || url.password) {
+      return null;
+    }
+    // Reject empty/null origins
+    if (!url.origin || url.origin === 'null') {
+      return null;
+    }
+    // Reject local/development hosts
+    if (isLocalOrDevHostname(url.hostname)) {
+      return null;
+    }
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Resolves the trusted deployment origin if known.
- * Never hard-codes a guessed domain or localhost as canonical production metadata.
+ * Never hard-codes a guessed domain or accepts localhost as canonical production metadata.
  *
  * @param {object} env
  * @param {Location} [location]
@@ -13,26 +66,21 @@ export function getDeploymentOrigin(
   location = typeof window !== 'undefined' ? window.location : null
 ) {
   if (env?.VITE_PUBLIC_URL && typeof env.VITE_PUBLIC_URL === 'string') {
-    const trimmed = env.VITE_PUBLIC_URL.trim().replace(/\/+$/, '');
-    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
-      return trimmed;
-    }
+    return parseCleanOrigin(env.VITE_PUBLIC_URL);
   }
 
-  if (location?.origin) {
-    const origin = location.origin.trim().replace(/\/+$/, '');
-    // Ignore local development hosts
-    if (!origin.includes('localhost') && !origin.includes('127.0.0.1') && origin !== 'null') {
-      return origin;
-    }
+  if (location) {
+    const candidate = location.origin && location.origin !== 'null' ? location.origin : location.href;
+    return parseCleanOrigin(candidate);
   }
 
   return null;
 }
 
 /**
- * Manages dynamic document title, description, and canonical link elements.
- * Safely cleans up on navigation.
+ * Manages dynamic document title, description, OpenGraph, and canonical link elements.
+ * Accurately restores pre-existing values on cleanup and removes only elements
+ * introduced by the page.
  */
 export function setPageMetadata({
   title,
@@ -42,87 +90,149 @@ export function setPageMetadata({
 } = {}) {
   if (typeof document === 'undefined') return () => {};
 
+  // 1. Document Title
   const previousTitle = document.title;
   const newTitle = title ? `${title} · Swipe 2 Study` : 'Swipe 2 Study';
   document.title = newTitle;
 
-  // Manage meta description
-  let descMeta = document.querySelector('meta[name="description"]');
-  const previousDesc = descMeta ? descMeta.getAttribute('content') : null;
+  // 2. Meta Description
+  const existingDescMeta = document.querySelector('meta[name="description"]');
+  let createdDescMeta = null;
+  const previousDescContent = existingDescMeta ? existingDescMeta.getAttribute('content') : null;
+
   if (description) {
-    if (!descMeta) {
-      descMeta = document.createElement('meta');
-      descMeta.setAttribute('name', 'description');
-      document.head.appendChild(descMeta);
+    if (existingDescMeta) {
+      existingDescMeta.setAttribute('content', description);
+    } else {
+      createdDescMeta = document.createElement('meta');
+      createdDescMeta.setAttribute('name', 'description');
+      createdDescMeta.setAttribute('content', description);
+      document.head.appendChild(createdDescMeta);
     }
-    descMeta.setAttribute('content', description);
   }
 
-  // Manage OpenGraph title and description
-  let ogTitle = document.querySelector('meta[property="og:title"]');
-  if (!ogTitle) {
-    ogTitle = document.createElement('meta');
-    ogTitle.setAttribute('property', 'og:title');
-    document.head.appendChild(ogTitle);
-  }
-  ogTitle.setAttribute('content', newTitle);
+  // 3. OpenGraph Title
+  const existingOgTitle = document.querySelector('meta[property="og:title"]');
+  let createdOgTitle = null;
+  const previousOgTitleContent = existingOgTitle ? existingOgTitle.getAttribute('content') : null;
 
-  let ogDesc = document.querySelector('meta[property="og:description"]');
+  if (existingOgTitle) {
+    existingOgTitle.setAttribute('content', newTitle);
+  } else {
+    createdOgTitle = document.createElement('meta');
+    createdOgTitle.setAttribute('property', 'og:title');
+    createdOgTitle.setAttribute('content', newTitle);
+    document.head.appendChild(createdOgTitle);
+  }
+
+  // 4. OpenGraph Description
+  const existingOgDesc = document.querySelector('meta[property="og:description"]');
+  let createdOgDesc = null;
+  const previousOgDescContent = existingOgDesc ? existingOgDesc.getAttribute('content') : null;
+
   if (description) {
-    if (!ogDesc) {
-      ogDesc = document.createElement('meta');
-      ogDesc.setAttribute('property', 'og:description');
-      document.head.appendChild(ogDesc);
+    if (existingOgDesc) {
+      existingOgDesc.setAttribute('content', description);
+    } else {
+      createdOgDesc = document.createElement('meta');
+      createdOgDesc.setAttribute('property', 'og:description');
+      createdOgDesc.setAttribute('content', description);
+      document.head.appendChild(createdOgDesc);
     }
-    ogDesc.setAttribute('content', description);
   }
 
-  // Canonical and og:url (only when deployment origin is verified)
+  // 5. Canonical Link & OpenGraph URL (only when deployment origin is verified)
   const origin = getDeploymentOrigin(env);
-  let canonicalLink = document.querySelector('link[rel="canonical"]');
-  let ogUrl = document.querySelector('meta[property="og:url"]');
+  const existingCanonical = document.querySelector('link[rel="canonical"]');
+  let createdCanonical = null;
+  const previousCanonicalHref = existingCanonical ? existingCanonical.getAttribute('href') : null;
+
+  const existingOgUrl = document.querySelector('meta[property="og:url"]');
+  let createdOgUrl = null;
+  const previousOgUrlContent = existingOgUrl ? existingOgUrl.getAttribute('content') : null;
 
   if (origin && canonicalPath) {
-    const fullUrl = `${origin}${canonicalPath.startsWith('/') ? canonicalPath : '/' + canonicalPath}`;
-    if (!canonicalLink) {
-      canonicalLink = document.createElement('link');
-      canonicalLink.setAttribute('rel', 'canonical');
-      document.head.appendChild(canonicalLink);
-    }
-    canonicalLink.setAttribute('href', fullUrl);
+    const cleanPath = canonicalPath.startsWith('/') ? canonicalPath : '/' + canonicalPath;
+    const fullUrl = `${origin}${cleanPath}`;
 
-    if (!ogUrl) {
-      ogUrl = document.createElement('meta');
-      ogUrl.setAttribute('property', 'og:url');
-      document.head.appendChild(ogUrl);
+    if (existingCanonical) {
+      existingCanonical.setAttribute('href', fullUrl);
+    } else {
+      createdCanonical = document.createElement('link');
+      createdCanonical.setAttribute('rel', 'canonical');
+      createdCanonical.setAttribute('href', fullUrl);
+      document.head.appendChild(createdCanonical);
     }
-    ogUrl.setAttribute('content', fullUrl);
-  } else {
-    // If origin is unknown or localhost, remove any existing canonical tag to prevent wrong metadata
-    if (canonicalLink) {
-      canonicalLink.remove();
-    }
-    if (ogUrl) {
-      ogUrl.remove();
+
+    if (existingOgUrl) {
+      existingOgUrl.setAttribute('content', fullUrl);
+    } else {
+      createdOgUrl = document.createElement('meta');
+      createdOgUrl.setAttribute('property', 'og:url');
+      createdOgUrl.setAttribute('content', fullUrl);
+      document.head.appendChild(createdOgUrl);
     }
   }
 
-  // Cleanup handler on navigation
+  // Cleanup handler: restore previous values accurately and remove only introduced elements
   return () => {
+    // Title restoration
     document.title = previousTitle;
-    if (previousDesc !== null && descMeta) {
-      descMeta.setAttribute('content', previousDesc);
-    } else if (descMeta && !previousDesc) {
-      descMeta.remove();
-    }
-    if (ogTitle) ogTitle.setAttribute('content', previousTitle);
-    if (ogDesc && previousDesc !== null) ogDesc.setAttribute('content', previousDesc);
-    else if (ogDesc) ogDesc.remove();
 
-    const currentCanonical = document.querySelector('link[rel="canonical"]');
-    if (currentCanonical) currentCanonical.remove();
-    const currentOgUrl = document.querySelector('meta[property="og:url"]');
-    if (currentOgUrl) currentOgUrl.remove();
+    // Description restoration
+    if (createdDescMeta) {
+      createdDescMeta.remove();
+    } else if (existingDescMeta) {
+      if (previousDescContent !== null) {
+        existingDescMeta.setAttribute('content', previousDescContent);
+      } else {
+        existingDescMeta.removeAttribute('content');
+      }
+    }
+
+    // OpenGraph Title restoration
+    if (createdOgTitle) {
+      createdOgTitle.remove();
+    } else if (existingOgTitle) {
+      if (previousOgTitleContent !== null) {
+        existingOgTitle.setAttribute('content', previousOgTitleContent);
+      } else {
+        existingOgTitle.removeAttribute('content');
+      }
+    }
+
+    // OpenGraph Description restoration
+    if (createdOgDesc) {
+      createdOgDesc.remove();
+    } else if (existingOgDesc) {
+      if (previousOgDescContent !== null) {
+        existingOgDesc.setAttribute('content', previousOgDescContent);
+      } else {
+        existingOgDesc.removeAttribute('content');
+      }
+    }
+
+    // Canonical Link restoration
+    if (createdCanonical) {
+      createdCanonical.remove();
+    } else if (existingCanonical) {
+      if (previousCanonicalHref !== null) {
+        existingCanonical.setAttribute('href', previousCanonicalHref);
+      } else {
+        existingCanonical.removeAttribute('href');
+      }
+    }
+
+    // OpenGraph URL restoration
+    if (createdOgUrl) {
+      createdOgUrl.remove();
+    } else if (existingOgUrl) {
+      if (previousOgUrlContent !== null) {
+        existingOgUrl.setAttribute('content', previousOgUrlContent);
+      } else {
+        existingOgUrl.removeAttribute('content');
+      }
+    }
   };
 }
 

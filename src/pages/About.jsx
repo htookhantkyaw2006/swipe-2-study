@@ -65,7 +65,7 @@ export default function About() {
             Curricula in this Release
           </h2>
           <p>
-            This release strictly covers official beginner standards with verified vocabulary and examples:
+            This release covers beginner standards for HSK 1 and JLPT N5 vocabulary and examples:
           </p>
           <ul>
             <li><strong>Chinese HSK 1:</strong> Essential beginner Mandarin vocabulary with standard Pinyin pronunciation, English and Burmese meanings, and stroke-level radical breakdowns.</li>
@@ -112,7 +112,7 @@ export default function About() {
             Learn at your own pace without unnecessary data collection:
           </p>
           <ul>
-            <li><strong>Guest Mode:</strong> Study immediately without an account. All progress is isolated to your local device storage.</li>
+            <li><strong>Guest Mode:</strong> Study immediately without an account. Progress is stored locally on your device.</li>
             <li><strong>Optional Accounts:</strong> Secure your learning identity with email and password to prepare your account for future features.</li>
             <li><strong>Zero Tracking:</strong> No third-party advertising cookies, fingerprinting, or invasive analytics tracking.</li>
           </ul>
