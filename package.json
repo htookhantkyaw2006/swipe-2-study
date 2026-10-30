@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -10,6 +13,7 @@
     "lint": "oxlint",
     "test": "node --test --test-concurrency=1",
     "check:backend": "node scripts/check-backend-env.mjs",
+    "check:release": "node scripts/check-backend-env.mjs production",
     "preview": "vite preview"
   },
   "dependencies": {

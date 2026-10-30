@@ -35,7 +35,7 @@ As of 28 October 2026:
   implemented and simulated locally; see password-recovery.md for callback
   allowlisting and the real-email checks that are still pending.
 
-Follow [preview verification](preview-verification.md) for the next deployment
+Follow [preview verification](preview-verification.md) and [deployment readiness](deployment-vercel-readiness.md) for the next deployment
 checkpoint. The client remains Owner of their hosted resources.
 
 The first migration defines profiles, preferences, trusted content tables and a

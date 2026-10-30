@@ -58,7 +58,7 @@ For this root-level React/Vite application, inspect the dashboard settings:
 - A change to environment variables requires a new deployment to take effect.
   Keep privileged service-role/secret/database credentials out of browser env.
 
-The existing `npm run check:backend -- production` validates production-mode
+The existing `npm run check:backend -- production` (or `npm run check:release`; see [deployment readiness](deployment-vercel-readiness.md)) validates production-mode
 configuration on a machine where the corresponding values are securely present.
 It does not check connectivity, project ownership, database policies or Vercel.
 No env-file contents or session tokens need to be pasted into chat.

@@ -1,0 +1,154 @@
+# Deployment & Vercel Configuration Readiness
+
+This guide details the exact deployment configuration, Vercel project settings,
+environment separation rules, feature-to-database prerequisite matrix, and remaining
+owner-controlled operations for Swipe 2 Study.
+
+---
+
+## 1. Vercel Project & Build Settings
+
+In the Vercel Dashboard (**Project Settings -> General / Build & Development Settings**):
+
+| Setting | Required Value | Notes |
+| :--- | :--- | :--- |
+| **Framework Preset** | `Vite` | Automatically configures Vite build patterns. |
+| **Root Directory** | `./` (repository root) | Monorepo/subfolder configurations must not be used. |
+| **Build Command** | `npm run build` | Executes `vite build`. Never override with unvetted flags. |
+| **Output Directory** | `dist` | Default build output destination for Vite. |
+| **Install Command** | `npm ci` | Strictly enforces clean installs matching committed `package-lock.json`. |
+| **Node.js Version** | `22.x` (`>=22.12.0`) | Explicitly matches repository CI (`.github/workflows/ci.yml`) and `package.json` engines. |
+
+---
+
+## 2. Environment Separation: Preview vs. Production
+
+Vercel provides isolated environments: **Production**, **Preview**, and **Development**.
+Each environment must maintain strict boundary separation.
+
+```
++--------------------------------------------------------------------------------+
+|                               ENVIRONMENT MATRIX                              |
++------------------------------------+-------------------------------------------+
+| PREVIEW ENVIRONMENT (Branches/PRs) | PRODUCTION ENVIRONMENT (main branch)      |
++------------------------------------+-------------------------------------------+
+| Vercel Scope: "Preview"            | Vercel Scope: "Production"                |
+| Target: Staging Supabase Project   | Target: Dedicated Production Supabase     |
+| VITE_PUBLIC_URL: (Omit or Preview) | VITE_PUBLIC_URL: https://swipe2study.app  |
+| Staging Auth Redirect URLs         | Production Domain Auth Redirect URLs      |
+| Safe test data / synthetic users   | Production client data / real accounts    |
++------------------------------------+-------------------------------------------+
+```
+
+### Critical Rules:
+1. **Never copy Staging credentials into Production scope**: Production must point to a dedicated, separate production Supabase instance.
+2. **Never promote Preview to Production without applying migrations**: A successful Preview build does not mean database tables, policies, or functions exist in Production.
+3. **Branch Previews**: All PRs and feature branches receive unique preview origins (e.g., `s2-s-anti-gravity-git-*.vercel.app`). Ensure Supabase Staging Auth has wildcard or exact redirect URLs configured.
+
+---
+
+## 3. SPA Deep-Link Routing & Static Asset Behavior
+
+The repository contains `vercel.json`:
+```json
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+### How Vercel Resolves Incoming Requests:
+1. **Static Filesystem First**: Vercel evaluates static assets in `dist/` before rewrites:
+   - Built chunks: `/assets/index-*.js`, `/assets/chunk-*.css` are served directly with cache headers.
+   - Root static assets: `/favicon.ico`, `/index.html` are served directly.
+2. **Client-Side Routes Fall Through to Rewrite**:
+   - Requests to client routes (`/learn`, `/login`, `/profile`, `/settings`, `/saved`, `/learn/level/HSK1`, etc.) do not match static disk files and rewrite to `/index.html`.
+   - Browser client scripts load `/index.html`, boot React Router, and mount the deep-linked view without HTTP 404s.
+3. **No Routing Redesign**: The rewrite in `vercel.json` is minimal, standard, and preserved as-is.
+
+---
+
+## 4. Build-Time Environment Baking & Rebuild Requirement
+
+> [!IMPORTANT]
+> **Vite bakes all `VITE_*` variables statically into client JavaScript bundles at BUILD TIME.**
+
+- When `npm run build` runs, Vite replaces occurrences of `import.meta.env.VITE_*` with their literal string values.
+- Modifying environment variables in the Vercel Dashboard **has zero runtime effect** on existing deployed bundles.
+- **Required Action**: After adding or modifying any environment variable in Vercel, you **must trigger a new deployment** (e.g. via *Redeploy* in the dashboard with *"Clear Build Cache"*, or by pushing a new commit).
+- **Security Reminder**: Never place database passwords, service-role keys, or `sb_secret_*` tokens in `VITE_*` variables. They are public to any user inspecting browser network requests.
+
+---
+
+## 5. Feature-to-Prerequisite Matrix
+
+Every feature gate in the application is disabled by default (`false`). Enabling a capability requires both setting its `VITE_*` flag to `'true'` and verifying its specific hosted prerequisites:
+
+| Capability | Environment Variable | Default | Hosted Database / Edge / Provider Prerequisites |
+| :--- | :--- | :--- | :--- |
+| **Core Auth & Profiles** | `VITE_SUPABASE_URL`<br>`VITE_SUPABASE_PUBLISHABLE_KEY` | *(blank)* | `20261027000100_backend_foundation.sql`<br>- `profiles`, `user_preferences` tables<br>- `avatars` Storage bucket + RLS<br>- Auth trigger for profile creation |
+| **Published HSK1/N5 Content** | `VITE_PUBLISHED_CONTENT_ENABLED` | `false` | `20261030000100_content_publication_foundation.sql`<br>`20261030000200_content_publication_hardening.sql`<br>`20261030000300_consistent_publication_reads.sql`<br>- Seeded rows for `zh-hsk1` and `ja-n5` |
+| **Online Progress Sync** | `VITE_ONLINE_SYNC_ENABLED` | `false` | `20261029000300_online_sync_foundation.sql`<br>`20261029000400_learned_words_sync.sql`<br>`20261029000500_study_streaks_yangon.sql`<br>`20261029000600_sync_progress_hardening.sql`<br>- `user_vocabulary_progress`, `user_learned_words`<br>- `user_study_streaks`, `record_word_action_batch` RPC |
+| **Self-Service Account Deletion** | `VITE_ACCOUNT_DELETION_ENABLED` | `false` | `20261029000100_account_deletion_foundation.sql`<br>`20261029000200_account_deletion_attempt_reservation.sql`<br>- Supabase Edge Function `delete-account` deployed with `SUPABASE_SERVICE_ROLE_KEY` secret |
+| **Learning Data Export & Reset** | `VITE_ACCOUNT_EXPORT_RESET_ENABLED` | `false` | `20261027000100_backend_foundation.sql`<br>- Cloud reset utilizes online sync reset RPCs if online sync is active |
+| **Preferences Cloud Sync** | `VITE_ACCOUNT_PREFERENCES_SYNC_ENABLED` | `false` | `20261027000100_backend_foundation.sql`<br>- `user_preferences` table, RLS, and `active_language` |
+| **Google OAuth Sign-In** | `VITE_GOOGLE_AUTH_ENABLED` | `false` | Google Cloud OAuth Client ID & Secret configured in **Supabase Dashboard -> Auth -> Providers -> Google**.<br>- Authorized redirect: `https://<ref>.supabase.co/auth/v1/callback` |
+| **Cloud Guest Import Staging** | `VITE_CLOUD_IMPORT_STAGING` | `false` | `20261028000100_guest_import_foundation.sql`<br>- `import_guest_records` RPC |
+| **Error Monitoring** | `VITE_ERROR_REPORTING_ENABLED`<br>`VITE_ERROR_REPORTING_URL` | `false`<br>*(blank)* | Remote telemetry collector endpoint capable of receiving POST JSON error reports. |
+| **Privacy Analytics** | `VITE_ANALYTICS_ENABLED`<br>`VITE_ANALYTICS_URL` | `false`<br>*(blank)* | Remote analytics collector endpoint capable of receiving allowlisted event JSON. |
+
+---
+
+## 6. Preflight Validation Command
+
+Run the local preflight validator before deploying to inspect the environment:
+
+```sh
+# For development environment (.env.local)
+npm run check:backend
+
+# For production environment validation
+npm run check:release
+```
+
+The preflight checker:
+1. Validates `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` formats.
+2. Checks that every enabled capability has its required frontend dependencies configured.
+3. Distinguishes `[CONFIGURED]`, `[DISABLED]`, `[INVALID]`, and `[UNCONFIGURED]` states.
+4. Redacts all credentials (never prints tokens/keys).
+5. Explicitly notes that database migrations and external providers are **externally-unverified**.
+
+---
+
+## 7. Exact Remaining Owner-Controlled Operations
+
+The following administrative actions require Owner-level credentials and dashboard access. They cannot be performed via code repository commits:
+
+1. **Vercel Project Administration**:
+   - Ensure repository `htookhantkyaw2006/swipe-2-study` is connected.
+   - Set Framework Preset to `Vite`, Node version to `22.x`, install command to `npm ci`.
+   - Configure Environment Variables in **Preview** and **Production** scopes according to `.env.example`.
+2. **Supabase Database Migrations**:
+   - Apply pending SQL migrations (`supabase/migrations/*.sql`) to the hosted Staging and Production databases via Supabase CLI (`supabase db push`) or the Supabase SQL Editor.
+3. **Supabase Edge Function Deployment**:
+   - Deploy `supabase/functions/delete-account` using the Supabase CLI (`supabase functions deploy delete-account`).
+   - Ensure the Edge Function environment contains `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+4. **Supabase Auth & Custom SMTP (Resend) Setup**:
+   - In **Supabase Dashboard -> Authentication -> URL Configuration**:
+     - Set **Site URL** to the canonical domain (`https://swipe2study.app`).
+     - Add **Redirect URLs** for local development (`http://localhost:5173/**`, `http://127.0.0.1:5173/**`), Vercel preview wildcards (`https://*-<team-slug>.vercel.app/**`), and production (`https://swipe2study.app/**`).
+   - In **Supabase Dashboard -> Settings -> Auth -> SMTP**:
+     - Configure Resend SMTP credentials (host `smtp.resend.com`, port 587, user `resend`, password `re_...`).
+     - Configure Sender email (e.g. `auth@swipe2study.app`) matching verified domain records in Resend.
+5. **Namecheap DNS Configuration**:
+   - In Namecheap domain management for `swipe2study.app`:
+     - Point root domain and `www` to Vercel (CNAME `cname.vercel-dns.com` or A record `76.76.21.21`).
+     - Add Resend DNS verification records (DKIM, SPF TXT, DMARC TXT) to ensure reliable transactional email delivery.
+6. **Google Cloud OAuth Credentials**:
+   - In Google Cloud Console, configure OAuth 2.0 Client credentials under APIs & Services.
+   - Add Authorized Redirect URI: `https://<supabase-project-ref>.supabase.co/auth/v1/callback`.
+   - Paste Client ID and Client Secret into Supabase Auth Google provider settings.
