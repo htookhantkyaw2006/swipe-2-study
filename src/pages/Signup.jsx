@@ -269,7 +269,16 @@ export default function Signup() {
         <p className="auth-guest-note">
           Guest progress stays on this device and is not synced to the cloud.
         </p>
-      </div>
+        <nav className="auth-legal-nav" aria-label="Legal and support links" style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '18px', fontSize: '0.8125rem' }}>
+          <Link to="/about" className="auth-link">About</Link>
+          <span style={{ color: 'var(--color-border)' }} aria-hidden="true">·</span>
+          <Link to="/privacy" className="auth-link">Privacy</Link>
+          <span style={{ color: 'var(--color-border)' }} aria-hidden="true">·</span>
+          <Link to="/terms" className="auth-link">Terms</Link>
+          <span style={{ color: 'var(--color-border)' }} aria-hidden="true">·</span>
+          <Link to="/support" className="auth-link">Support</Link>
+        </nav>
+        </div>
     </div>
   );
 }

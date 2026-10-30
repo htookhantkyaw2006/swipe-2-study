@@ -1,9 +1,10 @@
 import React, { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Target, Languages, Shuffle, Layers, Volume2, Gauge, Mic,
   Type, Bell, Flame, Trash2, Download, RotateCcw, HardDrive,
-  FileText, ShieldCheck, Star, MessageSquare, Info, BookOpen,
-  Cloud, CloudOff, RefreshCw
+  FileText, ShieldCheck, Info, BookOpen,
+  Cloud, CloudOff, RefreshCw, HelpCircle
 } from 'lucide-react';
 import {
   SettingsGroup, SettingsRow, ToggleSwitch, OptionSheet
@@ -60,6 +61,7 @@ const formatBytes = (bytes) => {
 };
 
 export default function SettingsSubpage() {
+  const navigate = useNavigate();
   const {
     prefs,
     setPref,
@@ -470,11 +472,11 @@ export default function SettingsSubpage() {
 
       {/* ---------------- About ---------------- */}
       <SettingsGroup title="About">
-        <SettingsRow icon={Info} iconGradient={GRADIENTS.blue} title="Version" value="0.1.0" />
-        <SettingsRow icon={MessageSquare} iconGradient={GRADIENTS.teal} title="Send feedback" comingSoon />
-        <SettingsRow icon={Star} iconGradient={GRADIENTS.orange} title="Rate the app" comingSoon />
-        <SettingsRow icon={ShieldCheck} iconGradient={GRADIENTS.green} title="Privacy policy" comingSoon />
-        <SettingsRow icon={FileText} iconGradient={GRADIENTS.slate} title="Terms of service" comingSoon isLast />
+        <SettingsRow icon={BookOpen} iconGradient={GRADIENTS.blue} title="About Swipe 2 Study" subtitle="Overview, curricula & learning tools" onClick={() => navigate('/about')} />
+        <SettingsRow icon={HelpCircle} iconGradient={GRADIENTS.teal} title="Support & help" subtitle="Assistance, inquiries, and status" onClick={() => navigate('/support')} />
+        <SettingsRow icon={ShieldCheck} iconGradient={GRADIENTS.green} title="Privacy policy" subtitle="Data handling & privacy posture" onClick={() => navigate('/privacy')} />
+        <SettingsRow icon={FileText} iconGradient={GRADIENTS.slate} title="Terms of service" subtitle="Service terms & scope" onClick={() => navigate('/terms')} />
+        <SettingsRow icon={Info} iconGradient={GRADIENTS.blue} title="Version" value="0.1.0" isLast />
       </SettingsGroup>
 
       {/* Sheets */}

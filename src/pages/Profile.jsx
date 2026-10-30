@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Bookmark, RotateCw, Flame, CheckCircle2, LogOut, Trash2, Languages, Target, Volume2, Crown, User, LogIn, AlertCircle, RefreshCw, ChevronRight, MessageSquare, FolderInput } from 'lucide-react';
+import { Settings, Bookmark, RotateCw, Flame, CheckCircle2, LogOut, Trash2, Languages, Target, Volume2, Crown, User, LogIn, AlertCircle, RefreshCw, ChevronRight, MessageSquare, FolderInput, HelpCircle, Info } from 'lucide-react';
 import { usePreferences, OPTIONS } from '../lib/preferences';
 import { useLanguage } from '../lib/language';
 import { useAuth } from '../lib/useAuth.js';
@@ -275,6 +275,8 @@ export default function Profile() {
             {user && !busy && <button type="button" className="profile-setting profile-setting--link" aria-label="Review guest learning" onClick={guestImport.openGuestImport} disabled={!guestImport.available || guestImport.pending || guestImport.checking}><span className="profile-setting__icon"><FolderInput size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{guestImport.checking ? 'Checking guest learning…' : 'Guest learning'}</strong><span>Review guest records on this device</span></span><ChevronRight size={20} aria-hidden="true" /></button>}
             {user ? <button type="button" className="profile-setting profile-setting--logout" onClick={handleLogout} disabled={loggingOut || globalSigningOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>{loggingOut ? 'Logging out?' : 'Log out'}</strong><span>Switch back to guest mode</span></span></button> : <ProfileLink to="/login" icon={LogIn} title="Sign in or register" subtitle="Use your account" />}
             {user && !busy && <button type="button" className="profile-setting profile-setting--logout" onClick={openGlobalSignOut} disabled={loggingOut || globalSigningOut || busy}><span className="profile-setting__icon"><LogOut size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Sign out on all devices</strong><span>Sign out here and on other devices</span></span></button>}
+            <ProfileLink to="/support" icon={HelpCircle} title="Support & help" subtitle="Assistance, inquiries, and status" />
+            <ProfileLink to="/about" icon={Info} title="About Swipe 2 Study" subtitle="Overview and learning curricula" />
             <div className="profile-setting"><span className="profile-setting__icon"><MessageSquare size={21} aria-hidden="true" /></span><span className="profile-setting__copy"><strong>Send feedback</strong><span>Help improve Swipe 2 Study</span></span><span className="profile-soon">Soon</span></div>
             {user && !busy && deletionEnabled ? (
               <button

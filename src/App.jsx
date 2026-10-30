@@ -30,6 +30,10 @@ const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const About = lazy(() => import('./pages/About'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const Support = lazy(() => import('./pages/Support'));
 
 import './App.css';
 
@@ -67,6 +71,10 @@ function App() {
             <Route path="profile/edit" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
             <Route path="premium" element={<Premium />} />
             <Route path="settings" element={<SettingsSubpage />} />
+            <Route path="about" element={<About />} />
+            <Route path="privacy" element={<PrivacyPolicy />} />
+            <Route path="terms" element={<TermsOfService />} />
+            <Route path="support" element={<Support />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

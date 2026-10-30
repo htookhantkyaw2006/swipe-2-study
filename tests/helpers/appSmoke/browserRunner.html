@@ -160,6 +160,23 @@
         results.push({ test: 'route-error-boundary-recovery', passed: true });
         unmountComponent();
 
+        // -------------------------------------------------------------
+        // Test 6: Public pages direct navigation ("/about", "/privacy")
+        // -------------------------------------------------------------
+        renderComponent(createTestTree('/about'));
+        await waitFor(() => document.body.textContent.includes('About Swipe 2 Study'));
+        assert(document.body.textContent.includes('HSK 1') || document.body.textContent.includes('JLPT N5'), 'About page renders curriculum scope');
+        assert(Boolean(document.querySelector('a[href="/learn"]')), 'Start Learning link present');
+        results.push({ test: 'public-page-about-direct', passed: true });
+        unmountComponent();
+
+        renderComponent(createTestTree('/privacy'));
+        await waitFor(() => document.body.textContent.includes('Privacy Policy'));
+        assert(document.body.textContent.includes('Pending Owner Publication'), 'Privacy page shows pending status');
+        assert(!document.querySelector('input[type="checkbox"]'), 'No acceptance checkbox');
+        results.push({ test: 'public-page-privacy-direct', passed: true });
+        unmountComponent();
+
         // Report results
         fetch('/report', {
           method: 'POST',
