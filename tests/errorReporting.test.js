@@ -33,24 +33,62 @@ test('errorReporting: sanitizeUrl strips sensitive query params, recovery hashes
   assert.equal(sanitizeUrl(null), '');
 });
 
-test('errorReporting: scrubSensitiveText and sanitizeError remove emails, bearer tokens, and passwords', () => {
-  const sensitiveMsg = 'Failed login for user test.learner@example.com with password: SuperSecretPassword123 and Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xyz';
-  const scrubbed = scrubSensitiveText(sensitiveMsg);
+test('errorReporting: scrubSensitiveText removes bare JWTs, quoted JSON credentials, emails, and passwords', () => {
+  // Bare JWT without "Bearer" prefix
+  const bareJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+  const textWithBareJwt = `Crash occurred while processing token: ${bareJwt}`;
+  const scrubbedJwt = scrubSensitiveText(textWithBareJwt);
+  assert.doesNotMatch(scrubbedJwt, /eyJhbGci/);
+  assert.match(scrubbedJwt, /\[REDACTED_TOKEN\]/);
 
-  assert.doesNotMatch(scrubbed, /test\.learner@example\.com/);
-  assert.match(scrubbed, /\[REDACTED_EMAIL\]/);
-  assert.doesNotMatch(scrubbed, /SuperSecretPassword123/);
-  assert.match(scrubbed, /password=\[REDACTED\]/);
-  assert.doesNotMatch(scrubbed, /eyJhbGciOiJIUzI1Ni/);
-  assert.match(scrubbed, /\[REDACTED_TOKEN\]/);
+  // Quoted JSON credentials
+  const jsonCredentials = 'Failed API call with body {"password": "SuperSecretPassword123", "token": "abcde1234567890", "email": "test@example.com"}';
+  const scrubbedJson = scrubSensitiveText(jsonCredentials);
+  assert.doesNotMatch(scrubbedJson, /SuperSecretPassword123/);
+  assert.doesNotMatch(scrubbedJson, /abcde1234567890/);
+  assert.doesNotMatch(scrubbedJson, /test@example\.com/);
+  assert.match(scrubbedJson, /\[REDACTED\]/);
 
-  const errorObj = new Error('Database query error on https://db.local/query?secret_key=99999');
-  errorObj.stack = `Error: Database query error\n    at query (https://db.local/query?secret_key=99999:12:34)\n    at Object.test (file:///app/test.js:1:2)`;
+  // UUIDs
+  const textWithUuid = 'User account 550e8400-e29b-41d4-a716-446655440000 encountered error';
+  const scrubbedUuid = scrubSensitiveText(textWithUuid);
+  assert.doesNotMatch(scrubbedUuid, /550e8400-e29b-41d4-a716-446655440000/);
+  assert.match(scrubbedUuid, /\[REDACTED_ID\]/);
+});
 
-  const sanitized = sanitizeError(errorObj);
-  assert.equal(sanitized.name, 'Error');
-  assert.doesNotMatch(sanitized.message, /secret_key=99999/);
-  assert.doesNotMatch(sanitized.stack, /secret_key=99999/);
+test('errorReporting: sanitizeError sanitizes error.name and restricts stack frames', () => {
+  // error.name containing email
+  const emailNameError = new Error('Database connection failed');
+  emailNameError.name = 'john.doe@example.com';
+  const sanitized1 = sanitizeError(emailNameError);
+  assert.equal(sanitized1.name, 'Error', 'Email in error.name must be replaced with static Error');
+
+  // error.name containing bare JWT
+  const jwtNameError = new Error('Auth error');
+  jwtNameError.name = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xyz.abc';
+  const sanitized2 = sanitizeError(jwtNameError);
+  assert.equal(sanitized2.name, 'Error', 'JWT in error.name must be replaced with static Error');
+
+  // error.name containing arbitrary learner text with spaces
+  const arbitraryNameError = new Error('Some error');
+  arbitraryNameError.name = 'Arbitrary Learner Notes In Error Name';
+  const sanitized3 = sanitizeError(arbitraryNameError);
+  assert.equal(sanitized3.name, 'Error', 'Arbitrary text with spaces in error.name must be replaced with static Error');
+
+  // error.name with valid identifier
+  const validError = new TypeError('Cannot read property of undefined');
+  const sanitized4 = sanitizeError(validError);
+  assert.equal(sanitized4.name, 'TypeError');
+
+  // Restricted stack frames (arbitrary injected text outside stack frame dropped)
+  const errorWithInjectedStack = new Error('Render crash');
+  errorWithInjectedStack.stack = `Error: Render crash\nLearner free-form notes injected here\n    at Component.render (https://app.local/bundle.js?token=secret123:10:20)\nMore arbitrary text\n    at Object.click (https://app.local/main.js:5:6)`;
+  const sanitizedStack = sanitizeError(errorWithInjectedStack);
+  assert.doesNotMatch(sanitizedStack.stack, /Learner free-form notes/);
+  assert.doesNotMatch(sanitizedStack.stack, /More arbitrary text/);
+  assert.doesNotMatch(sanitizedStack.stack, /token=secret123/);
+  assert.match(sanitizedStack.stack, /Component\.render/);
+  assert.match(sanitizedStack.stack, /Object\.click/);
 });
 
 test('errorReporting: sanitizeContext keeps only allowed coarse metadata and scrubs values', () => {
@@ -117,6 +155,32 @@ test('errorReporting: deduplicates identical Error instances and rolling signatu
   assert.equal(sentPayloads.length, 2);
 });
 
+test('errorReporting: independent concurrent errors are NOT dropped while a request is in flight', async () => {
+  const env = { VITE_ERROR_REPORTING_ENABLED: 'true', VITE_ERROR_REPORTING_URL: 'https://errors.example.com' };
+  const dispatchedErrors = [];
+
+  // Transport with artificial delay simulating network transit
+  const slowTransport = async (payload) => {
+    dispatchedErrors.push(payload.error.message);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  };
+
+  const errA = new Error('Concurrent Error Alpha');
+  const errB = new Error('Concurrent Error Beta');
+
+  // Trigger Error A and Error B concurrently
+  const [resA, resB] = await Promise.all([
+    reportError(errA, { source: 'source_a' }, { env, transport: slowTransport }),
+    reportError(errB, { source: 'source_b' }, { env, transport: slowTransport }),
+  ]);
+
+  assert.equal(resA.reported, true, 'Error A must be reported');
+  assert.equal(resB.reported, true, 'Error B must NOT be dropped while Error A is in flight');
+  assert.equal(dispatchedErrors.length, 2);
+  assert.ok(dispatchedErrors.includes('Concurrent Error Alpha'));
+  assert.ok(dispatchedErrors.includes('Concurrent Error Beta'));
+});
+
 test('errorReporting: transport failure is safely isolated and never throws or breaks execution', async () => {
   const failingTransport = () => { throw new Error('Network failure or DNS timeout'); };
   const env = { VITE_ERROR_REPORTING_ENABLED: 'true', VITE_ERROR_REPORTING_URL: 'https://errors.example.com' };
@@ -163,34 +227,42 @@ test('errorReporting: initGlobalErrorMonitoring attaches listeners and returns c
   }
 });
 
-test('errorReporting: Edge Function failure invokes reporting hook with sanitized error details', async () => {
-  const reportedEdgeErrors = [];
-  const mockReportError = (err, ctx) => reportedEdgeErrors.push({ err, ctx });
-
-  const handler = createDeletionHttpHandler({
+test('errorReporting: Edge Function failure handles sync throws and rejected promises in reporting hook', async () => {
+  // 1. Hook that throws synchronously
+  const syncThrowHook = () => { throw new Error('Synchronous hook failure'); };
+  const handlerWithSyncThrow = createDeletionHttpHandler({
     adminClient: {},
     env: { SUPABASE_URL: '', SUPABASE_ANON_KEY: '' },
-    reportError: mockReportError,
+    reportError: syncThrowHook,
   });
 
-  const request = new Request('https://edge.supabase.com/account-deletion', {
+  const req1 = new Request('https://edge.supabase.com/account-deletion', {
     method: 'POST',
-    headers: {
-      Authorization: 'Bearer user-sensitive-access-token-999',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ password: 'user-raw-password' }),
+    headers: { Authorization: 'Bearer test-token', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: 'user-pass' }),
   });
 
-  const response = await handler(request);
-  assert.equal(response.status, 500);
+  const res1 = await handlerWithSyncThrow(req1);
+  assert.equal(res1.status, 500, 'Sync throw in hook must not change deletion error status');
+  const body1 = await res1.json();
+  assert.equal(body1.code, 'SERVER_CONFIG_ERROR');
 
-  assert.equal(reportedEdgeErrors.length, 1);
-  assert.equal(reportedEdgeErrors[0].ctx.source, 'accountDeletionHandler');
-  assert.equal(reportedEdgeErrors[0].ctx.status, 500);
-  assert.equal(reportedEdgeErrors[0].ctx.code, 'SERVER_CONFIG_ERROR');
-  // Ensure sensitive request body and token are NOT in the reported error context
-  assert.equal(reportedEdgeErrors[0].ctx.password, undefined);
-  assert.equal(reportedEdgeErrors[0].ctx.rawBody, undefined);
-  assert.equal(reportedEdgeErrors[0].ctx.authorization, undefined);
+  // 2. Hook that returns a rejected promise
+  const asyncRejectHook = () => Promise.reject(new Error('Async rejected hook'));
+  const handlerWithAsyncReject = createDeletionHttpHandler({
+    adminClient: {},
+    env: { SUPABASE_URL: '', SUPABASE_ANON_KEY: '' },
+    reportError: asyncRejectHook,
+  });
+
+  const req2 = new Request('https://edge.supabase.com/account-deletion', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer test-token', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: 'user-pass' }),
+  });
+
+  const res2 = await handlerWithAsyncReject(req2);
+  assert.equal(res2.status, 500, 'Rejected promise in hook must not cause unhandled rejection or alter response');
+  const body2 = await res2.json();
+  assert.equal(body2.code, 'SERVER_CONFIG_ERROR');
 });

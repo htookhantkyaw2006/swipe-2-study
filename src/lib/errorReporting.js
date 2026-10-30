@@ -2,23 +2,29 @@
  * Centralized, Privacy-Conscious Error Monitoring
  *
  * Captures unhandled frontend errors, rejected promises, route boundary errors,
- * and server/edge errors while strictly stripping all PII, tokens, credentials,
- * and sensitive URL parameters.
+ * and server/edge errors while strictly stripping all credentials, bare tokens,
+ * passwords, emails, UUIDs, and sensitive URL parameters.
  *
  * Disabled by default. Activated only when VITE_ERROR_REPORTING_ENABLED === 'true'
  * and VITE_ERROR_REPORTING_URL is configured.
  */
 
-const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-const TOKEN_REGEX = /(?:bearer\s+|token[=:]\s*|jwt[=:]\s*|key[=:]\s*)[a-zA-Z0-9._~+/-]{10,}/gi;
-const PASSWORD_REGEX = /(?:password|passwd|secret)[=:\s]+[^\s,"'&]+/gi;
-const AUTH_HEADER_REGEX = /authorization:\s*[^\r\n]+/gi;
+const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
+const BARE_JWT_REGEX = /(?:\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]+\b|\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b)/g;
+const JSON_CREDENTIAL_REGEX = /"(?:password|passwd|secret|token|access_token|refresh_token|id_token|apiKey|api_key|auth|credential|credentials)"\s*:\s*"[^"]*"/gi;
+const KEY_VALUE_CREDENTIAL_REGEX = /(?:password|passwd|secret|access_token|refresh_token|id_token|api_?key|auth_token)[=:\s]+[^\s,"'&`]+/gi;
+const BEARER_REGEX = /bearer\s+(?:"[^"]+"|[a-zA-Z0-9._~+/-]{8,})/gi;
+const AUTH_HEADER_REGEX = /(?:authorization|proxy-authorization):\s*[^\r\n]+/gi;
+const UUID_REGEX = /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/gi;
+const SAFE_NAME_REGEX = /^[A-Za-z][A-Za-z0-9_$]{0,50}$/;
+const SAFE_IDENTIFIER_REGEX = /^[A-Za-z0-9_$.-]{1,60}$/;
 
 const reportedErrors = new WeakSet();
 const recentSignatures = new Map();
+const inFlightSignatures = new Set();
 const SIGNATURE_WINDOW_MS = 5000;
 
-let isReporting = false;
+let isSyncReporting = false;
 
 /**
  * Checks whether error reporting is enabled in the current environment.
@@ -49,26 +55,38 @@ export function sanitizeUrl(url) {
   } catch {
     // Fallback: strip everything from first '?' or '#'
     const stripped = trimmed.split(/[?#]/)[0];
-    return stripped.replace(EMAIL_REGEX, '[REDACTED_EMAIL]').replace(TOKEN_REGEX, '[REDACTED_TOKEN]');
+    return stripped.replace(EMAIL_REGEX, '[REDACTED_EMAIL]').replace(BARE_JWT_REGEX, '[REDACTED_TOKEN]');
   }
 }
 
 /**
  * Sanitizes an error message or stack string, stripping tokens, emails, passwords,
- * and sensitive URL parameters.
+ * bare JWTs, JSON credentials, UUIDs, and sensitive URL parameters.
  */
 export function scrubSensitiveText(text) {
   if (!text || typeof text !== 'string') return '';
   return text
     .replace(AUTH_HEADER_REGEX, 'Authorization: [REDACTED]')
+    .replace(JSON_CREDENTIAL_REGEX, (match) => {
+      const colonIdx = match.indexOf(':');
+      if (colonIdx === -1) return '"[REDACTED_CREDENTIAL]"';
+      return `${match.slice(0, colonIdx)}: "[REDACTED]"`;
+    })
+    .replace(BEARER_REGEX, 'Bearer [REDACTED_TOKEN]')
+    .replace(KEY_VALUE_CREDENTIAL_REGEX, (match) => {
+      const sep = match.includes('=') ? '=' : ': ';
+      const key = match.split(/[=:\s]/)[0];
+      return `${key}${sep}[REDACTED]`;
+    })
+    .replace(BARE_JWT_REGEX, '[REDACTED_TOKEN]')
     .replace(EMAIL_REGEX, '[REDACTED_EMAIL]')
-    .replace(PASSWORD_REGEX, 'password=[REDACTED]')
-    .replace(TOKEN_REGEX, '[REDACTED_TOKEN]')
+    .replace(UUID_REGEX, '[REDACTED_ID]')
     .replace(/(https?:\/\/[^\s"'<>]+)/g, (match) => sanitizeUrl(match));
 }
 
 /**
- * Extracts and sanitizes error details.
+ * Extracts and sanitizes error details, including error.name and stack traces.
+ * Untrusted or arbitrary name fields are strictly scrubbed and replaced with static categories.
  */
 export function sanitizeError(error) {
   if (!error) {
@@ -83,13 +101,42 @@ export function sanitizeError(error) {
     };
   }
 
-  const name = typeof error.name === 'string' ? error.name.slice(0, 100) : 'Error';
-  const message = typeof error.message === 'string' ? scrubSensitiveText(error.message).slice(0, 500) : 'Unknown error';
-  let stack = typeof error.stack === 'string' ? scrubSensitiveText(error.stack) : '';
+  // 1. Sanitize error.name: replace with 'Error' if it contains emails, credentials, UUIDs, or arbitrary text
+  const rawName = typeof error.name === 'string' ? error.name.trim() : 'Error';
+  const scrubbedName = scrubSensitiveText(rawName);
+  let name = 'Error';
+  if (
+    SAFE_NAME_REGEX.test(rawName) &&
+    !scrubbedName.includes('[REDACTED') &&
+    !/@/.test(rawName) &&
+    !UUID_REGEX.test(rawName)
+  ) {
+    name = rawName;
+  }
 
-  // Bound stack trace length (max 20 lines)
-  if (stack) {
-    stack = stack.split('\n').slice(0, 20).join('\n');
+  // 2. Sanitize error.message
+  const message = typeof error.message === 'string'
+    ? scrubSensitiveText(error.message).slice(0, 500)
+    : 'Unknown error';
+
+  // 3. Sanitize error.stack: restrict to genuine stack frame lines
+  let stack = '';
+  if (typeof error.stack === 'string') {
+    const rawLines = error.stack.split('\n');
+    const cleanLines = [];
+
+    for (const line of rawLines) {
+      const trimmed = line.trim();
+      // Match typical JS stack frames: 'at ...' or 'name@url:line:col'
+      if (/^at\s+/i.test(trimmed) || /^[\w$@/.-]+@/i.test(trimmed)) {
+        cleanLines.push('    ' + scrubSensitiveText(trimmed));
+      }
+      if (cleanLines.length >= 15) break;
+    }
+
+    if (cleanLines.length > 0) {
+      stack = `${name}: ${message}\n${cleanLines.join('\n')}`;
+    }
   }
 
   return { name, message, stack };
@@ -108,8 +155,20 @@ export function sanitizeContext(context = {}) {
     if (key in context) {
       const val = context[key];
       if (typeof val === 'string') {
-        safe[key] = scrubSensitiveText(val).slice(0, 1000);
-      } else if (typeof val === 'number' || typeof val === 'boolean') {
+        const scrubbed = scrubSensitiveText(val).slice(0, 1000);
+        // Code and source must be safe identifiers without redactions or special characters
+        if (key === 'code' || key === 'source') {
+          if (SAFE_IDENTIFIER_REGEX.test(val) && !scrubbed.includes('[REDACTED') && !/@/.test(val)) {
+            safe[key] = val;
+          } else {
+            safe[key] = key === 'code' ? 'ERROR' : 'unknown';
+          }
+        } else {
+          safe[key] = scrubbed;
+        }
+      } else if (typeof val === 'number' && Number.isFinite(val)) {
+        safe[key] = Math.floor(val);
+      } else if (typeof val === 'boolean') {
         safe[key] = val;
       }
     }
@@ -138,6 +197,7 @@ function pruneSignatures(now = Date.now()) {
 
 /**
  * Default network transport for reporting errors.
+ * Avoids unnecessary cookies and referrer information.
  */
 async function defaultTransport(endpointUrl, payload) {
   if (typeof globalThis.fetch !== 'function') return;
@@ -146,11 +206,16 @@ async function defaultTransport(endpointUrl, payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     keepalive: true,
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
   });
 }
 
 /**
  * Central reportError function.
+ *
+ * Concurrently dispatches independent errors while deduplicating in-flight and
+ * recent duplicates, and preventing synchronous recursive loops.
  *
  * @param {Error|string} error
  * @param {object} context
@@ -160,8 +225,8 @@ export async function reportError(error, context = {}, {
   env = typeof import.meta !== 'undefined' ? import.meta.env : (typeof process !== 'undefined' ? process.env : {}),
   transport,
 } = {}) {
-  // 1. Recursive reporting guard
-  if (isReporting) {
+  // 1. Synchronous recursion guard (prevents infinite synchronous loops during error handling)
+  if (isSyncReporting) {
     return { reported: false, reason: 'recursive_guard' };
   }
 
@@ -170,25 +235,42 @@ export async function reportError(error, context = {}, {
     return { reported: false, reason: 'disabled' };
   }
 
-  // 3. Deduplication via WeakSet (for exact Error object instances)
+  // 3. Deduplication via WeakSet (for exact Error object instances already reported)
   if (error && typeof error === 'object') {
     if (reportedErrors.has(error)) {
       return { reported: false, reason: 'deduplicated' };
     }
-    reportedErrors.add(error);
   }
 
-  const sanitizedErr = sanitizeError(error);
-  const sanitizedCtx = sanitizeContext(context);
+  isSyncReporting = true;
+  let sanitizedErr;
+  let sanitizedCtx;
+  let signature;
+  try {
+    sanitizedErr = sanitizeError(error);
+    sanitizedCtx = sanitizeContext(context);
+    signature = getErrorSignature(sanitizedErr, sanitizedCtx);
+  } finally {
+    isSyncReporting = false;
+  }
 
-  // 4. Deduplication via signature (for identical errors across boundary & window.onerror)
+  // 4. In-flight duplicate protection (drops identical error while already sending, but NOT independent errors)
+  if (inFlightSignatures.has(signature)) {
+    return { reported: false, reason: 'deduplicated' };
+  }
+
+  // 5. Recent duplicate deduplication (time-window based)
   const now = Date.now();
   pruneSignatures(now);
-  const signature = getErrorSignature(sanitizedErr, sanitizedCtx);
   if (recentSignatures.has(signature)) {
     return { reported: false, reason: 'deduplicated' };
   }
-  recentSignatures.set(signature, now);
+
+  // Mark error as reported and currently in flight
+  if (error && typeof error === 'object') {
+    reportedErrors.add(error);
+  }
+  inFlightSignatures.add(signature);
 
   const payload = {
     error: sanitizedErr,
@@ -197,17 +279,17 @@ export async function reportError(error, context = {}, {
     timestamp: new Date(now).toISOString(),
   };
 
-  isReporting = true;
   try {
     const endpoint = env.VITE_ERROR_REPORTING_URL;
     const send = typeof transport === 'function' ? transport : (p) => defaultTransport(endpoint, p);
     await send(payload);
+    recentSignatures.set(signature, Date.now());
     return { reported: true, payload };
   } catch {
     // Monitoring failures must NEVER affect application execution
     return { reported: false, reason: 'transport_error' };
   } finally {
-    isReporting = false;
+    inFlightSignatures.delete(signature);
   }
 }
 

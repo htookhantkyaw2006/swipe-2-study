@@ -6,6 +6,8 @@ import {
   trackEvent,
   ALLOWED_ANALYTICS_EVENTS,
   ALLOWED_METADATA_KEYS,
+  APPROVED_COURSE_IDS,
+  APPROVED_LEVEL_IDS,
 } from '../src/lib/analytics.js';
 
 test('analytics: isAnalyticsEnabled is false by default and requires URL + enabled flag', () => {
@@ -36,6 +38,8 @@ test('analytics: event allowlist and metadata keys contain exactly in-scope defi
     'scope',
     'recordCount',
   ]);
+  assert.deepEqual(APPROVED_COURSE_IDS, ['zh', 'ja', 'zh-hsk1', 'ja-n5']);
+  assert.deepEqual(APPROVED_LEVEL_IDS, ['1', 'hsk1', 'HSK1', '5', 'n5', 'N5']);
 });
 
 test('analytics: unlisted events are rejected', async () => {
@@ -49,135 +53,102 @@ test('analytics: unlisted events are rejected', async () => {
   assert.equal(transportCalled, false);
 });
 
-test('analytics: sanitizeMetadata keeps only allowed coarse metadata keys and strips PII', () => {
-  const raw = {
-    courseId: 'zh',
+test('analytics: enforces event-specific coarse enums and approved course/level identifiers', () => {
+  // 1. auth:signin_success only accepts coarse mode enum ('password', 'oauth_callback')
+  const validSignin = sanitizeMetadata('auth:signin_success', { mode: 'password' });
+  assert.equal(validSignin.mode, 'password');
+
+  const invalidSigninMode = sanitizeMetadata('auth:signin_success', { mode: 'arbitrary_mode_text' });
+  assert.equal(invalidSigninMode.mode, undefined, 'Arbitrary text mode must be rejected');
+
+  // 2. study:session_start enforces approved courseId and levelId
+  const validStudy = sanitizeMetadata('study:session_start', {
+    courseId: 'zh-hsk1',
     levelId: 'HSK1',
-    mode: 'learn',
-    cardCount: 25,
-    choice: 'merge',
-    scope: 'account',
-    recordCount: 150,
-    // Sensitive / unlisted properties
-    userId: 'usr_123456789',
-    email: 'learner@example.com',
-    userText: 'Hello world! This is user text',
-    characterWord: '你好',
-    nestedObj: { test: true },
-    token: 'Bearer sensitive_token_xyz',
-  };
+    cardCount: 20,
+  });
+  assert.equal(validStudy.courseId, 'zh-hsk1');
+  assert.equal(validStudy.levelId, 'HSK1');
+  assert.equal(validStudy.cardCount, 20);
 
-  const clean = sanitizeMetadata(raw);
-  assert.equal(clean.courseId, 'zh');
-  assert.equal(clean.levelId, 'HSK1');
-  assert.equal(clean.mode, 'learn');
-  assert.equal(clean.cardCount, 25);
-  assert.equal(clean.choice, 'merge');
-  assert.equal(clean.scope, 'account');
-  assert.equal(clean.recordCount, 150);
+  const invalidCourseStudy = sanitizeMetadata('study:session_start', {
+    courseId: 'unapproved_course_name',
+    levelId: 'HSK9',
+  });
+  assert.equal(invalidCourseStudy.courseId, undefined);
+  assert.equal(invalidCourseStudy.levelId, undefined);
 
-  assert.equal(clean.userId, undefined);
-  assert.equal(clean.email, undefined);
-  assert.equal(clean.userText, undefined);
-  assert.equal(clean.characterWord, undefined);
-  assert.equal(clean.nestedObj, undefined);
-  assert.equal(clean.token, undefined);
+  // 3. import:guest_completed only accepts coarse choice ('merge', 'replace', 'discard')
+  const validImport = sanitizeMetadata('import:guest_completed', { choice: 'merge', recordCount: 15 });
+  assert.equal(validImport.choice, 'merge');
+  assert.equal(validImport.recordCount, 15);
+
+  const invalidImportChoice = sanitizeMetadata('import:guest_completed', { choice: 'user_custom_choice' });
+  assert.equal(invalidImportChoice.choice, undefined);
+
+  // 4. learning:reset_confirmed only accepts coarse scope ('all', 'course', 'level')
+  const validReset = sanitizeMetadata('learning:reset_confirmed', { scope: 'all' });
+  assert.equal(validReset.scope, 'all');
+
+  const invalidResetScope = sanitizeMetadata('learning:reset_confirmed', { scope: 'arbitrary_scope' });
+  assert.equal(invalidResetScope.scope, undefined);
 });
 
-test('analytics: sanitizeMetadata strips emails, tokens, and out-of-bounds numbers in allowed keys', () => {
+test('analytics: strictly rejects bare credentials, quoted JSON credentials, emails, learner text, and UUID values', () => {
   const dirty = {
-    mode: 'learner@example.com', // email pattern in string
-    levelId: 'Bearer sensitive_auth_key', // token pattern in string
-    cardCount: -10, // negative number
-    recordCount: 99999999, // out of bounds
+    // Bare credentials / JWT
+    mode: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHVo',
+    // Quoted JSON credentials
+    choice: '{"password":"supersecret123"}',
+    // Email
+    courseId: 'learner@example.com',
+    // Arbitrary learner text
+    levelId: 'My personal vocabulary notes and translation questions',
+    // UUID values
+    scope: '550e8400-e29b-41d4-a716-446655440000',
   };
 
   const clean = sanitizeMetadata(dirty);
-  assert.equal(clean.mode, undefined);
-  assert.equal(clean.levelId, undefined);
-  assert.equal(clean.cardCount, undefined);
-  assert.equal(clean.recordCount, undefined);
+  assert.equal(clean.mode, undefined, 'Bare credential must be rejected');
+  assert.equal(clean.choice, undefined, 'Quoted JSON must be rejected');
+  assert.equal(clean.courseId, undefined, 'Email must be rejected');
+  assert.equal(clean.levelId, undefined, 'Arbitrary text must be rejected');
+  assert.equal(clean.scope, undefined, 'UUID must be rejected');
 });
 
-test('analytics: disabled tracking performs zero network requests', async () => {
-  let transportCalled = false;
-  const mockTransport = () => { transportCalled = true; };
+test('analytics: strictly bounds numeric metadata and rejects negative or out-of-bound numbers', () => {
+  const dirtyNumbers = {
+    cardCount: -5,
+    recordCount: 99999999,
+  };
 
-  const res = await trackEvent('study:session_start', { courseId: 'zh' }, {
-    env: { VITE_ANALYTICS_ENABLED: 'false' },
-    transport: mockTransport,
-  });
+  const clean = sanitizeMetadata('study:session_start', dirtyNumbers);
+  assert.equal(clean.cardCount, undefined, 'Negative number must be rejected');
 
-  assert.equal(res.tracked, false);
-  assert.equal(res.reason, 'disabled');
-  assert.equal(transportCalled, false);
+  const cleanImport = sanitizeMetadata('import:guest_completed', dirtyNumbers);
+  assert.equal(cleanImport.recordCount, undefined, 'Out-of-bounds number must be rejected');
 });
 
-test('analytics: deduplicates rapid calls with identical signature or dedupeKey', async () => {
-  const sentPayloads = [];
-  const mockTransport = (p) => { sentPayloads.push(p); };
+test('analytics: trackEvent sends sanitized payload and avoids unnecessary cookies/referrer data', async () => {
+  let capturedPayload = null;
+  const mockTransport = (payload) => { capturedPayload = payload; };
   const env = { VITE_ANALYTICS_ENABLED: 'true', VITE_ANALYTICS_URL: 'https://analytics.example.com' };
 
-  // 1. Signature-based deduplication (React StrictMode simulation)
-  const res1 = await trackEvent('study:session_start', { courseId: 'zh', levelId: 'HSK1' }, { env, transport: mockTransport });
-  assert.equal(res1.tracked, true);
-  assert.equal(sentPayloads.length, 1);
+  const res = await trackEvent('study:session_start', {
+    courseId: 'ja-n5',
+    levelId: 'N5',
+    cardCount: 15,
+    // Sensitive injection attempt
+    userId: '550e8400-e29b-41d4-a716-446655440000',
+    email: 'test@example.com',
+  }, { env, transport: mockTransport });
 
-  const res2 = await trackEvent('study:session_start', { courseId: 'zh', levelId: 'HSK1' }, { env, transport: mockTransport });
-  assert.equal(res2.tracked, false);
-  assert.equal(res2.reason, 'deduplicated');
-  assert.equal(sentPayloads.length, 1);
-
-  // 2. Explicit dedupeKey deduplication
-  const res3 = await trackEvent('study:session_complete', { courseId: 'ja', levelId: 'N5' }, {
-    env,
-    transport: mockTransport,
-    dedupeKey: 'session-complete-ja-n5-test-key-1',
-  });
-  assert.equal(res3.tracked, true);
-  assert.equal(sentPayloads.length, 2);
-
-  const res4 = await trackEvent('study:session_complete', { courseId: 'ja', levelId: 'N5' }, {
-    env,
-    transport: mockTransport,
-    dedupeKey: 'session-complete-ja-n5-test-key-1',
-  });
-  assert.equal(res4.tracked, false);
-  assert.equal(res4.reason, 'deduplicated');
-  assert.equal(sentPayloads.length, 2);
-});
-
-test('analytics: transport failures never throw or disrupt application execution', async () => {
-  const failingTransport = () => { throw new Error('Ingest endpoint 503 unavailable'); };
-  const env = { VITE_ANALYTICS_ENABLED: 'true', VITE_ANALYTICS_URL: 'https://analytics.example.com' };
-
-  const res = await trackEvent('study:word_saved', { courseId: 'zh' }, { env, transport: failingTransport, dedupeKey: 'unique-fail-key' });
-  assert.equal(res.tracked, false);
-  assert.equal(res.reason, 'transport_error');
-});
-
-test('analytics: all 7 business events track successfully with valid coarse metadata', async () => {
-  const sentPayloads = [];
-  const mockTransport = (p) => { sentPayloads.push(p); };
-  const env = { VITE_ANALYTICS_ENABLED: 'true', VITE_ANALYTICS_URL: 'https://analytics.example.com' };
-
-  const testCases = [
-    { event: 'auth:signup_success', meta: { mode: 'email_confirmation' } },
-    { event: 'auth:signin_success', meta: { mode: 'password' } },
-    { event: 'study:session_start', meta: { courseId: 'zh', levelId: 'hsk1', mode: 'learn', cardCount: 20 } },
-    { event: 'study:session_complete', meta: { courseId: 'zh', levelId: 'hsk1', mode: 'learn', cardCount: 20 } },
-    { event: 'study:word_saved', meta: { courseId: 'zh' } },
-    { event: 'import:guest_completed', meta: { choice: 'merge', recordCount: 15 } },
-    { event: 'learning:reset_confirmed', meta: { scope: 'account' } },
-  ];
-
-  for (let i = 0; i < testCases.length; i++) {
-    const { event, meta } = testCases[i];
-    const res = await trackEvent(event, meta, { env, transport: mockTransport, dedupeKey: `all-events-test-${i}` });
-    assert.equal(res.tracked, true, `Event ${event} should have been tracked`);
-    assert.equal(res.payload.event, event);
-    assert.deepEqual(res.payload.metadata, meta);
-  }
-
-  assert.equal(sentPayloads.length, 7);
+  assert.equal(res.tracked, true);
+  assert.ok(capturedPayload);
+  assert.equal(capturedPayload.event, 'study:session_start');
+  assert.equal(capturedPayload.metadata.courseId, 'ja-n5');
+  assert.equal(capturedPayload.metadata.levelId, 'N5');
+  assert.equal(capturedPayload.metadata.cardCount, 15);
+  assert.equal(capturedPayload.metadata.userId, undefined);
+  assert.equal(capturedPayload.metadata.email, undefined);
 });

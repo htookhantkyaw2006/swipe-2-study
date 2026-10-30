@@ -1006,12 +1006,17 @@ export function createDeletionHttpHandler({
       const code = err.code || 'INTERNAL_SERVER_ERROR';
       if (typeof reportError === 'function') {
         try {
-          reportError(err, {
+          const reportPromise = reportError(err, {
             source: 'accountDeletionHandler',
             status,
             code,
           });
-        } catch {}
+          if (reportPromise && typeof reportPromise.catch === 'function') {
+            reportPromise.catch(() => {});
+          }
+        } catch {
+          // Synchronous throws in reporting hook must never affect deletion response
+        }
       }
       const errorMsg = err.message || 'An unexpected error occurred during account deletion.';
       const headers = {

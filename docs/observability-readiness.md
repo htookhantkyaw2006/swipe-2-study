@@ -24,7 +24,7 @@ This document specifies the architecture, privacy boundaries, configuration, and
   6. `import:guest_completed` (triggered when a guest learning import successfully merges or commits)
   7. `learning:reset_confirmed` (triggered when user/guest confirms and completes learning data reset)
 - **Coarse Metadata Only**: Permitted properties are limited to: `courseId`, `levelId`, `mode`, `cardCount`, `recordCount`, `choice`, `scope`.
-- **Absolute Privacy**: No user IDs, emails, IP addresses, free-text inputs, character strings, device fingerprints, session recordings, or persistent tracking identifiers.
+- **Payload Privacy Boundaries**: No user IDs, account emails, free-text inputs, character strings, device fingerprints, session recordings, or persistent tracking identifiers in event payloads. (Note: Network-layer IP transmission is inherent to underlying HTTP socket connections and cannot be guaranteed anonymous without proxy/Tor routing).
 - **Deduplication**: Deduplication cache protects against duplicate events caused by React 19 `StrictMode` or rapid component remounts.
 - **Disabled by Default**: Requires explicit environment configuration to activate (`VITE_ANALYTICS_ENABLED=true` and non-empty `VITE_ANALYTICS_URL`).
 
