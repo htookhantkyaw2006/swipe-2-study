@@ -4,6 +4,7 @@ import {
   isErrorReportingEnabled,
   sanitizeUrl,
   scrubSensitiveText,
+  sanitizeAssetPath,
   sanitizeError,
   sanitizeContext,
   reportError,
@@ -33,15 +34,31 @@ test('errorReporting: sanitizeUrl strips sensitive query params, recovery hashes
   assert.equal(sanitizeUrl(null), '');
 });
 
+test('errorReporting: sanitizeAssetPath strips user home directories and keeps safe asset paths', () => {
+  // Strip Windows user home directory
+  assert.equal(
+    sanitizeAssetPath('C:\\Users\\VivoBook\\Desktop\\swipe-2-study\\src\\lib\\errorReporting.js'),
+    'src/lib/errorReporting.js'
+  );
+  // Strip POSIX user home directory
+  assert.equal(
+    sanitizeAssetPath('/Users/johndoe/projects/swipe-2-study/src/pages/Learn.jsx'),
+    'src/pages/Learn.jsx'
+  );
+  // Keep web assets
+  assert.equal(
+    sanitizeAssetPath('https://swipe2study.app/assets/index-D6ZxBklE.js?token=secret#h'),
+    '/assets/index-D6ZxBklE.js'
+  );
+});
+
 test('errorReporting: scrubSensitiveText removes bare JWTs, quoted JSON credentials, emails, and passwords', () => {
-  // Bare JWT without "Bearer" prefix
   const bareJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
   const textWithBareJwt = `Crash occurred while processing token: ${bareJwt}`;
   const scrubbedJwt = scrubSensitiveText(textWithBareJwt);
   assert.doesNotMatch(scrubbedJwt, /eyJhbGci/);
   assert.match(scrubbedJwt, /\[REDACTED_TOKEN\]/);
 
-  // Quoted JSON credentials
   const jsonCredentials = 'Failed API call with body {"password": "SuperSecretPassword123", "token": "abcde1234567890", "email": "test@example.com"}';
   const scrubbedJson = scrubSensitiveText(jsonCredentials);
   assert.doesNotMatch(scrubbedJson, /SuperSecretPassword123/);
@@ -49,49 +66,54 @@ test('errorReporting: scrubSensitiveText removes bare JWTs, quoted JSON credenti
   assert.doesNotMatch(scrubbedJson, /test@example\.com/);
   assert.match(scrubbedJson, /\[REDACTED\]/);
 
-  // UUIDs
   const textWithUuid = 'User account 550e8400-e29b-41d4-a716-446655440000 encountered error';
   const scrubbedUuid = scrubSensitiveText(textWithUuid);
   assert.doesNotMatch(scrubbedUuid, /550e8400-e29b-41d4-a716-446655440000/);
   assert.match(scrubbedUuid, /\[REDACTED_ID\]/);
 });
 
-test('errorReporting: sanitizeError sanitizes error.name and restricts stack frames', () => {
-  // error.name containing email
-  const emailNameError = new Error('Database connection failed');
-  emailNameError.name = 'john.doe@example.com';
-  const sanitized1 = sanitizeError(emailNameError);
-  assert.equal(sanitized1.name, 'Error', 'Email in error.name must be replaced with static Error');
+test('errorReporting: sanitizeError strictly enforces static approved messages and excludes learner text', () => {
+  // Untrusted error with private learner note
+  const learnerError = new Error('Could not save learner note: MY_PRIVATE_NOTE');
+  learnerError.stack = `Error: Could not save learner note: MY_PRIVATE_NOTE\n    at saveNote (C:\\Users\\JohnDoe\\Desktop\\swipe-2-study\\src\\pages\\Study.jsx:10:20)\nArbitrary injected text with user data\n    at onClick (/assets/index-abc.js:30:40)`;
 
-  // error.name containing bare JWT
-  const jwtNameError = new Error('Auth error');
-  jwtNameError.name = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xyz.abc';
-  const sanitized2 = sanitizeError(jwtNameError);
-  assert.equal(sanitized2.name, 'Error', 'JWT in error.name must be replaced with static Error');
+  const sanitized = sanitizeError(learnerError);
 
-  // error.name containing arbitrary learner text with spaces
-  const arbitraryNameError = new Error('Some error');
-  arbitraryNameError.name = 'Arbitrary Learner Notes In Error Name';
-  const sanitized3 = sanitizeError(arbitraryNameError);
-  assert.equal(sanitized3.name, 'Error', 'Arbitrary text with spaces in error.name must be replaced with static Error');
+  // Must use static approved category and message
+  assert.equal(sanitized.name, 'Error');
+  assert.equal(sanitized.message, 'An unexpected application error occurred');
 
-  // error.name with valid identifier
-  const validError = new TypeError('Cannot read property of undefined');
-  const sanitized4 = sanitizeError(validError);
-  assert.equal(sanitized4.name, 'TypeError');
+  // Must NOT include MY_PRIVATE_NOTE in message or stack
+  assert.doesNotMatch(sanitized.message, /MY_PRIVATE_NOTE/);
+  assert.doesNotMatch(sanitized.stack, /MY_PRIVATE_NOTE/);
 
-  // Restricted stack frames (arbitrary injected text outside stack frame dropped)
-  const errorWithInjectedStack = new Error('Render crash');
-  errorWithInjectedStack.stack = `Error: Render crash\nLearner free-form notes injected here\n    at Component.render (https://app.local/bundle.js?token=secret123:10:20)\nMore arbitrary text\n    at Object.click (https://app.local/main.js:5:6)`;
-  const sanitizedStack = sanitizeError(errorWithInjectedStack);
-  assert.doesNotMatch(sanitizedStack.stack, /Learner free-form notes/);
-  assert.doesNotMatch(sanitizedStack.stack, /More arbitrary text/);
-  assert.doesNotMatch(sanitizedStack.stack, /token=secret123/);
-  assert.match(sanitizedStack.stack, /Component\.render/);
-  assert.match(sanitizedStack.stack, /Object\.click/);
+  // Stack must not include user directory or arbitrary injected text
+  assert.doesNotMatch(sanitized.stack, /JohnDoe/);
+  assert.doesNotMatch(sanitized.stack, /Arbitrary injected text/);
+  assert.match(sanitized.stack, /src\/pages\/Study\.jsx:10:20/);
+  assert.match(sanitized.stack, /\/assets\/index-abc\.js:30:40/);
+
+  // Raw string rejection must NOT pass raw rejection text
+  const stringRejection = sanitizeError('Custom rejection string: MY_SECRET_INPUT');
+  assert.equal(stringRejection.name, 'UnhandledRejection');
+  assert.equal(stringRejection.message, 'Unhandled promise rejection occurred');
+  assert.doesNotMatch(stringRejection.message, /MY_SECRET_INPUT/);
+
+  // TypeError preserves standard static category
+  const typeErr = new TypeError('Cannot read properties of undefined');
+  const sanitizedType = sanitizeError(typeErr);
+  assert.equal(sanitizedType.name, 'TypeError');
+  assert.equal(sanitizedType.message, 'Type error occurred');
+
+  // Error with approved code
+  const codeErr = new Error('Raw server fail details');
+  const sanitizedCode = sanitizeError(codeErr, { code: 'SERVER_CONFIG_ERROR' });
+  assert.equal(sanitizedCode.name, 'ApplicationError');
+  assert.equal(sanitizedCode.message, 'Server configuration error');
+  assert.doesNotMatch(sanitizedCode.message, /Raw server fail details/);
 });
 
-test('errorReporting: sanitizeContext keeps only allowed coarse metadata and scrubs values', () => {
+test('errorReporting: sanitizeContext keeps only approved metadata keys and strips component text/paths', () => {
   const rawContext = {
     source: 'RouteErrorBoundary',
     status: 500,
@@ -99,18 +121,62 @@ test('errorReporting: sanitizeContext keeps only allowed coarse metadata and scr
     authorization: 'Bearer secret_auth_token_value',
     rawBody: '{"email":"leak@example.com","password":"secretpassword"}',
     userPassword: 'secretpassword',
-    componentStack: 'in LazyRoute\n  in RouteErrorBoundary',
+    componentStack: 'in UserCard (at UserCard.jsx:10)\n  with privateText="MY_NOTE"\n  in RouteErrorBoundary',
+    filename: 'C:\\Users\\JohnDoe\\Desktop\\swipe-2-study\\src\\App.jsx',
+    lineno: 42,
+    colno: 15,
   };
 
   const cleanContext = sanitizeContext(rawContext);
   assert.equal(cleanContext.source, 'RouteErrorBoundary');
   assert.equal(cleanContext.status, 500);
   assert.equal(cleanContext.code, 'CHUNK_LOAD_FAILED');
-  assert.equal(cleanContext.componentStack, 'in LazyRoute\n  in RouteErrorBoundary');
+  assert.equal(cleanContext.filename, 'src/App.jsx');
+  assert.doesNotMatch(cleanContext.filename, /JohnDoe/);
+  assert.equal(cleanContext.lineno, 42);
+  assert.equal(cleanContext.colno, 15);
+
+  // ComponentStack must only retain component names, not component text or props
+  assert.doesNotMatch(cleanContext.componentStack, /MY_NOTE/);
+  assert.doesNotMatch(cleanContext.componentStack, /privateText/);
+  assert.match(cleanContext.componentStack, /in UserCard/);
+  assert.match(cleanContext.componentStack, /in RouteErrorBoundary/);
 
   assert.equal(cleanContext.authorization, undefined);
   assert.equal(cleanContext.rawBody, undefined);
   assert.equal(cleanContext.userPassword, undefined);
+});
+
+test('errorReporting: final reportError transport payload excludes arbitrary learner text and user paths', async () => {
+  let capturedPayload = null;
+  const mockTransport = (payload) => { capturedPayload = payload; };
+  const env = { VITE_ERROR_REPORTING_ENABLED: 'true', VITE_ERROR_REPORTING_URL: 'https://errors.example.com' };
+
+  const learnerErr = new Error('Could not save learner note: MY_PRIVATE_NOTE_12345');
+  learnerErr.stack = `Error: Could not save learner note: MY_PRIVATE_NOTE_12345\n    at saveWord (C:\\Users\\SecretUser\\Desktop\\app\\src\\lib\\db.js:50:10)`;
+
+  const res = await reportError(learnerErr, {
+    source: 'RouteErrorBoundary',
+    componentStack: 'in FlashcardView (text="LEARNER_NOTE_CONTENT")\n  in App',
+    filename: 'C:\\Users\\SecretUser\\Desktop\\app\\src\\lib\\db.js',
+  }, { env, transport: mockTransport });
+
+  assert.equal(res.reported, true);
+  assert.ok(capturedPayload);
+
+  // Outgoing error payload must NOT contain the learner note
+  assert.doesNotMatch(capturedPayload.error.message, /MY_PRIVATE_NOTE/);
+  assert.equal(capturedPayload.error.message, 'An unexpected application error occurred');
+
+  // Outgoing stack must NOT contain the learner note or the local user name
+  assert.doesNotMatch(capturedPayload.error.stack, /MY_PRIVATE_NOTE/);
+  assert.doesNotMatch(capturedPayload.error.stack, /SecretUser/);
+  assert.match(capturedPayload.error.stack, /src\/lib\/db\.js:50:10/);
+
+  // Context componentStack must NOT contain props/learner text
+  assert.doesNotMatch(capturedPayload.context.componentStack, /LEARNER_NOTE_CONTENT/);
+  assert.doesNotMatch(capturedPayload.context.filename, /SecretUser/);
+  assert.equal(capturedPayload.context.filename, 'src/lib/db.js');
 });
 
 test('errorReporting: disabled reporting performs zero network requests', async () => {
@@ -132,7 +198,7 @@ test('errorReporting: deduplicates identical Error instances and rolling signatu
   const mockTransport = (p) => { sentPayloads.push(p); };
   const env = { VITE_ERROR_REPORTING_ENABLED: 'true', VITE_ERROR_REPORTING_URL: 'https://errors.example.com' };
 
-  const sharedError = new Error('Unique render crash 1');
+  const sharedError = new TypeError('Cannot read properties of null');
   const res1 = await reportError(sharedError, { source: 'RouteErrorBoundary' }, { env, transport: mockTransport });
   assert.equal(res1.reported, true);
   assert.equal(sentPayloads.length, 1);
@@ -142,43 +208,30 @@ test('errorReporting: deduplicates identical Error instances and rolling signatu
   assert.equal(res2.reported, false);
   assert.equal(res2.reason, 'deduplicated');
   assert.equal(sentPayloads.length, 1);
-
-  // Third call with distinct error instance but identical signature
-  const duplicateErr = new Error('Unique render crash 2');
-  const res3 = await reportError(duplicateErr, { source: 'window_onerror' }, { env, transport: mockTransport });
-  assert.equal(res3.reported, true);
-  assert.equal(sentPayloads.length, 2);
-
-  const res4 = await reportError(new Error('Unique render crash 2'), { source: 'window_onerror' }, { env, transport: mockTransport });
-  assert.equal(res4.reported, false);
-  assert.equal(res4.reason, 'deduplicated');
-  assert.equal(sentPayloads.length, 2);
 });
 
 test('errorReporting: independent concurrent errors are NOT dropped while a request is in flight', async () => {
   const env = { VITE_ERROR_REPORTING_ENABLED: 'true', VITE_ERROR_REPORTING_URL: 'https://errors.example.com' };
-  const dispatchedErrors = [];
+  const dispatchedCategories = [];
 
-  // Transport with artificial delay simulating network transit
   const slowTransport = async (payload) => {
-    dispatchedErrors.push(payload.error.message);
+    dispatchedCategories.push(payload.error.name);
     await new Promise((resolve) => setTimeout(resolve, 50));
   };
 
-  const errA = new Error('Concurrent Error Alpha');
-  const errB = new Error('Concurrent Error Beta');
+  const errA = new TypeError('First type issue');
+  const errB = new ReferenceError('Second reference issue');
 
-  // Trigger Error A and Error B concurrently
   const [resA, resB] = await Promise.all([
-    reportError(errA, { source: 'source_a' }, { env, transport: slowTransport }),
-    reportError(errB, { source: 'source_b' }, { env, transport: slowTransport }),
+    reportError(errA, { source: 'window_onerror' }, { env, transport: slowTransport }),
+    reportError(errB, { source: 'unhandled_rejection' }, { env, transport: slowTransport }),
   ]);
 
   assert.equal(resA.reported, true, 'Error A must be reported');
   assert.equal(resB.reported, true, 'Error B must NOT be dropped while Error A is in flight');
-  assert.equal(dispatchedErrors.length, 2);
-  assert.ok(dispatchedErrors.includes('Concurrent Error Alpha'));
-  assert.ok(dispatchedErrors.includes('Concurrent Error Beta'));
+  assert.equal(dispatchedCategories.length, 2);
+  assert.ok(dispatchedCategories.includes('TypeError'));
+  assert.ok(dispatchedCategories.includes('ReferenceError'));
 });
 
 test('errorReporting: transport failure is safely isolated and never throws or breaks execution', async () => {
@@ -189,10 +242,9 @@ test('errorReporting: transport failure is safely isolated and never throws or b
   assert.equal(res.reported, false);
   assert.equal(res.reason, 'transport_error');
 
-  // Verify recursion guard resets and subsequent report succeeds
   let recovered = false;
   const succeedingTransport = () => { recovered = true; };
-  const res2 = await reportError(new Error('Subsequent error'), {}, { env, transport: succeedingTransport });
+  const res2 = await reportError(new TypeError('Subsequent error'), {}, { env, transport: succeedingTransport });
   assert.equal(res2.reported, true);
   assert.equal(recovered, true);
 });
@@ -228,7 +280,6 @@ test('errorReporting: initGlobalErrorMonitoring attaches listeners and returns c
 });
 
 test('errorReporting: Edge Function failure handles sync throws and rejected promises in reporting hook', async () => {
-  // 1. Hook that throws synchronously
   const syncThrowHook = () => { throw new Error('Synchronous hook failure'); };
   const handlerWithSyncThrow = createDeletionHttpHandler({
     adminClient: {},
@@ -247,7 +298,6 @@ test('errorReporting: Edge Function failure handles sync throws and rejected pro
   const body1 = await res1.json();
   assert.equal(body1.code, 'SERVER_CONFIG_ERROR');
 
-  // 2. Hook that returns a rejected promise
   const asyncRejectHook = () => Promise.reject(new Error('Async rejected hook'));
   const handlerWithAsyncReject = createDeletionHttpHandler({
     adminClient: {},

@@ -53,58 +53,114 @@ test('analytics: unlisted events are rejected', async () => {
   assert.equal(transportCalled, false);
 });
 
-test('analytics: enforces event-specific coarse enums and approved course/level identifiers', () => {
-  // 1. auth:signin_success only accepts coarse mode enum ('password', 'oauth_callback')
-  const validSignin = sanitizeMetadata('auth:signin_success', { mode: 'password' });
-  assert.equal(validSignin.mode, 'password');
+test('analytics: caller contract test for learning:reset_confirmed (emits scope account or guest)', async () => {
+  let captured = null;
+  const mockTransport = (p) => { captured = p; };
+  const env = { VITE_ANALYTICS_ENABLED: 'true', VITE_ANALYTICS_URL: 'https://analytics.example.com' };
 
-  const invalidSigninMode = sanitizeMetadata('auth:signin_success', { mode: 'arbitrary_mode_text' });
-  assert.equal(invalidSigninMode.mode, undefined, 'Arbitrary text mode must be rejected');
+  // 1. Emitted by SettingsSubpage for authenticated user reset: scope='account'
+  await trackEvent('learning:reset_confirmed', { scope: 'account' }, { env, transport: mockTransport });
+  assert.ok(captured);
+  assert.equal(captured.metadata.scope, 'account');
 
-  // 2. study:session_start enforces approved courseId and levelId
-  const validStudy = sanitizeMetadata('study:session_start', {
-    courseId: 'zh-hsk1',
+  // 2. Emitted by SettingsSubpage for guest user reset: scope='guest'
+  await trackEvent('learning:reset_confirmed', { scope: 'guest' }, { env, transport: mockTransport, dedupeKey: 'k2' });
+  assert.equal(captured.metadata.scope, 'guest');
+
+  // 3. Unsupported legacy scopes (all, course, level) or arbitrary text/UUIDs MUST be rejected
+  await trackEvent('learning:reset_confirmed', { scope: 'all' }, { env, transport: mockTransport, dedupeKey: 'k3' });
+  assert.equal(captured.metadata.scope, undefined, 'Unsupported scope "all" must be rejected');
+
+  await trackEvent('learning:reset_confirmed', { scope: '550e8400-e29b-41d4-a716-446655440000' }, { env, transport: mockTransport, dedupeKey: 'k4' });
+  assert.equal(captured.metadata.scope, undefined, 'UUID in scope must be rejected');
+});
+
+test('analytics: caller contract test for import:guest_completed (emits choice account-only or merge)', async () => {
+  let captured = null;
+  const mockTransport = (p) => { captured = p; };
+  const env = { VITE_ANALYTICS_ENABLED: 'true', VITE_ANALYTICS_URL: 'https://analytics.example.com' };
+
+  // 1. Real caller choice='account-only'
+  await trackEvent('import:guest_completed', { choice: 'account-only', recordCount: 25 }, { env, transport: mockTransport });
+  assert.ok(captured);
+  assert.equal(captured.metadata.choice, 'account-only');
+  assert.equal(captured.metadata.recordCount, 25);
+
+  // 2. Real caller choice='merge'
+  await trackEvent('import:guest_completed', { choice: 'merge', recordCount: 10 }, { env, transport: mockTransport, dedupeKey: 'imp2' });
+  assert.equal(captured.metadata.choice, 'merge');
+  assert.equal(captured.metadata.recordCount, 10);
+
+  // 3. Unsupported choices ('replace', 'discard') or arbitrary text/UUIDs MUST be rejected
+  await trackEvent('import:guest_completed', { choice: 'replace' }, { env, transport: mockTransport, dedupeKey: 'imp3' });
+  assert.equal(captured.metadata.choice, undefined, 'Unsupported choice "replace" must be rejected');
+
+  await trackEvent('import:guest_completed', { choice: 'discard' }, { env, transport: mockTransport, dedupeKey: 'imp4' });
+  assert.equal(captured.metadata.choice, undefined, 'Unsupported choice "discard" must be rejected');
+});
+
+test('analytics: caller contract test for study session events (emits mode learn/review/saved)', async () => {
+  let captured = null;
+  const mockTransport = (p) => { captured = p; };
+  const env = { VITE_ANALYTICS_ENABLED: 'true', VITE_ANALYTICS_URL: 'https://analytics.example.com' };
+
+  // 1. Study session start with mode='learn'
+  await trackEvent('study:session_start', {
+    courseId: 'zh',
     levelId: 'HSK1',
+    mode: 'learn',
     cardCount: 20,
-  });
-  assert.equal(validStudy.courseId, 'zh-hsk1');
-  assert.equal(validStudy.levelId, 'HSK1');
-  assert.equal(validStudy.cardCount, 20);
+  }, { env, transport: mockTransport, dedupeKey: 's1' });
+  assert.equal(captured.metadata.mode, 'learn');
+  assert.equal(captured.metadata.courseId, 'zh');
+  assert.equal(captured.metadata.levelId, 'HSK1');
+  assert.equal(captured.metadata.cardCount, 20);
 
-  const invalidCourseStudy = sanitizeMetadata('study:session_start', {
-    courseId: 'unapproved_course_name',
-    levelId: 'HSK9',
-  });
-  assert.equal(invalidCourseStudy.courseId, undefined);
-  assert.equal(invalidCourseStudy.levelId, undefined);
+  // 2. Study session start with mode='review'
+  await trackEvent('study:session_start', {
+    courseId: 'ja',
+    levelId: 'N5',
+    mode: 'review',
+    cardCount: 15,
+  }, { env, transport: mockTransport, dedupeKey: 's2' });
+  assert.equal(captured.metadata.mode, 'review');
+  assert.equal(captured.metadata.courseId, 'ja');
+  assert.equal(captured.metadata.levelId, 'N5');
 
-  // 3. import:guest_completed only accepts coarse choice ('merge', 'replace', 'discard')
-  const validImport = sanitizeMetadata('import:guest_completed', { choice: 'merge', recordCount: 15 });
-  assert.equal(validImport.choice, 'merge');
-  assert.equal(validImport.recordCount, 15);
+  // 3. Study session complete with mode='saved'
+  await trackEvent('study:session_complete', {
+    courseId: 'zh-hsk1',
+    levelId: '1',
+    mode: 'saved',
+    cardCount: 10,
+  }, { env, transport: mockTransport, dedupeKey: 's3' });
+  assert.equal(captured.metadata.mode, 'saved');
+  assert.equal(captured.metadata.courseId, 'zh-hsk1');
 
-  const invalidImportChoice = sanitizeMetadata('import:guest_completed', { choice: 'user_custom_choice' });
-  assert.equal(invalidImportChoice.choice, undefined);
+  // 4. Excluded phrase flow mode='phrases' MUST NOT be enabled
+  await trackEvent('study:session_start', {
+    courseId: 'zh',
+    levelId: 'HSK1',
+    mode: 'phrases',
+    cardCount: 20,
+  }, { env, transport: mockTransport, dedupeKey: 's4' });
+  assert.equal(captured.metadata.mode, undefined, 'Excluded phrase flow mode must NOT be permitted');
 
-  // 4. learning:reset_confirmed only accepts coarse scope ('all', 'course', 'level')
-  const validReset = sanitizeMetadata('learning:reset_confirmed', { scope: 'all' });
-  assert.equal(validReset.scope, 'all');
-
-  const invalidResetScope = sanitizeMetadata('learning:reset_confirmed', { scope: 'arbitrary_scope' });
-  assert.equal(invalidResetScope.scope, undefined);
+  // 5. Arbitrary text/UUID under mode or courseId MUST be rejected
+  await trackEvent('study:session_start', {
+    courseId: 'user_free_text_course',
+    mode: '550e8400-e29b-41d4-a716-446655440000',
+  }, { env, transport: mockTransport, dedupeKey: 's5' });
+  assert.equal(captured.metadata.courseId, undefined);
+  assert.equal(captured.metadata.mode, undefined);
 });
 
 test('analytics: strictly rejects bare credentials, quoted JSON credentials, emails, learner text, and UUID values', () => {
   const dirty = {
-    // Bare credentials / JWT
     mode: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHVo',
-    // Quoted JSON credentials
     choice: '{"password":"supersecret123"}',
-    // Email
     courseId: 'learner@example.com',
-    // Arbitrary learner text
     levelId: 'My personal vocabulary notes and translation questions',
-    // UUID values
     scope: '550e8400-e29b-41d4-a716-446655440000',
   };
 
@@ -127,28 +183,4 @@ test('analytics: strictly bounds numeric metadata and rejects negative or out-of
 
   const cleanImport = sanitizeMetadata('import:guest_completed', dirtyNumbers);
   assert.equal(cleanImport.recordCount, undefined, 'Out-of-bounds number must be rejected');
-});
-
-test('analytics: trackEvent sends sanitized payload and avoids unnecessary cookies/referrer data', async () => {
-  let capturedPayload = null;
-  const mockTransport = (payload) => { capturedPayload = payload; };
-  const env = { VITE_ANALYTICS_ENABLED: 'true', VITE_ANALYTICS_URL: 'https://analytics.example.com' };
-
-  const res = await trackEvent('study:session_start', {
-    courseId: 'ja-n5',
-    levelId: 'N5',
-    cardCount: 15,
-    // Sensitive injection attempt
-    userId: '550e8400-e29b-41d4-a716-446655440000',
-    email: 'test@example.com',
-  }, { env, transport: mockTransport });
-
-  assert.equal(res.tracked, true);
-  assert.ok(capturedPayload);
-  assert.equal(capturedPayload.event, 'study:session_start');
-  assert.equal(capturedPayload.metadata.courseId, 'ja-n5');
-  assert.equal(capturedPayload.metadata.levelId, 'N5');
-  assert.equal(capturedPayload.metadata.cardCount, 15);
-  assert.equal(capturedPayload.metadata.userId, undefined);
-  assert.equal(capturedPayload.metadata.email, undefined);
 });

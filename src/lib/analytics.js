@@ -60,22 +60,24 @@ export const EVENT_METADATA_RULES = Object.freeze({
   'study:session_start': {
     courseId: APPROVED_COURSE_IDS,
     levelId: APPROVED_LEVEL_IDS,
+    mode: ['learn', 'review', 'saved'],
     cardCount: { type: 'number', min: 0, max: 1000 },
   },
   'study:session_complete': {
     courseId: APPROVED_COURSE_IDS,
     levelId: APPROVED_LEVEL_IDS,
+    mode: ['learn', 'review', 'saved'],
     cardCount: { type: 'number', min: 0, max: 1000 },
   },
   'study:word_saved': {
     courseId: APPROVED_COURSE_IDS,
   },
   'import:guest_completed': {
-    choice: ['merge', 'replace', 'discard'],
+    choice: ['merge', 'account-only'],
     recordCount: { type: 'number', min: 0, max: 10000 },
   },
   'learning:reset_confirmed': {
-    scope: ['all', 'course', 'level'],
+    scope: ['account', 'guest'],
   },
 });
 
@@ -100,7 +102,7 @@ export function isAnalyticsEnabled(
 /**
  * Validates and scrubs coarse metadata.
  * Strictly enforces coarse enums, approved course/level identifiers, and bounded numeric metadata.
- * Drops arbitrary learner text, UUIDs, emails, credentials, and out-of-bounds numbers.
+ * Drops arbitrary learner text, UUIDs, emails, credentials, unsupported choices, and out-of-bounds numbers.
  */
 export function sanitizeMetadata(rawMetadataOrEvent, maybeMetadata) {
   let eventName = null;
@@ -139,7 +141,6 @@ export function sanitizeMetadata(rawMetadataOrEvent, maybeMetadata) {
       }
     } else if (!rules) {
       // Fallback for standalone / generic key validation:
-      // Strictly reject UUIDs, emails, tokens, and arbitrary unapproved text
       if (typeof val === 'string') {
         const trimmed = val.trim();
         if (
@@ -152,9 +153,9 @@ export function sanitizeMetadata(rawMetadataOrEvent, maybeMetadata) {
         ) {
           if (key === 'courseId' && !APPROVED_COURSE_IDS.includes(trimmed)) continue;
           if (key === 'levelId' && !APPROVED_LEVEL_IDS.includes(trimmed)) continue;
-          if (key === 'mode' && !['email_confirmation', 'direct', 'password', 'oauth_callback'].includes(trimmed)) continue;
-          if (key === 'choice' && !['merge', 'replace', 'discard'].includes(trimmed)) continue;
-          if (key === 'scope' && !['all', 'course', 'level'].includes(trimmed)) continue;
+          if (key === 'mode' && !['email_confirmation', 'direct', 'password', 'oauth_callback', 'learn', 'review', 'saved'].includes(trimmed)) continue;
+          if (key === 'choice' && !['merge', 'account-only'].includes(trimmed)) continue;
+          if (key === 'scope' && !['account', 'guest'].includes(trimmed)) continue;
           clean[key] = trimmed;
         }
       } else if (typeof val === 'number' && Number.isFinite(val)) {

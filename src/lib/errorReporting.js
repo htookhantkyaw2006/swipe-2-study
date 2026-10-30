@@ -2,8 +2,9 @@
  * Centralized, Privacy-Conscious Error Monitoring
  *
  * Captures unhandled frontend errors, rejected promises, route boundary errors,
- * and server/edge errors while strictly stripping all credentials, bare tokens,
- * passwords, emails, UUIDs, and sensitive URL parameters.
+ * and server/edge errors while strictly enforcing static approved error categories
+ * and messages. Raw arbitrary error messages, rejection strings, component text,
+ * and user filesystem paths are NEVER sent to the telemetry endpoint.
  *
  * Disabled by default. Activated only when VITE_ERROR_REPORTING_ENABLED === 'true'
  * and VITE_ERROR_REPORTING_URL is configured.
@@ -16,8 +17,43 @@ const KEY_VALUE_CREDENTIAL_REGEX = /(?:password|passwd|secret|access_token|refre
 const BEARER_REGEX = /bearer\s+(?:"[^"]+"|[a-zA-Z0-9._~+/-]{8,})/gi;
 const AUTH_HEADER_REGEX = /(?:authorization|proxy-authorization):\s*[^\r\n]+/gi;
 const UUID_REGEX = /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/gi;
-const SAFE_NAME_REGEX = /^[A-Za-z][A-Za-z0-9_$]{0,50}$/;
-const SAFE_IDENTIFIER_REGEX = /^[A-Za-z0-9_$.-]{1,60}$/;
+
+export const APPROVED_ERROR_CATEGORIES = Object.freeze({
+  TypeError: 'Type error occurred',
+  ReferenceError: 'Reference error occurred',
+  RangeError: 'Range error occurred',
+  SyntaxError: 'Syntax error occurred',
+  URIError: 'URI error occurred',
+  NetworkError: 'Network request failed',
+  ChunkLoadError: 'Dynamic import chunk failed to load',
+  AbortError: 'Operation was aborted',
+  TimeoutError: 'Operation timed out',
+  DOMException: 'DOM exception occurred',
+  UnhandledRejection: 'Unhandled promise rejection occurred',
+  ApplicationError: 'Application error occurred',
+  Error: 'An unexpected application error occurred',
+});
+
+export const APPROVED_ERROR_CODES = Object.freeze({
+  SERVER_CONFIG_ERROR: 'Server configuration error',
+  RATE_LIMITED: 'Rate limit exceeded',
+  CHUNK_LOAD_FAILED: 'Dynamic import chunk failed to load',
+  INTERNAL_SERVER_ERROR: 'Internal server error',
+  METHOD_NOT_ALLOWED: 'Method not allowed',
+  UNAUTHORIZED: 'Authentication required',
+  INVALID_REQUEST: 'Invalid request',
+  NETWORK_ERROR: 'Network request failed',
+  NOT_FOUND: 'Resource not found',
+  ERROR: 'An unexpected error occurred',
+});
+
+export const APPROVED_SOURCES = Object.freeze([
+  'RouteErrorBoundary',
+  'window_onerror',
+  'unhandled_rejection',
+  'accountDeletionHandler',
+  'test',
+]);
 
 const reportedErrors = new WeakSet();
 const recentSignatures = new Map();
@@ -47,21 +83,19 @@ export function sanitizeUrl(url) {
 
   try {
     const parsed = new URL(trimmed, 'https://swipe2study.app');
-    // If it's a relative URL in browser or dummy origin
     if (trimmed.startsWith('/') || trimmed.startsWith('.')) {
       return parsed.pathname;
     }
     return `${parsed.origin}${parsed.pathname}`;
   } catch {
-    // Fallback: strip everything from first '?' or '#'
     const stripped = trimmed.split(/[?#]/)[0];
     return stripped.replace(EMAIL_REGEX, '[REDACTED_EMAIL]').replace(BARE_JWT_REGEX, '[REDACTED_TOKEN]');
   }
 }
 
 /**
- * Sanitizes an error message or stack string, stripping tokens, emails, passwords,
- * bare JWTs, JSON credentials, UUIDs, and sensitive URL parameters.
+ * Strips tokens, emails, passwords, bare JWTs, JSON credentials, and UUIDs.
+ * Used as defense-in-depth on validated diagnostics.
  */
 export function scrubSensitiveText(text) {
   if (!text || typeof text !== 'string') return '';
@@ -85,93 +119,225 @@ export function scrubSensitiveText(text) {
 }
 
 /**
- * Extracts and sanitizes error details, including error.name and stack traces.
- * Untrusted or arbitrary name fields are strictly scrubbed and replaced with static categories.
+ * Sanitizes a file path or URL to strip local filesystem paths containing user names
+ * (e.g. C:\Users\JohnDoe\...) and preserve only clean asset or source references.
  */
-export function sanitizeError(error) {
-  if (!error) {
-    return { name: 'Error', message: 'Unknown error', stack: '' };
+export function sanitizeAssetPath(rawPath) {
+  if (!rawPath || typeof rawPath !== 'string') return '';
+  const trimmed = rawPath.trim();
+
+  // Strip query strings and hash fragments
+  const noQuery = trimmed.split(/[?#]/)[0];
+
+  // If it's a web asset URL (e.g. https://.../assets/foo-123.js)
+  const assetMatch = noQuery.match(/\/(assets\/[a-zA-Z0-9._-]+\.(?:js|css|html))/i);
+  if (assetMatch) {
+    return '/' + assetMatch[1];
   }
 
-  if (typeof error === 'string') {
+  // If it contains src/ (e.g. file:///.../src/lib/foo.js or C:\Users\...\src\lib\foo.js)
+  const srcMatch = noQuery.match(/(?:^|[/\\])(src[/\\][a-zA-Z0-9._/\\-]+)/i);
+  if (srcMatch) {
+    return srcMatch[1].replace(/\\/g, '/');
+  }
+
+  // If it's a safe relative path like /assets/ or /src/
+  if (noQuery.startsWith('/') && !noQuery.includes('/Users/') && !noQuery.includes('/home/')) {
+    return noQuery;
+  }
+
+  // Otherwise, do not leak unknown local directory structure
+  return '/assets/app.js';
+}
+
+/**
+ * Classifies an untrusted error or rejection into a static approved error category and message.
+ * Strictly guarantees that no arbitrary learner text, notes, or raw rejection strings are forwarded.
+ */
+function classifyError(error, context = {}) {
+  // 1. Check if an approved code is provided in context or error
+  const rawCode = context?.code || error?.code;
+  if (typeof rawCode === 'string' && rawCode in APPROVED_ERROR_CODES) {
     return {
-      name: 'Error',
-      message: scrubSensitiveText(error).slice(0, 500),
-      stack: '',
+      name: 'ApplicationError',
+      message: APPROVED_ERROR_CODES[rawCode],
     };
   }
 
-  // 1. Sanitize error.name: replace with 'Error' if it contains emails, credentials, UUIDs, or arbitrary text
-  const rawName = typeof error.name === 'string' ? error.name.trim() : 'Error';
-  const scrubbedName = scrubSensitiveText(rawName);
-  let name = 'Error';
-  if (
-    SAFE_NAME_REGEX.test(rawName) &&
-    !scrubbedName.includes('[REDACTED') &&
-    !/@/.test(rawName) &&
-    !UUID_REGEX.test(rawName)
-  ) {
-    name = rawName;
+  // 2. If it's a raw string rejection
+  if (typeof error === 'string') {
+    return {
+      name: 'UnhandledRejection',
+      message: APPROVED_ERROR_CATEGORIES.UnhandledRejection,
+    };
   }
 
-  // 2. Sanitize error.message
-  const message = typeof error.message === 'string'
-    ? scrubSensitiveText(error.message).slice(0, 500)
-    : 'Unknown error';
+  if (!error || typeof error !== 'object') {
+    return {
+      name: 'Error',
+      message: APPROVED_ERROR_CATEGORIES.Error,
+    };
+  }
 
-  // 3. Sanitize error.stack: restrict to genuine stack frame lines
-  let stack = '';
-  if (typeof error.stack === 'string') {
-    const rawLines = error.stack.split('\n');
-    const cleanLines = [];
+  // 3. Inspect error.name against approved categories
+  const rawName = typeof error.name === 'string' ? error.name.trim() : '';
+  if (rawName in APPROVED_ERROR_CATEGORIES) {
+    return {
+      name: rawName,
+      message: APPROVED_ERROR_CATEGORIES[rawName],
+    };
+  }
 
-    for (const line of rawLines) {
-      const trimmed = line.trim();
-      // Match typical JS stack frames: 'at ...' or 'name@url:line:col'
-      if (/^at\s+/i.test(trimmed) || /^[\w$@/.-]+@/i.test(trimmed)) {
-        cleanLines.push('    ' + scrubSensitiveText(trimmed));
+  // 4. Check for chunk load or network keywords in message as coarse diagnostic
+  const rawMsg = typeof error.message === 'string' ? error.message : '';
+  if (/chunk|dynamically imported/i.test(rawMsg)) {
+    return {
+      name: 'ChunkLoadError',
+      message: APPROVED_ERROR_CATEGORIES.ChunkLoadError,
+    };
+  }
+  if (/network|failed to fetch|load failed/i.test(rawMsg)) {
+    return {
+      name: 'NetworkError',
+      message: APPROVED_ERROR_CATEGORIES.NetworkError,
+    };
+  }
+  if (/aborted/i.test(rawMsg)) {
+    return {
+      name: 'AbortError',
+      message: APPROVED_ERROR_CATEGORIES.AbortError,
+    };
+  }
+
+  // Default static category
+  return {
+    name: 'Error',
+    message: APPROVED_ERROR_CATEGORIES.Error,
+  };
+}
+
+/**
+ * Validates and extracts safe asset stack frames.
+ * Replaces the unscrubbed message header with static approved category/message,
+ * drops arbitrary text, and strips local user directories from paths.
+ */
+function sanitizeStack(rawStack, staticName, staticMessage) {
+  if (!rawStack || typeof rawStack !== 'string') {
+    return '';
+  }
+
+  const lines = rawStack.split('\n');
+  const cleanFrames = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match 'at functionName (path:line:col)' or 'at path:line:col'
+    const atMatch = trimmed.match(/^at\s+(?:([A-Za-z0-9_$.<>]+)\s+\((.+):(\d+):(\d+)\)|(.+):(\d+):(\d+))/);
+    if (atMatch) {
+      if (atMatch[1]) {
+        const funcName = atMatch[1];
+        const safePath = sanitizeAssetPath(atMatch[2]);
+        const lineNo = atMatch[3];
+        const colNo = atMatch[4];
+        cleanFrames.push(`    at ${funcName} (${safePath}:${lineNo}:${colNo})`);
+      } else if (atMatch[5]) {
+        const safePath = sanitizeAssetPath(atMatch[5]);
+        const lineNo = atMatch[6];
+        const colNo = atMatch[7];
+        cleanFrames.push(`    at ${safePath}:${lineNo}:${colNo}`);
       }
-      if (cleanLines.length >= 15) break;
+    } else {
+      // Safari / Firefox style: funcName@path:line:col
+      const safariMatch = trimmed.match(/^([A-Za-z0-9_$.]+)?@(.+):(\d+):(\d+)/);
+      if (safariMatch) {
+        const funcName = safariMatch[1] || 'anonymous';
+        const safePath = sanitizeAssetPath(safariMatch[2]);
+        const lineNo = safariMatch[3];
+        const colNo = safariMatch[4];
+        cleanFrames.push(`    at ${funcName} (${safePath}:${lineNo}:${colNo})`);
+      }
     }
 
-    if (cleanLines.length > 0) {
-      stack = `${name}: ${message}\n${cleanLines.join('\n')}`;
-    }
+    if (cleanFrames.length >= 10) break;
   }
+
+  if (cleanFrames.length === 0) {
+    return '';
+  }
+
+  return `${staticName}: ${staticMessage}\n${cleanFrames.join('\n')}`;
+}
+
+/**
+ * Extracts and sanitizes error details using static approved categories and messages.
+ * Arbitrary learner text, raw rejection strings, and user directory paths are strictly discarded.
+ */
+export function sanitizeError(error, context = {}) {
+  const { name, message } = classifyError(error, context);
+  const rawStack = error && typeof error === 'object' && typeof error.stack === 'string' ? error.stack : '';
+  const stack = sanitizeStack(rawStack, name, message);
 
   return { name, message, stack };
 }
 
 /**
- * Sanitizes the reporting context, permitting only safe metadata keys and scrubbing text.
+ * Sanitizes the reporting context, permitting only approved enum sources/codes,
+ * stripped component names, and safe asset paths.
  */
 export function sanitizeContext(context = {}) {
   if (!context || typeof context !== 'object') return {};
 
   const safe = {};
-  const allowedKeys = ['source', 'status', 'code', 'componentStack', 'filename', 'lineno', 'colno'];
 
-  for (const key of allowedKeys) {
-    if (key in context) {
-      const val = context[key];
-      if (typeof val === 'string') {
-        const scrubbed = scrubSensitiveText(val).slice(0, 1000);
-        // Code and source must be safe identifiers without redactions or special characters
-        if (key === 'code' || key === 'source') {
-          if (SAFE_IDENTIFIER_REGEX.test(val) && !scrubbed.includes('[REDACTED') && !/@/.test(val)) {
-            safe[key] = val;
-          } else {
-            safe[key] = key === 'code' ? 'ERROR' : 'unknown';
-          }
-        } else {
-          safe[key] = scrubbed;
-        }
-      } else if (typeof val === 'number' && Number.isFinite(val)) {
-        safe[key] = Math.floor(val);
-      } else if (typeof val === 'boolean') {
-        safe[key] = val;
-      }
+  // 1. source: must be in approved sources
+  if ('source' in context) {
+    const rawSource = String(context.source);
+    safe.source = APPROVED_SOURCES.includes(rawSource) ? rawSource : 'unknown';
+  }
+
+  // 2. code: must be in approved codes
+  if ('code' in context) {
+    const rawCode = String(context.code);
+    safe.code = rawCode in APPROVED_ERROR_CODES ? rawCode : 'ERROR';
+  }
+
+  // 3. status: must be valid HTTP status
+  if ('status' in context) {
+    const statusNum = Number(context.status);
+    if (Number.isInteger(statusNum) && statusNum >= 100 && statusNum <= 599) {
+      safe.status = statusNum;
     }
+  }
+
+  // 4. componentStack: only allow validated component names (no props, text, or attributes)
+  if ('componentStack' in context && typeof context.componentStack === 'string') {
+    const rawComp = context.componentStack;
+    const compMatches = [];
+    for (const line of rawComp.split('\n')) {
+      const match = line.match(/\bin\s+([A-Za-z0-9_]+)/);
+      if (match && match[1]) {
+        compMatches.push(`    in ${match[1]}`);
+      }
+      if (compMatches.length >= 10) break;
+    }
+    if (compMatches.length > 0) {
+      safe.componentStack = compMatches.join('\n');
+    }
+  }
+
+  // 5. filename: validated asset-frame path only (no user directories)
+  if ('filename' in context && typeof context.filename === 'string') {
+    safe.filename = sanitizeAssetPath(context.filename);
+  }
+
+  // 6. lineno, colno: non-negative integers
+  if ('lineno' in context && Number.isFinite(context.lineno)) {
+    const line = Math.floor(context.lineno);
+    if (line >= 0 && line < 1000000) safe.lineno = line;
+  }
+  if ('colno' in context && Number.isFinite(context.colno)) {
+    const col = Math.floor(context.colno);
+    if (col >= 0 && col < 100000) safe.colno = col;
   }
 
   return safe;
@@ -181,7 +347,7 @@ export function sanitizeContext(context = {}) {
  * Generates a deduplication signature for an error and context.
  */
 function getErrorSignature(sanitizedErr, sanitizedCtx) {
-  return `${sanitizedErr.name}:${sanitizedErr.message}:${sanitizedCtx.source || ''}:${sanitizedCtx.filename || ''}:${sanitizedCtx.lineno || ''}`;
+  return `${sanitizedErr.name}:${sanitizedErr.message}:${sanitizedCtx.source || ''}:${sanitizedCtx.code || ''}:${sanitizedCtx.filename || ''}:${sanitizedCtx.lineno || ''}`;
 }
 
 /**
@@ -225,7 +391,7 @@ export async function reportError(error, context = {}, {
   env = typeof import.meta !== 'undefined' ? import.meta.env : (typeof process !== 'undefined' ? process.env : {}),
   transport,
 } = {}) {
-  // 1. Synchronous recursion guard (prevents infinite synchronous loops during error handling)
+  // 1. Synchronous recursion guard
   if (isSyncReporting) {
     return { reported: false, reason: 'recursive_guard' };
   }
@@ -247,26 +413,25 @@ export async function reportError(error, context = {}, {
   let sanitizedCtx;
   let signature;
   try {
-    sanitizedErr = sanitizeError(error);
     sanitizedCtx = sanitizeContext(context);
+    sanitizedErr = sanitizeError(error, sanitizedCtx);
     signature = getErrorSignature(sanitizedErr, sanitizedCtx);
   } finally {
     isSyncReporting = false;
   }
 
-  // 4. In-flight duplicate protection (drops identical error while already sending, but NOT independent errors)
+  // 4. In-flight duplicate protection
   if (inFlightSignatures.has(signature)) {
     return { reported: false, reason: 'deduplicated' };
   }
 
-  // 5. Recent duplicate deduplication (time-window based)
+  // 5. Recent duplicate deduplication
   const now = Date.now();
   pruneSignatures(now);
   if (recentSignatures.has(signature)) {
     return { reported: false, reason: 'deduplicated' };
   }
 
-  // Mark error as reported and currently in flight
   if (error && typeof error === 'object') {
     reportedErrors.add(error);
   }
@@ -286,7 +451,6 @@ export async function reportError(error, context = {}, {
     recentSignatures.set(signature, Date.now());
     return { reported: true, payload };
   } catch {
-    // Monitoring failures must NEVER affect application execution
     return { reported: false, reason: 'transport_error' };
   } finally {
     inFlightSignatures.delete(signature);
