@@ -72,6 +72,12 @@ export function mapVocabularyToCard(vocab, courseData, index = 0) {
  */
 export const MAX_PUBLICATION_RETRIES = 3;
 
+function formatDecimalString(val) {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  return s.length > 0 ? s : null;
+}
+
 export async function fetchPublishedCourseContent(courseId, { client = null, pageSize = 1000, maxRetries = MAX_PUBLICATION_RETRIES } = {}) {
   if (!SUPPORTED_PUBLISHED_COURSES[courseId]) {
     throw new Error(`Unsupported published course '${courseId}'. Only 'zh-hsk1' and 'ja-n5' are permitted.`);
@@ -89,7 +95,7 @@ export async function fetchPublishedCourseContent(courseId, { client = null, pag
     // 1. Verify course exists and is published in public.courses
     const { data: courseData, error: courseError } = await dbClient
       .from('courses')
-      .select('id, language, level_id, title, is_published, content_version, updated_at')
+      .select('id, language, level_id, title, is_published, content_version, updated_at, publication_seq')
       .eq('id', courseId)
       .maybeSingle();
 
@@ -132,7 +138,7 @@ export async function fetchPublishedCourseContent(courseId, { client = null, pag
       // Check if course publication changed concurrently (publish or rollback)
       const { data: verifyCourse, error: verifyError } = await dbClient
         .from('courses')
-        .select('id, is_published, content_version, updated_at')
+        .select('id, is_published, content_version, updated_at, publication_seq')
         .eq('id', courseId)
         .maybeSingle();
 
@@ -140,16 +146,23 @@ export async function fetchPublishedCourseContent(courseId, { client = null, pag
         throw new Error(`Failed to verify course publication status: ${verifyError.message}`);
       }
 
-      const initialVer = String(courseData.content_version ?? '');
-      const currentVer = String(verifyCourse?.content_version ?? '');
-      const initialUpdated = String(courseData.updated_at ?? '');
-      const currentUpdated = String(verifyCourse?.updated_at ?? '');
+      const initialVer = formatDecimalString(courseData.content_version) ?? '';
+      const currentVer = formatDecimalString(verifyCourse?.content_version) ?? '';
+      const initialUpdated = formatDecimalString(courseData.updated_at) ?? '';
+      const currentUpdated = formatDecimalString(verifyCourse?.updated_at) ?? '';
+      const initialSeq = formatDecimalString(courseData.publication_seq);
+      const currentSeq = formatDecimalString(verifyCourse?.publication_seq);
+
+      const hasSeqMismatch = Boolean(initialSeq !== currentSeq && (initialSeq !== null || currentSeq !== null));
+      const hasVerMismatch = Boolean(initialVer !== currentVer);
+      const hasUpdatedMismatch = Boolean(initialUpdated && currentUpdated && initialUpdated !== currentUpdated);
 
       if (
         !verifyCourse ||
         !verifyCourse.is_published ||
-        initialVer !== currentVer ||
-        (initialUpdated && currentUpdated && initialUpdated !== currentUpdated)
+        hasSeqMismatch ||
+        hasVerMismatch ||
+        hasUpdatedMismatch
       ) {
         inconsistent = true;
         break;

@@ -347,6 +347,77 @@ test('3c. Consistent Publication Reads: throws retryable error when publications
   );
 });
 
+test('3d. Consistent Publication Reads: unchanged version and timestamp but changed sequence invalidates fetch and retries', async () => {
+  const constantVersion = 1;
+  const constantUpdatedAt = '2026-10-30T01:00:00.000Z';
+  let publicationSeq = '9007199254740995'; // BigInt string beyond JS safe integer
+  let pageReads = 0;
+  let retried = false;
+
+  const mockClient = {
+    from: (table) => {
+      if (table === 'courses') {
+        const builder = {
+          select: () => builder,
+          eq: () => builder,
+          maybeSingle: async () => ({
+            data: {
+              id: 'zh-hsk1',
+              language: 'zh',
+              level_id: 'HSK1',
+              title: 'HSK 1',
+              is_published: true,
+              content_version: constantVersion,
+              updated_at: constantUpdatedAt,
+              publication_seq: publicationSeq,
+            },
+            error: null,
+          }),
+        };
+        return builder;
+      }
+
+      if (table === 'vocabulary') {
+        const builder = {
+          select: () => builder,
+          eq: () => builder,
+          order: () => builder,
+          range: async () => {
+            pageReads++;
+            if (pageReads === 1) {
+              // Simulate publication update incrementing sequence while version and updated_at stay unchanged
+              publicationSeq = '9007199254740996';
+              retried = true;
+              return {
+                data: [
+                  { id: 'zh_01', course_id: 'zh-hsk1', written_form: '中', reading: 'zhōng', is_active: true },
+                  { id: 'zh_02', course_id: 'zh-hsk1', written_form: '大', reading: 'dà', is_active: true },
+                ],
+                error: null,
+              };
+            }
+
+            // Consistent read after retry
+            return {
+              data: [
+                { id: 'zh_01', course_id: 'zh-hsk1', written_form: '中', reading: 'zhōng', is_active: true },
+              ],
+              error: null,
+            };
+          },
+        };
+        return builder;
+      }
+    },
+  };
+
+  const res = await fetchPublishedCourseContent('zh-hsk1', { client: mockClient, pageSize: 2 });
+  assert.equal(res.isPublished, true);
+  assert.equal(res.version, 1);
+  assert.equal(res.items.length, 1);
+  assert.ok(retried, 'Retry loop was executed upon detecting publication_seq change');
+});
+
 // ===========================================================================
 // Finding 4: Durable Queued Preferences
 // ===========================================================================
@@ -454,6 +525,198 @@ test('4. Durable Queued Preferences: mutation B queued while A in-flight survive
   // Verify the last payload sent to the server had dailyGoal === 25
   const lastCall = saveCalls[saveCalls.length - 1];
   assert.equal(lastCall.settings.dailyGoal, 25, 'Mutation B survived reload and was saved to cloud');
+});
+
+test('4b. Queued Preferences: storage throw with mutation A in flight and B queued fails honestly without overwriting', async () => {
+  const store = new Map();
+  let failWrite = false;
+  let throwWrite = false;
+
+  const storage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => {
+      if (throwWrite) {
+        throw new Error('Storage quota exceeded');
+      }
+      if (failWrite) {
+        return;
+      }
+      store.set(k, String(v));
+    },
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear(),
+  };
+
+  const storageOwner = createMockStorageOwner(storage);
+  const accountId = '44444444-4444-4444-4444-444444444445';
+  storageOwner.setOwner(accountId);
+
+  let resolveMutationA;
+  const inFlightPromiseA = new Promise((resolve) => { resolveMutationA = resolve; });
+  let saveCalls = [];
+
+  const mockSupabase = {
+    from: () => ({
+      upsert: (payload) => {
+        saveCalls.push(payload);
+        const isA = payload.settings?.dailyGoal === 10;
+        return {
+          select: () => ({
+            maybeSingle: async () => {
+              if (isA) {
+                await inFlightPromiseA;
+              }
+              return {
+                data: {
+                  settings: payload.settings,
+                  active_language: payload.active_language,
+                  updated_at: '2026-10-30T10:00:00.000Z',
+                },
+                error: null,
+              };
+            },
+          }),
+        };
+      },
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: {
+              user_id: accountId,
+              settings: { dailyGoal: 5 },
+              active_language: 'zh',
+              updated_at: '2026-10-30T09:00:00.000Z',
+            },
+            error: null,
+          }),
+        }),
+      }),
+    }),
+  };
+
+  const service = createPreferencesSyncService({
+    getClient: () => mockSupabase,
+    storageOwner,
+  });
+
+  const controller = createPreferencesSyncController({
+    service,
+    allowOnline: true,
+  });
+
+  await controller.setAccount({ id: accountId, generation: 1 });
+
+  // 1. Dispatch mutation A (dailyGoal: 10) - persists to storage and starts cloud call
+  controller.onLocalChange({
+    settings: { dailyGoal: 10 },
+    activeLanguage: 'zh',
+    changedKey: 'dailyGoal',
+  });
+
+  assert.equal(controller.getState().status, 'saving');
+  const pendingA = readPendingPreferences(storage, accountId).state;
+  assert.equal(pendingA?.settings?.dailyGoal, 10, 'Mutation A recorded in storage');
+
+  // 2. Enable storage throw
+  throwWrite = true;
+
+  // 3. Dispatch mutation B (dailyGoal: 30) while A is in flight
+  await controller.onLocalChange({
+    settings: { dailyGoal: 30 },
+    activeLanguage: 'zh',
+    changedKey: 'dailyGoal',
+  });
+
+  // Actionable failure must be exposed immediately!
+  const stateAfterB = controller.getState();
+  assert.equal(stateAfterB.status, 'failed', 'Controller exposes actionable failure on persistence throw');
+  assert.match(stateAfterB.error, /quota|storage/i, 'Error message is honest');
+
+  // Storage pending state must NOT have been corrupted or overwritten by failed mutation B
+  const pendingAfterFail = readPendingPreferences(storage, accountId).state;
+  assert.equal(pendingAfterFail?.settings?.dailyGoal, 10, 'Existing pending record A is preserved');
+
+  // 4. Now earlier in-flight mutation A finishes
+  resolveMutationA();
+  await new Promise((r) => setTimeout(r, 10));
+
+  // Earlier completion MUST NOT overwrite B's failed state with 'saved'!
+  const stateAfterAComplete = controller.getState();
+  assert.equal(stateAfterAComplete.status, 'failed', 'Earlier completion must not overwrite newer failed-to-persist intent');
+
+  // Storage must NOT be cleared by earlier completion!
+  const pendingStillThere = readPendingPreferences(storage, accountId).state;
+  assert.ok(pendingStillThere, 'Pending record was not cleared by older mutation A completion');
+
+  // 5. When storage is fixed and user retries:
+  throwWrite = false;
+  await controller.retry();
+
+  // Mutation B must now be saved and state must be saved!
+  assert.equal(controller.getState().status, 'saved', 'Retry succeeds after storage recovered');
+  const lastCall = saveCalls[saveCalls.length - 1];
+  assert.equal(lastCall.settings.dailyGoal, 30, 'Mutation B was synced to cloud on retry');
+});
+
+test('4c. Queued Preferences: false persistence return in savePreferences fails without cloud upsert and in coordinateSave does not queue', async () => {
+  const failingStorage = {
+    getItem: () => null, // always returns null, so writePendingPreferences readback check fails
+    setItem: () => {},
+    removeItem: () => {},
+  };
+
+  const storageOwner = createMockStorageOwner(failingStorage);
+  const accountId = '44444444-4444-4444-4444-444444444446';
+  storageOwner.setOwner(accountId);
+
+  let upsertCalled = false;
+  const mockSupabase = {
+    from: () => ({
+      upsert: () => {
+        upsertCalled = true;
+        return {
+          select: () => ({
+            maybeSingle: async () => ({
+              data: { settings: {}, active_language: 'zh' },
+              error: null,
+            }),
+          }),
+        };
+      },
+    }),
+  };
+
+  const service = createPreferencesSyncService({
+    getClient: () => mockSupabase,
+    storageOwner,
+  });
+
+  // Direct savePreferences test: false persistence return returns failed without cloud upsert
+  const res = await service.savePreferences({
+    accountId,
+    settings: { dailyGoal: 15 },
+    activeLanguage: 'zh',
+  });
+
+  assert.equal(res.status, 'failed', 'savePreferences must return failed on unsuccessful persistence');
+  assert.match(res.error, /Failed to record pending preferences/i);
+  assert.equal(upsertCalled, false, 'Cloud upsert must NOT be dispatched when persistence fails');
+
+  // Controller coordinateSave test: false persistence return exposes failure and does not queue/dispatch
+  const controller = createPreferencesSyncController({
+    service,
+    allowOnline: true,
+  });
+
+  await controller.setAccount({ id: accountId, generation: 1 });
+  await controller.onLocalChange({
+    settings: { dailyGoal: 20 },
+    activeLanguage: 'zh',
+    changedKey: 'dailyGoal',
+  });
+
+  assert.equal(controller.getState().status, 'failed', 'Controller exposes actionable failure on false persistence');
+  assert.equal(upsertCalled, false, 'No cloud mutation was dispatched');
 });
 
 // ===========================================================================

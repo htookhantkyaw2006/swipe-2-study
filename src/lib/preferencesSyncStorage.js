@@ -51,14 +51,23 @@ export function writePendingPreferences(storage, ownerId, state) {
     }
   } catch {
     // If existing bytes are corrupt, do not silently overwrite without explicit handling
+    return false;
   }
 
   const data = JSON.stringify({
     ...state,
     ownerId: ownerId.toLowerCase(),
   });
-  storage.setItem(key, data);
-  return true;
+  try {
+    storage.setItem(key, data);
+    if (typeof storage.getItem === 'function') {
+      const stored = storage.getItem(key);
+      return stored === data;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function clearPendingPreferences(storage, ownerId, localMutationId = null) {

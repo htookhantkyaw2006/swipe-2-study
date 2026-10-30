@@ -195,6 +195,7 @@ export function createPreferencesSyncService({
   async function savePreferences({
     accountId,
     isCurrent,
+    hasNewerIntent = null,
     settings,
     activeLanguage,
     localMutationId = 1,
@@ -226,8 +227,9 @@ export function createPreferencesSyncService({
     const storage = storageOwner.getStorage?.() || globalThis.localStorage;
 
     // Record dedicated owner-scoped pending state before network transmission
+    let persisted = false;
     try {
-      recordPendingPreferences({
+      persisted = recordPendingPreferences({
         accountId,
         settings: inScopeSettings,
         activeLanguage: sanitizedActiveLanguage,
@@ -238,6 +240,13 @@ export function createPreferencesSyncService({
       return {
         status: 'failed',
         error: storageErr?.message || 'Failed to record pending preferences save.',
+      };
+    }
+
+    if (!persisted) {
+      return {
+        status: 'failed',
+        error: 'Failed to record pending preferences save.',
       };
     }
 
@@ -274,7 +283,10 @@ export function createPreferencesSyncService({
     if (mutationError) {
       const msg = mutationError.message || 'Failed to save preferences to cloud.';
       const currentPending = readPendingPreferences(storage, accountId).state;
-      if (currentPending && typeof currentPending.localMutationId === 'number' && currentPending.localMutationId > localMutationId) {
+      const isNewer = (typeof hasNewerIntent === 'function' && hasNewerIntent(localMutationId)) ||
+        Boolean(currentPending && typeof currentPending.localMutationId === 'number' && currentPending.localMutationId > localMutationId);
+
+      if (isNewer) {
         return {
           status: 'pending',
           newerPending: true,
@@ -306,7 +318,10 @@ export function createPreferencesSyncService({
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       const msg = 'Preferences save confirmation missing or malformed.';
       const currentPending = readPendingPreferences(storage, accountId).state;
-      if (!currentPending || currentPending.localMutationId <= localMutationId) {
+      const isNewer = (typeof hasNewerIntent === 'function' && hasNewerIntent(localMutationId)) ||
+        Boolean(currentPending && typeof currentPending.localMutationId === 'number' && currentPending.localMutationId > localMutationId);
+
+      if (!isNewer) {
         try {
           writePendingPreferences(storage, accountId, {
             ownerId: accountId,
@@ -330,7 +345,10 @@ export function createPreferencesSyncService({
 
     // Check if a newer local mutation occurred while this request was in flight
     const currentPending = readPendingPreferences(storage, accountId).state;
-    if (currentPending && typeof currentPending.localMutationId === 'number' && currentPending.localMutationId > localMutationId) {
+    const isNewer = (typeof hasNewerIntent === 'function' && hasNewerIntent(localMutationId)) ||
+      Boolean(currentPending && typeof currentPending.localMutationId === 'number' && currentPending.localMutationId > localMutationId);
+
+    if (isNewer) {
       return {
         status: 'pending',
         newerPending: true,

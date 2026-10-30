@@ -17,6 +17,8 @@ export function createPreferencesSyncController({
   let state = Object.freeze(initial());
   let operationToken = 0;
   let localMutationCounter = 0;
+  let latestAttemptedMutationId = 0;
+  let latestFailedIntent = null;
   let lastFailedOperation = null; // null | 'restore' | 'save'
   let inFlightSavePromise = null;
   let queuedSave = null;
@@ -52,6 +54,8 @@ export function createPreferencesSyncController({
     inFlightSavePromise = null;
     queuedSave = null;
     lastFailedOperation = null;
+    latestAttemptedMutationId = 0;
+    latestFailedIntent = null;
     pendingRestoreEdits = { settings: {}, activeLanguage: null, changedKeys: [] };
   }
 
@@ -66,6 +70,7 @@ export function createPreferencesSyncController({
       const res = await service.savePreferences({
         accountId,
         isCurrent: () => isCurrentOperation(token, accountId, generation),
+        hasNewerIntent: (id) => id < latestAttemptedMutationId || latestFailedIntent !== null,
         ...saveArgs,
       });
 
@@ -75,11 +80,18 @@ export function createPreferencesSyncController({
         lastFailedOperation = 'save';
         publish({ status: 'failed', error: res.error });
       } else if (res?.status === 'saved') {
-        lastFailedOperation = null;
-        publish({ status: 'saved', lastSyncedAt: res.lastSyncedAt, error: null });
+        if (latestAttemptedMutationId > (saveArgs.localMutationId || 0) || latestFailedIntent !== null) {
+          // Newer intent exists; preserve existing status
+        } else {
+          lastFailedOperation = null;
+          publish({ status: 'saved', lastSyncedAt: res.lastSyncedAt, error: null });
+        }
       } else if (res?.status === 'pending' || res?.newerPending) {
-        // Newer pending mutation is already queued/persisted and will run next in loop
-        lastFailedOperation = null;
+        // Newer pending mutation is already queued/persisted and will run next in loop,
+        // or a newer intent was attempted. Do not clear lastFailedOperation if newer intent failed!
+        if (!latestFailedIntent) {
+          lastFailedOperation = null;
+        }
       }
       return res;
     } catch (err) {
@@ -96,18 +108,38 @@ export function createPreferencesSyncController({
     const { accountId } = state;
     if (!accountId) return;
 
+    const mutationId = saveArgs.localMutationId || 0;
+    if (mutationId > latestAttemptedMutationId) {
+      latestAttemptedMutationId = mutationId;
+    }
+
     // Persist newest validated owner-scoped pending intent immediately,
     // before waiting for earlier in-flight save.
     if (typeof service.recordPendingPreferences === 'function') {
+      let persisted = false;
+      let persistErr = null;
       try {
-        service.recordPendingPreferences({
+        persisted = service.recordPendingPreferences({
           accountId,
           ...saveArgs,
         });
-      } catch {
-        // Non-fatal or caught during executeSave
+      } catch (err) {
+        persistErr = err;
+      }
+
+      if (!persisted || persistErr) {
+        latestFailedIntent = { ...saveArgs };
+        lastFailedOperation = 'save';
+        const msg = persistErr?.message || 'Failed to persist preferences to device storage.';
+        publish({
+          status: 'failed',
+          error: msg,
+        });
+        return;
       }
     }
+
+    latestFailedIntent = null;
 
     if (inFlightSavePromise) {
       queuedSave = saveArgs;
@@ -218,6 +250,8 @@ export function createPreferencesSyncController({
 
     operationToken++;
     localMutationCounter = 0;
+    latestAttemptedMutationId = 0;
+    latestFailedIntent = null;
     lastFailedOperation = null;
     inFlightSavePromise = null;
     queuedSave = null;
@@ -289,6 +323,11 @@ export function createPreferencesSyncController({
 
     if (lastFailedOperation === 'restore') {
       return await performRestore(token, state.accountId, state.generation);
+    }
+
+    if (latestFailedIntent) {
+      const intentToRetry = { ...latestFailedIntent };
+      return await coordinateSave(intentToRetry, token);
     }
 
     publish({ status: 'saving', error: null });
