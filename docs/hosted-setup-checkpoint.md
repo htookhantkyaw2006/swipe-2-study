@@ -1,7 +1,7 @@
 # Hosted Setup Checkpoint
 
 **Date:** October 31, 2026<br>
-**Status:** Verified Test Backend, Resend SMTP, Google Auth & Preview Checkpoint<br>
+**Status:** Verified Test Backend Checkpoint & Operator Acceptance Runbook<br>
 **Branch:** `fix/release-readiness-pass`
 
 ---
@@ -82,6 +82,13 @@ Eleven checked public RPCs were inspected in the test backend database catalog:
 
 > **Access Control Note:** The six `authenticated = false` functions are restricted server-side or owner operations (such as the account deletion Edge Function executing with `service_role` authority or curriculum release workflows). They are intentionally not exposed to the client `authenticated` role, and client access must not be broadened to grant them privileged access.
 
+### Account & State Baseline Row Counts
+Baseline record counts across core user state tables remained exactly 2 each:
+- `auth.users`: 2 accounts
+- `public.profiles`: 2 rows
+- `public.user_preferences`: 2 rows
+- `private.account_state`: 2 rows
+
 ---
 
 ## 4. Current Hosted Infrastructure & Verification Status
@@ -104,174 +111,204 @@ Eleven checked public RPCs were inspected in the test backend database catalog:
 > The successful user checks above confirm basic auth, email delivery, and single-session local/cloud merge.
 > **They do NOT prove background cloud sync, cross-account isolation, or account deletion:**
 > - **Account Deletion Edge Function has NOT been deployed:** The function `supabase/functions/delete-account` has not been deployed to project `olwicxljwfemgrsbobtg`.
-> - **Vercel Preview Environment Variable Scoping:** Environment variables were scoped in Vercel specifically to preview branch `fix/deployment-config-readiness`. New branches (including `fix/release-readiness-pass`) do not inherit them automatically unless configured in Vercel (**Settings -> Environment Variables -> Preview** scope).
+> - **Vercel Preview Environment Variable Scoping:** Environment variables were scoped in Vercel specifically to preview branch `fix/deployment-config-readiness`. New preview branches do not inherit them automatically unless configured in Vercel (**Settings -> Environment Variables -> Preview** scope).
 
 ---
 
-## 5. Edge Function Deployment & Gateway JWT Guidance
+## 5. Local Backup & Disaster Recovery Readiness (Historical Checkpoint)
 
-### Signing-Key Verification (Action for PT)
-In Supabase Dashboard -> **Project Settings -> API -> JWT Settings / JWT Keys**:
-- Check whether project `olwicxljwfemgrsbobtg` uses **Symmetric (HS256)** or **Asymmetric (ECC / ES256 / RS256)** signing keys.
-- **If HS256:** Deploy with standard gateway verification:
-  ```bash
-  supabase functions deploy delete-account
-  ```
-- **If Asymmetric (ES256) or if Gateway blocks preflight OPTIONS:**
-  The Supabase gateway may reject ES256 tokens with `401 Invalid JWT` or block browser CORS preflight. If this occurs, deploy with:
-  ```bash
-  supabase functions deploy delete-account --no-verify-jwt
-  ```
-- **Security Guarantee:** Server-side caller authentication and password reauthentication are **never bypassed**. The function code in `src/server/accountDeletion.js` independently verifies the Bearer JWT via `userClient.auth.getUser()` and reauthenticates the account password before executing any deletion or database mutation.
-
-### Required Server Secrets
-```bash
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY="<staging-service-role-key>" ALLOWED_ORIGINS="https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app"
-```
-
-### Third-Party / Google-Only Accounts Handling
-- **Limitation:** Self-service deletion via password reauthentication is strictly limited to accounts with an email/password identity.
-- **Behavior:** Accounts created solely via third-party OAuth (e.g. Google-only) fail closed on the server with `400 UNSUPPORTED_AUTH_PROVIDER`.
-- **UI Presentation:** The frontend `DeleteAccountDialog` inspects account provider metadata; for Google-only accounts, it displays an explicit informational notice (*"Password reauthentication is not supported for accounts signed in with a third-party provider (such as Google). Self-service account deletion is unavailable for this account in this version. Please contact support if you need assistance deleting this account."*) and disables password submission.
+- **Local Database Archive:** A database dump exists locally.
+- **Archive Integrity Check:** Inspection via `pg_restore --list` succeeded with valid table definitions, sequences, and RPC signatures.
+- **Pending Restore Test:** Actual restore execution into an isolated target test database remains pending.
+- **Storage Objects:** Demo avatar object backup in Supabase Storage was intentionally skipped, as avatars were disposable development test fixtures.
 
 ---
 
-## 6. Two-User / Two-Browser Manual Acceptance Runbook
+## 6. Deletion Deployment Guidance & Edge Runtime Status
 
-To establish verified proof of cross-account isolation, learning reset, and account boundaries, PT should execute this sequence:
+### Managed vs. Custom Secrets
+- **Runtime-Provided Secrets:** In the Supabase Edge Functions runtime, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are automatically injected by the platform.
+- **Reserved Prefix Prohibition:** The Supabase CLI and Management API strictly prohibit setting secret names starting with the `SUPABASE_` prefix (`Secret name must not start with the SUPABASE_ prefix.`). Operators **must NOT** run `supabase secrets set SUPABASE_SERVICE_ROLE_KEY=...`.
+- **Custom Secret (`ALLOWED_ORIGINS`):** The only custom secret required for account deletion is `ALLOWED_ORIGINS` (or `ALLOWED_ORIGIN`). Set it with the active preview origin placeholder:
+  ```powershell
+  supabase secrets set ALLOWED_ORIGINS="https://<your-active-preview-origin>" --project-ref olwicxljwfemgrsbobtg
+  ```
+  *(Replace `https://<your-active-preview-origin>` with the exact URL of the Vercel preview deployment being tested, e.g. `https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app`)*.
 
-### Setup
-- **Session 1 (Browser A):** Standard browser window on Device/Profile A.
-- **Session 2 (Browser B):** Separate browser profile or Incognito on Device/Profile B.
-- Both sessions point to the active preview URL.
+### Gateway JWT Verification Decision
+- **Application-Level Security:** In `src/server/accountDeletion.js`, caller authentication is unconditionally verified in application code via `userClient.auth.getUser()` and fresh password reauthentication against `user.email`. Authentication is never bypassed regardless of gateway settings.
+- **Gateway Compatibility Check:**
+  - In Supabase Dashboard -> **Project Settings -> API -> JWT Settings / JWT Keys**, inspect whether project `olwicxljwfemgrsbobtg` uses **Symmetric (HS256)** or **Asymmetric (ECC / ES256 / RS256)** keys.
+  - If the project uses standard HS256 and Kong passes browser CORS preflight `OPTIONS`, deploy with standard gateway verification:
+    ```powershell
+    supabase functions deploy delete-account --project-ref olwicxljwfemgrsbobtg
+    ```
+  - If the project uses asymmetric keys (ES256) and Kong rejects tokens with `401 Invalid JWT`, or if Kong blocks unauthenticated `OPTIONS` preflights before reaching the function, deploy with:
+    ```powershell
+    supabase functions deploy delete-account --no-verify-jwt --project-ref olwicxljwfemgrsbobtg
+    ```
+  - *Status:* Because live hosted gateway compatibility has not yet been executed against project `olwicxljwfemgrsbobtg`, the final choice between standard deployment and `--no-verify-jwt` remains **pending operator verification**.
+
+### Native Deno Runtime Status
+- **Verification Boundary:** Local automated Node.js tests, syntax checks, and Vite builds do **NOT** prove native Deno or Supabase Edge runtime execution. Standalone `deno` CLI is not installed on the Windows host and local Docker is stopped. Native Deno/Edge runtime execution has not been verified locally and remains **pending hosted deployment**.
+
+### Google-Only Account Deletion Boundary
+- Self-service account deletion via password reauthentication requires an email/password identity.
+- Accounts created solely via third-party OAuth (e.g. Google-only) fail closed on the server with `400 UNSUPPORTED_AUTH_PROVIDER`.
+- In the frontend dialog, provider metadata is inspected (`isOAuthOnly`); for Google-only accounts, the dialog displays an informational notice and disables password submission.
+- *Status:* Third-party provider reauthentication remains an **unsupported, explicitly unresolved limitation** in this version.
+
+---
+
+## 7. Two-User / Two-Browser Manual Acceptance Runbook
+
+### Required Frontend Feature Gates
+To verify capabilities on the hosted preview, enable the corresponding feature flags in Vercel environment variables:
+- `VITE_ONLINE_SYNC_ENABLED=true` (Background online progress sync)
+- `VITE_CLOUD_IMPORT_STAGING=true` (Cloud guest import dialog & snapshot sync)
+- `VITE_ACCOUNT_PREFERENCES_SYNC_ENABLED=true` (Preferences cloud persistence)
+- `VITE_ACCOUNT_EXPORT_RESET_ENABLED=true` (Learning data export and reset)
+- `VITE_GOOGLE_AUTH_ENABLED=true` (Google OAuth sign-in)
+- `VITE_ACCOUNT_DELETION_ENABLED=true` (Self-service account deletion UI)
+- `VITE_PUBLISHED_CONTENT_ENABLED=true` (Curriculum database reads)
+
+> **Important:** Use operator-controlled disposable email accounts capable of receiving confirmation mail (e.g. via Zoho Mail or test inboxes). `@example.com` addresses are non-routable syntax placeholders only.
 
 ### Test Sequence
 1. **Guest Isolation:**
-   - In Browser A, learn 3 words and bookmark 2 cards in Guest mode.
-   - In Browser B, open the app in Guest mode.
-   - *Verification:* Browser B shows 0 saved cards (guest records remain strictly local to Browser A).
+   - In Browser 1, learn 3 words and bookmark 2 cards in Guest mode.
+   - In Browser 2, open the app in Guest mode.
+   - *Verification:* Browser 2 displays 0 saved cards (guest records remain strictly local to Browser 1).
 2. **Account A Registration & Guest Merge:**
-   - In Browser A, register a new disposable account `user-a@example.com`.
+   - In Browser 1, register a new disposable account `user-a@<operator-domain>`. Complete email verification.
    - Confirm guest import offer dialog. Complete import.
-   - *Verification:* `user-a` sees all 3 learned words and 2 bookmarks in collection.
-3. **Account B Isolation:**
-   - In Browser B, sign in as second disposable account `user-b@example.com`.
-   - *Verification:* `user-b` has zero saved items, zero streak, and default preferences. `user-a` data is completely invisible.
-4. **Preferences Persistence & Independence:**
-   - In Browser A (`user-a`), change theme to dark, speech rate to 0.75x, and active language to Japanese. Reload page.
-   - *Verification:* Browser A preserves settings. Browser B (`user-b`) remains on its own independent preferences.
-5. **Learning Export & Reset:**
-   - In Browser A (`user-a`), navigate to Settings/Profile -> Export Learning Data.
-   - *Verification:* Downloads valid JSON file containing `user-a`'s items and streak history.
-   - In Browser A (`user-a`), click Reset Learning Progress -> Confirm with `RESET`.
-   - *Verification:* `user-a`'s learned items are reset to zero. Profile and account remain signed in.
-   - *Cross-Check:* Refresh Browser B (`user-b`); verify `user-b` is completely unaffected.
-6. **Account Deletion (Email/Password):**
-   - In Browser A (`user-a`), click Delete Account.
+   - *Verification:* Account A sees all 3 learned words and 2 bookmarks in collection.
+3. **Same-Account Two-Session Cloud Persistence & Sync:**
+   - In Browser 2, sign into the **same** Account A (`user-a@<operator-domain>`).
+   - In Browser 1, learn 2 additional words -> Verify background sync completes.
+   - In Browser 2, refresh or trigger sync -> Verify the 2 new words appear in Browser 2.
+4. **Network Interruption & Sync Reconnect:**
+   - In Browser 1, disconnect network (or set DevTools Network to Offline).
+   - Learn 1 new word -> Verify local synchronous update and visible pending sync indicator.
+   - Re-enable network -> Trigger explicit retry or wait for auto-retry -> Verify pending mutation confirms with cloud.
+5. **Account-Switch Isolation (Same Browser):**
+   - In Browser 1, log out of Account A.
+   - Register or sign in as Account B (`user-b@<operator-domain>`) in Browser 1.
+   - *Verification:* Account A's local cache is cleared. Account B starts with clean state and does not inherit Account A's words, streak, or preferences.
+6. **Cross-Account Session Isolation (Two Browsers):**
+   - Browser 1 = Account A, Browser 2 = Account B.
+   - Change theme to dark and active language to Japanese in Browser 1.
+   - *Verification:* Browser 2 (Account B) remains completely isolated with its own independent preferences and vocabulary.
+7. **Learning Export & Reset (Verified Implementation Bounds):**
+   - In Browser 1 (Account A), navigate to Settings/Profile -> Export Learning Data.
+   - *Verification:* Downloads valid JSON containing all 8 learning tables across `zh` and `ja` (`saved_words`, `review_cards`, `search_history`, `written_chars`, `learned_radicals`, `learned_kana`, `learned_sounds`, `learned_words`), streak history, and preferences.
+   - In Browser 1 (Account A), click Reset Learning Progress -> Type `RESET` -> Confirm.
+   - *Verified Reset Scope:*
+     - **Cleared:** All 8 learning tables across `zh` and `ja`, pre-reset pending sync envelopes, and study streak (`user_study_streaks` reset to 0).
+     - **Retained:** Account session/auth (`auth.users`), profile (`public.profiles`, avatar, display name, email), user preferences (`public.user_preferences`, theme, speech rate, active language), and other local accounts.
+   - *Cross-Check:* Refresh Browser 2 (Account B); verify Account B is completely unaffected.
+8. **Account Deletion (Email/Password):**
+   - In Browser 1 (Account A), open Profile -> Delete Account.
    - Submit incorrect password -> Verify error alert; session preserved.
    - Type `DELETE` and correct password -> Submit.
-   - *Verification:* Client returns to guest mode with success banner. Attempting login as `user-a` fails with invalid credentials.
-7. **Google-Only Account Boundary:**
-   - In Browser B, sign in using Google account.
+   - *Verification:* Client returns to guest mode with success banner. Attempting login as Account A fails with invalid credentials.
+9. **Google-Only Account Boundary:**
+   - In Browser 2, sign in using Google account.
    - Open Profile -> Delete Account.
-   - *Verification:* Dialog shows explicit third-party provider notice; password input is disabled; no unauthenticated or broken requests sent.
+   - *Verification:* Dialog shows explicit unsupported notice and disables password submission (unresolved limitation).
 
 ---
 
-## 7. Content Handoff: Loading Client-Approved Curriculum
+## 8. Content Handoff: Loading Client-Approved Curriculum
 
-To load official, client-approved HSK1 or JLPT N5 vocabulary, use the verified content pipeline.
-
-### Prerequisites & Credentials
-Set operator environment variables:
-```bash
-export SUPABASE_URL="https://olwicxljwfemgrsbobtg.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="<staging-service-role-key>"
+### Prerequisites & PowerShell Environment
+In PowerShell, set operator environment variables:
+```powershell
+$env:SUPABASE_URL = "https://olwicxljwfemgrsbobtg.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY = "<staging-service-role-key>"
 ```
 *(Client-facing `VITE_*` keys are strictly rejected for write operations).*
 
-### Input CSV Schema & Templates
-Templates are located at:
-- `tools/content-csv/templates/hsk1-template.csv`
-- `tools/content-csv/templates/n5-template.csv`
-
+### Exact CSV Schema & Field Limits (from `validator.mjs`)
 Required CSV headers (all 11 columns required in exact order):
 ```csv
 id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burmese,audio_path,examples_json,sort_order
 ```
 
-**Column Rules:**
-- `id`: Alphanumeric identifier, max 64 characters (e.g. `zh-hsk1-001`, `ja-n5-001`).
-- `course_id`: Strictly `zh-hsk1` or `ja-n5`.
-- `language`: Strictly `zh` or `ja`.
-- `level_id`: Strictly `HSK1` or `N5`.
-- `written_form`: Hanzi or Kanji/Kana. **Natural identity key** (cannot be altered after publication).
-- `reading`: Pinyin with tone marks for Chinese; Kana for Japanese. **Natural identity key**.
-- `meaning_english`: English definition, max 255 chars.
-- `meaning_burmese`: Burmese definition, max 255 chars. (At least one meaning must be provided).
-- `audio_path`: Relative path under audio assets (e.g. `audio/zh/hsk1/001.mp3`), no leading `/` or `..`.
-- `examples_json`: Valid JSON array of up to 3 sentence objects: `[{"sentence":"...", "reading":"...", "translation":"..."}]`, or `[]`.
-- `sort_order`: Integer between 1 and 32767.
+**Field Rules:**
+- `id`: Required string, max **150** characters, unique per course.
+- `course_id`: Required string, max **100** characters (`zh-hsk1` or `ja-n5` currently supported).
+- `language`: Required string, strictly `zh` or `ja`.
+- `level_id`: Required string, max **100** characters (in database: `HSK1` for Chinese, `N5` for Japanese).
+- `written_form`: Required string, max **500** characters. **Natural identity key** (cannot be changed once published).
+- `reading`: Required string, max **2000** characters. **Natural identity key** (cannot be changed once published).
+- `meaning_english`: String, max **2000** characters.
+- `meaning_burmese`: String, max **2000** characters.
+- *Meaning Rule:* At least one meaning (`meaning_english` or `meaning_burmese`) is required; warning issued if one is missing.
+- `audio_path`: Optional string, max **256** characters. Relative storage path, forward slashes, no leading `/` or `..`, must end in `.mp3`, `.wav`, `.ogg`, `.m4a`, `.aac`, or `.webm`.
+- `examples_json`: JSON array string of up to **3** items. Each item is a JSON object with:
+  - `text`: Required non-empty string, max **1000** characters (the sentence text).
+  - `reading`: Optional string (pronunciation).
+  - `english`: Optional string (English translation).
+  - `burmese`: Optional string (Burmese translation).
+  - *Translation Rule:* At least one of `english` or `burmese` is required. Warning issued if one is missing.
+- `sort_order`: Required signed 32-bit integer (**-2147483648** to **2147483647**).
 
-### Step-by-Step Operator Commands
+### Illustrative CSV Example (Fixture)
+```csv
+id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burmese,audio_path,examples_json,sort_order
+zh_hsk1_001,zh-hsk1,zh,HSK1,中,zhōng,middle; center; China,အလယ်; အလယ်ဗဟို; တရုတ်,audio/zh/hsk1/001.mp3,"[{""text"": ""我是中国人。"", ""reading"": ""Wǒ shì Zhōngguó rén."", ""english"": ""I am Chinese."", ""burmese"": ""ကျွန်တော်/မ တရုတ်လူမျိုးပါ။""}]",10
+zh_hsk1_002,zh-hsk1,zh,HSK1,你好,nǐ hǎo,hello,မင်္ဂလာပါ,,"[{""text"": ""你好，我是学生。"", ""reading"": ""Nǐ hǎo, wǒ shì xuéshēng."", ""english"": ""Hello, I am a student."", ""burmese"": ""မင်္ဂလာပါ၊ ကျွန်တော်/မက ကျောင်းသားပါ။""}]",20
+zh_hsk1_003,zh-hsk1,zh,HSK1,谢谢,xiè xie,thank you,ကျေးဇူးတင်ပါတယ်,audio/zh/hsk1/003.mp3,[],30
+```
+
+### Executable Operator Commands (PowerShell)
 1. **Validate CSV (Offline):**
-   ```bash
+   ```powershell
    node tools/content-csv/content-manager.mjs validate <path-to-approved-content.csv>
    ```
-   Confirm output displays `"valid": true` and zero errors.
-2. **Dry-Run (Online diff comparison):**
-   ```bash
+   *Executed Result:*
+   `{"action":"validate","valid":true,"summary":{"total_rows":3,"valid_rows":3,"error_count":0,"warning_count":0}}`
+2. **Dry-Run (Online comparison):**
+   ```powershell
    node tools/content-csv/content-manager.mjs dry-run <path-to-approved-content.csv> --target staging
    ```
-   Inspect inserted, updated, unchanged, and retired item counts without modifying the database.
 3. **Stage Content:**
-   ```bash
+   ```powershell
    node tools/content-csv/content-manager.mjs stage <path-to-approved-content.csv> --target staging --operator "pt"
    ```
-   Copy the returned `stage_id` UUID from the output.
 4. **Publish Staged Content:**
-   ```bash
+   ```powershell
    node tools/content-csv/content-manager.mjs publish zh-hsk1 --stage-id <uuid> --target staging --reason "Client-approved HSK1 release"
    ```
    *(Automatically writes a pre-update backup to `./content-backups` before publishing).*
 5. **Inspect Status:**
-   ```bash
+   ```powershell
    node tools/content-csv/content-manager.mjs status zh-hsk1 --target staging
    ```
 6. **Rollback (if needed):**
-   ```bash
+   ```powershell
    node tools/content-csv/content-manager.mjs rollback zh-hsk1 --to-version <previous_version> --target staging --reason "Revert content typo"
    ```
 
 ---
 
-## 8. Exact Next Operator Steps
+## 9. Outstanding Production & Handover Tasks
 
-1. **Vercel Preview Configuration:**
-   - Configure preview environment variables in Vercel for the current branch:
-     - `VITE_SUPABASE_URL=https://olwicxljwfemgrsbobtg.supabase.co`
-     - `VITE_SUPABASE_PUBLISHABLE_KEY=<anon-key>`
-     - Optional capability gates: `VITE_ACCOUNT_DELETION_ENABLED=true`, `VITE_CLOUD_IMPORT_STAGING=true`.
-   - Redeploy the preview build with cleared build cache.
-2. **Deploy Deletion Edge Function:**
-   - Set secrets:
-     ```bash
-     supabase secrets set SUPABASE_SERVICE_ROLE_KEY="<staging-service-role-key>" ALLOWED_ORIGINS="https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app"
-     ```
-   - Deploy:
-     ```bash
-     supabase functions deploy delete-account
-     ```
-   - Test preflight OPTIONS and POST using curl.
-3. **Execute Two-User Acceptance Sequence:**
-   - Follow the 7-step sequence in Section 6.
-4. **Validate & Publish Client-Approved Curriculum:**
-   - Follow the 6-step content pipeline in Section 7.
-5. **Preserve Production Infrastructure:**
-   - Do NOT switch root DNS or Zoho Mail MX records until official production cutover.
+The following administrative, infrastructural, and deployment tasks remain pending:
+
+1. **SMTP & DNS Records**: Resend custom SMTP setup verified on sending subdomain `auth.swipe2study.com`. Preserve existing root domain DNS and Zoho Mail MX records without altering root configuration.
+2. **Google OAuth**: Google Cloud Console OAuth 2.0 Client credentials configured and verified with Lamduan email.
+3. **Account Deletion Edge Function**: Deploy `supabase/functions/delete-account` to project `olwicxljwfemgrsbobtg` after operator verification of gateway signing-key compatibility.
+4. **Feature Activation & Acceptance**: Progressively enable feature flags in preview, verifying each capability before general release.
+5. **Real Curriculum Content**: Validate and publish official HSK1 and JLPT N5 curriculum data using the content publication pipeline.
+6. **Dedicated Production Supabase Setup**: Provision a separate, clean production Supabase instance, apply migrations in order, and maintain strict environment isolation from staging.
+7. **Domain Cutover**: Complete official domain cutover to `swipe2study.com` after production verification.
+8. **Disaster Recovery Demonstration**: Execute an end-to-end database restore demonstration against an isolated test target using the database dump.
+9. **Final Polish & Review**: Perform final performance, security, and accessibility checks prior to launch.
 
 ---
 
-## 9. Zero-Credentials Compliance
+## 10. Zero-Credentials Compliance
 
 In accordance with repository security policies, this document contains zero passwords, tokens, JWTs, secret keys, or database dump contents.

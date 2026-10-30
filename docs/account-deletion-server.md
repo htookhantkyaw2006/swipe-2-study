@@ -191,14 +191,14 @@ Operators can safely reconcile and finalize the deletion without exposing any an
 
 ## 7. Environment Variables & Staging Deployment
 
-### Client & Server Environment Variable Names Only (No Secrets)
+### Client & Server Environment Variables
 - `VITE_ACCOUNT_DELETION_ENABLED`: Client capability gate flag (boolean string `'true'`). Disabled by default. Completely independent of `VITE_CLOUD_IMPORT_STAGING`.
-- `SUPABASE_URL` / `VITE_SUPABASE_URL`: HTTPS project origin of the Supabase project. Automatically provided by Supabase Edge runtime or server environment.
-- `SUPABASE_ANON_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY`: Public anon/publishable key for user authentication.
-- `SUPABASE_SERVICE_ROLE_KEY`: Privileged secret key for administrative Storage cleanup, Auth deletion, and durable attempt throttling.
-- `ALLOWED_ORIGINS` / `ALLOWED_ORIGIN`: Comma- or whitespace-separated list of permitted web origins for CORS validation. In the staging Edge Function, defaults to verified staging preview origin `https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app`. Hardcoded wildcard (`*`) access has been removed.
+- `SUPABASE_URL` / `VITE_SUPABASE_URL`: HTTPS project origin of the Supabase project. In Supabase Edge Functions, this is automatically provided by the platform runtime.
+- `SUPABASE_ANON_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY`: Public anon/publishable key for user authentication. In Supabase Edge Functions, this is automatically provided by the platform runtime.
+- `SUPABASE_SERVICE_ROLE_KEY`: Privileged secret key for administrative Storage cleanup, Auth deletion, and durable attempt throttling. In Supabase Edge Functions, this is **automatically injected by the platform runtime**. Do not set custom secrets starting with `SUPABASE_` as the Supabase CLI strictly prohibits reserved prefixes.
+- `ALLOWED_ORIGINS` / `ALLOWED_ORIGIN`: Custom secret containing comma- or whitespace-separated list of permitted web origins for CORS validation. Must match the active frontend preview/production URL being tested.
 
-> **Security Rule:** `SUPABASE_SERVICE_ROLE_KEY` must exist **only** in server environment variables or Supabase Edge Function secrets. It must **never** be prefixed with `VITE_` or included in frontend bundles.
+> **Security Rule:** `SUPABASE_SERVICE_ROLE_KEY` must exist **only** in server environment variables or platform-injected Edge Function secrets. It must **never** be prefixed with `VITE_` or included in frontend bundles.
 
 ### Staging Deployment & Verification Prerequisites
 1. Apply both required additive database migrations to the staging project:
@@ -214,27 +214,34 @@ Operators can safely reconcile and finalize the deletion without exposing any an
           to_regprocedure('public.s2s_get_deletion_state(uuid)') AS get_state_rpc;
    ```
    Confirm all deletion RPCs have execution revoked from `public`, `anon`, and `authenticated`, and granted exclusively to `service_role`.
-3. Set Edge Function secrets on the staging project:
-   ```bash
-   supabase secrets set SUPABASE_SERVICE_ROLE_KEY="<staging-service-role-key>" ALLOWED_ORIGINS="https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app"
+3. Set custom CORS origin secret on the staging project (PowerShell syntax):
+   ```powershell
+   supabase secrets set ALLOWED_ORIGINS="https://<your-active-preview-origin>" --project-ref olwicxljwfemgrsbobtg
    ```
+   *(Note: Do NOT set `SUPABASE_SERVICE_ROLE_KEY` here; it is automatically provided by the runtime).*
 4. Deploy the Edge Function:
-   ```bash
-   supabase functions deploy delete-account
-   ```
-   *(Do NOT use `--no-verify-jwt`. Gateway JWT verification is enabled; requests supply `Authorization: Bearer <token>`).*
+   - In Supabase Dashboard -> **Project Settings -> API -> JWT Settings / JWT Keys**, check if project `olwicxljwfemgrsbobtg` uses **HS256** or **ES256** signing keys.
+   - Standard deployment (if HS256 and gateway passes preflight `OPTIONS`):
+     ```powershell
+     supabase functions deploy delete-account --project-ref olwicxljwfemgrsbobtg
+     ```
+   - Bypassing gateway verification (if ES256 asymmetric keys or gateway blocks preflight `OPTIONS`):
+     ```powershell
+     supabase functions deploy delete-account --no-verify-jwt --project-ref olwicxljwfemgrsbobtg
+     ```
+   *(Application-level caller authentication via `userClient.auth.getUser()` and password reauthentication are unconditionally enforced in function code either way).*
 5. Execute preflight HTTP checks:
    - **OPTIONS preflight**:
      ```bash
-     curl -i -X OPTIONS "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
-       -H "Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app" \
+     curl -i -X OPTIONS "https://olwicxljwfemgrsbobtg.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://<your-active-preview-origin>" \
        -H "Access-Control-Request-Method: POST" \
        -H "Access-Control-Request-Headers: authorization, content-type, apikey, x-client-info"
      ```
-     Confirm HTTP 200 `ok`, `Access-Control-Allow-Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app`, and `Vary: Origin`.
+     Confirm HTTP 200 `ok`, `Access-Control-Allow-Origin: https://<your-active-preview-origin>`, and `Vary: Origin`.
    - **Unauthorized origin rejection**:
      ```bash
-     curl -i -X OPTIONS "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
+     curl -i -X OPTIONS "https://olwicxljwfemgrsbobtg.supabase.co/functions/v1/delete-account" \
        -H "Origin: https://unauthorized.origin.com" \
        -H "Access-Control-Request-Method: POST"
      ```
@@ -247,7 +254,7 @@ Operators can safely reconcile and finalize the deletion without exposing any an
    ```
 
 ### Disposable-Account Staging Acceptance Steps
-1. **Account Setup**: Register a new disposable staging account (e.g. `stage-del-user@example.com`) and upload a test avatar image via `/profile/edit`.
+1. **Account Setup**: Register a new operator-controlled disposable staging account (capable of receiving confirmation mail) and upload a test avatar image via `/profile/edit`.
 2. **Wrong Password & Throttling**:
    - Open `/profile` -> **Delete Account**.
    - Submit incorrect password -> Verify immediate 401 `INVALID_CREDENTIALS`, error alert, and preserved session.
@@ -263,8 +270,8 @@ Operators can safely reconcile and finalize the deletion without exposing any an
    - `private.account_deletions`: 1 row with `status = 'finalized'`, recording audit timestamps for storage cleanup, auth deletion, and finalization.
 
 ### Tooling Status & Verification Levels
-- **Local Automated Testing (Node.js & PGlite)**: 41 automated deletion tests pass locally (client coordination, dialog accessibility, HTTP preflight and boundary rejection, PGlite database locking, attempt reservation concurrency, and storage/auth lifecycle cascades).
-- **Standalone Deno Environment (Recorded Limitation)**: Neither `deno` nor `supabase` CLI is installed in the local Windows system PATH. Edge Function runtime execution could not be executed locally in Deno; entry point compatibility was verified through Web Standard APIs (`Request`, `Response`, `Headers`) and Node/ESM module loading.
+- **Local Automated Testing (Node.js & PGlite)**: 43 automated deletion tests pass locally (client coordination, dialog accessibility, HTTP preflight and boundary rejection, PGlite database locking, attempt reservation concurrency, and storage/auth lifecycle cascades).
+- **Standalone Deno Environment (Recorded Limitation)**: Standalone `deno` CLI is not installed on the local Windows system PATH, and local Docker is stopped. Node/ESM module tests do not prove native Deno execution; native runtime execution has **not** been executed locally and remains **pending hosted deployment**.
 - **Hosted Execution (Pending)**: Real Supabase Edge Function invocation on staging project `olwicxljwfemgrsbobtg` remains pending deployment by an operator with CLI access.
 
 ---

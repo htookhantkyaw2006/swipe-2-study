@@ -118,44 +118,51 @@ where id = 'avatars';
 
 - **Prerequisite**: Stage 3 completed (both `20261029000100_account_deletion_foundation.sql` and `20261029000200_account_deletion_attempt_reservation.sql` applied). Supabase CLI installed on deploy machine or CI runner.
 - **Configuration & Secrets Setup**:
-  1. In Supabase Dashboard -> **Project Settings** -> **Edge Functions** -> **Secrets** (or via `supabase secrets set`):
-     * Set `SUPABASE_SERVICE_ROLE_KEY` to the staging service role secret.
-     * Set `ALLOWED_ORIGINS` to the verified staging preview origin: `https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app` (do not add unverified wildcard `*` or guessed production origins).
-     * Note: `SUPABASE_URL` and `SUPABASE_ANON_KEY` are automatically provided by the Supabase Edge runtime (or pass explicitly when running outside managed runtime).
-     * ⚠️ **Security Boundary**: Never put `SUPABASE_SERVICE_ROLE_KEY` into frontend `.env` or Git.
-- **Deployment Command**:
-  ```bash
-  supabase functions deploy delete-account
-  ```
-  *(Note: Standard API Gateway JWT verification is retained. The client contract in `accountDeletionClient.js` passes `Authorization: Bearer <token>`. Do NOT pass `--no-verify-jwt`. The gateway enforces bearer token structure, and the function executes application-level caller identity validation and fresh password reauthentication).*
+  1. In Supabase Edge Functions runtime, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are automatically provided by the platform.
+  2. The Supabase CLI prohibits custom secrets starting with the reserved `SUPABASE_` prefix. Do **NOT** set `SUPABASE_SERVICE_ROLE_KEY` via CLI.
+  3. Set the custom CORS allowlist secret (`ALLOWED_ORIGINS`) in PowerShell:
+     ```powershell
+     supabase secrets set ALLOWED_ORIGINS="https://<your-active-preview-origin>" --project-ref olwicxljwfemgrsbobtg
+     ```
+     *(Replace `https://<your-active-preview-origin>` with the active preview deployment URL under test)*.
+- **Deployment Command (PowerShell)**:
+  - Check whether project `olwicxljwfemgrsbobtg` uses HS256 or ES256 signing keys in the dashboard:
+    ```powershell
+    # Standard deployment (if HS256 and gateway passes preflight OPTIONS)
+    supabase functions deploy delete-account --project-ref olwicxljwfemgrsbobtg
+
+    # If ES256 asymmetric keys or if gateway blocks preflight OPTIONS
+    supabase functions deploy delete-account --no-verify-jwt --project-ref olwicxljwfemgrsbobtg
+    ```
+  *(Note: Application-level caller identity validation and password reauthentication are unconditionally enforced in `src/server/accountDeletion.js` either way).*
 - **HTTP Boundary Verification (curl)**:
   1. **Test OPTIONS Preflight with Allowlisted Origin**:
      ```bash
-     curl -i -X OPTIONS "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
-       -H "Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app" \
+     curl -i -X OPTIONS "https://olwicxljwfemgrsbobtg.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://<your-active-preview-origin>" \
        -H "Access-Control-Request-Method: POST" \
        -H "Access-Control-Request-Headers: authorization, content-type, apikey, x-client-info"
      ```
-     *Expected*: HTTP 200 `ok`, with headers `Access-Control-Allow-Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app`, `Vary: Origin`, `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Expose-Headers: Retry-After, Content-Type`.
+     *Expected*: HTTP 200 `ok`, with headers `Access-Control-Allow-Origin: https://<your-active-preview-origin>`, `Vary: Origin`, `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Expose-Headers: Retry-After, Content-Type`.
   2. **Test OPTIONS Preflight with Disallowed Origin**:
      ```bash
-     curl -i -X OPTIONS "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
+     curl -i -X OPTIONS "https://olwicxljwfemgrsbobtg.supabase.co/functions/v1/delete-account" \
        -H "Origin: https://malicious.example.com" \
        -H "Access-Control-Request-Method: POST"
      ```
      *Expected*: HTTP 403 `{"error":"Origin not allowed by CORS policy.","code":"CORS_ORIGIN_DENIED"}` and no `Access-Control-Allow-Origin` header.
   3. **Test Unauthenticated POST**:
      ```bash
-     curl -i -X POST "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
-       -H "Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app" \
+     curl -i -X POST "https://olwicxljwfemgrsbobtg.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://<your-active-preview-origin>" \
        -H "Content-Type: application/json" \
        -d '{"password":"test"}'
      ```
      *Expected*: HTTP 401 with JSON `{"error":"Authentication header is required.","code":"UNAUTHENTICATED"}` (or gateway 401) with CORS headers matching the allowlisted Origin.
   4. **Test POST with Valid JWT and Wrong Password**:
      ```bash
-     curl -i -X POST "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
-       -H "Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app" \
+     curl -i -X POST "https://olwicxljwfemgrsbobtg.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://<your-active-preview-origin>" \
        -H "Authorization: Bearer <disposable_user_access_token>" \
        -H "apikey: <staging-anon-key>" \
        -H "Content-Type: application/json" \
