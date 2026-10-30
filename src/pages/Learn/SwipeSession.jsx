@@ -10,6 +10,7 @@ import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
 import { readSessionCards } from '../../lib/studyWords';
 import { phraseCards } from '../../lib/phraseCards';
 import { recordWordAction } from '../../lib/vocabularyProgress';
+import { usePublishedCourse } from '../../lib/publishedContentContext';
 import './SwipeSession.css';
 
 const ShuffleDeck = ({ reducedMotion }) => (
@@ -58,6 +59,15 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
   };
   const playWord = (event) => {
     event.stopPropagation();
+    if (card?.audio_path && typeof Audio !== 'undefined') {
+      try {
+        const audio = new Audio(card.audio_path);
+        audio.play().catch(() => speak(sayOf(card)));
+        return;
+      } catch {
+        // Fall back to speech synthesis
+      }
+    }
     speak(sayOf(card));
   };
   const pronunciation = card.pronunciation ?? readingOf(card);
@@ -183,12 +193,33 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const course = useCourse();
   const { prefs } = usePreferences();
   const reducedMotion = useReducedMotion();
+  const targetLevel = levelId || course.levels[0]?.id;
+  const publishedCourse = usePublishedCourse(targetLevel);
+  const isPublishedSession = !isReview && !isSaved && !isPhrases && publishedCourse.enabled && publishedCourse.isInScope;
+
   // A session snapshots its deck; preferences cannot replace cards mid-session.
   const [cards, setCards] = useState(() => {
+    if (isPublishedSession) {
+      if (publishedCourse.isLoaded) {
+        const allCards = publishedCourse.items;
+        return (prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards).slice(0, prefs.cardsPerSession);
+      }
+      return [];
+    }
     const allCards = isPhrases ? phraseCards(course, levelId) : readSessionCards(db, { mode: isReview ? 'review' : isSaved ? 'saved' : 'learn', levelId });
     if (isReview || isSaved) return allCards;
     return (prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards).slice(0, prefs.cardsPerSession);
   });
+
+  const initializedRef = useRef(isPublishedSession && publishedCourse.isLoaded);
+  useEffect(() => {
+    if (isPublishedSession && publishedCourse.isLoaded && !initializedRef.current) {
+      initializedRef.current = true;
+      const allCards = publishedCourse.items;
+      setCards((prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards).slice(0, prefs.cardsPerSession));
+    }
+  }, [isPublishedSession, publishedCourse.isLoaded, publishedCourse.items, prefs.cardOrder, prefs.cardsPerSession]);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
@@ -207,7 +238,18 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   useEffect(() => {
     const card = cards[currentIndex];
-    if (card && prefs.autoPlayAudio) speak(sayOf(card));
+    if (card && prefs.autoPlayAudio) {
+      if (card.audio_path && typeof Audio !== 'undefined') {
+        try {
+          const audio = new Audio(card.audio_path);
+          audio.play().catch(() => speak(sayOf(card)));
+          return;
+        } catch {
+          // Fall back to speech synthesis
+        }
+      }
+      speak(sayOf(card));
+    }
   }, [cards, currentIndex, prefs.autoPlayAudio]);
 
   const triggerSwipe = (direction, swipedCard = cards[currentIndex]) => {
@@ -248,6 +290,47 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       actionLocked.current = false;
     }, reducedMotion ? 0 : 450);
   };
+
+  if (isPublishedSession && publishedCourse.isLoading) {
+    return (
+      <div className="swipe-session swipe-session--loading">
+        <div className="swipe-empty" role="status" aria-live="polite">
+          <div className="study-spinner" aria-hidden="true" />
+          <h1>Loading flashcards...</h1>
+          <p>Preparing published course content</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPublishedSession && publishedCourse.isError) {
+    return (
+      <div className="swipe-session swipe-session--error">
+        <div className="swipe-empty" role="alert">
+          <X size={32} aria-hidden="true" style={{ color: '#B91C1C', margin: '0 auto 16px' }} />
+          <h1>Unable to load flashcards</h1>
+          <p>{publishedCourse.error?.message || 'Failed to load published course content.'}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button className="btn-primary" onClick={publishedCourse.retry}>Retry</button>
+            <button className="btn-secondary" onClick={() => navigate(backTo)}>Back to course</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPublishedSession && publishedCourse.isUnpublished) {
+    return (
+      <div className="swipe-session swipe-session--empty">
+        <div className="swipe-empty">
+          <Check size={32} aria-hidden="true" />
+          <h1>Course not published</h1>
+          <p>This course has not been published yet.</p>
+          <button className="btn-primary" onClick={() => navigate(backTo)}>Back to courses</button>
+        </div>
+      </div>
+    );
+  }
 
   if (cards.length === 0) return (
     <div className="swipe-session swipe-session--empty">

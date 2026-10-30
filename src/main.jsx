@@ -13,6 +13,7 @@ import OnlineSyncProvider from './components/OnlineSyncProvider.jsx'
 import { recoveryLink } from './lib/recoveryLink.js'
 import './responsive-tools.css'
 import GuestImportProvider from './components/GuestImportProvider.jsx'
+import { PublishedContentProvider } from './lib/publishedContentContext.jsx'
 
 // Capture and scrub custom recovery links before Auth or Router initialization.
 recoveryLink.capture(window.location.href, path => window.history.replaceState(window.history.state, '', path));
@@ -32,7 +33,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <LanguageProvider>
               <BrowserRouter>
                 <GuestImportProvider>
-                  <CourseShell />
+                  <PublishedContentProvider>
+                    <CourseShell />
+                  </PublishedContentProvider>
                 </GuestImportProvider>
               </BrowserRouter>
             </LanguageProvider>

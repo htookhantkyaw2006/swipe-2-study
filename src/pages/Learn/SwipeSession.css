@@ -99,7 +99,7 @@
 .swipe-session button:active:not(:disabled) { transform: scale(0.96); }
 .swipe-shuffle { position: absolute; inset: 0; pointer-events: none; }
 .swipe-shuffle__card { background: white; border: 1px solid var(--color-border); box-shadow: var(--shadow-soft); }
-.swipe-session--empty { justify-content: center; }
+.swipe-session--empty, .swipe-session--loading, .swipe-session--error { justify-content: center; }
 .swipe-session--phrases .swipe-card__character { white-space: normal; overflow-wrap: anywhere; font-size: clamp(1.5rem, 9cqi, 2.5rem); }
 .swipe-session--phrases .swipe-card__word { overflow-y: auto; overscroll-behavior-y: contain; }
 /* Scrollable faces must declare their own gesture policy: the browser stops

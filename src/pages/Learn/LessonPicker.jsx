@@ -9,6 +9,7 @@ import { speak } from '../../lib/speech';
 import { StudyHeader, StudySearch } from '../../components/study/StudyPage';
 import { getLevelProgress } from '../../lib/vocabularyProgress';
 import { storageOwner } from '../../lib/storageOwner';
+import { usePublishedCourse } from '../../lib/publishedContentContext';
 import './LessonPicker.css';
 
 export default function LessonPicker() {
@@ -31,15 +32,57 @@ export default function LessonPicker() {
     || course.levels.find(item => String(item.num) === String(levelId).replace(/\D/g, ''))
     || course.levels[0];
   const [query, setQuery] = useState('');
-  const words = useMemo(() => db.get('flashcards').filter(word => word.level === level.id), [level.id]);
+
+  const publishedCourse = usePublishedCourse(level.id);
+  const isPublishedLevel = publishedCourse.enabled && publishedCourse.isInScope;
+
+  const words = useMemo(() => {
+    if (isPublishedLevel) {
+      return publishedCourse.isLoaded ? publishedCourse.items : [];
+    }
+    if (publishedCourse.enabled && !publishedCourse.isInScope) {
+      return [];
+    }
+    return db.get('flashcards').filter(word => word.level === level.id);
+  }, [isPublishedLevel, publishedCourse.isLoaded, publishedCourse.items, publishedCourse.enabled, publishedCourse.isInScope, level.id]);
+
   const visibleWords = filterStudyWords(words, query);
   const reviewCount = db.get('review_cards').length;
   const savedCount = db.get('saved_words').length;
 
+  const totalWords = isPublishedLevel
+    ? (publishedCourse.isLoaded ? publishedCourse.items.length : 0)
+    : (publishedCourse.enabled ? 0 : level.words);
+
   // Real progress derived from learner records
-  const progress = getLevelProgress(db, level.id, course);
+  const progress = getLevelProgress(db, level.id, course, null, isPublishedLevel ? totalWords : (publishedCourse.enabled ? 0 : null));
   const completed = progress.uniqueLearned;
-  const percent = progress.percent;
+  const percent = totalWords > 0 ? Math.min(100, Math.floor((completed / totalWords) * 100)) : 0;
+
+  const playWordAudio = (word) => {
+    if (word?.audio_path && typeof Audio !== 'undefined') {
+      try {
+        const audio = new Audio(word.audio_path);
+        audio.play().catch(() => speak(sayOf(word)));
+        return;
+      } catch {
+        // Fall back to TTS
+      }
+    }
+    speak(sayOf(word));
+  };
+
+  const heroSubtitle = publishedCourse.isLoading
+    ? 'Loading curriculum...'
+    : isPublishedLevel
+      ? (publishedCourse.isError
+          ? 'Error loading curriculum'
+          : publishedCourse.isUnpublished
+            ? 'Unpublished curriculum'
+            : `${completed.toLocaleString()} / ${totalWords.toLocaleString()} completed`)
+      : course.id === 'zh'
+        ? `${completed.toLocaleString()} / ${level.words.toLocaleString()} completed`
+        : `${level.words.toLocaleString()} vocabulary words`;
 
   return (
     <div className="study-page lesson-page">
@@ -58,15 +101,11 @@ export default function LessonPicker() {
           >
             <p className="study-eyebrow">{level.tier}</p>
             <h2>{level.name}</h2>
-            <p>
-              {course.id === 'zh'
-                ? `${completed.toLocaleString()} / ${level.words.toLocaleString()} completed`
-                : `${level.words.toLocaleString()} vocabulary words`}
-            </p>
+            <p>{heroSubtitle}</p>
             <div className="lesson-hero__progress">
               <div className="lesson-hero__progress-label"><span>Course progress</span><span>{percent}%</span></div>
-              <progress aria-label="Course progress" value={completed} max={level.words} />
-              <p>{completed.toLocaleString()} of {level.words.toLocaleString()} words</p>
+              <progress aria-label="Course progress" value={completed} max={totalWords || 1} />
+              <p>{completed.toLocaleString()} of {totalWords.toLocaleString()} words</p>
             </div>
           </section>
           <section className="lesson-modules" aria-labelledby="lesson-modules-title">
@@ -99,10 +138,38 @@ export default function LessonPicker() {
               <div><h2 id="lesson-browser-title">Browse words</h2><p role="status">{visibleWords.length} of {words.length} available</p></div>
               <StudySearch value={query} onChange={setQuery} label="Search course words" />
             </div>
-            {words.length === 0 ? (
-              <div className="study-empty"><Layers size={30} aria-hidden="true" /><h3>More words on the way</h3><p>No {level.name} words yet. This level’s content is still being added.</p><Link className="study-text-link" to="/learn">Explore other courses</Link></div>
+            {isPublishedLevel && publishedCourse.isLoading ? (
+              <div className="study-loading" role="status" aria-live="polite">
+                <div className="study-spinner" aria-hidden="true" />
+                <h3>Loading course content...</h3>
+                <p>Retrieving published vocabulary for {level.name}.</p>
+              </div>
+            ) : isPublishedLevel && publishedCourse.isError ? (
+              <div className="study-error" role="alert">
+                <h3>Unable to load course content</h3>
+                <p>{publishedCourse.error?.message || 'Failed to retrieve published vocabulary. Please check your connection and retry.'}</p>
+                <button className="btn-primary" onClick={publishedCourse.retry}>Retry</button>
+              </div>
+            ) : isPublishedLevel && publishedCourse.isUnpublished ? (
+              <div className="study-empty">
+                <Layers size={30} aria-hidden="true" />
+                <h3>Course not published</h3>
+                <p>Content for {level.name} has not been published yet.</p>
+                <Link className="study-text-link" to="/learn">Explore other courses</Link>
+              </div>
+            ) : words.length === 0 ? (
+              <div className="study-empty">
+                <Layers size={30} aria-hidden="true" />
+                <h3>More words on the way</h3>
+                <p>No {level.name} words yet. This level’s content is still being added.</p>
+                <Link className="study-text-link" to="/learn">Explore other courses</Link>
+              </div>
             ) : visibleWords.length === 0 ? (
-              <div className="study-empty"><h3>No matching words</h3><p>Try another word, reading or meaning.</p><button className="btn-secondary" onClick={() => setQuery('')}>Clear search</button></div>
+              <div className="study-empty">
+                <h3>No matching words</h3>
+                <p>Try another word, reading or meaning.</p>
+                <button className="btn-secondary" onClick={() => setQuery('')}>Clear search</button>
+              </div>
             ) : (
               <ul className="lesson-word-list" aria-label={`${level.name} vocabulary`}>
                 {visibleWords.map(stored => {
@@ -118,7 +185,7 @@ export default function LessonPicker() {
                         {word.english && <p lang="en">{word.english}</p>}
                         {word.burmese && <p lang="my">{word.burmese}</p>}
                       </div>
-                      <button className="study-icon-button" onClick={() => speak(sayOf(stored))} aria-label={`Play word: ${word.phrase}`}><Volume2 size={20} aria-hidden="true" /></button>
+                      <button className="study-icon-button" onClick={() => playWordAudio(stored)} aria-label={`Play word: ${word.phrase}`}><Volume2 size={20} aria-hidden="true" /></button>
                     </li>
                   );
                 })}

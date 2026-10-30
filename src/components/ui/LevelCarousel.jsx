@@ -5,10 +5,13 @@ import { useCourse } from '../../lib/language';
 import { db } from '../../lib/db';
 import { getLevelProgress } from '../../lib/vocabularyProgress';
 import { storageOwner } from '../../lib/storageOwner';
+import { usePublishedContent } from '../../lib/publishedContentContext';
+import { resolvePublishedCourseId } from '../../lib/publishedContentService';
 
 export default function LevelCarousel() {
   const course = useCourse();
   const navigate = useNavigate();
+  const publishedContent = usePublishedContent();
   const [activeIndex, setActiveIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
   const [, setTick] = useState(0);
@@ -26,10 +29,16 @@ export default function LevelCarousel() {
   const level = course.levels[activeIndex] || course.levels[0];
   if (!level) return null;
 
+  const publishedCourseId = resolvePublishedCourseId(course.id, level.id);
+  const isInScope = publishedContent.enabled && Boolean(publishedCourseId);
+  const publishedState = publishedCourseId ? publishedContent.getCourseState(publishedCourseId) : null;
+  const isLoaded = publishedState?.status === 'loaded';
+  const availableCount = isLoaded ? publishedState.items.length : (publishedContent.enabled ? 0 : level.words);
+
   // Real progress derived from learner records
-  const progress = getLevelProgress(db, level.id, course);
+  const progress = getLevelProgress(db, level.id, course, null, isInScope ? availableCount : (publishedContent.enabled ? 0 : null));
   const completed = progress.uniqueLearned;
-  const percent = progress.percent;
+  const percent = availableCount > 0 ? Math.min(100, Math.floor((completed / availableCount) * 100)) : 0;
   const changeLevel = delta => setActiveIndex(index => Math.max(0, Math.min(course.levels.length - 1, index + delta)));
 
   const cardStyle = {
@@ -41,9 +50,17 @@ export default function LevelCarousel() {
     boxShadow: level.shadow ? `0 14px 34px ${level.shadow}` : undefined,
   };
 
-  const wordCountText = course.id === 'zh'
-    ? `${completed.toLocaleString()} / ${level.words.toLocaleString()} completed`
-    : `${level.words.toLocaleString()} words to explore`;
+  const wordCountText = publishedState?.status === 'loading'
+    ? 'Loading curriculum...'
+    : isInScope
+      ? (publishedState?.status === 'error'
+          ? 'Error loading curriculum'
+          : publishedState?.status === 'unpublished'
+            ? 'Curriculum coming soon'
+            : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
+      : course.id === 'zh'
+        ? `${completed.toLocaleString()} / ${level.words.toLocaleString()} completed`
+        : `${level.words.toLocaleString()} words to explore`;
 
   return (
     <div className="course-browser" aria-label={`${course.name} flashcard levels`}>

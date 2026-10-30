@@ -176,9 +176,9 @@ export function getCourseProgress(database, course, language = null) {
   };
 }
 
-export function getLevelProgress(database, levelId, course, language = null) {
+export function getLevelProgress(database, levelId, course, language = null, totalTargetOverride = null) {
   const courseProgress = getCourseProgress(database, course, language);
-  return courseProgress.levels[levelId] || {
+  const base = courseProgress.levels[levelId] || {
     id: levelId,
     name: levelId,
     words: 0,
@@ -187,6 +187,18 @@ export function getLevelProgress(database, levelId, course, language = null) {
     uniqueLearned: 0,
     percent: 0,
   };
+
+  if (totalTargetOverride !== null && totalTargetOverride !== undefined) {
+    const totalTarget = totalTargetOverride;
+    const percent = totalTarget > 0 ? Math.min(100, Math.floor((base.uniqueLearned / totalTarget) * 100)) : 0;
+    return {
+      ...base,
+      words: totalTarget,
+      percent,
+    };
+  }
+
+  return base;
 }
 
 export function resetVocabularyProgress(database, language = null) {

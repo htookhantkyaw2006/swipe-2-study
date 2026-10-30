@@ -3,31 +3,64 @@ import { ArrowUpRight, ChevronRight } from 'lucide-react';
 import { useCourse } from '../../lib/language';
 import { db } from '../../lib/db';
 import { phraseCards } from '../../lib/phraseCards';
+import { usePublishedContent } from '../../lib/publishedContentContext';
+import { resolvePublishedCourseId } from '../../lib/publishedContentService';
 import LearningIcon from '../ui/LearningIcon';
 import { StudyHeader } from './StudyPage';
 import './LevelOverview.css';
 
 export default function LevelOverview({ phrases = false }) {
   const course = useCourse();
-  const words = phrases ? [] : db.get('flashcards');
-  return <div className="study-page level-overview">
-    <StudyHeader title={phrases ? 'Learn phrases' : course.copy.coursesTitle} subtitle={`${course.name} · ${course.levelSystem}`} backTo="/" backLabel="Back to Home" />
-    <section className="level-overview__hero">
-      <div><p className="study-eyebrow">{phrases ? 'WORDS IN CONTEXT' : 'YOUR LEARNING PATH'}</p><h2>{phrases ? 'Small phrases. Real conversations.' : course.copy.pickerHeadline}</h2><p>{phrases ? 'Choose a level and practise everyday expressions.' : 'Build your vocabulary with short, focused practice.'}</p></div>
-      <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
-    </section>
-    <div className="study-section-heading"><div><h2>{course.copy.allLevels}</h2><p>Choose a level to see its available lessons.</p></div><span className="level-overview__meta">{course.levels.length} levels <ArrowUpRight size={16} aria-hidden="true" /></span></div>
-    <div className="level-overview__grid">
-      {course.levels.map(level => {
-        const count = phrases ? phraseCards(course, level.id).length : words.filter(word => word.level === level.id).length;
-        return <Link key={level.id} className="level-tile" style={{ '--level-accent': level.gradientEnd, '--level-tint': level.gradientStart }} to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}>
-          <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
-          <span className="level-tile__tier">{level.tier}</span>
-          <h3>{level.name}</h3><p>{count ? `${count} ${phrases ? 'phrases' : 'cards'} available` : 'Content coming soon'}</p>
-          <span className="level-tile__action">Explore level <ChevronRight size={16} aria-hidden="true" /></span>
-          <span className="level-tile__watermark" aria-hidden="true">{level.numeral || level.badge}</span>
-        </Link>;
-      })}
+  const { enabled, getCourseState } = usePublishedContent();
+  const localWords = phrases ? [] : db.get('flashcards');
+
+  return (
+    <div className="study-page level-overview">
+      <StudyHeader title={phrases ? 'Learn phrases' : course.copy.coursesTitle} subtitle={`${course.name} · ${course.levelSystem}`} backTo="/" backLabel="Back to Home" />
+      <section className="level-overview__hero">
+        <div><p className="study-eyebrow">{phrases ? 'WORDS IN CONTEXT' : 'YOUR LEARNING PATH'}</p><h2>{phrases ? 'Small phrases. Real conversations.' : course.copy.pickerHeadline}</h2><p>{phrases ? 'Choose a level and practise everyday expressions.' : 'Build your vocabulary with short, focused practice.'}</p></div>
+        <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
+      </section>
+      <div className="study-section-heading"><div><h2>{course.copy.allLevels}</h2><p>Choose a level to see its available lessons.</p></div><span className="level-overview__meta">{course.levels.length} levels <ArrowUpRight size={16} aria-hidden="true" /></span></div>
+      <div className="level-overview__grid">
+        {course.levels.map(level => {
+          let countText = 'Content coming soon';
+          if (phrases) {
+            const count = phraseCards(course, level.id).length;
+            countText = count ? `${count} phrases available` : 'Content coming soon';
+          } else if (enabled) {
+            const publishedCourseId = resolvePublishedCourseId(course.id, level.id);
+            if (publishedCourseId) {
+              const state = getCourseState(publishedCourseId);
+              if (state.status === 'loading') {
+                countText = 'Loading content...';
+              } else if (state.status === 'error') {
+                countText = 'Unable to load content';
+              } else if (state.status === 'loaded') {
+                const count = state.items.length;
+                countText = count ? `${count} ${count === 1 ? 'card' : 'cards'} available` : 'No cards available';
+              } else {
+                countText = 'Content coming soon';
+              }
+            } else {
+              countText = 'Content coming soon';
+            }
+          } else {
+            const count = localWords.filter(word => word.level === level.id).length;
+            countText = count ? `${count} cards available` : 'Content coming soon';
+          }
+
+          return (
+            <Link key={level.id} className="level-tile" style={{ '--level-accent': level.gradientEnd, '--level-tint': level.gradientStart }} to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}>
+              <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
+              <span className="level-tile__tier">{level.tier}</span>
+              <h3>{level.name}</h3><p>{countText}</p>
+              <span className="level-tile__action">Explore level <ChevronRight size={16} aria-hidden="true" /></span>
+              <span className="level-tile__watermark" aria-hidden="true">{level.numeral || level.badge}</span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
-  </div>;
+  );
 }
