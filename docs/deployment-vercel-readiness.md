@@ -97,14 +97,14 @@ Every feature gate in the application is disabled by default (`false`). Enabling
 
 | Capability | Environment Variable | Default | Hosted Database / Edge / Provider Prerequisites |
 | :--- | :--- | :--- | :--- |
-| **Core Auth & Profiles** | `VITE_SUPABASE_URL`<br>`VITE_SUPABASE_PUBLISHABLE_KEY` | *(blank)* | `20261027000100_backend_foundation.sql`<br>- `profiles`, `user_preferences` tables<br>- `avatars` Storage bucket + RLS<br>- Auth trigger for profile creation |
-| **Published HSK1/N5 Content** | `VITE_PUBLISHED_CONTENT_ENABLED` | `false` | `20261030000100_content_publication_foundation.sql`<br>`20261030000200_content_publication_hardening.sql`<br>`20261030000300_consistent_publication_reads.sql`<br>- Seeded rows for `zh-hsk1` and `ja-n5` |
-| **Online Progress Sync** | `VITE_ONLINE_SYNC_ENABLED` | `false` | `20261029000300_online_sync_foundation.sql`<br>`20261029000400_learned_words_sync.sql`<br>`20261029000500_study_streaks_yangon.sql`<br>`20261029000600_sync_progress_hardening.sql`<br>- `user_vocabulary_progress`, `user_learned_words`<br>- `user_study_streaks`, `record_word_action_batch` RPC |
-| **Self-Service Account Deletion** | `VITE_ACCOUNT_DELETION_ENABLED` | `false` | `20261029000100_account_deletion_foundation.sql`<br>`20261029000200_account_deletion_attempt_reservation.sql`<br>- Supabase Edge Function `delete-account` deployed with `SUPABASE_SERVICE_ROLE_KEY` secret |
-| **Learning Data Export & Reset** | `VITE_ACCOUNT_EXPORT_RESET_ENABLED` | `false` | `20261027000100_backend_foundation.sql`<br>- Cloud reset utilizes online sync reset RPCs if online sync is active |
-| **Preferences Cloud Sync** | `VITE_ACCOUNT_PREFERENCES_SYNC_ENABLED` | `false` | `20261027000100_backend_foundation.sql`<br>- `user_preferences` table, RLS, and `active_language` |
+| **Core Auth & Profiles** | `VITE_SUPABASE_URL`<br>`VITE_SUPABASE_PUBLISHABLE_KEY` | *(blank)* | `20261027000100_backend_foundation.sql`<br>- Tables: `public.profiles`, `public.user_preferences`, `private.account_state`<br>- Storage: `avatars` bucket + storage RLS policies<br>- Auth trigger: `public.handle_new_user()` on `auth.users` |
+| **Published HSK1/N5 Content** | `VITE_PUBLISHED_CONTENT_ENABLED` | `false` | `20261030000100_content_publication_foundation.sql`<br>`20261030000200_content_publication_hardening.sql`<br>`20261030000300_consistent_publication_reads.sql`<br>- Tables: `public.courses`, `public.vocabulary`, `private.content_stages`, `private.content_publication_history`<br>- Owner RPCs: `public.s2s_stage_course_content`, `public.s2s_publish_staged_content`, `public.s2s_rollback_course_content`, `public.s2s_get_course_content_status`<br>- Seeded published rows for `zh-hsk1` and `ja-n5` |
+| **Online Progress Sync** | `VITE_ONLINE_SYNC_ENABLED` | `false` | `20261029000300_online_sync_foundation.sql`<br>`20261029000400_learned_words_sync.sql`<br>`20261029000500_study_streaks_yangon.sql`<br>`20261029000600_sync_progress_hardening.sql`<br>- Tables: `public.user_items`, `public.user_item_tombstones`, `public.user_study_streaks`, `public.user_study_activity`, `private.sync_mutation_receipts`<br>- RPCs: `public.s2s_apply_mutations`, `public.s2s_get_study_streak` |
+| **Self-Service Account Deletion** | `VITE_ACCOUNT_DELETION_ENABLED` | `false` | `20261029000100_account_deletion_foundation.sql`<br>`20261029000200_account_deletion_attempt_reservation.sql`<br>- Tables: `private.account_deletions`, `private.account_deletion_attempts`<br>- RPCs: `public.s2s_reserve_deletion_attempt`, `public.s2s_begin_account_deletion`, `public.s2s_record_deletion_progress`, `public.s2s_record_deletion_attempt_failure`, `public.s2s_get_deletion_state`, `public.s2s_check_deletion_throttled`, `public.s2s_reset_deletion_attempts`<br>- Supabase Edge Function `delete-account` deployed with `SUPABASE_SERVICE_ROLE_KEY` secret |
+| **Learning Data Export & Reset** | `VITE_ACCOUNT_EXPORT_RESET_ENABLED` | `false` | `20261028000100_guest_import_foundation.sql`<br>`20261029000300_online_sync_foundation.sql`<br>`20261029000500_study_streaks_yangon.sql`<br>`20261029000600_sync_progress_hardening.sql`<br>- Tables: `public.user_items`, `public.user_item_tombstones`, `public.user_study_streaks`, `public.user_study_activity`, `private.learning_reset_receipts`<br>- RPCs: `public.s2s_account_snapshot` (for verified export) and `public.s2s_reset_learning` (for cloud reset)<br>- *Note: Export and reset require these snapshot and reset RPC migrations independently of whether background sync (`VITE_ONLINE_SYNC_ENABLED`) is enabled.* |
+| **Preferences Cloud Sync** | `VITE_ACCOUNT_PREFERENCES_SYNC_ENABLED` | `false` | `20261027000100_backend_foundation.sql`<br>- Table: `public.user_preferences` and RLS policies (`active_language`, theme, audio, streak preferences) |
 | **Google OAuth Sign-In** | `VITE_GOOGLE_AUTH_ENABLED` | `false` | Google Cloud OAuth Client ID & Secret configured in **Supabase Dashboard -> Auth -> Providers -> Google**.<br>- Authorized redirect: `https://<ref>.supabase.co/auth/v1/callback` |
-| **Cloud Guest Import Staging** | `VITE_CLOUD_IMPORT_STAGING` | `false` | `20261028000100_guest_import_foundation.sql`<br>- `import_guest_records` RPC |
+| **Cloud Guest Import Staging** | `VITE_CLOUD_IMPORT_STAGING` | `false` | `20261028000100_guest_import_foundation.sql`<br>`20261029000300_online_sync_foundation.sql`<br>`20261029000400_learned_words_sync.sql`<br>- Tables: `public.user_items`, `private.guest_import_receipts`<br>- RPCs: `public.s2s_import_guest`, `public.s2s_account_snapshot` |
 | **Error Monitoring** | `VITE_ERROR_REPORTING_ENABLED`<br>`VITE_ERROR_REPORTING_URL` | `false`<br>*(blank)* | Remote telemetry collector endpoint capable of receiving POST JSON error reports. |
 | **Privacy Analytics** | `VITE_ANALYTICS_ENABLED`<br>`VITE_ANALYTICS_URL` | `false`<br>*(blank)* | Remote analytics collector endpoint capable of receiving allowlisted event JSON. |
 
@@ -155,9 +155,32 @@ The following administrative actions require Owner-level credentials and dashboa
      - Configure Sender email on the dedicated sending subdomain: `auth@auth.swipe2study.com` (or address under `auth.swipe2study.com`).
 5. **DNS & Email Infrastructure (Namecheap)**:
    - **Important**: `swipe2study.com` currently hosts an active website and receives business mail via Zoho Mail MX records.
-   - **Resend Sending Subdomain**: To protect the existing website and email routing, Resend sending is planned strictly under the subdomain `auth.swipe2study.com`.
-   - In Namecheap DNS, configure verification records (SPF TXT, DKIM CNAME, DMARC TXT) **only for the `auth` subdomain** (`auth.swipe2study.com`). Do **NOT** alter the root domain MX records (preserve existing Zoho Mail records).
-   - Do **NOT** switch root domain DNS or add CNAME/A records pointing `swipe2study.com` to Vercel until the new production deployment is fully tested, confirmed, and ready for official cutover.
+   - **Resend Sending Subdomain**: To protect the existing website and email routing, Resend sending is configured strictly under the dedicated subdomain `auth.swipe2study.com`.
+   - **Exact Dashboard-Provided Resend DNS Records**: In the Resend Dashboard (**Domains -> Add Domain -> auth.swipe2study.com**), Resend generates the exact hostnames, record types, and values to add in Namecheap DNS:
+     - **Sending-Subdomain MX Record (Required)**:
+       - **Type**: `MX`
+       - **Host / Name**: `auth` (resolves to `auth.swipe2study.com`)
+       - **Priority**: `10`
+       - **Value**: Exact dashboard-provided mail exchanger (e.g. `feedback-smtp.us-east-1.amazonses.com` or Resend dashboard-specified MX target).
+       - *Critical*: Do not omit this MX record; Resend requires it for inbound bounce, delivery feedback, and complaint processing on the sending subdomain.
+     - **SPF Record**:
+       - **Type**: `TXT`
+       - **Host / Name**: `auth` (resolves to `auth.swipe2study.com`)
+       - **Value**: Exact dashboard-provided SPF string (e.g. `v=spf1 include:amazonses.com ~all` or Resend dashboard-specified value).
+     - **DKIM Record (TXT, NOT CNAME)**:
+       - **Type**: `TXT`
+       - **Host / Name**: `resend._domainkey.auth` (resolves to `resend._domainkey.auth.swipe2study.com`)
+       - **Value**: Exact dashboard-generated RSA public key string (e.g. `k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GN...`).
+       - *Critical*: Resend uses a `TXT` record for DKIM, **not a CNAME**. Do not attempt to configure DKIM as a CNAME.
+     - **DMARC Record (Recommended)**:
+       - **Type**: `TXT`
+       - **Host / Name**: `_dmarc.auth` (resolves to `_dmarc.auth.swipe2study.com`)
+       - **Value**: `v=DMARC1; p=none;`
+   - **Preservation of Existing Root Website & Zoho Mail Records**:
+     - The apex/root domain `swipe2study.com` has active website records and business email managed by Zoho Mail MX records (`mx.zoho.com`, `mx2.zoho.com`, `mx3.zoho.com` with priorities 10, 20, 50).
+     - Because all Resend records are strictly scoped to the `auth` subdomain host (`auth` and `resend._domainkey.auth`), existing root MX records, root website A/CNAME records, and root SPF records remain 100% untouched and operational.
+     - Do **NOT** alter root domain `@` MX records or overwrite root SPF records.
+     - Do **NOT** switch root domain DNS or add CNAME/A records pointing `swipe2study.com` to Vercel until the new production deployment is fully tested, confirmed, and ready for official cutover.
 6. **Google Cloud OAuth Credentials**:
    - In Google Cloud Console, configure OAuth 2.0 Client credentials under APIs & Services.
    - Add Authorized Redirect URI: `https://<supabase-project-ref>.supabase.co/auth/v1/callback`.
