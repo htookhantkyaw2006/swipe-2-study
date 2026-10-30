@@ -225,12 +225,14 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   useEffect(() => {
     if (cards.length > 0 && !sessionStartedRef.current) {
       sessionStartedRef.current = true;
-      trackEvent('study:session_start', {
-        courseId: course.id,
-        levelId: targetLevel,
-        mode: isPhrases ? 'phrases' : isReview ? 'review' : isSaved ? 'saved' : 'learn',
-        cardCount: cards.length,
-      }, { dedupeKey: 'session_start_' + course.id + '_' + targetLevel + '_' + cards.length });
+      if (!isPhrases) {
+        trackEvent('study:session_start', {
+          courseId: course.id,
+          levelId: targetLevel,
+          mode: isReview ? 'review' : isSaved ? 'saved' : 'learn',
+          cardCount: cards.length,
+        }, { dedupeKey: 'session_start_' + course.id + '_' + targetLevel + '_' + cards.length });
+      }
     }
   }, [cards.length, course.id, targetLevel, isPhrases, isReview, isSaved]);
 
@@ -286,12 +288,14 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       animate(dragOffset, 0, { duration: reducedMotion ? 0 : 0.22 });
       after(() => { actionLocked.current = false; setAdvancing(false); }, reducedMotion ? 0 : 240);
     } else {
-      trackEvent('study:session_complete', {
-        courseId: course.id,
-        levelId: targetLevel,
-        mode: isPhrases ? 'phrases' : isReview ? 'review' : isSaved ? 'saved' : 'learn',
-        cardCount: cards.length,
-      }, { dedupeKey: 'session_complete_' + course.id + '_' + targetLevel + '_' + cards.length });
+      if (!isPhrases) {
+        trackEvent('study:session_complete', {
+          courseId: course.id,
+          levelId: targetLevel,
+          mode: isReview ? 'review' : isSaved ? 'saved' : 'learn',
+          cardCount: cards.length,
+        }, { dedupeKey: 'session_complete_' + course.id + '_' + targetLevel + '_' + cards.length });
+      }
       after(() => navigate(backTo), reducedMotion ? 0 : 240);
     }
   };

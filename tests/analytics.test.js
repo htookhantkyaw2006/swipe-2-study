@@ -101,58 +101,88 @@ test('analytics: caller contract test for import:guest_completed (emits choice a
 
 test('analytics: caller contract test for study session events (emits mode learn/review/saved)', async () => {
   let captured = null;
-  const mockTransport = (p) => { captured = p; };
+  let transportCallCount = 0;
+  const mockTransport = (p) => {
+    transportCallCount++;
+    captured = p;
+  };
   const env = { VITE_ANALYTICS_ENABLED: 'true', VITE_ANALYTICS_URL: 'https://analytics.example.com' };
 
-  // 1. Study session start with mode='learn'
-  await trackEvent('study:session_start', {
+  // 1. Study session start with mode='learn' (supported control)
+  const res1 = await trackEvent('study:session_start', {
     courseId: 'zh',
     levelId: 'HSK1',
     mode: 'learn',
     cardCount: 20,
   }, { env, transport: mockTransport, dedupeKey: 's1' });
+  assert.equal(res1.tracked, true);
+  assert.equal(transportCallCount, 1);
   assert.equal(captured.metadata.mode, 'learn');
   assert.equal(captured.metadata.courseId, 'zh');
   assert.equal(captured.metadata.levelId, 'HSK1');
   assert.equal(captured.metadata.cardCount, 20);
 
-  // 2. Study session start with mode='review'
-  await trackEvent('study:session_start', {
+  // 2. Study session start with mode='review' (supported control)
+  const res2 = await trackEvent('study:session_start', {
     courseId: 'ja',
     levelId: 'N5',
     mode: 'review',
     cardCount: 15,
   }, { env, transport: mockTransport, dedupeKey: 's2' });
+  assert.equal(res2.tracked, true);
+  assert.equal(transportCallCount, 2);
   assert.equal(captured.metadata.mode, 'review');
   assert.equal(captured.metadata.courseId, 'ja');
   assert.equal(captured.metadata.levelId, 'N5');
 
-  // 3. Study session complete with mode='saved'
-  await trackEvent('study:session_complete', {
+  // 3. Study session complete with mode='saved' (supported control)
+  const res3 = await trackEvent('study:session_complete', {
     courseId: 'zh-hsk1',
     levelId: '1',
     mode: 'saved',
     cardCount: 10,
   }, { env, transport: mockTransport, dedupeKey: 's3' });
+  assert.equal(res3.tracked, true);
+  assert.equal(transportCallCount, 3);
   assert.equal(captured.metadata.mode, 'saved');
   assert.equal(captured.metadata.courseId, 'zh-hsk1');
 
-  // 4. Excluded phrase flow mode='phrases' MUST NOT be enabled
-  await trackEvent('study:session_start', {
+  // 4. Excluded phrase flow mode='phrases' MUST reject entire event and make ZERO transport calls
+  const beforeCount = transportCallCount;
+  const res4 = await trackEvent('study:session_start', {
     courseId: 'zh',
     levelId: 'HSK1',
     mode: 'phrases',
-    cardCount: 20,
+    cardCount: 5,
   }, { env, transport: mockTransport, dedupeKey: 's4' });
-  assert.equal(captured.metadata.mode, undefined, 'Excluded phrase flow mode must NOT be permitted');
+  assert.equal(res4.tracked, false, 'Excluded phrase flow must not be tracked');
+  assert.equal(res4.reason, 'unsupported_mode');
+  assert.equal(transportCallCount, beforeCount, 'Transport call count must be zero for excluded phrases mode');
 
-  // 5. Arbitrary text/UUID under mode or courseId MUST be rejected
-  await trackEvent('study:session_start', {
+  // 5. Excluded drill / unsupported mode MUST reject entire event and make ZERO transport calls
+  const res5 = await trackEvent('study:session_complete', {
+    courseId: 'zh',
+    levelId: 'HSK1',
+    mode: 'drills',
+    cardCount: 10,
+  }, { env, transport: mockTransport, dedupeKey: 's5' });
+  assert.equal(res5.tracked, false, 'Excluded drill flow must not be tracked');
+  assert.equal(transportCallCount, beforeCount, 'Transport call count must remain zero for unsupported drills mode');
+
+  // 6. Arbitrary text/UUID under mode or missing mode MUST reject entire event
+  const res6 = await trackEvent('study:session_start', {
     courseId: 'user_free_text_course',
     mode: '550e8400-e29b-41d4-a716-446655440000',
-  }, { env, transport: mockTransport, dedupeKey: 's5' });
-  assert.equal(captured.metadata.courseId, undefined);
-  assert.equal(captured.metadata.mode, undefined);
+  }, { env, transport: mockTransport, dedupeKey: 's6' });
+  assert.equal(res6.tracked, false);
+  assert.equal(transportCallCount, beforeCount, 'Transport call count must remain zero for UUID mode');
+
+  const res7 = await trackEvent('study:session_start', {
+    courseId: 'zh',
+    levelId: 'HSK1',
+  }, { env, transport: mockTransport, dedupeKey: 's7' });
+  assert.equal(res7.tracked, false);
+  assert.equal(transportCallCount, beforeCount, 'Transport call count must remain zero for missing mode');
 });
 
 test('analytics: strictly rejects bare credentials, quoted JSON credentials, emails, learner text, and UUID values', () => {

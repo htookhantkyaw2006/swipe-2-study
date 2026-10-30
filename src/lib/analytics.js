@@ -89,6 +89,17 @@ const BARE_JWT_REGEX = /[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]+/;
 const recentEvents = new Map();
 const DEDUPE_WINDOW_MS = 1500;
 
+export const STUDY_SESSION_EVENTS = Object.freeze([
+  'study:session_start',
+  'study:session_complete',
+]);
+
+export const APPROVED_STUDY_MODES = Object.freeze([
+  'learn',
+  'review',
+  'saved',
+]);
+
 /**
  * Checks whether analytics collection is enabled in the current environment.
  */
@@ -218,6 +229,15 @@ export async function trackEvent(eventName, rawMetadata = {}, {
     // 2. Validate event name against allowlist
     if (!ALLOWED_ANALYTICS_EVENTS.includes(eventName)) {
       return { tracked: false, reason: 'unallowed_event' };
+    }
+
+    // 3. Prevent excluded phrase/drill flows from emitting study events.
+    // Validate study mode before transport and reject unsupported events.
+    if (STUDY_SESSION_EVENTS.includes(eventName)) {
+      const mode = rawMetadata && typeof rawMetadata === 'object' ? rawMetadata.mode : undefined;
+      if (typeof mode !== 'string' || !APPROVED_STUDY_MODES.includes(mode.trim())) {
+        return { tracked: false, reason: 'unsupported_mode' };
+      }
     }
 
     const sanitizedMeta = sanitizeMetadata(eventName, rawMetadata);

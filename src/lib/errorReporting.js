@@ -72,9 +72,67 @@ export function isErrorReportingEnabled(
   return env.VITE_ERROR_REPORTING_ENABLED === 'true' && typeof env.VITE_ERROR_REPORTING_URL === 'string' && env.VITE_ERROR_REPORTING_URL.trim().length > 0;
 }
 
+export const STATIC_ASSET_PLACEHOLDER = '/assets/app.js';
+
+export const APPROVED_APP_ROUTES = Object.freeze([
+  '/',
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/auth/callback',
+  '/learn',
+  '/learn/session',
+  '/learn/review',
+  '/learn/review/session',
+  '/library',
+  '/flashcards',
+  '/flashcards/session',
+  '/saved',
+  '/saved/session',
+  '/dictionary',
+  '/interest',
+  '/writing',
+  '/radicals',
+  '/kana',
+  '/sounds',
+  '/notifications',
+  '/profile',
+  '/profile/edit',
+  '/premium',
+  '/settings',
+  '/about',
+  '/privacy',
+  '/terms',
+  '/support',
+]);
+
+const APPROVED_LEVEL_IDS_SET = new Set(['1', 'hsk1', 'HSK1', '5', 'n5', 'N5']);
+
+export function isApprovedRoute(pathname) {
+  if (!pathname || typeof pathname !== 'string') return false;
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  if (APPROVED_APP_ROUTES.includes(normalized)) return true;
+
+  // Parameterized routes: /learn/level/:levelId and /flashcards/level/:levelId
+  const learnLevelMatch = normalized.match(/^\/learn\/level\/([a-zA-Z0-9_-]+)$/);
+  if (learnLevelMatch && APPROVED_LEVEL_IDS_SET.has(learnLevelMatch[1])) return true;
+
+  const flashLevelMatch = normalized.match(/^\/flashcards\/level\/([a-zA-Z0-9_-]+)$/);
+  if (flashLevelMatch && APPROVED_LEVEL_IDS_SET.has(flashLevelMatch[1])) return true;
+
+  // Approved asset URLs
+  if (/^\/assets\/[a-zA-Z0-9._-]+\.(?:js|mjs|css|wasm|map|html|png|svg|ico|webp)$/i.test(normalized)) return true;
+  if (/^\/(?:index\.html|favicon\.ico|robots\.txt|manifest\.json|sw\.js)$/i.test(normalized)) return true;
+
+  return false;
+}
+
 /**
  * Strips query parameters, hash fragments, and sensitive credentials from URLs.
- * Preserves only origin and path.
+ * Validates against approved application routes and assets; unknown paths
+ * become a static placeholder to prevent leakage of arbitrary segments or user text.
  */
 export function sanitizeUrl(url) {
   if (!url || typeof url !== 'string') return '';
@@ -82,14 +140,21 @@ export function sanitizeUrl(url) {
   if (!trimmed) return '';
 
   try {
+    const isRelative = trimmed.startsWith('/') || trimmed.startsWith('.');
     const parsed = new URL(trimmed, 'https://swipe2study.app');
-    if (trimmed.startsWith('/') || trimmed.startsWith('.')) {
-      return parsed.pathname;
+    const pathname = parsed.pathname;
+
+    if (isApprovedRoute(pathname)) {
+      return isRelative ? pathname : `${parsed.origin}${pathname}`;
     }
-    return `${parsed.origin}${parsed.pathname}`;
+
+    // Unknown or unapproved path: return static placeholder
+    // Do not preserve arbitrary path segments, traversal, usernames, or user text
+    return isRelative ? '/' : `${parsed.origin}/`;
   } catch {
     const stripped = trimmed.split(/[?#]/)[0];
-    return stripped.replace(EMAIL_REGEX, '[REDACTED_EMAIL]').replace(BARE_JWT_REGEX, '[REDACTED_TOKEN]');
+    const isRelative = stripped.startsWith('/') || stripped.startsWith('.');
+    return isRelative ? '/' : 'https://swipe2study.app/';
   }
 }
 
@@ -118,36 +183,58 @@ export function scrubSensitiveText(text) {
     .replace(/(https?:\/\/[^\s"'<>]+)/g, (match) => sanitizeUrl(match));
 }
 
+const APPROVED_ASSET_REGEX = /^(?:https?:\/\/[^/]+)?(?:\/)?assets\/([a-zA-Z0-9._-]+\.(?:js|mjs|css|wasm|map|html|png|svg|ico|webp|jpg|jpeg))$/i;
+const APPROVED_ROOT_ASSET_REGEX = /^(?:https?:\/\/[^/]+)?(?:\/)?(index\.html|favicon\.ico|robots\.txt|manifest\.json|sw\.js)$/i;
+const APPROVED_SRC_REGEX = /^src\/(?:(?:components|courses|data|lib|pages|server|assets)\/[a-zA-Z0-9._/-]+\.(?:js|jsx|ts|tsx|json|css|html)|(?:App|main|index|responsive-tools)\.(?:js|jsx|css|html))$/i;
+
 /**
- * Sanitizes a file path or URL to strip local filesystem paths containing user names
- * (e.g. C:\Users\JohnDoe\...) and preserve only clean asset or source references.
+ * Sanitizes a file path or URL to strictly approved application asset or source references.
+ * Unknown paths, traversal, usernames, or arbitrary user directory structures become
+ * the static placeholder '/assets/app.js'.
  */
 export function sanitizeAssetPath(rawPath) {
   if (!rawPath || typeof rawPath !== 'string') return '';
   const trimmed = rawPath.trim();
+  if (!trimmed) return '';
 
   // Strip query strings and hash fragments
-  const noQuery = trimmed.split(/[?#]/)[0];
+  const clean = trimmed.split(/[?#]/)[0];
+  const normalized = clean.replace(/\\/g, '/');
 
-  // If it's a web asset URL (e.g. https://.../assets/foo-123.js)
-  const assetMatch = noQuery.match(/\/(assets\/[a-zA-Z0-9._-]+\.(?:js|css|html))/i);
+  // Reject path traversal explicitly
+  if (normalized.includes('..')) {
+    return STATIC_ASSET_PLACEHOLDER;
+  }
+
+  // 1. Web asset check (e.g. /assets/index-D6ZxBklE.js or https://.../assets/foo.js)
+  const assetMatch = normalized.match(APPROVED_ASSET_REGEX);
   if (assetMatch) {
-    return '/' + assetMatch[1];
+    return '/assets/' + assetMatch[1];
   }
 
-  // If it contains src/ (e.g. file:///.../src/lib/foo.js or C:\Users\...\src\lib\foo.js)
-  const srcMatch = noQuery.match(/(?:^|[/\\])(src[/\\][a-zA-Z0-9._/\\-]+)/i);
-  if (srcMatch) {
-    return srcMatch[1].replace(/\\/g, '/');
+  // 2. Root static asset check (e.g. /index.html)
+  const rootAssetMatch = normalized.match(APPROVED_ROOT_ASSET_REGEX);
+  if (rootAssetMatch) {
+    return '/' + rootAssetMatch[1];
   }
 
-  // If it's a safe relative path like /assets/ or /src/
-  if (noQuery.startsWith('/') && !noQuery.includes('/Users/') && !noQuery.includes('/home/')) {
-    return noQuery;
+  // 3. Source reference check (e.g. src/lib/errorReporting.js or C:/Users/.../src/lib/foo.js)
+  let srcCandidate = null;
+  if (normalized.startsWith('src/')) {
+    srcCandidate = normalized;
+  } else {
+    const srcIdx = normalized.lastIndexOf('/src/');
+    if (srcIdx !== -1) {
+      srcCandidate = normalized.slice(srcIdx + 1); // "src/..."
+    }
   }
 
-  // Otherwise, do not leak unknown local directory structure
-  return '/assets/app.js';
+  if (srcCandidate && APPROVED_SRC_REGEX.test(srcCandidate)) {
+    return srcCandidate;
+  }
+
+  // Fallback for unknown / arbitrary paths (e.g. /private/MY_PRIVATE_NOTE/file.js)
+  return STATIC_ASSET_PLACEHOLDER;
 }
 
 /**
@@ -478,7 +565,7 @@ export function initGlobalErrorMonitoring({
       const err = event.error || event.message;
       reportError(err, {
         source: 'window_onerror',
-        filename: sanitizeUrl(event.filename || ''),
+        filename: sanitizeAssetPath(event.filename || ''),
         lineno: event.lineno,
         colno: event.colno,
       }, { env, transport });

@@ -30,6 +30,15 @@ test('errorReporting: sanitizeUrl strips sensitive query params, recovery hashes
   const sanitizedRelative = sanitizeUrl(relativeUrl);
   assert.equal(sanitizedRelative, '/reset-password');
 
+  // Unknown / unapproved paths must become a static placeholder without preserving user text
+  const unapprovedFull = sanitizeUrl('https://swipe2study.app/private/MY_PRIVATE_NOTE/page');
+  assert.equal(unapprovedFull, 'https://swipe2study.app/');
+  assert.doesNotMatch(unapprovedFull, /MY_PRIVATE_NOTE/);
+
+  const unapprovedRelative = sanitizeUrl('/private/MY_PRIVATE_NOTE/page');
+  assert.equal(unapprovedRelative, '/');
+  assert.doesNotMatch(unapprovedRelative, /MY_PRIVATE_NOTE/);
+
   assert.equal(sanitizeUrl(''), '');
   assert.equal(sanitizeUrl(null), '');
 });
@@ -49,6 +58,25 @@ test('errorReporting: sanitizeAssetPath strips user home directories and keeps s
   assert.equal(
     sanitizeAssetPath('https://swipe2study.app/assets/index-D6ZxBklE.js?token=secret#h'),
     '/assets/index-D6ZxBklE.js'
+  );
+  // Valid asset and source controls
+  assert.equal(
+    sanitizeAssetPath('/assets/index-D6ZxBklE.js'),
+    '/assets/index-D6ZxBklE.js'
+  );
+  assert.equal(
+    sanitizeAssetPath('src/App.jsx'),
+    'src/App.jsx'
+  );
+  // Arbitrary leading-slash path must become static placeholder
+  assert.equal(
+    sanitizeAssetPath('/private/MY_PRIVATE_NOTE/file.js'),
+    '/assets/app.js'
+  );
+  // Traversal must become static placeholder
+  assert.equal(
+    sanitizeAssetPath('src/../../private/MY_PRIVATE_NOTE/file.js'),
+    '/assets/app.js'
   );
 });
 
@@ -152,6 +180,7 @@ test('errorReporting: final reportError transport payload excludes arbitrary lea
   const mockTransport = (payload) => { capturedPayload = payload; };
   const env = { VITE_ERROR_REPORTING_ENABLED: 'true', VITE_ERROR_REPORTING_URL: 'https://errors.example.com' };
 
+  // 1. Valid asset controls: local path with user home directory normalizes to approved src reference
   const learnerErr = new Error('Could not save learner note: MY_PRIVATE_NOTE_12345');
   learnerErr.stack = `Error: Could not save learner note: MY_PRIVATE_NOTE_12345\n    at saveWord (C:\\Users\\SecretUser\\Desktop\\app\\src\\lib\\db.js:50:10)`;
 
@@ -177,6 +206,26 @@ test('errorReporting: final reportError transport payload excludes arbitrary lea
   assert.doesNotMatch(capturedPayload.context.componentStack, /LEARNER_NOTE_CONTENT/);
   assert.doesNotMatch(capturedPayload.context.filename, /SecretUser/);
   assert.equal(capturedPayload.context.filename, 'src/lib/db.js');
+
+  // 2. Arbitrary leading-slash path (/private/MY_PRIVATE_NOTE/file.js) must become static placeholder
+  const privateErr = new Error('Could not save note: MY_PRIVATE_NOTE_67890');
+  privateErr.stack = 'Error: Could not save note: MY_PRIVATE_NOTE_67890\n    at recordNote (/private/MY_PRIVATE_NOTE/file.js:12:34)\n    at handleAction (src/pages/Learn/SwipeSession.jsx:25:10)';
+
+  const res2 = await reportError(privateErr, {
+    source: 'RouteErrorBoundary',
+    filename: '/private/MY_PRIVATE_NOTE/file.js',
+  }, { env, transport: mockTransport });
+
+  assert.equal(res2.reported, true);
+  assert.doesNotMatch(capturedPayload.context.filename, /MY_PRIVATE_NOTE/);
+  assert.doesNotMatch(capturedPayload.context.filename, /\/private\//);
+  assert.equal(capturedPayload.context.filename, '/assets/app.js');
+
+  assert.doesNotMatch(capturedPayload.error.stack, /MY_PRIVATE_NOTE/);
+  assert.doesNotMatch(capturedPayload.error.stack, /\/private\//);
+  assert.match(capturedPayload.error.stack, /\/assets\/app\.js:12:34/);
+  // Valid asset control in stack is preserved
+  assert.match(capturedPayload.error.stack, /src\/pages\/Learn\/SwipeSession\.jsx:25:10/);
 });
 
 test('errorReporting: disabled reporting performs zero network requests', async () => {
