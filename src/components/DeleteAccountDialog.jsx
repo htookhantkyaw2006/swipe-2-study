@@ -22,6 +22,7 @@ export default function DeleteAccountDialog({
   open = false,
   pending = false,
   error = null,
+  isOAuthOnly = false,
   localCleanupError = false,
   accountLabel = '',
   onConfirm,
@@ -109,7 +110,25 @@ export default function DeleteAccountDialog({
           </div>
         ) : null}
 
-        {localCleanupError ? (
+        {isOAuthOnly ? (
+          <div className="delete-account-dialog__cleanup-state">
+            <div className="delete-account-dialog__error" role="alert" aria-live="assertive">
+              Password reauthentication is not supported for accounts signed in with a third-party provider (such as Google). Self-service account deletion is unavailable for this account in this version.
+            </div>
+            <p className="delete-account-dialog__cleanup-message">
+              Please contact support if you need assistance deleting this account.
+            </p>
+            <div className="delete-account-dialog__actions">
+              <button
+                type="button"
+                className="delete-account-dialog__btn delete-account-dialog__btn--cancel"
+                onClick={handleClose}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ) : localCleanupError ? (
           <div className="delete-account-dialog__cleanup-state">
             <p className="delete-account-dialog__cleanup-message">
               Your account was successfully deleted on the server, but local cached data on this device

@@ -42,6 +42,10 @@ export default function Profile() {
   const [globalSignOutError, setGlobalSignOutError] = useState(null);
   const [targetAccountLabel, setTargetAccountLabel] = useState('');
   const deletionEnabled = isAccountDeletionEnabled();
+  const authProviders = user?.app_metadata?.providers || (user?.app_metadata?.provider ? [user?.app_metadata.provider] : []);
+  const authIdentities = Array.isArray(user?.identities) ? user.identities : [];
+  const hasEmailAuth = authIdentities.some(i => i.provider === 'email') || authProviders.includes('email');
+  const isOAuthOnly = Boolean(user && authProviders.length > 0 && !hasEmailAuth);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deletionError, setDeletionError] = useState(null);
@@ -308,6 +312,7 @@ export default function Profile() {
         open={deleteDialogOpen}
         pending={deletingAccount}
         error={deletionError}
+        isOAuthOnly={isOAuthOnly}
         localCleanupError={localCleanupError}
         accountLabel={user?.email || name || ''}
         onConfirm={handleDeleteAccount}

@@ -547,3 +547,16 @@ test('DeleteAccountDialog: displays local cleanup failure state with dedicated r
   assert.ok(html.includes('Retry local cleanup'));
   assert.ok(html.includes('could not be completely cleared'));
 });
+
+test('DeleteAccountDialog: displays unsupported third-party provider notice and disables form when isOAuthOnly is true', () => {
+  const html = renderToString(React.createElement(DeleteAccountDialog, {
+    open: true,
+    isOAuthOnly: true,
+    accountLabel: 'google-user@example.com',
+  }));
+
+  assert.ok(html.includes('third-party provider'));
+  assert.ok(html.includes('Self-service account deletion is unavailable'));
+  assert.ok(html.includes('Close'));
+  assert.ok(!html.includes('Account password'));
+});
