@@ -18,7 +18,7 @@ This document records the verified hosted infrastructure checkpoint for Swipe 2 
 
 ## 2. Hosted Database Migrations
 
-PT applied the ten migrations following `20261027000100_backend_foundation.sql` in strict filename order:
+PT manually applied the ten migrations following `20261027000100_backend_foundation.sql` in strict filename order through `psql`:
 
 1. `20261028000100_guest_import_foundation.sql`
 2. `20261029000100_account_deletion_foundation.sql`
@@ -31,7 +31,7 @@ PT applied the ten migrations following `20261027000100_backend_foundation.sql` 
 9. `20261030000200_content_publication_hardening.sql`
 10. `20261030000300_consistent_publication_reads.sql`
 
-All 11 repository migrations are now present in the test backend database schema.
+All 11 repository migrations are present in the test backend database schema. These migrations were applied directly to PostgreSQL via `psql`; no claim is made that Supabase CLI migration history (e.g. `supabase_migrations.schema_migrations`) was recorded or tracked in the database.
 
 ---
 
@@ -60,21 +60,27 @@ Row-Level Security (RLS) is enabled on all 16 application tables across public a
   - `private.content_publication_history`
 
 ### Remote Procedure Calls (RPCs)
-Eleven checked public RPCs have expected `anon` or `authenticated` EXECUTE grants aligned with security-definer boundaries:
+Eleven checked public RPCs were inspected in the test backend database catalog:
 
-1. `public.s2s_apply_mutations` (`authenticated`)
-2. `public.s2s_account_snapshot` (`authenticated`)
-3. `public.s2s_reset_learning` (`authenticated`)
-4. `public.s2s_import_guest` (`authenticated`)
-5. `public.s2s_get_study_streak` (`authenticated`)
-6. `public.s2s_reserve_deletion_attempt` (`authenticated`)
-7. `public.s2s_check_deletion_throttled` (`authenticated`)
-8. `public.s2s_get_course_content_status` (`anon`, `authenticated`)
-9. `public.s2s_stage_course_content` (`authenticated`, owner-checked)
-10. `public.s2s_publish_staged_content` (`authenticated`, owner-checked)
-11. `public.s2s_rollback_course_content` (`authenticated`, owner-checked)
+- **Callable by Authenticated Role (`authenticated = true`):**
+  1. `public.s2s_account_snapshot`
+  2. `public.s2s_import_guest`
+  3. `public.s2s_apply_mutations`
+  4. `public.s2s_reset_learning`
+  5. `public.s2s_get_study_streak`
 
-> **Security Note:** Verification of RLS enablement and function EXECUTE grants confirms that expected access control flags and definitions are present in the catalog. *These catalog checks do not prove complete cross-account isolation under all edge cases.*
+- **Privileged / Restricted Functions (`authenticated = false`):**
+  6. `public.s2s_begin_account_deletion`
+  7. `public.s2s_reserve_deletion_attempt`
+  8. `public.s2s_stage_course_content`
+  9. `public.s2s_publish_staged_content`
+  10. `public.s2s_rollback_course_content`
+  11. `public.s2s_get_course_content_status`
+
+- **Anonymous Access:**
+  `anon = false` for all eleven checked functions (none are granted to the `anon` role).
+
+> **Access Control Note:** The six `authenticated = false` functions are restricted server-side or owner operations (such as the account deletion Edge Function executing with `service_role` authority or curriculum release workflows). They are intentionally not exposed to the client `authenticated` role, and client access must not be broadened to grant them privileged access. While catalog inspection confirms these grant boundaries, *these checks do not prove complete cross-account isolation.*
 
 ### Account & State Baseline Row Counts
 Baseline record counts across core user state tables remained exactly 2 each:
@@ -94,7 +100,7 @@ Baseline record counts across core user state tables remained exactly 2 each:
 PT manually tested the hosted preview and reported success across the following user journeys:
 - Account login
 - Guest progress and vocabulary merge into authenticated account
-- Word saving and study/review session operations
+- Saved words (saving words)
 
 > **Verification Notice:** The above user-journey checks are **user-reported manual checks**, not agent-executed automated verification.
 
@@ -113,7 +119,7 @@ PT manually tested the hosted preview and reported success across the following 
 
 The following administrative, infrastructural, and deployment tasks remain pending:
 
-1. **SMTP & DNS Records**: Configure Resend sending subdomain (`auth.swipe2study.com`) in Namecheap DNS with exact dashboard MX, SPF TXT, and DKIM TXT records while preserving existing root website records and Zoho Mail MX records.
+1. **SMTP & DNS Records**: Resend custom SMTP setup is pending. When configured in the Resend dashboard for sending subdomain `auth.swipe2study.com`, copy the authoritative dashboard-provided DNS records—including the generated return-path subdomain records, SPF, and DKIM—directly into Namecheap DNS. Preserve existing root domain DNS and Zoho Mail MX records without altering root configuration.
 2. **Google OAuth**: Complete Google Cloud Console OAuth 2.0 Client credentials and configure Client ID/Secret in Supabase Dashboard.
 3. **Account Deletion Edge Function**: Deploy `supabase/functions/delete-account` with `SUPABASE_SERVICE_ROLE_KEY`.
 4. **Feature Activation & Acceptance**: Progressively enable feature flags in preview, verifying each capability before general release.
