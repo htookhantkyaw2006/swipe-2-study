@@ -116,34 +116,53 @@ where id = 'avatars';
 
 ## Stage 4: Validate and Deploy Deletion Function with Server-Only Secrets
 
-- **Prerequisite**: Stage 3 completed. Supabase CLI installed on deploy machine or CI runner.
+- **Prerequisite**: Stage 3 completed (both `20261029000100_account_deletion_foundation.sql` and `20261029000200_account_deletion_attempt_reservation.sql` applied). Supabase CLI installed on deploy machine or CI runner.
 - **Configuration & Secrets Setup**:
-  1. In Supabase Dashboard -> **Project Settings** -> **Edge Functions** -> **Secrets**:
-     * Confirm `SUPABASE_SERVICE_ROLE_KEY` is set to the staging service role secret.
-     * Note: `SUPABASE_URL` and `SUPABASE_ANON_KEY` are automatically provided by the Supabase Edge runtime.
+  1. In Supabase Dashboard -> **Project Settings** -> **Edge Functions** -> **Secrets** (or via `supabase secrets set`):
+     * Set `SUPABASE_SERVICE_ROLE_KEY` to the staging service role secret.
+     * Set `ALLOWED_ORIGINS` to the verified staging preview origin: `https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app` (do not add unverified wildcard `*` or guessed production origins).
+     * Note: `SUPABASE_URL` and `SUPABASE_ANON_KEY` are automatically provided by the Supabase Edge runtime (or pass explicitly when running outside managed runtime).
      * ⚠️ **Security Boundary**: Never put `SUPABASE_SERVICE_ROLE_KEY` into frontend `.env` or Git.
 - **Deployment Command**:
   ```bash
-  supabase functions deploy delete-account --no-verify-jwt
+  supabase functions deploy delete-account
   ```
-  *(Note: `--no-verify-jwt` allows the function to handle browser CORS `OPTIONS` preflight requests cleanly and perform its own caller authentication & password reauthentication via `handleReauthenticationStep`).*
+  *(Note: Standard API Gateway JWT verification is retained. The client contract in `accountDeletionClient.js` passes `Authorization: Bearer <token>`. Do NOT pass `--no-verify-jwt`. The gateway enforces bearer token structure, and the function executes application-level caller identity validation and fresh password reauthentication).*
 - **HTTP Boundary Verification (curl)**:
-  1. **Test OPTIONS Preflight**:
+  1. **Test OPTIONS Preflight with Allowlisted Origin**:
      ```bash
      curl -i -X OPTIONS "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
-       -H "Origin: https://<staging-app-url>" \
+       -H "Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app" \
        -H "Access-Control-Request-Method: POST" \
-       -H "Access-Control-Request-Headers: authorization, content-type"
+       -H "Access-Control-Request-Headers: authorization, content-type, apikey, x-client-info"
      ```
-     *Expected*: HTTP 200 `ok`, with headers `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Expose-Headers: Retry-After, Content-Type`.
-  2. **Test Unauthenticated POST**:
+     *Expected*: HTTP 200 `ok`, with headers `Access-Control-Allow-Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app`, `Vary: Origin`, `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Expose-Headers: Retry-After, Content-Type`.
+  2. **Test OPTIONS Preflight with Disallowed Origin**:
+     ```bash
+     curl -i -X OPTIONS "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://malicious.example.com" \
+       -H "Access-Control-Request-Method: POST"
+     ```
+     *Expected*: HTTP 403 `{"error":"Origin not allowed by CORS policy.","code":"CORS_ORIGIN_DENIED"}` and no `Access-Control-Allow-Origin` header.
+  3. **Test Unauthenticated POST**:
      ```bash
      curl -i -X POST "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app" \
        -H "Content-Type: application/json" \
        -d '{"password":"test"}'
      ```
-     *Expected*: HTTP 401 with JSON `{"error":"Authentication header is required.","code":"UNAUTHENTICATED"}` and CORS headers present.
-- **Stop Condition on Failure**: Preflight returns 405/500; CORS headers missing; function fails to deploy.
+     *Expected*: HTTP 401 with JSON `{"error":"Authentication header is required.","code":"UNAUTHENTICATED"}` (or gateway 401) with CORS headers matching the allowlisted Origin.
+  4. **Test POST with Valid JWT and Wrong Password**:
+     ```bash
+     curl -i -X POST "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app" \
+       -H "Authorization: Bearer <disposable_user_access_token>" \
+       -H "apikey: <staging-anon-key>" \
+       -H "Content-Type: application/json" \
+       -d '{"password":"wrong-password"}'
+     ```
+     *Expected*: HTTP 401 `{"error":"Incorrect password.","code":"INVALID_CREDENTIALS","status":"pending"}` and `Vary: Origin`.
+- **Stop Condition on Failure**: Preflight returns 405/500; CORS headers missing or wildcard `*` emitted; gateway or function rejects valid tokens; function fails to deploy.
 
 ---
 

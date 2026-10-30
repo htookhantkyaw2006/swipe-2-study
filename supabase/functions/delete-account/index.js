@@ -1,18 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 import { createDeletionHttpHandler } from '../../../src/server/accountDeletion.js';
 
+export const VERIFIED_STAGING_ORIGIN = 'https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app';
+
 const getEnv = () => {
   if (typeof Deno !== 'undefined' && Deno?.env?.get) {
     return {
       SUPABASE_URL: Deno.env.get('SUPABASE_URL'),
       SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY'),
       SUPABASE_SERVICE_ROLE_KEY: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      ALLOWED_ORIGINS: Deno.env.get('ALLOWED_ORIGINS') || Deno.env.get('ALLOWED_ORIGIN') || VERIFIED_STAGING_ORIGIN,
     };
   }
   return {
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || VERIFIED_STAGING_ORIGIN,
   };
 };
 

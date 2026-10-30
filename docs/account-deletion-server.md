@@ -193,39 +193,79 @@ Operators can safely reconcile and finalize the deletion without exposing any an
 
 ### Client & Server Environment Variable Names Only (No Secrets)
 - `VITE_ACCOUNT_DELETION_ENABLED`: Client capability gate flag (boolean string `'true'`). Disabled by default. Completely independent of `VITE_CLOUD_IMPORT_STAGING`.
-- `SUPABASE_URL` / `VITE_SUPABASE_URL`: HTTPS project origin of the Supabase project.
+- `SUPABASE_URL` / `VITE_SUPABASE_URL`: HTTPS project origin of the Supabase project. Automatically provided by Supabase Edge runtime or server environment.
 - `SUPABASE_ANON_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY`: Public anon/publishable key for user authentication.
 - `SUPABASE_SERVICE_ROLE_KEY`: Privileged secret key for administrative Storage cleanup, Auth deletion, and durable attempt throttling.
+- `ALLOWED_ORIGINS` / `ALLOWED_ORIGIN`: Comma- or whitespace-separated list of permitted web origins for CORS validation. In the staging Edge Function, defaults to verified staging preview origin `https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app`. Hardcoded wildcard (`*`) access has been removed.
 
 > **Security Rule:** `SUPABASE_SERVICE_ROLE_KEY` must exist **only** in server environment variables or Supabase Edge Function secrets. It must **never** be prefixed with `VITE_` or included in frontend bundles.
 
 ### Staging Deployment & Verification Prerequisites
-1. Apply additive migration `supabase/migrations/20261029000100_account_deletion_foundation.sql` to the staging project.
-2. Verify durable throttling table and RPCs:
+1. Apply both required additive database migrations to the staging project:
+   - `supabase/migrations/20261029000100_account_deletion_foundation.sql`
+   - `supabase/migrations/20261029000200_account_deletion_attempt_reservation.sql`
+2. Verify durable throttling table and service-role RPC dependencies:
    ```sql
-   SELECT to_regclass('private.account_deletion_attempts') AS attempts_table,
-          to_regprocedure('public.s2s_check_deletion_throttled(uuid,integer,integer)') AS check_throttle_rpc,
-          to_regprocedure('public.s2s_record_deletion_attempt_failure(uuid,integer,integer)') AS record_throttle_rpc,
-          to_regprocedure('public.s2s_reset_deletion_attempts(uuid)') AS reset_throttle_rpc;
+   SELECT to_regclass('private.account_deletions') AS deletions_table,
+          to_regclass('private.account_deletion_attempts') AS attempts_table,
+          to_regprocedure('public.s2s_reserve_deletion_attempt(uuid,integer,integer)') AS reserve_attempt_rpc,
+          to_regprocedure('public.s2s_begin_account_deletion(uuid)') AS begin_deletion_rpc,
+          to_regprocedure('public.s2s_record_deletion_progress(uuid,text,text)') AS record_progress_rpc,
+          to_regprocedure('public.s2s_get_deletion_state(uuid)') AS get_state_rpc;
    ```
-3. Deploy the Edge Function:
+   Confirm all deletion RPCs have execution revoked from `public`, `anon`, and `authenticated`, and granted exclusively to `service_role`.
+3. Set Edge Function secrets on the staging project:
+   ```bash
+   supabase secrets set SUPABASE_SERVICE_ROLE_KEY="<staging-service-role-key>" ALLOWED_ORIGINS="https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app"
+   ```
+4. Deploy the Edge Function:
    ```bash
    supabase functions deploy delete-account
    ```
-4. Verify function secrets:
-   ```bash
-   supabase secrets list
-   # Ensure SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY are set.
-   ```
-5. Enable the client gate for staging testing in `.env`:
+   *(Do NOT use `--no-verify-jwt`. Gateway JWT verification is enabled; requests supply `Authorization: Bearer <token>`).*
+5. Execute preflight HTTP checks:
+   - **OPTIONS preflight**:
+     ```bash
+     curl -i -X OPTIONS "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app" \
+       -H "Access-Control-Request-Method: POST" \
+       -H "Access-Control-Request-Headers: authorization, content-type, apikey, x-client-info"
+     ```
+     Confirm HTTP 200 `ok`, `Access-Control-Allow-Origin: https://s2-s-anti-gravity-3739ky7ll-htookhantkyaw2006-9042s-projects.vercel.app`, and `Vary: Origin`.
+   - **Unauthorized origin rejection**:
+     ```bash
+     curl -i -X OPTIONS "https://<staging-project-ref>.supabase.co/functions/v1/delete-account" \
+       -H "Origin: https://unauthorized.origin.com" \
+       -H "Access-Control-Request-Method: POST"
+     ```
+     Confirm HTTP 403 `CORS_ORIGIN_DENIED`.
+   - **Unauthenticated POST**:
+     Confirm HTTP 401 `UNAUTHENTICATED`.
+6. Enable the client gate for staging testing in frontend configuration:
    ```bash
    VITE_ACCOUNT_DELETION_ENABLED=true
    ```
 
-### Local Tooling Validation & Remaining Validation Gaps
-- **Local Automated Testing:** 256 Node/PGlite tests pass locally (11 database & lifecycle tests, 12 server reauth tests, 13 client coordination & dialog tests).
-- **Edge Function Verification:** Entry point (`supabase/functions/delete-account/index.js`) and imports verified via Node syntax check, Oxlint, and Vite SSR bundling.
-- **Validation Gap (Recorded):** Docker daemon is not active on this host, and Deno is not in Windows system PATH. Therefore `supabase functions serve` (local Docker container) and hosted deployment were not executed locally. Staging Edge Function execution remains to be validated upon staging deployment.
+### Disposable-Account Staging Acceptance Steps
+1. **Account Setup**: Register a new disposable staging account (e.g. `stage-del-user@example.com`) and upload a test avatar image via `/profile/edit`.
+2. **Wrong Password & Throttling**:
+   - Open `/profile` -> **Delete Account**.
+   - Submit incorrect password -> Verify immediate 401 `INVALID_CREDENTIALS`, error alert, and preserved session.
+   - Submit 5 consecutive incorrect passwords -> Verify 6th attempt returns 429 `RATE_LIMITED` with countdown timer based on `Retry-After` header.
+3. **Confirmed Deletion Execution**:
+   - On a fresh disposable account (or after rate limit window elapses), open **Delete Account** dialog.
+   - Enter confirmation phrase `DELETE` and correct account password.
+   - Confirm deletion completes, local client cache is purged of `s2s_user_<userId>_*`, and app returns to guest mode with success banner.
+4. **Backend Cascade Audit**:
+   - `auth.users`: 0 rows matching deleted user UUID.
+   - `public.profiles`, `public.user_items`, `public.user_preferences`: 0 rows (relational cascade confirmed).
+   - `storage.objects`: 0 objects in `avatars` bucket matching `<userId>/*`.
+   - `private.account_deletions`: 1 row with `status = 'finalized'`, recording audit timestamps for storage cleanup, auth deletion, and finalization.
+
+### Tooling Status & Verification Levels
+- **Local Automated Testing (Node.js & PGlite)**: 41 automated deletion tests pass locally (client coordination, dialog accessibility, HTTP preflight and boundary rejection, PGlite database locking, attempt reservation concurrency, and storage/auth lifecycle cascades).
+- **Standalone Deno Environment (Recorded Limitation)**: Neither `deno` nor `supabase` CLI is installed in the local Windows system PATH. Edge Function runtime execution could not be executed locally in Deno; entry point compatibility was verified through Web Standard APIs (`Request`, `Response`, `Headers`) and Node/ESM module loading.
+- **Hosted Execution (Pending)**: Real Supabase Edge Function invocation on staging project `olwicxljwfemgrsbobtg` remains pending deployment by an operator with CLI access.
 
 ---
 

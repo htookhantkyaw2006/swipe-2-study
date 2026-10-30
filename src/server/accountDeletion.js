@@ -905,12 +905,51 @@ export async function reconcilePendingDeletion({
   };
 }
 
-export const DELETION_CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+export const DELETION_CORS_HEADERS = Object.freeze({
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Expose-Headers': 'Retry-After, Content-Type',
-};
+});
+
+/**
+ * Resolves CORS headers for an incoming request against allowlisted origins.
+ * Supports exact matching for verified origins without broad wildcard access.
+ */
+export function resolveCorsHeaders(request, { allowedOrigins, env = {}, customCorsHeaders } = {}) {
+  // If caller provided an explicit custom corsHeaders object with Access-Control-Allow-Origin, respect it
+  if (customCorsHeaders && customCorsHeaders['Access-Control-Allow-Origin']) {
+    return { ...DELETION_CORS_HEADERS, ...customCorsHeaders };
+  }
+
+  const headers = { ...DELETION_CORS_HEADERS, ...(customCorsHeaders || {}) };
+  const originSet = new Set();
+
+  const add = (val) => {
+    if (!val) return;
+    if (Array.isArray(val) || val instanceof Set) {
+      for (const item of val) add(item);
+    } else if (typeof val === 'string') {
+      for (const part of val.split(/[\s,]+/)) {
+        const trimmed = part.trim().replace(/\/+$/, '');
+        if (trimmed) originSet.add(trimmed);
+      }
+    }
+  };
+
+  add(allowedOrigins);
+  add(env.ALLOWED_ORIGINS);
+  add(env.ALLOWED_ORIGIN);
+
+  const rawOrigin = request?.headers?.get?.('Origin') || request?.headers?.get?.('origin');
+  const requestOrigin = typeof rawOrigin === 'string' ? rawOrigin.trim().replace(/\/+$/, '') : '';
+
+  if (requestOrigin && originSet.has(requestOrigin)) {
+    headers['Access-Control-Allow-Origin'] = requestOrigin;
+    headers['Vary'] = 'Origin';
+  }
+
+  return headers;
+}
 
 /**
  * Standard Web Request / Response HTTP Handler suitable for Supabase Edge Functions.
@@ -924,16 +963,35 @@ export function createDeletionHttpHandler({
   getEnv,
   attemptLimiter,
   createClient = defaultCreateClient,
-  corsHeaders = DELETION_CORS_HEADERS,
+  corsHeaders,
+  allowedOrigins,
   reportError,
 }) {
   return async function handleRequest(request) {
+    const env = typeof getEnv === 'function' ? getEnv() : (staticEnv || (typeof process !== 'undefined' ? process.env : {}));
+    const rawOrigin = request?.headers?.get?.('Origin') || request?.headers?.get?.('origin');
+    const requestOrigin = typeof rawOrigin === 'string' ? rawOrigin.trim().replace(/\/+$/, '') : '';
+    const resolvedCorsHeaders = resolveCorsHeaders(request, {
+      allowedOrigins,
+      env,
+      customCorsHeaders: corsHeaders,
+    });
+
     // 1. Browser cross-origin preflight handling
     if (request.method === 'OPTIONS') {
+      if (requestOrigin && !resolvedCorsHeaders['Access-Control-Allow-Origin']) {
+        return new Response(JSON.stringify({ error: 'Origin not allowed by CORS policy.', code: 'CORS_ORIGIN_DENIED' }), {
+          status: 403,
+          headers: {
+            ...resolvedCorsHeaders,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
       return new Response('ok', {
         status: 200,
         headers: {
-          ...corsHeaders,
+          ...resolvedCorsHeaders,
         },
       });
     }
@@ -943,14 +1001,24 @@ export function createDeletionHttpHandler({
       return new Response(JSON.stringify({ error: 'Method not allowed. Use POST.', code: 'METHOD_NOT_ALLOWED' }), {
         status: 405,
         headers: {
-          ...corsHeaders,
+          ...resolvedCorsHeaders,
           'Content-Type': 'application/json',
           Allow: 'POST, OPTIONS',
         },
       });
     }
 
-    const env = typeof getEnv === 'function' ? getEnv() : (staticEnv || (typeof process !== 'undefined' ? process.env : {}));
+    // Reject browser cross-origin POST if Origin is present and not allowlisted
+    if (requestOrigin && !resolvedCorsHeaders['Access-Control-Allow-Origin']) {
+      return new Response(JSON.stringify({ error: 'Origin not allowed by CORS policy.', code: 'CORS_ORIGIN_DENIED' }), {
+        status: 403,
+        headers: {
+          ...resolvedCorsHeaders,
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+
     const resolvedAdminClient = typeof getAdminClient === 'function' ? getAdminClient() : adminClient;
     const resolvedDbClient = typeof getDbClient === 'function' ? getDbClient() : (dbClient || resolvedAdminClient);
     const effectiveLimiter = attemptLimiter || (resolvedDbClient ? createDatabaseAttemptLimiter(resolvedDbClient) : createAttemptLimiter());
@@ -963,7 +1031,7 @@ export function createDeletionHttpHandler({
       return new Response(JSON.stringify({ error: 'Could not read request body.', code: 'INVALID_PAYLOAD' }), {
         status: 400,
         headers: {
-          ...corsHeaders,
+          ...resolvedCorsHeaders,
           'Content-Type': 'application/json',
         },
       });
@@ -997,7 +1065,7 @@ export function createDeletionHttpHandler({
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: {
-          ...corsHeaders,
+          ...resolvedCorsHeaders,
           'Content-Type': 'application/json',
         },
       });
@@ -1020,7 +1088,7 @@ export function createDeletionHttpHandler({
       }
       const errorMsg = err.message || 'An unexpected error occurred during account deletion.';
       const headers = {
-        ...corsHeaders,
+        ...resolvedCorsHeaders,
         'Content-Type': 'application/json',
       };
       if (code === 'RATE_LIMITED' && err.retryAfter) {
