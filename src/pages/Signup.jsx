@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { useAuth } from '../lib/useAuth.js';
 import { safeReturnPath } from '../lib/safeReturnPath.js';
+import { trackEvent } from '../lib/analytics.js';
 import { isGoogleAuthEnabled, initiateGoogleSignIn } from '../lib/googleAuth.js';
 import { Mail, Lock, Eye, EyeOff, User, ArrowLeft, Sparkles } from 'lucide-react';
 
@@ -75,9 +76,10 @@ export default function Signup() {
 
       // Supabase returns a user but with no session when email confirmation is required.
       if (data.user && !data.session) {
+        trackEvent('auth:signup_success', { mode: 'email_confirmation' });
         navigate(`/verify-email?email=${encodeURIComponent(trimmedEmail)}&returnTo=${encodeURIComponent(returnTo)}`);
       } else if (data.session) {
-        // Auto-confirm is on (unlikely in production but possible in dev).
+        trackEvent('auth:signup_success', { mode: 'direct' });
         navigate(returnTo, { replace: true });
       }
     } catch (err) {

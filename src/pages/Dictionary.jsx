@@ -3,6 +3,7 @@ import { Bookmark, BookmarkMinus, Clock, Search, Volume2 } from 'lucide-react';
 import { db } from '../lib/db';
 import { speak } from '../lib/speech';
 import { useCourse } from '../lib/language';
+import { trackEvent } from '../lib/analytics';
 import { readingOf, sayOf, kanaOf, matchesQuery } from '../lib/entry';
 import { StudyHeader, StudySearch } from '../components/study/StudyPage';
 import './Dictionary.css';
@@ -22,7 +23,10 @@ export default function Dictionary() {
   const toggleSave = word => {
     const existing = db.get('saved_words').find(item => item.phrase === word.phrase);
     if (existing) db.remove('saved_words', existing.id);
-    else db.insert('saved_words', { phrase: word.phrase, ...(word.kana ? { kana: word.kana } : {}), reading: readingOf(word), english: word.english, burmese: word.burmese });
+    else {
+      db.insert('saved_words', { phrase: word.phrase, ...(word.kana ? { kana: word.kana } : {}), reading: readingOf(word), english: word.english, burmese: word.burmese });
+      trackEvent('study:word_saved', { courseId: course.id });
+    }
     setSaved(db.get('saved_words'));
   };
   return <div className="study-page dictionary-page">

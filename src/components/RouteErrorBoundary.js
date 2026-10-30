@@ -1,4 +1,5 @@
 import React, { createElement, Component } from 'react';
+import { reportError } from '../lib/errorReporting.js';
 
 export function RouteLoadingFallback() {
   return createElement(
@@ -24,6 +25,15 @@ export class RouteErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    try {
+      reportError(error, {
+        source: 'RouteErrorBoundary',
+        componentStack: errorInfo?.componentStack,
+      });
+    } catch {
+      // Error monitoring failure must never disrupt boundary fallback
+    }
+
     if (typeof this.props.onError === 'function') {
       this.props.onError(error, errorInfo);
     }

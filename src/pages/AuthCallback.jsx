@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/useAuth.js';
 import { safeReturnPath } from '../lib/safeReturnPath.js';
+import { trackEvent } from '../lib/analytics.js';
 import { getAuthCallbackState } from '../lib/authCallbackState.js';
 import { inspectAuthCallbackSession } from '../lib/authCallbackSession.js';
 import { getSupabaseClient } from '../lib/supabase.js';
@@ -202,6 +203,7 @@ export default function AuthCallback({ client: propClient, auth: propAuth } = {}
   useEffect(() => {
     if (canNavigate && isLifecycleValid()) {
       setStoredCallbackOwner(null);
+      trackEvent('auth:signin_success', { mode: 'oauth_callback' });
       navigate(returnTo, { replace: true });
     }
   }, [canNavigate, navigate, returnTo, isLifecycleValid]);

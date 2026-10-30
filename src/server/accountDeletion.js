@@ -925,6 +925,7 @@ export function createDeletionHttpHandler({
   attemptLimiter,
   createClient = defaultCreateClient,
   corsHeaders = DELETION_CORS_HEADERS,
+  reportError,
 }) {
   return async function handleRequest(request) {
     // 1. Browser cross-origin preflight handling
@@ -1003,6 +1004,15 @@ export function createDeletionHttpHandler({
     } catch (err) {
       const status = err.status || 500;
       const code = err.code || 'INTERNAL_SERVER_ERROR';
+      if (typeof reportError === 'function') {
+        try {
+          reportError(err, {
+            source: 'accountDeletionHandler',
+            status,
+            code,
+          });
+        } catch {}
+      }
       const errorMsg = err.message || 'An unexpected error occurred during account deletion.';
       const headers = {
         ...corsHeaders,

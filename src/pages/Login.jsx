@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { useAuth } from '../lib/useAuth.js';
 import { safeReturnPath } from '../lib/safeReturnPath.js';
+import { trackEvent } from '../lib/analytics.js';
 import { isGoogleAuthEnabled, initiateGoogleSignIn } from '../lib/googleAuth.js';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, Sparkles } from 'lucide-react';
 import './PasswordRecovery.css';
@@ -48,6 +49,7 @@ export default function Login() {
       if (signInError) {
         setError(signInError.message);
       } else {
+        trackEvent('auth:signin_success', { mode: 'password' });
         navigate(returnTo, { replace: true });
       }
     } catch (err) {

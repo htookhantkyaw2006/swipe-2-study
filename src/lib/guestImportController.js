@@ -1,4 +1,5 @@
 import { isCloudImportStagingEnabled } from './cloudImportGate.js';
+import { trackEvent } from './analytics.js';
 const initial = () => ({
   accountId: null, generation: null, autoChecked: false,
   checking: false, pending: false, open: false, offer: null,
@@ -82,6 +83,10 @@ export function createGuestImportController(service, { allowCloud = isCloudImpor
       if (!current(token, accountId, generation)) return;
       if (!['saved', 'already-decided'].includes(result?.status) || (allowCloud ? (result?.persistence !== 'device-only' && result?.persistence !== 'cloud') : result?.persistence !== 'device-only')
         || !['merge', 'account-only'].includes(result.choice)) throw new Error('Guest import save was not confirmed.');
+      trackEvent('import:guest_completed', {
+        choice: result.choice,
+        recordCount: Math.min(result.addedRecords ?? 0, 10000),
+      });
       const isCloudResult = result.persistence === 'cloud';
       const message = result.status === 'already-decided'
         ? (isCloudResult ? 'This guest learning is already handled on your account.' : 'This guest learning is already handled on this device. Cloud sync is not available yet.')

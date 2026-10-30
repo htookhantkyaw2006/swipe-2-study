@@ -18,6 +18,7 @@ import { StudyHeader } from '../components/study/StudyPage';
 import './SettingsSubpage.css';
 import LanguageFlag from '../components/ui/LanguageFlag';
 import { AuthContext } from '../lib/authContext.js';
+import { trackEvent } from '../lib/analytics.js';
 import { isLearningExportResetEnabled } from '../lib/learningExportResetGate.js';
 import { learningExportService } from '../lib/learningExportService.js';
 import { learningResetService } from '../lib/learningResetService.js';
@@ -187,6 +188,9 @@ export default function SettingsSubpage() {
       } else if (res.status === 'failed') {
         setResetError(res.error || 'Learning reset failed. Please try again.');
       } else if (res.status === 'success') {
+        trackEvent('learning:reset_confirmed', {
+          scope: initiatingUserId ? 'account' : 'guest',
+        });
         setResetDialogOpen(false);
         refreshUsage();
         flash('Learning data has been reset.');

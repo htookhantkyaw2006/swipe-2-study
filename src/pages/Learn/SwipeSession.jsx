@@ -11,6 +11,7 @@ import { readSessionCards } from '../../lib/studyWords';
 import { phraseCards } from '../../lib/phraseCards';
 import { recordWordAction } from '../../lib/vocabularyProgress';
 import { usePublishedCourse } from '../../lib/publishedContentContext';
+import { trackEvent } from '../../lib/analytics';
 import './SwipeSession.css';
 
 const ShuffleDeck = ({ reducedMotion }) => (
@@ -220,6 +221,19 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     }
   }, [isPublishedSession, publishedCourse.isLoaded, publishedCourse.items, prefs.cardOrder, prefs.cardsPerSession]);
 
+  const sessionStartedRef = useRef(false);
+  useEffect(() => {
+    if (cards.length > 0 && !sessionStartedRef.current) {
+      sessionStartedRef.current = true;
+      trackEvent('study:session_start', {
+        courseId: course.id,
+        levelId: targetLevel,
+        mode: isPhrases ? 'phrases' : isReview ? 'review' : isSaved ? 'saved' : 'learn',
+        cardCount: cards.length,
+      }, { dedupeKey: 'session_start_' + course.id + '_' + targetLevel + '_' + cards.length });
+    }
+  }, [cards.length, course.id, targetLevel, isPhrases, isReview, isSaved]);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
@@ -272,6 +286,12 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       animate(dragOffset, 0, { duration: reducedMotion ? 0 : 0.22 });
       after(() => { actionLocked.current = false; setAdvancing(false); }, reducedMotion ? 0 : 240);
     } else {
+      trackEvent('study:session_complete', {
+        courseId: course.id,
+        levelId: targetLevel,
+        mode: isPhrases ? 'phrases' : isReview ? 'review' : isSaved ? 'saved' : 'learn',
+        cardCount: cards.length,
+      }, { dedupeKey: 'session_complete_' + course.id + '_' + targetLevel + '_' + cards.length });
       after(() => navigate(backTo), reducedMotion ? 0 : 240);
     }
   };
