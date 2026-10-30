@@ -11,5 +11,8 @@ export default defineConfig(({ mode, command }) => {
   return {
     plugins: [react()],
     server: { host: true },
+    build: {
+      chunkSizeWarningLimit: 800,
+    },
   }
 })

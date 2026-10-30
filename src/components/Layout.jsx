@@ -6,6 +6,8 @@ import { readCollapsedPreference, writeCollapsedPreference } from '../lib/sideba
 import { useDesktopLayout } from '../lib/useDesktopLayout';
 import { useGuestImport } from '../lib/useGuestImport';
 import GuestImportNotice from './GuestImportNotice';
+import { Suspense } from 'react';
+import { RouteErrorBoundary, RouteLoadingFallback } from './RouteErrorBoundary';
 
 const readScrollCache = () => {
   try {
@@ -75,7 +77,11 @@ export default function Layout() {
           </button>
         </div>}
         {!isSessionActive && <GuestImportNotice />}
-        <Outlet key={renderVersion} />
+        <RouteErrorBoundary>
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Outlet key={renderVersion} />
+          </Suspense>
+        </RouteErrorBoundary>
       </main>
     </div>
   );

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>App Smoke Browser Verification</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React, { createElement, Component } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom';
+    import { LanguageProvider } from '/src/lib/language.jsx';
+    import { AuthProvider } from '/src/lib/auth.jsx';
+    import { PreferencesProvider } from '/src/lib/preferences.jsx';
+    import StorageOwnerBoundary from '/src/components/StorageOwnerBoundary.jsx';
+    import { PublishedContentProvider } from '/src/lib/publishedContentContext.jsx';
+    import GuestImportProvider from '/src/components/GuestImportProvider.jsx';
+    import App from '/src/App.jsx';
+    import { RouteErrorBoundary, RouteLoadingFallback } from '/src/components/RouteErrorBoundary.js';
+
+    const rootElement = document.getElementById('root');
+    let reactRoot = null;
+    const testLogs = [];
+    const origLog = console.log;
+    console.log = (...args) => { testLogs.push(args.join(' ')); origLog(...args); };
+
+    function renderComponent(ui) {
+      if (!reactRoot) {
+        reactRoot = createRoot(rootElement);
+      }
+      reactRoot.render(ui);
+    }
+
+    function unmountComponent() {
+      if (reactRoot) {
+        reactRoot.unmount();
+        reactRoot = null;
+        rootElement.innerHTML = '';
+      }
+    }
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    async function waitFor(condition, timeoutMs = 2500, intervalMs = 50) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        if (condition()) return;
+        await sleep(intervalMs);
+      }
+      throw new Error('waitFor timed out after ' + timeoutMs + 'ms');
+    }
+
+    function assert(cond, msg) {
+      if (!cond) throw new Error(msg || 'Assertion failed');
+    }
+
+    function createTestTree(initialEntry) {
+      return createElement(
+        AuthProvider,
+        null,
+        createElement(
+          StorageOwnerBoundary,
+          null,
+          createElement(
+            PreferencesProvider,
+            null,
+            createElement(
+              LanguageProvider,
+              null,
+              createElement(
+                MemoryRouter,
+                { initialEntries: [initialEntry] },
+                createElement(
+                  GuestImportProvider,
+                  null,
+                  createElement(
+                    PublishedContentProvider,
+                    { enabledOverride: false },
+                    createElement(App)
+                  )
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+
+    async function runTests() {
+      const results = [];
+
+      try {
+        // -------------------------------------------------------------
+        // Test 1: Guest startup on root route ("/")
+        // -------------------------------------------------------------
+        renderComponent(createTestTree('/'));
+        await waitFor(() => document.querySelector('.home-page') !== null);
+
+        assert(document.body.textContent.includes('Guest Learner') || document.body.textContent.includes('Welcome'), 'Guest startup: greets guest user');
+        assert(Boolean(document.querySelector('.bottom-nav') || document.querySelector('nav')), 'Guest startup: navigation is present');
+        results.push({ test: 'guest-startup', passed: true });
+        unmountComponent();
+
+        // -------------------------------------------------------------
+        // Test 2: Direct learning-route navigation ("/learn")
+        // -------------------------------------------------------------
+        renderComponent(createTestTree('/learn'));
+        await waitFor(() => document.body.textContent.includes('HSK') || document.body.textContent.includes('Vocabulary') || document.body.textContent.includes('Levels') || document.body.textContent.includes('Learn'));
+        results.push({ test: 'direct-learning-navigation', passed: true });
+        unmountComponent();
+
+        // -------------------------------------------------------------
+        // Test 3: Protected profile editing ("/profile/edit")
+        // -------------------------------------------------------------
+        renderComponent(createTestTree('/profile/edit'));
+        await waitFor(() => document.body.textContent.includes('guest mode') || document.body.textContent.includes('Sign in') || document.body.textContent.includes('Log in') || document.body.textContent.includes('Welcome back') || document.body.textContent.includes('Password'));
+        results.push({ test: 'protected-profile-editing-redirect', passed: true });
+        unmountComponent();
+
+        // -------------------------------------------------------------
+        // Test 4: Auth callback loading ("/auth/callback?returnTo=%2Fprofile%2Fedit")
+        // -------------------------------------------------------------
+        renderComponent(createTestTree('/auth/callback?returnTo=%2Fprofile%2Fedit'));
+        await waitFor(() => Boolean(document.querySelector('.auth-page') || document.querySelector('.study-page') || document.body.textContent.includes('account') || document.body.textContent.includes('Connecting') || document.body.textContent.includes('signing')));
+        results.push({ test: 'auth-callback-loading', passed: true });
+        unmountComponent();
+
+        // -------------------------------------------------------------
+        // Test 5: Route error boundary recoverable retry
+        // -------------------------------------------------------------
+        let shouldFail = true;
+        class FlakyComponent extends Component {
+          render() {
+            if (shouldFail) throw new Error('Simulated chunk loading failure');
+            return createElement('div', { id: 'recovered-view' }, 'Page loaded successfully');
+          }
+        }
+
+        renderComponent(
+          createElement(
+            RouteErrorBoundary,
+            null,
+            createElement(FlakyComponent)
+          )
+        );
+        await sleep(100);
+
+        assert(document.body.textContent.includes('Unable to load page'), 'Error boundary displays error alert');
+        const retryBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Retry'));
+        assert(Boolean(retryBtn), 'Retry button is present in error UI');
+
+        // Now fix component and simulate retry
+        shouldFail = false;
+        retryBtn.click();
+        await sleep(100);
+
+        const recoveredEl = document.getElementById('recovered-view');
+        assert(Boolean(recoveredEl), 'Component successfully recovered after retry');
+        results.push({ test: 'route-error-boundary-recovery', passed: true });
+        unmountComponent();
+
+        // Report results
+        fetch('/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, results, logs: testLogs }),
+        });
+      } catch (err) {
+        fetch('/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: err.stack || err.message, logs: testLogs }),
+        });
+      }
+    }
+
+    runTests();
+  </script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'feat/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Lint, Test & Build (Required)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies (clean lockfile)
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run complete automated test suite
+        run: npm test
+        env:
+          CI: true
+
+      - name: Run production build
+        run: npm run build
+
+  browser-smoke:
+    name: Browser Smoke Checks (Optional)
+    runs-on: ubuntu-latest
+    needs: validate
+    if: always() && needs.validate.result == 'success'
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run headless browser smoke verification
+        run: |
+          node tests/runBrowserAppSmoke.mjs
+          node tests/runBrowserRouteCheck.mjs
+          node tests/runBrowserPublishedContentCheck.mjs
+        env:
+          CI: true
+          CHROME_BIN: /usr/bin/google-chrome
