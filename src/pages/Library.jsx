@@ -45,7 +45,7 @@ export default function Library() {
     reviewCount = db.get('review_cards').length;
     cardCount = db.get('flashcards').length;
     const progress = getCourseProgress(db, course);
-    learnedCount = progress.uniqueLearnedCount;
+    learnedCount = progress.uniqueLearned ?? 0;
   } catch {
     // Keep safe defaults
   }
