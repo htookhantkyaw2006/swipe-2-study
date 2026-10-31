@@ -14,6 +14,20 @@ async function sha256(value) {
   return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function itemKey(item) {
+  return `${item.language}:${item.kind}:${item.written_form}:${item.reading ?? ''}`;
+}
+
+function legacy6Source(sourceJson) {
+  try {
+    const parsed = JSON.parse(sourceJson);
+    if (!Array.isArray(parsed)) return null;
+    return JSON.stringify(parsed.filter(([name]) => typeof name === 'string' && !name.endsWith('_learned_words')));
+  } catch {
+    return null;
+  }
+}
+
 function buildSummary(items) {
   const langMap = {
     zh: { languageId: 'zh', languageLabel: 'Chinese', savedWords: 0, reviewWords: 0, progressRecords: 0 },
@@ -81,7 +95,7 @@ export function createCloudGuestImportService({
     }
 
     // 2. Check durable record status
-    const existingDurable = readDurableRecord(storage, account.ownerId);
+    let existingDurable = readDurableRecord(storage, account.ownerId);
 
     if (existingDurable.error) {
       const error = new Error(existingDurable.error);
@@ -92,21 +106,7 @@ export function createCloudGuestImportService({
     // If server acknowledged previously: local hydration just succeeded, so mark applied
     if (existingDurable.record?.state === 'server_acknowledged') {
       markDurableApplied(storage, account.ownerId, now);
-      return Object.freeze({
-        status: 'nothing-to-import',
-        persistence: 'cloud',
-        ownerId: account.ownerId,
-        summary: Object.freeze([]),
-      });
-    }
-
-    if (existingDurable.record?.state === 'locally_applied') {
-      return Object.freeze({
-        status: 'nothing-to-import',
-        persistence: 'cloud',
-        ownerId: account.ownerId,
-        summary: Object.freeze([]),
-      });
+      existingDurable = readDurableRecord(storage, account.ownerId);
     }
 
     // If unconfirmed request exists after reload: discover it and offer retry
@@ -136,13 +136,23 @@ export function createCloudGuestImportService({
       return offer;
     }
 
-    // 3. Otherwise inspect local guest snapshot
+    // 3. Inspect local guest snapshot
     const guestSnapshot = readGuestSnapshot(storageOwner.scope(null));
     const hash = await fingerprint(guestSnapshot.source);
     guard(account);
 
     if (!/^[a-f0-9]{64}$/.test(hash)) {
       throw new Error('Could not identify the guest data. Please retry.');
+    }
+
+    // Unchanged completed import: repeat-safe early return
+    if (existingDurable.record?.state === 'locally_applied' && existingDurable.record.sourceFingerprint === hash) {
+      return Object.freeze({
+        status: 'nothing-to-import',
+        persistence: 'cloud',
+        ownerId: account.ownerId,
+        summary: Object.freeze([]),
+      });
     }
 
     // Read cloud snapshot to obtain current reset_version and verify auth
@@ -161,9 +171,30 @@ export function createCloudGuestImportService({
 
     const expectedResetVersion = snapshotRes.snapshot.reset_version;
 
-    // Build items from guest snapshot
-    const items = buildCloudImportItems(guestSnapshot.tables);
-    const summary = buildSummary(items);
+    // Build all candidate items from current guest snapshot
+    const allItems = buildCloudImportItems(guestSnapshot.tables);
+    let eligibleItems = allItems;
+
+    if (existingDurable.record?.state === 'locally_applied') {
+      const legacySource = legacy6Source(guestSnapshot.source);
+      const legacyHash = legacySource ? await fingerprint(legacySource) : null;
+      guard(account);
+      const isLegacy6Match = legacyHash !== null && legacyHash === existingDurable.record.sourceFingerprint;
+
+      const handledKeys = new Set([
+        ...(existingDurable.record.handledItemKeys || []),
+        ...(existingDurable.record.items || []).map(itemKey),
+        ...(snapshotRes.snapshot.items || []).map(itemKey),
+      ]);
+
+      if (isLegacy6Match) {
+        eligibleItems = allItems.filter(item => item.kind === 'learned_words' && !handledKeys.has(itemKey(item)));
+      } else {
+        eligibleItems = allItems.filter(item => !handledKeys.has(itemKey(item)));
+      }
+    }
+
+    const summary = buildSummary(eligibleItems);
 
     const offer = Object.freeze({
       status: summary.length ? 'available' : 'nothing-to-import',
@@ -177,7 +208,8 @@ export function createCloudGuestImportService({
       account,
       guestSnapshot,
       fingerprint: hash,
-      items,
+      items: eligibleItems,
+      allItems,
       expectedResetVersion,
     });
 
@@ -223,6 +255,7 @@ export function createCloudGuestImportService({
       }
 
       const itemsToSend = choice === 'merge' ? prepared.items : [];
+      const handledKeys = (prepared.allItems || prepared.items || []).map(itemKey);
 
       const result = await executeDurableImport(client, storage, {
         ownerId: account.ownerId,
@@ -230,6 +263,7 @@ export function createCloudGuestImportService({
         sourceFingerprint,
         choice,
         items: itemsToSend,
+        handledItemKeys: handledKeys,
         isCurrent: () => {
           try { guard(account); return true; } catch { return false; }
         },

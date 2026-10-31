@@ -57,6 +57,12 @@ export function validateDurableRecord(record, expectedOwnerId = null) {
   if (!validTimestamp(record.createdAt) || !validTimestamp(record.updatedAt)) {
     throw new Error('Invalid timestamps in durable record.');
   }
+  if (record.handledItemKeys !== undefined && (!Array.isArray(record.handledItemKeys) || record.handledItemKeys.some(k => typeof k !== 'string'))) {
+    throw new Error('Invalid handledItemKeys in durable record.');
+  }
+  if (record.previousReceipt !== undefined && record.previousReceipt !== null && (typeof record.previousReceipt !== 'object' || Array.isArray(record.previousReceipt))) {
+    throw new Error('Invalid previousReceipt in durable record.');
+  }
   return record;
 }
 
@@ -113,6 +119,8 @@ export function createDurableRecord({
   sourceFingerprint,
   choice,
   items,
+  handledItemKeys,
+  previousReceipt,
   requestId,
   makeId = () => globalThis.crypto.randomUUID(),
   now = () => new Date().toISOString(),
@@ -134,6 +142,8 @@ export function createDurableRecord({
     updatedAt: timestamp,
     error: null,
     receipt: null,
+    ...(Array.isArray(handledItemKeys) ? { handledItemKeys } : {}),
+    ...(previousReceipt ? { previousReceipt } : {}),
   };
   return validateDurableRecord(record);
 }
@@ -152,6 +162,7 @@ export async function executeDurableImport(client, storage, {
   sourceFingerprint,
   choice,
   items,
+  handledItemKeys,
   isCurrent,
   now = () => new Date().toISOString(),
 }) {
@@ -198,36 +209,58 @@ export async function executeDurableImport(client, storage, {
       };
     }
 
-    // Reject choice mismatch on unresolved request
-    if (choice && record.choice !== choice) {
-      return {
-        outcome: 'choice_mismatch',
-        error: 'Cannot change choice on an unresolved request.',
-        code: 'CHOICE_MISMATCH',
-        record,
-      };
-    }
+    if (record.state === 'unconfirmed' || record.state === 'not_sent') {
+      // Reject choice mismatch on unresolved request
+      if (choice && record.choice !== choice) {
+        return {
+          outcome: 'choice_mismatch',
+          error: 'Cannot change choice on an unresolved request.',
+          code: 'CHOICE_MISMATCH',
+          record,
+        };
+      }
 
-    // Reject fingerprint mismatch on unresolved request
-    if (sourceFingerprint && record.sourceFingerprint !== sourceFingerprint) {
-      return {
-        outcome: 'fingerprint_mismatch',
-        error: 'Source fingerprint does not match unresolved request.',
-        code: 'FINGERPRINT_MISMATCH',
-        record,
-      };
-    }
-
-    // If already acknowledged by server, return immediately for hydration
-    if (record.state === 'server_acknowledged' || record.state === 'locally_applied') {
+      // Reject fingerprint mismatch on unresolved request
+      if (sourceFingerprint && record.sourceFingerprint !== sourceFingerprint) {
+        return {
+          outcome: 'fingerprint_mismatch',
+          error: 'Source fingerprint does not match unresolved request.',
+          code: 'FINGERPRINT_MISMATCH',
+          record,
+        };
+      }
+    } else if (record.state === 'server_acknowledged') {
       return {
         outcome: record.state,
         receipt: record.receipt,
         record,
         error: null,
       };
+    } else if (record.state === 'locally_applied') {
+      if (record.sourceFingerprint === sourceFingerprint && record.choice === choice && record.expectedResetVersion === expectedResetVersion) {
+        return {
+          outcome: 'locally_applied',
+          receipt: record.receipt,
+          record,
+          error: null,
+        };
+      }
+      record = null;
+    } else {
+      record = null;
     }
-  } else {
+  }
+
+  if (!record) {
+    const previousReceipt = existingResult.record?.receipt || existingResult.record?.previousReceipt || null;
+    const mergedHandledKeys = [
+      ...new Set([
+        ...(existingResult.record?.handledItemKeys || []),
+        ...(existingResult.record?.items || []).map(item => `${item.language}:${item.kind}:${item.written_form}:${item.reading ?? ''}`),
+        ...(handledItemKeys || []),
+      ]),
+    ];
+
     // Create new durable record
     record = createDurableRecord({
       ownerId,
@@ -235,6 +268,8 @@ export async function executeDurableImport(client, storage, {
       sourceFingerprint,
       choice,
       items,
+      handledItemKeys: mergedHandledKeys,
+      previousReceipt,
       now,
     });
 
