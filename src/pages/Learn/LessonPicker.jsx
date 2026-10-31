@@ -1,11 +1,12 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Layers, Compass, ChevronRight, RotateCw, CheckCircle2, Bookmark, Volume2 } from 'lucide-react';
 import { useCourse } from '../../lib/language';
 import { db } from '../../lib/db';
-import { kanaOf, sayOf } from '../../lib/entry';
+import { kanaOf } from '../../lib/entry';
 import { filterStudyWords, wordDetails } from '../../lib/studyWords';
 import { speak } from '../../lib/speech';
+import { playWordAudio } from '../../lib/wordAudio';
 import { StudyHeader, StudySearch } from '../../components/study/StudyPage';
 import { getLevelProgress } from '../../lib/vocabularyProgress';
 import { storageOwner } from '../../lib/storageOwner';
@@ -60,26 +61,12 @@ export default function LessonPicker() {
   const totalWords = progress.words;
   const percent = progress.percent;
 
-  const playWordAudio = (word) => {
-    const audioPath = typeof word?.audio_path === 'string' ? word.audio_path.trim() : null;
-    if (audioPath && typeof Audio !== 'undefined') {
-      try {
-        const audio = new Audio(audioPath);
-        let hasFallenBack = false;
-        const fallback = () => {
-          if (!hasFallenBack) {
-            hasFallenBack = true;
-            speak(sayOf(word));
-          }
-        };
-        audio.addEventListener('error', fallback, { once: true });
-        audio.play().catch(fallback);
-        return;
-      } catch {
-        // Fall back to TTS
-      }
-    }
-    speak(sayOf(word));
+  const activeAudioRef = useRef(null);
+  useEffect(() => () => activeAudioRef.current?.cancel(), []);
+
+  const handlePlayWord = (word) => {
+    activeAudioRef.current?.cancel();
+    activeAudioRef.current = playWordAudio(word, { speakFn: speak });
   };
 
   const heroSubtitle = publishedCourse.isLoading
@@ -195,7 +182,7 @@ export default function LessonPicker() {
                         {word.english && <p lang="en">{word.english}</p>}
                         {word.burmese && <p lang="my">{word.burmese}</p>}
                       </div>
-                      <button className="study-icon-button" onClick={() => playWordAudio(stored)} aria-label={`Play word: ${word.phrase}`}><Volume2 size={20} aria-hidden="true" /></button>
+                      <button className="study-icon-button" onClick={() => handlePlayWord(stored)} aria-label={`Play word: ${word.phrase}`}><Volume2 size={20} aria-hidden="true" /></button>
                     </li>
                   );
                 })}

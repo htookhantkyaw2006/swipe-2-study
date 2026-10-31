@@ -245,7 +245,7 @@ id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burm
 - `meaning_english`: String, max **2000** characters.
 - `meaning_burmese`: String, max **2000** characters.
 - *Meaning Rule:* At least one meaning (`meaning_english` or `meaning_burmese`) is required; warning issued if one is missing.
-- `audio_path`: Optional string, max **256** characters. Relative storage path, forward slashes, no leading `/` or `..`, must end in `.mp3`, `.wav`, `.ogg`, `.m4a`, `.aac`, or `.webm`.
+- `audio_path`: Optional string, max **256** characters. Relative path using forward slashes, no leading `/` or `..`, ending in `.mp3`, `.wav`, `.ogg`, `.m4a`, `.aac`, or `.webm`. Served as same-origin static assets under `public/audio/zh/hsk1/<id>.mp3` and resolved against origin root (`/audio/zh/hsk1/<id>.mp3`) independent of current route. Do not concatenate Supabase URLs or invent Storage buckets.
 - `examples_json`: JSON array string of up to **3** items. Each item is a JSON object with:
   - `text`: Required non-empty string, max **1000** characters (the sentence text).
   - `reading`: Optional string (pronunciation).
@@ -290,6 +290,36 @@ zh_hsk1_003,zh-hsk1,zh,HSK1,谢谢,xiè xie,thank you,ကျေးဇူးတ�
    ```powershell
    node tools/content-csv/content-manager.mjs rollback zh-hsk1 --to-version <previous_version> --target staging --reason "Revert content typo"
    ```
+
+### Audio Serving Convention & Attachment Runbook
+
+1. **Same-Origin Static Asset Convention:**
+   - Client-recorded audio files are served as same-origin static assets stored under:
+     `public/audio/zh/hsk1/<id>.mp3`
+   - In CSV datasets and database tables, `audio_path` contains the relative path (e.g. `audio/zh/hsk1/<id>.mp3`).
+   - The production helper (`src/lib/wordAudio.js`) normalizes and resolves relative audio paths against the application origin root (`new URL('/' + cleanPath, origin)`). This guarantees identical URL resolution whether the word is played from `/learn/level/HSK1` or `/learn/session`.
+   - Do not concatenate Supabase URLs or invent Storage buckets for vocabulary audio.
+
+2. **Audio Attachment Workflow:**
+   - **Step 1 (Asset Placement):** Copy client-recorded MP3 files into `public/audio/zh/hsk1/` using the canonical IDs (e.g., `zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3`).
+   - **Step 2 (CSV Update):** Populate the `audio_path` column in `tools/content-csv/data/HSK1_Swipe2Study_import.csv` with `audio/zh/hsk1/<id>.mp3`.
+   - **Step 3 (Local Validation):** Validate CSV offline with zero network requests:
+     ```powershell
+     node tools/content-csv/content-manager.mjs validate tools/content-csv/data/HSK1_Swipe2Study_import.csv
+     ```
+   - **Step 4 (Online Dry-Run Comparison):**
+     ```powershell
+     node tools/content-csv/content-manager.mjs dry-run tools/content-csv/data/HSK1_Swipe2Study_import.csv --target staging
+     ```
+     > **Bounded Claims Notice:** Hosted canonical-ID reconciliation remains pending until live database execution. An offline dry-run test verifies diff engine logic, but does not prove zero hosted vocabulary records exist or that hosted learner progress was tested. Actual insert vs. update counts can only be confirmed upon real online dry-run comparison with the hosted target; do not assume exactly 300 updates beforehand.
+   - **Step 5 (Stage Updated Content):**
+     ```powershell
+     node tools/content-csv/content-manager.mjs stage tools/content-csv/data/HSK1_Swipe2Study_import.csv --target staging --operator "pt"
+     ```
+   - **Step 6 (Publish Revisions):**
+     ```powershell
+     node tools/content-csv/content-manager.mjs publish zh-hsk1 --stage-id <uuid> --target staging --reason "Attach client-recorded HSK1 audio"
+     ```
 
 ---
 

@@ -4,6 +4,7 @@ import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePres
 import { ChevronLeft, Check, X, Hand, Shuffle, Volume2, RotateCw } from 'lucide-react';
 import { db } from '../../lib/db';
 import { speak } from '../../lib/speech';
+import { playWordAudio } from '../../lib/wordAudio';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
 import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
@@ -58,27 +59,13 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
     setFlipped(!flipped);
     setHasFlippedOnce(true);
   };
+  const activeAudioRef = useRef(null);
+  useEffect(() => () => activeAudioRef.current?.cancel(), []);
+
   const playWord = (event) => {
     event.stopPropagation();
-    const audioPath = typeof card?.audio_path === 'string' ? card.audio_path.trim() : null;
-    if (audioPath && typeof Audio !== 'undefined') {
-      try {
-        const audio = new Audio(audioPath);
-        let hasFallenBack = false;
-        const fallback = () => {
-          if (!hasFallenBack) {
-            hasFallenBack = true;
-            speak(sayOf(card));
-          }
-        };
-        audio.addEventListener('error', fallback, { once: true });
-        audio.play().catch(fallback);
-        return;
-      } catch {
-        // Fall back to speech synthesis
-      }
-    }
-    speak(sayOf(card));
+    activeAudioRef.current?.cancel();
+    activeAudioRef.current = playWordAudio(card, { speakFn: speak });
   };
   const pronunciation = card.pronunciation ?? readingOf(card);
 
@@ -264,25 +251,8 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   useEffect(() => {
     const card = cards[currentIndex];
     if (card && prefs.autoPlayAudio) {
-      const audioPath = typeof card?.audio_path === 'string' ? card.audio_path.trim() : null;
-      if (audioPath && typeof Audio !== 'undefined') {
-        try {
-          const audio = new Audio(audioPath);
-          let hasFallenBack = false;
-          const fallback = () => {
-            if (!hasFallenBack) {
-              hasFallenBack = true;
-              speak(sayOf(card));
-            }
-          };
-          audio.addEventListener('error', fallback, { once: true });
-          audio.play().catch(fallback);
-          return;
-        } catch {
-          // Fall back to speech synthesis
-        }
-      }
-      speak(sayOf(card));
+      const playback = playWordAudio(card, { speakFn: speak });
+      return () => playback.cancel();
     }
   }, [cards, currentIndex, prefs.autoPlayAudio]);
 

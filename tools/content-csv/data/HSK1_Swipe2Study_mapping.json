@@ -12,9 +12,12 @@
     "hosted_reconciliation_status": "pending_before_publication"
   },
   "audio_attachment_convention": {
-    "recommended_storage_prefix": "audio/zh/hsk1/",
+    "serving_location": "public/audio/zh/hsk1/<id>.mp3",
+    "csv_relative_path": "audio/zh/hsk1/<id>.mp3",
     "filename_pattern": "<id>.mp3",
-    "example": "audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3"
+    "example": "audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3",
+    "serving_convention": "same_origin_static_asset",
+    "note": "Static assets under public/ are served at origin root (/audio/...). The application wordAudio helper resolves CSV relative paths against origin root, ensuring identical URL resolution regardless of current route. Hosted canonical-ID reconciliation remains pending."
   },
   "records": [
     {

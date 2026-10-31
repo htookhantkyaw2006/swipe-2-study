@@ -10,6 +10,7 @@ import { calculateContentDiff } from '../tools/content-csv/contentImportEngine.m
 import { mapVocabularyToCard } from '../src/lib/publishedContentService.js';
 import { recordWordAction, getLearnedWords, getLevelProgress } from '../src/lib/vocabularyProgress.js';
 import { createLocalDatabase } from '../src/lib/localDatabase.js';
+import { resolveAudioUrl, playWordAudio } from '../src/lib/wordAudio.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, '../tools/content-csv/data');
@@ -175,45 +176,167 @@ test('3. Sidecar Mapping preserves part_of_speech and deterministic IDs', () => 
   }
 });
 
-test('4. Optional audio and safe fallback execution without empty-source requests', () => {
-  // Test card without audio
-  const cardNoAudio = {
-    id: 'zh-hsk1-2d3c1c3573f96f2fcb888e47',
-    character: '爱',
-    pronunciation: 'ài',
-    reading: 'ài',
-    definition: 'to love',
-    burmese_definition: 'ချစ်သည်',
-    audio_path: null,
-    examples: [],
-  };
+class MockAudio {
+  static instances = [];
 
-  const cardEmptyAudio = { ...cardNoAudio, audio_path: '' };
-  const cardWhitespaceAudio = { ...cardNoAudio, audio_path: '   ' };
-
-  // Helper verifying safe audio decision logic
-  function resolveAudioDecision(card) {
-    const audioPath = typeof card?.audio_path === 'string' && card.audio_path.trim().length > 0 ? card.audio_path.trim() : null;
-    return {
-      hasAudioToPlay: Boolean(audioPath),
-      audioPath,
-    };
+  constructor(src) {
+    this.src = src;
+    this.listeners = new Map();
+    this.playCallCount = 0;
+    this.pauseCallCount = 0;
+    this.playRejection = null;
+    MockAudio.instances.push(this);
   }
 
-  assert.equal(resolveAudioDecision(cardNoAudio).hasAudioToPlay, false);
-  assert.equal(resolveAudioDecision(cardNoAudio).audioPath, null);
+  addEventListener(event, handler, options) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event).push({ handler, once: Boolean(options?.once) });
+  }
 
-  assert.equal(resolveAudioDecision(cardEmptyAudio).hasAudioToPlay, false);
-  assert.equal(resolveAudioDecision(cardEmptyAudio).audioPath, null);
+  removeEventListener(event, handler) {
+    if (!this.listeners.has(event)) return;
+    const filtered = this.listeners.get(event).filter((l) => l.handler !== handler);
+    this.listeners.set(event, filtered);
+  }
 
-  assert.equal(resolveAudioDecision(cardWhitespaceAudio).hasAudioToPlay, false);
-  assert.equal(resolveAudioDecision(cardWhitespaceAudio).audioPath, null);
+  dispatchEvent(event) {
+    const handlers = this.listeners.get(event.type) || [];
+    const remaining = [];
+    for (const item of handlers) {
+      item.handler(event);
+      if (!item.once) remaining.push(item);
+    }
+    this.listeners.set(event.type, remaining);
+  }
 
-  // Card with valid audio path
-  const cardWithAudio = { ...cardNoAudio, audio_path: 'audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3' };
-  const decision = resolveAudioDecision(cardWithAudio);
-  assert.equal(decision.hasAudioToPlay, true);
-  assert.equal(decision.audioPath, 'audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3');
+  play() {
+    this.playCallCount++;
+    if (this.playRejection) {
+      return Promise.reject(this.playRejection);
+    }
+    return Promise.resolve();
+  }
+
+  pause() {
+    this.pauseCallCount++;
+  }
+}
+
+test('4. Production audio playback helper verifies URL root resolution, offline mocks, once-only fallback, and cancellation', async () => {
+  // 1. null, blank, and whitespace paths do not construct Audio and fall back to speech immediately
+  const blankSpoken = [];
+  const blankSpeak = (text) => blankSpoken.push(text);
+
+  for (const emptyVal of [null, '', '   ']) {
+    MockAudio.instances = [];
+    blankSpoken.length = 0;
+    const word = { character: '爱', reading: 'ài', audio_path: emptyVal };
+    const playback = playWordAudio(word, { speakFn: blankSpeak, audioCtor: MockAudio });
+
+    assert.equal(MockAudio.instances.length, 0, `Audio constructor must NOT be called for path: ${JSON.stringify(emptyVal)}`);
+    assert.equal(blankSpoken.length, 1, `Speech fallback must be called immediately for path: ${JSON.stringify(emptyVal)}`);
+    assert.equal(blankSpoken[0], '爱');
+    assert.equal(playback.hasAudio, false);
+    assert.equal(playback.url, null);
+  }
+
+  // 2. Relative audio_path resolves to the same final origin-root URL on /learn/level/HSK1 and /learn/session
+  const relativePath = 'audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3';
+  const urlOnLevel = resolveAudioUrl(relativePath, 'https://swipe2study.com/learn/level/HSK1');
+  const urlOnSession = resolveAudioUrl(relativePath, 'https://swipe2study.com/learn/session');
+  const urlWithLeadingSlash = resolveAudioUrl('/' + relativePath, 'https://swipe2study.com/learn/level/HSK1');
+
+  assert.equal(urlOnLevel, 'https://swipe2study.com/audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3');
+  assert.equal(urlOnSession, 'https://swipe2study.com/audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3');
+  assert.equal(urlOnLevel, urlOnSession, 'Must resolve to identical origin-root URL regardless of nested router path');
+  assert.equal(urlWithLeadingSlash, urlOnLevel, 'Leading slashes normalize to origin root');
+
+  // 3. Valid recording plays and does not trigger speech fallback
+  MockAudio.instances = [];
+  const validSpoken = [];
+  const validWord = {
+    character: '爱',
+    reading: 'ài',
+    audio_path: relativePath,
+  };
+  const successPlayback = playWordAudio(validWord, {
+    speakFn: (t) => validSpoken.push(t),
+    audioCtor: MockAudio,
+    baseOrigin: 'https://swipe2study.com',
+  });
+
+  assert.equal(MockAudio.instances.length, 1, 'Exactly 1 Audio instance created');
+  assert.equal(MockAudio.instances[0].src, 'https://swipe2study.com/audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3');
+  assert.equal(MockAudio.instances[0].playCallCount, 1, 'play() called on Audio');
+  assert.equal(successPlayback.hasAudio, true);
+  assert.equal(validSpoken.length, 0, 'Zero speech fallback calls when playback succeeds');
+
+  // 4. Media error plus rejected play promise trigger speech fallback exactly once
+  MockAudio.instances = [];
+  const errorSpoken = [];
+  let failingAudioInstance = null;
+  class FailingAudio extends MockAudio {
+    constructor(src) {
+      super(src);
+      failingAudioInstance = this;
+      this.playRejection = new Error('NotAllowedError: media failed to decode');
+    }
+  }
+
+  playWordAudio(validWord, {
+    speakFn: (t) => errorSpoken.push(t),
+    audioCtor: FailingAudio,
+    baseOrigin: 'https://swipe2study.com',
+  });
+
+  assert.ok(failingAudioInstance, 'Failing audio instantiated');
+  // Trigger both the error event AND let the rejected play() promise settle
+  failingAudioInstance.dispatchEvent({ type: 'error' });
+  await Promise.resolve(); // flush microtasks for promise.catch
+
+  assert.equal(errorSpoken.length, 1, 'Speech fallback invoked exactly once despite both error event and rejected promise');
+  assert.equal(errorSpoken[0], '爱');
+
+  // 5. Cancelled or disposed playback does not trigger stale speech fallback when a card changes or session ends
+  MockAudio.instances = [];
+  const cancelSpoken = [];
+  let delayedReject = null;
+  class DelayedFailAudio extends MockAudio {
+    constructor(src) {
+      super(src);
+      this.play = () => {
+        this.playCallCount++;
+        return new Promise((_, reject) => {
+          delayedReject = reject;
+        });
+      };
+    }
+  }
+
+  const cancelPlayback = playWordAudio(validWord, {
+    speakFn: (t) => cancelSpoken.push(t),
+    audioCtor: DelayedFailAudio,
+    baseOrigin: 'https://swipe2study.com',
+  });
+
+  const delayedAudioInstance = MockAudio.instances[0];
+  assert.equal(cancelSpoken.length, 0, 'No speech initially');
+
+  // Learner swipes or leaves session -> component unmounts and cancels playback
+  cancelPlayback.cancel();
+
+  // Now the delayed network failure / decode error arrives
+  delayedAudioInstance.dispatchEvent({ type: 'error' });
+  if (delayedReject) {
+    delayedReject(new Error('AbortError'));
+  }
+  await Promise.resolve();
+
+  assert.equal(cancelSpoken.length, 0, 'Cancelled playback must NOT trigger speech fallback');
+  assert.equal(delayedAudioInstance.pauseCallCount, 1, 'Audio paused on cancel');
+  assert.equal(delayedAudioInstance.src, '', 'Audio src cleared on cancel');
 });
 
 test('5. Later audio-only updates preserve item identity, examples, and learner progress', () => {
