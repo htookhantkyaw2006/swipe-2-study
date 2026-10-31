@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Layers, Compass, ChevronRight, RotateCw, CheckCircle2, Bookmark, Volume2 } from 'lucide-react';
+import { Compass, RotateCw, CheckCircle2, Bookmark, Volume2 } from 'lucide-react';
 import { useCourse } from '../../lib/language';
 import { db } from '../../lib/db';
 import { kanaOf } from '../../lib/entry';
@@ -81,60 +81,110 @@ export default function LessonPicker() {
         ? `${completed.toLocaleString()} / ${(totalWords || level.words).toLocaleString()} completed`
         : `${(totalWords || level.words).toLocaleString()} vocabulary words`;
 
+  const isLevelAvailable = words.length > 0;
+
   return (
     <div className="study-page lesson-page">
-      <StudyHeader title={level.name} subtitle={`${course.name} · Vocabulary course`} backTo="/learn" backLabel="Back to courses" />
+      <StudyHeader
+        title={level.name}
+        subtitle={`${course.name} · Vocabulary course`}
+        backTo="/learn"
+        backLabel="Back to courses"
+      />
+
       <div className="lesson-layout">
-        <aside className="lesson-overview" aria-label={`${level.name} course overview`}>
+        <aside className="lesson-sidebar" aria-label={`${level.name} course overview`}>
           <section
-            className="lesson-hero"
+            className="lesson-hero-card"
             style={{
               '--card-gradient-start': level.gradientStart,
               '--card-gradient-end': level.gradientEnd,
               '--level-accent': level.gradientEnd,
+              '--level-btn-color': level.btnColor || level.gradientEnd,
               background: `linear-gradient(135deg, ${level.gradientStart} 0%, ${level.gradientEnd} 100%)`,
               boxShadow: level.shadow ? `0 14px 34px ${level.shadow}` : undefined,
             }}
           >
-            <p className="study-eyebrow">{level.tier}</p>
-            <h2>{level.name}</h2>
-            <p>{heroSubtitle}</p>
-            <div className="lesson-hero__progress">
-              <div className="lesson-hero__progress-label"><span>Course progress</span><span>{percent}%</span></div>
-              <progress aria-label="Course progress" value={completed} max={totalWords || 1} />
-              <p>{completed.toLocaleString()} of {totalWords.toLocaleString()} words</p>
+            <div className="lesson-hero-card__top">
+              <span className="lesson-hero-card__badge">NOW LEARNING</span>
+              <Link to="/learn" className="lesson-hero-card__all-link">
+                All levels
+              </Link>
+            </div>
+            <p className="lesson-hero-card__kicker">{level.kicker || `LEVEL ${level.num || 1}`}</p>
+            <h2 className="lesson-hero-card__title">{level.name}</h2>
+            <p className="lesson-hero-card__completion">{heroSubtitle}</p>
+            <div className="lesson-hero-card__progress-track" aria-hidden="true">
+              <span className="lesson-hero-card__progress-fill" style={{ width: `${percent}%` }} />
+            </div>
+
+            <div className="lesson-hero-card__actions">
+              {isLevelAvailable ? (
+                <Link
+                  className="lesson-hero-card__study-btn"
+                  style={{ color: level.btnColor || level.gradientEnd }}
+                  to={`/learn/session?level=${encodeURIComponent(level.id)}`}
+                >
+                  {completed === 0 ? 'Start learning' : 'Continue learning'}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="lesson-hero-card__study-btn lesson-hero-card__study-btn--disabled"
+                  disabled
+                  style={{ color: level.btnColor || level.gradientEnd }}
+                >
+                  Coming soon
+                </button>
+              )}
+              <Link className="lesson-hero-card__review-btn" to="/learn/review">
+                Review {reviewCount}
+              </Link>
             </div>
           </section>
-          <section className="lesson-modules" aria-labelledby="lesson-modules-title">
-            <h2 id="lesson-modules-title">Course modules</h2>
-            {words.length > 0 ? (
-              <Link className="lesson-module" to={`/learn/session?level=${encodeURIComponent(level.id)}`}>
-                <span className="lesson-module__icon"><Layers size={23} aria-hidden="true" /></span>
-                <span className="lesson-module__copy"><strong>Flashcards</strong><span>{words.length} {words.length === 1 ? 'card' : 'cards'} available</span></span>
-                <ChevronRight size={20} aria-hidden="true" />
-              </Link>
-            ) : (
-              <div className="lesson-module lesson-module--unavailable"><span className="lesson-module__icon"><Layers size={23} aria-hidden="true" /></span><span className="lesson-module__copy"><strong>Flashcards</strong><span>Cards coming soon</span></span></div>
-            )}
-            <Link className="lesson-module" to="/interest">
-              <span className="lesson-module__icon"><Compass size={23} aria-hidden="true" /></span>
-              <span className="lesson-module__copy"><strong>Explore</strong><span>Browse by topic</span></span>
-              <ChevronRight size={20} aria-hidden="true" />
+
+          <section className="lesson-quick-nav" aria-label="Course quick links">
+            <Link className="lesson-quick-tile" to="/learn/review">
+              <RotateCw size={18} aria-hidden="true" />
+              <div className="lesson-quick-tile__copy">
+                <strong>Review queue</strong>
+                <span>{reviewCount} to review</span>
+              </div>
+            </Link>
+            <div className="lesson-quick-tile lesson-quick-tile--stat">
+              <CheckCircle2 size={18} aria-hidden="true" />
+              <div className="lesson-quick-tile__copy">
+                <strong>{completed.toLocaleString()}</strong>
+                <span>Mastered</span>
+              </div>
+            </div>
+            <Link className="lesson-quick-tile" to="/saved">
+              <Bookmark size={18} aria-hidden="true" />
+              <div className="lesson-quick-tile__copy">
+                <strong>Saved words</strong>
+                <span>{savedCount} saved</span>
+              </div>
+            </Link>
+            <Link className="lesson-quick-tile" to="/interest">
+              <Compass size={18} aria-hidden="true" />
+              <div className="lesson-quick-tile__copy">
+                <strong>Explore topics</strong>
+                <span>Browse by category</span>
+              </div>
             </Link>
           </section>
         </aside>
 
-        <div className="lesson-content">
-          <section className="lesson-practice" aria-label="Flashcard practice">
-            <Link className="lesson-practice__tile" to="/learn/review"><RotateCw size={21} aria-hidden="true" /><strong>Review</strong><span>{reviewCount} to review</span></Link>
-            <div className="lesson-practice__tile"><CheckCircle2 size={21} aria-hidden="true" /><strong>{completed.toLocaleString()}</strong><span>Mastered</span></div>
-            <Link className="lesson-practice__tile" to="/saved"><Bookmark size={21} aria-hidden="true" /><strong>Saved</strong><span>{savedCount} saved words</span></Link>
-          </section>
+        <main className="lesson-content">
           <section className="lesson-browser" aria-labelledby="lesson-browser-title">
             <div className="study-section-heading">
-              <div><h2 id="lesson-browser-title">Browse words</h2><p role="status">{visibleWords.length} of {words.length} available</p></div>
+              <div>
+                <h2 id="lesson-browser-title">Browse words</h2>
+                <p role="status">{visibleWords.length} of {words.length} available</p>
+              </div>
               <StudySearch value={query} onChange={setQuery} label="Search course words" />
             </div>
+
             {isPublishedLevel && publishedCourse.isLoading ? (
               <div className="study-loading" role="status" aria-live="polite">
                 <div className="study-spinner" aria-hidden="true" />
@@ -149,14 +199,12 @@ export default function LessonPicker() {
               </div>
             ) : isPublishedLevel && publishedCourse.isUnpublished ? (
               <div className="study-empty">
-                <Layers size={30} aria-hidden="true" />
                 <h3>Course not published</h3>
                 <p>Content for {level.name} has not been published yet.</p>
                 <Link className="study-text-link" to="/learn">Explore other courses</Link>
               </div>
             ) : words.length === 0 ? (
               <div className="study-empty">
-                <Layers size={30} aria-hidden="true" />
                 <h3>More words on the way</h3>
                 <p>No {level.name} words yet. This level’s content is still being added.</p>
                 <Link className="study-text-link" to="/learn">Explore other courses</Link>
@@ -182,14 +230,21 @@ export default function LessonPicker() {
                         {word.english && <p lang="en">{word.english}</p>}
                         {word.burmese && <p lang="my">{word.burmese}</p>}
                       </div>
-                      <button className="study-icon-button" onClick={() => handlePlayWord(stored)} aria-label={`Play word: ${word.phrase}`}><Volume2 size={20} aria-hidden="true" /></button>
+                      <button
+                        type="button"
+                        className="study-icon-button"
+                        onClick={() => handlePlayWord(stored)}
+                        aria-label={`Play word: ${word.phrase}`}
+                      >
+                        <Volume2 size={18} aria-hidden="true" />
+                      </button>
                     </li>
                   );
                 })}
               </ul>
             )}
           </section>
-        </div>
+        </main>
       </div>
     </div>
   );

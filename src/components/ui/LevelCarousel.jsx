@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, ChevronRight, Layers } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useCourse } from '../../lib/language';
 import { db } from '../../lib/db';
 import { getLevelProgress } from '../../lib/vocabularyProgress';
@@ -42,6 +42,12 @@ export default function LevelCarousel() {
   const completed = progress.uniqueLearned;
   const availableCount = progress.words;
   const percent = progress.percent;
+  const reviewCount = db.get('review_cards').length;
+
+  const isLevelAvailable = isInScope
+    ? (isLoaded && availableCount > 0)
+    : (publishedContent.enabled ? false : (availableCount > 0 || level.words > 0));
+
   const changeLevel = delta => setActiveIndex(index => Math.max(0, Math.min(course.levels.length - 1, index + delta)));
 
   const cardStyle = {
@@ -61,9 +67,18 @@ export default function LevelCarousel() {
           : publishedState?.status === 'unpublished'
             ? 'Curriculum coming soon'
             : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
-      : course.id === 'zh'
-        ? `${completed.toLocaleString()} / ${(availableCount || level.words).toLocaleString()} completed`
-        : `${(availableCount || level.words).toLocaleString()} words to explore`;
+      : publishedContent.enabled
+        ? 'Curriculum coming soon'
+        : course.id === 'zh'
+          ? `${completed.toLocaleString()} / ${(availableCount || level.words).toLocaleString()} completed`
+          : `${(availableCount || level.words).toLocaleString()} words to explore`;
+
+  const isNowLearning = activeIndex === 0 && isLevelAvailable;
+
+  const handlePrimaryAction = () => {
+    if (!isLevelAvailable) return;
+    navigate(`/learn/session?level=${encodeURIComponent(level.id)}`);
+  };
 
   return (
     <div className="course-browser" aria-label={`${course.name} flashcard levels`}>
@@ -81,51 +96,82 @@ export default function LevelCarousel() {
         }}
       >
         <div className="course-card-heading">
-          <span className="course-category">
-            <Layers size={15} aria-hidden="true" /> {course.copy.nowLearning || `${course.levelSystem} FLASHCARDS`}
+          <span className={`course-badge${isNowLearning ? ' course-badge--active' : ''}`}>
+            {isNowLearning ? 'NOW LEARNING' : level.tier}
           </span>
-          <span className="course-tier">{level.tier}</span>
+          <Link to="/learn" className="course-all-link">
+            All levels
+          </Link>
         </div>
+
         <div className="course-card-body">
           <div className="course-card-copy">
-            <p className="course-kicker">{level.kicker}</p>
+            <p className="course-kicker">{level.kicker || `LEVEL ${level.num || 1}`}</p>
             <h3>{level.name}</h3>
             <p className="course-word-count">{wordCountText}</p>
           </div>
-          <div className="course-card-art" aria-hidden="true">
-            <div className="course-art-back" />
-            <div className="course-art-front" style={{ color: level.btnColor || level.gradientEnd }}>
-              <span>{course.copy.flashcardsWatermark}</span>
-              <span className="course-art-label">{level.name}</span>
-            </div>
-            <span className="course-art-spark">✦</span>
-          </div>
         </div>
+
         <div className="course-progress">
-          <div className="course-progress-label">
-            <span>Progress</span>
-            <span>{percent}%</span>
+          <div className="course-progress-track" aria-hidden="true">
+            <span style={{ width: `${percent}%` }} />
           </div>
-          <div className="course-progress-track" aria-hidden="true"><span style={{ width: `${percent}%` }} /></div>
         </div>
+
         <div className="course-card-actions">
+          {isLevelAvailable ? (
+            <button
+              type="button"
+              className="course-study-button"
+              style={{ color: level.btnColor || level.gradientEnd }}
+              onClick={handlePrimaryAction}
+            >
+              {completed === 0 ? (course.copy.startSwiping || 'Start learning') : 'Continue learning'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="course-study-button course-study-button--disabled"
+              disabled
+              style={{ color: level.btnColor || level.gradientEnd }}
+            >
+              Coming soon
+            </button>
+          )}
           <button
-            className="course-study-button"
-            style={{ color: level.btnColor || level.gradientEnd }}
-            onClick={() => navigate(`/learn/level/${level.id}`)}
+            type="button"
+            className="course-review-button"
+            onClick={() => navigate('/learn/review')}
           >
-            {course.copy.startSwiping || 'Open level'} <ArrowRight size={17} aria-hidden="true" />
-          </button>
-          <button className="course-all-button" onClick={() => navigate('/learn')}>
-            All levels <ChevronRight size={17} aria-hidden="true" />
+            Review {reviewCount}
           </button>
         </div>
       </article>
+
       <div className="course-browser-controls">
-        <p aria-live="polite" aria-atomic="true"><strong>{level.name}</strong><span> · {activeIndex + 1} of {course.levels.length} levels</span></p>
+        <p aria-live="polite" aria-atomic="true">
+          <strong>{level.name}</strong>
+          <span> · {activeIndex + 1} of {course.levels.length} levels</span>
+        </p>
         <div className="course-arrows">
-          <button className="icon-button" onClick={() => changeLevel(-1)} disabled={activeIndex === 0} aria-label="Previous level"><ArrowLeft size={18} /></button>
-          <button className="icon-button" onClick={() => changeLevel(1)} disabled={activeIndex === course.levels.length - 1} aria-label="Next level"><ArrowRight size={18} /></button>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => changeLevel(-1)}
+            disabled={activeIndex === 0}
+            aria-label="Previous level"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => changeLevel(1)}
+            disabled={activeIndex === course.levels.length - 1}
+            aria-label="Next level"
+          >
+            <ArrowRight size={16} />
+          </button>
         </div>
       </div>
     </div>

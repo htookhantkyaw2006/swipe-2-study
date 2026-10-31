@@ -16,17 +16,39 @@ export default function LevelOverview({ phrases = false }) {
 
   return (
     <div className="study-page level-overview">
-      <StudyHeader title={phrases ? 'Learn phrases' : course.copy.coursesTitle} subtitle={`${course.name} · ${course.levelSystem}`} backTo="/" backLabel="Back to Home" />
+      <StudyHeader
+        title={phrases ? 'Learn phrases' : course.copy.coursesTitle}
+        subtitle={`${course.name} · ${course.levelSystem}`}
+        backTo="/"
+        backLabel="Back to Home"
+      />
+
       <section className="level-overview__hero">
-        <div><p className="study-eyebrow">{phrases ? 'WORDS IN CONTEXT' : 'YOUR LEARNING PATH'}</p><h2>{phrases ? 'Small phrases. Real conversations.' : course.copy.pickerHeadline}</h2><p>{phrases ? 'Choose a level and practise everyday expressions.' : 'Build your vocabulary with short, focused practice.'}</p></div>
+        <div className="level-overview__hero-content">
+          <p className="study-eyebrow">{phrases ? 'WORDS IN CONTEXT' : 'YOUR LEARNING PATH'}</p>
+          <h2>{phrases ? 'Small phrases. Real conversations.' : course.copy.pickerHeadline}</h2>
+          <p>{phrases ? 'Choose a level and practise everyday expressions.' : 'Build your vocabulary with short, focused practice.'}</p>
+        </div>
         <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
       </section>
-      <div className="study-section-heading"><div><h2>{course.copy.allLevels}</h2><p>Choose a level to see its available lessons.</p></div><span className="level-overview__meta">{course.levels.length} levels <ArrowUpRight size={16} aria-hidden="true" /></span></div>
+
+      <div className="study-section-heading">
+        <div>
+          <h2>{course.copy.allLevels}</h2>
+          <p>Choose a level to see its available lessons.</p>
+        </div>
+        <span className="level-overview__meta">
+          {course.levels.length} levels <ArrowUpRight size={15} aria-hidden="true" />
+        </span>
+      </div>
+
       <div className="level-overview__grid">
-        {course.levels.map(level => {
+        {course.levels.map((level, index) => {
           let countText = 'Content coming soon';
+          let hasContent = false;
           if (phrases) {
             const count = phraseCards(course, level.id).length;
+            hasContent = count > 0;
             countText = count ? `${count} phrases available` : 'Content coming soon';
           } else if (enabled) {
             const publishedCourseId = resolvePublishedCourseId(course.id, level.id);
@@ -38,6 +60,7 @@ export default function LevelOverview({ phrases = false }) {
                 countText = 'Unable to load content';
               } else if (state.status === 'loaded') {
                 const count = state.items.length;
+                hasContent = count > 0;
                 countText = count ? `${count} ${count === 1 ? 'card' : 'cards'} available` : 'No cards available';
               } else {
                 countText = 'Content coming soon';
@@ -47,15 +70,41 @@ export default function LevelOverview({ phrases = false }) {
             }
           } else {
             const count = localWords.filter(word => word.level === level.id).length;
+            hasContent = count > 0;
             countText = count ? `${count} cards available` : 'Content coming soon';
           }
 
+          const isNowLearning = !phrases && index === 0 && hasContent;
+
           return (
-            <Link key={level.id} className="level-tile" style={{ '--level-accent': level.gradientEnd, '--level-tint': level.gradientStart }} to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}>
-              <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
-              <span className="level-tile__tier">{level.tier}</span>
-              <h3>{level.name}</h3><p>{countText}</p>
-              <span className="level-tile__action">Explore level <ChevronRight size={16} aria-hidden="true" /></span>
+            <Link
+              key={level.id}
+              className={`level-tile${!hasContent ? ' level-tile--unavailable' : ''}`}
+              style={{
+                '--level-accent': level.gradientEnd,
+                '--level-tint': level.gradientStart,
+              }}
+              to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}
+            >
+              <div className="level-tile__top">
+                <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
+                {isNowLearning ? (
+                  <span className="level-tile__badge level-tile__badge--learning">NOW LEARNING</span>
+                ) : !hasContent ? (
+                  <span className="level-tile__badge level-tile__badge--soon">COMING SOON</span>
+                ) : (
+                  <span className="level-tile__tier">{level.tier}</span>
+                )}
+              </div>
+              <h3>{level.name}</h3>
+              <p>{countText}</p>
+              <span className={`level-tile__action${!hasContent ? ' level-tile__action--disabled' : ''}`}>
+                {hasContent ? (
+                  <>Explore level <ChevronRight size={15} aria-hidden="true" /></>
+                ) : (
+                  <>Coming soon</>
+                )}
+              </span>
               <span className="level-tile__watermark" aria-hidden="true">{level.numeral || level.badge}</span>
             </Link>
           );

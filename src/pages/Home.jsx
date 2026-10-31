@@ -49,56 +49,125 @@ export default function Home() {
     <div className="home-page">
       <header className="home-header">
         <Link to="/profile" className="home-identity" aria-label="Go to profile">
-          <Avatar src={photo.url} size={44} alt="Your profile" />
-          <div className="home-greeting"><p>{user ? greeting : 'Welcome'}</p><div className="home-name"><h1>{name}</h1>{isGuest && <span className="guest-badge">Guest</span>}</div></div>
+          <Avatar src={photo.url} size={42} alt="Your profile" />
+          <div className="home-greeting">
+            <p>{user ? greeting : 'Welcome'}</p>
+            <div className="home-name">
+              <h1>{name}</h1>
+              {isGuest && <span className="guest-badge">Guest</span>}
+            </div>
+          </div>
         </Link>
-        <LanguageSwitcher />
+        <div className="home-header-actions">
+          <div className="home-course-badge" aria-label={`Current course: ${course.name}`}>
+            <LanguageFlag id={course.id} size={18} />
+            <span>{course.name} · {course.levelSystem}</span>
+          </div>
+          <LanguageSwitcher />
+        </div>
       </header>
-      <div className="home-heading">
-        <div><p className="section-eyebrow">YOUR LEARNING SPACE</p><h2>A little practice, every day.</h2><p>Choose a level. Find a new word. Keep going.</p></div>
-        <span className="home-course-label"><LanguageFlag id={course.id} size={22} />{course.name} · {course.levelSystem}</span>
-      </div>
+
       <div className="home-dashboard">
         <div className="home-primary">
           <section aria-labelledby="flashcards-heading">
-            <div className="section-heading"><h2 id="flashcards-heading">Your flashcards</h2><Link to="/learn">Browse levels <ArrowUpRight size={16} aria-hidden="true" /></Link></div>
+            <div className="section-heading">
+              <h2 id="flashcards-heading">Today&apos;s study</h2>
+              <Link to="/learn">
+                All levels <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>
+            </div>
             <LevelCarousel />
           </section>
+
           <section aria-labelledby="explore-heading">
-            <div className="section-heading"><h2 id="explore-heading">Explore & practice</h2></div>
+            <div className="section-heading">
+              <h2 id="explore-heading">Explore & practice</h2>
+            </div>
             <div className="home-shortcuts">
-              <Link to="/flashcards" className="home-shortcut"><LearningIcon kind="phrases" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Phrases</strong><span>Everyday words in context</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
-              <Link to="/dictionary" className="home-shortcut"><LearningIcon kind="search" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Dictionary</strong><span>Look up a word</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
-              <Link to="/library" className="home-shortcut"><LearningIcon kind="library" className="shortcut-art" /><span className="home-shortcut__copy"><strong>Library</strong><span>Explore your learning tools</span></span><ArrowUpRight size={18} aria-hidden="true" /></Link>
+              <Link to="/flashcards" className="home-shortcut">
+                <LearningIcon kind="phrases" className="shortcut-art" />
+                <span className="home-shortcut__copy">
+                  <strong>Phrases</strong>
+                  <span>Everyday words in context</span>
+                </span>
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </Link>
+              <Link to="/dictionary" className="home-shortcut">
+                <LearningIcon kind="search" className="shortcut-art" />
+                <span className="home-shortcut__copy">
+                  <strong>Dictionary</strong>
+                  <span>Look up a word</span>
+                </span>
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </Link>
+              <Link to="/library" className="home-shortcut">
+                <LearningIcon kind="library" className="shortcut-art" />
+                <span className="home-shortcut__copy">
+                  <strong>Library</strong>
+                  <span>Explore learning tools</span>
+                </span>
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </Link>
             </div>
           </section>
         </div>
+
         <aside className="home-aside" aria-label="Practice and saved words">
           <section className="practice-panel" aria-labelledby="practice-heading">
-            <div className="practice-panel-heading"><span className="section-eyebrow">MAKE IT STICK</span><Layers size={19} aria-hidden="true" /></div>
-            <h2 id="practice-heading">A word worth revisiting.</h2><p>Your review queue and saved words, all in one place.</p>
+            <div className="practice-panel-heading">
+              <span className="section-eyebrow">MAKE IT STICK</span>
+              <Layers size={18} aria-hidden="true" />
+            </div>
+            <h2 id="practice-heading">Review & saved</h2>
+            <p>Your cards and saved words, ready when you are.</p>
             <div className="practice-links">
               <div className="practice-link practice-link--streak">
-                <Flame size={20} className="practice-art" aria-hidden="true" style={{ color: streak.todayStudied ? '#EA580C' : 'var(--color-text-muted)' }} />
+                <Flame size={19} className="practice-art" aria-hidden="true" style={{ color: streak.todayStudied ? '#EA580C' : 'var(--color-text-muted)' }} />
                 <span>
                   <strong>{isGuest ? 'Study streak' : `${streak.currentStreak} day streak`}</strong>
                   <span>{isGuest ? 'Guest mode (device-local)' : streak.todayStudied ? 'Confirmed today · Asia/Yangon' : streak.hasPendingSync ? 'Pending sync · Asia/Yangon' : 'Study today to keep streak'}</span>
                 </span>
                 <span className="practice-count">{isGuest ? '—' : streak.currentStreak}</span>
               </div>
-              <Link to="/learn/review" className="practice-link"><LearningIcon kind="review" className="practice-art" /><span><strong>Review queue</strong><span>Go over your cards</span></span><span className="practice-count">{counts.review ?? '—'}</span><ArrowRight size={16} aria-hidden="true" /></Link>
-              <Link to="/saved" className="practice-link"><LearningIcon kind="saved" className="practice-art" /><span><strong>Saved words</strong><span>Keep them close</span></span><span className="practice-count">{counts.saved ?? '—'}</span><ArrowRight size={16} aria-hidden="true" /></Link>
+              <Link to="/learn/review" className="practice-link">
+                <LearningIcon kind="review" className="practice-art" />
+                <span>
+                  <strong>Review queue</strong>
+                  <span>Go over cards needing practice</span>
+                </span>
+                <span className="practice-count">{counts.review ?? '—'}</span>
+                <ArrowRight size={15} aria-hidden="true" />
+              </Link>
+              <Link to="/saved" className="practice-link">
+                <LearningIcon kind="saved" className="practice-art" />
+                <span>
+                  <strong>Saved words</strong>
+                  <span>Keep bookmarked words close</span>
+                </span>
+                <span className="practice-count">{counts.saved ?? '—'}</span>
+                <ArrowRight size={15} aria-hidden="true" />
+              </Link>
             </div>
             <p className="device-note">{counts.error ? 'Saved data could not be read on this device.' : 'Learning records on this device.'}</p>
           </section>
+
           <section className="study-note" aria-labelledby="study-note-heading">
-            <LearningIcon kind="dictionary" className="study-note-art" /><p className="section-eyebrow">A SMALL STUDY TIP</p>
-            <h2 id="study-note-heading">Take a moment.<br />Say it out loud.</h2><p>Read the word, listen to its pronunciation, then try saying it yourself.</p>
-            <Link to="/learn">Find your next word <ArrowRight size={17} aria-hidden="true" /></Link>
+            <div className="study-note-top">
+              <LearningIcon kind="dictionary" className="study-note-art" />
+              <span className="section-eyebrow">A SMALL STUDY TIP</span>
+            </div>
+            <h2 id="study-note-heading">Take a moment.<br />Say it out loud.</h2>
+            <p>Read the word, listen to its pronunciation, then try saying it yourself.</p>
+            <Link to="/learn">Find your next word <ArrowRight size={15} aria-hidden="true" /></Link>
           </section>
         </aside>
       </div>
-      <footer className="home-footer"><Layers size={15} aria-hidden="true" /><span>Swipe 2 Study</span><span>One word at a time.</span></footer>
+
+      <footer className="home-footer">
+        <Layers size={14} aria-hidden="true" />
+        <span>Swipe 2 Study</span>
+        <span>One word at a time.</span>
+      </footer>
     </div>
   );
 }

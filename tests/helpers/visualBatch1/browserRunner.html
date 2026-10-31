@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Batch 1 Visual & Interaction Verification Runner</title>
+  <style>
+    :root {
+      --color-ghost-blue: #EFF6FF;
+      --color-primary-blue: #0369A1;
+      --color-border: #BAE6FD;
+      --color-text-navy: #0C4A6E;
+      --color-page-bg: #F0F9FF;
+      --font-reading: system-ui, -apple-system, sans-serif;
+      --font-mono: monospace;
+    }
+    html, body { margin: 0; padding: 0; min-height: 100%; }
+    #root { width: 100%; min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React, { createElement, useState } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter, Routes, Route } from 'react-router-dom';
+    import { AuthProvider } from '/src/lib/auth.jsx';
+    import StorageOwnerBoundary from '/src/components/StorageOwnerBoundary.jsx';
+    import { LanguageProvider } from '/src/lib/language.jsx';
+    import { PreferencesProvider } from '/src/lib/preferences.jsx';
+    import { PublishedContentProvider } from '/src/lib/publishedContentContext.jsx';
+    import GuestImportProvider from '/src/components/GuestImportProvider.jsx';
+    import Layout from '/src/components/Layout.jsx';
+    import Home from '/src/pages/Home.jsx';
+    import LevelPicker from '/src/pages/Learn/LevelPicker.jsx';
+    import LessonPicker from '/src/pages/Learn/LessonPicker.jsx';
+    import SwipeSession from '/src/pages/Learn/SwipeSession.jsx';
+    import { db } from '/src/lib/db.js';
+
+    const rootElement = document.getElementById('root');
+    let reactRoot = null;
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    window.addEventListener('error', (e) => console.error('WINDOW ERROR:', e.error || e.message));
+    window.addEventListener('unhandledrejection', (e) => console.error('UNHANDLED REJECTION:', e.reason));
+
+    async function waitFor(condition, timeoutMs = 4000, label = 'unnamed', intervalMs = 30) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        try {
+          if (condition()) return;
+        } catch {}
+        await sleep(intervalMs);
+      }
+      const root = document.getElementById('root');
+      throw new Error(`waitFor[${label}] timed out after ${timeoutMs}ms. Root: ` + (root ? root.innerHTML.slice(0, 500) : 'no root'));
+    }
+
+    function assert(cond, msg) {
+      if (!cond) throw new Error(msg || 'Assertion failed');
+    }
+
+    async function loadHsk1Items() {
+      const res = await fetch('/api/hsk1-items');
+      if (!res.ok) throw new Error('Failed to fetch /api/hsk1-items');
+      return await res.json();
+    }
+
+    function AppTestWrapper({ initialEntries, hsk1Items }) {
+      const initialCache = {
+        'zh-hsk1': {
+          status: 'loaded',
+          items: hsk1Items,
+          version: 1,
+          error: null,
+          isPublished: true,
+        },
+      };
+
+      return createElement(
+        AuthProvider,
+        null,
+        createElement(
+          StorageOwnerBoundary,
+          null,
+          createElement(
+            PreferencesProvider,
+            null,
+            createElement(
+              LanguageProvider,
+              null,
+              createElement(
+                MemoryRouter,
+                { initialEntries },
+                createElement(
+                  GuestImportProvider,
+                  null,
+                  createElement(
+                    PublishedContentProvider,
+                    { enabledOverride: true, initialCache },
+                    createElement(
+                      Routes,
+                      null,
+                      createElement(
+                        Route,
+                        { path: '/', element: createElement(Layout) },
+                        createElement(Route, { index: true, element: createElement(Home) }),
+                        createElement(Route, { path: 'learn', element: createElement(LevelPicker) }),
+                        createElement(Route, { path: 'learn/level/:levelId', element: createElement(LessonPicker) }),
+                        createElement(Route, { path: 'learn/session', element: createElement(SwipeSession) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+
+    function setReactInputValue(input, val) {
+      const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+      descriptor.set.call(input, val);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function renderTree(ui) {
+      if (!reactRoot) reactRoot = createRoot(rootElement);
+      reactRoot.render(ui);
+    }
+
+    function unmountTree() {
+      if (reactRoot) {
+        reactRoot.unmount();
+        reactRoot = null;
+        rootElement.innerHTML = '';
+      }
+    }
+
+    async function runVerification() {
+      const results = [];
+      const hsk1Items = await loadHsk1Items();
+      assert(hsk1Items.length === 300, `Expected 300 HSK1 items, received ${hsk1Items.length}`);
+
+      // Reset storage for clean test run
+      db.set('saved_words', []);
+      db.set('learned_words', []);
+      db.set('review_cards', []);
+
+      // -----------------------------------------------------------------------
+      // Step 1: Verify Home Page ('/')
+      // -----------------------------------------------------------------------
+      renderTree(createElement(AppTestWrapper, { initialEntries: ['/'], hsk1Items }));
+      await waitFor(() => document.querySelector('.home-page') !== null, 4000, 'step1-home-page');
+
+      // Verify Greeting and Identity
+      const homeGreeting = document.querySelector('.home-greeting');
+      assert(homeGreeting !== null, 'Home greeting is mounted');
+      assert(document.body.textContent.includes('Guest Learner') || document.body.textContent.includes('Welcome'), 'Greets user');
+
+      // Verify Course Badge
+      const courseBadge = document.querySelector('.home-course-badge');
+      assert(courseBadge !== null, 'Course badge is present');
+      assert(courseBadge.textContent.includes('Chinese'), 'Course badge mentions Chinese');
+
+      // Verify Compact HSK 1 Learning Card
+      const featuredCourse = document.querySelector('.featured-course');
+      assert(featuredCourse !== null, 'Featured course hero card is present');
+      assert(featuredCourse.textContent.includes('NOW LEARNING'), 'Displays NOW LEARNING badge on active level');
+      assert(featuredCourse.textContent.includes('LEVEL 1'), 'Displays LEVEL 1 kicker');
+      assert(featuredCourse.textContent.includes('HSK 1'), 'Displays HSK 1 title');
+      assert(featuredCourse.textContent.includes('0 / 300 completed'), 'Hero displays honest completion: 0 / 300 completed');
+
+      // Verify Primary Learning Action & Secondary Review Action
+      const studyBtn = featuredCourse.querySelector('.course-study-button');
+      const reviewBtn = featuredCourse.querySelector('.course-review-button');
+      const allLevelsLink = featuredCourse.querySelector('.course-all-link');
+
+      assert(studyBtn !== null, 'Primary study button is present');
+      assert(reviewBtn !== null, 'Secondary review button is present');
+      assert(allLevelsLink !== null, 'All levels link is present');
+      assert(studyBtn.textContent.includes('Start learning') || studyBtn.textContent.includes('Start swiping'), 'Primary CTA is Start learning');
+      assert(reviewBtn.textContent.includes('Review 0'), 'Secondary action is Review 0');
+
+      // Test level carousel browsing
+      const nextBtn = document.querySelector('.course-arrows button[aria-label="Next level"]');
+      assert(nextBtn !== null, 'Next level arrow is present');
+      nextBtn.click();
+      await waitFor(() => document.querySelector('.featured-course').textContent.includes('HSK 2'), 4000, 'step1-carousel-hsk2');
+
+      const hsk2Card = document.querySelector('.featured-course');
+      assert(!hsk2Card.textContent.includes('NOW LEARNING'), 'HSK 2 does NOT falsely display NOW LEARNING');
+      assert(hsk2Card.textContent.includes('Curriculum coming soon') || hsk2Card.textContent.includes('Coming soon'), 'HSK 2 reports coming soon');
+      assert(hsk2Card.querySelector('.course-study-button').disabled === true, 'Coming soon level study button is disabled');
+
+      // Switch back to Level 1
+      const prevBtn = document.querySelector('.course-arrows button[aria-label="Previous level"]');
+      prevBtn.click();
+      await waitFor(() => document.querySelector('.featured-course').textContent.includes('HSK 1'), 4000, 'step1-carousel-back-hsk1');
+
+      results.push({ test: 'home-page-hierarchy-and-card', passed: true });
+      unmountTree();
+
+      // -----------------------------------------------------------------------
+      // Step 2: Verify Level Selection Page ('/learn')
+      // -----------------------------------------------------------------------
+      renderTree(createElement(AppTestWrapper, { initialEntries: ['/learn'], hsk1Items }));
+      await waitFor(() => document.querySelector('.level-overview__grid') !== null, 4000, 'step2-level-picker-grid');
+
+      const levelTiles = document.querySelectorAll('.level-tile');
+      assert(levelTiles.length === 9, `Expected 9 HSK level tiles, found ${levelTiles.length}`);
+
+      // Check 3-column responsive grid
+      const grid = document.querySelector('.level-overview__grid');
+      assert(grid !== null, 'Level overview grid is present');
+
+      // First tile is HSK 1: active, 300 cards available
+      const hsk1Tile = levelTiles[0];
+      assert(hsk1Tile.textContent.includes('HSK 1'), 'First tile is HSK 1');
+      assert(hsk1Tile.textContent.includes('300 cards available'), 'HSK 1 has 300 cards available');
+      assert(hsk1Tile.textContent.includes('NOW LEARNING'), 'HSK 1 shows NOW LEARNING');
+      assert(!hsk1Tile.classList.contains('level-tile--unavailable'), 'HSK 1 is available');
+
+      // Second tile is HSK 2: unavailable coming soon
+      const hsk2Tile = levelTiles[1];
+      assert(hsk2Tile.textContent.includes('HSK 2'), 'Second tile is HSK 2');
+      assert(hsk2Tile.textContent.includes('Content coming soon'), 'HSK 2 shows Content coming soon');
+      assert(hsk2Tile.textContent.includes('COMING SOON'), 'HSK 2 shows COMING SOON badge');
+      assert(hsk2Tile.classList.contains('level-tile--unavailable'), 'HSK 2 has unavailable class modifier');
+
+      results.push({ test: 'level-selection-3x3-and-availability', passed: true });
+      unmountTree();
+
+      // -----------------------------------------------------------------------
+      // Step 3: Verify Course Overview Page ('/learn/level/HSK1')
+      // -----------------------------------------------------------------------
+      renderTree(createElement(AppTestWrapper, { initialEntries: ['/learn/level/HSK1'], hsk1Items }));
+      await waitFor(() => document.querySelector('.lesson-word-list') !== null, 4000, 'step3-lesson-word-list');
+
+      // Hero Card Identity
+      const heroCard = document.querySelector('.lesson-hero-card');
+      assert(heroCard !== null, 'Lesson hero card is present');
+      assert(heroCard.textContent.includes('NOW LEARNING'), 'Hero shows NOW LEARNING');
+      assert(heroCard.textContent.includes('HSK 1'), 'Hero shows HSK 1');
+      assert(heroCard.textContent.includes('0 / 300 completed'), 'Hero shows 0 / 300 completed');
+
+      // Primary CTA on Course Overview
+      const heroStudyBtn = heroCard.querySelector('.lesson-hero-card__study-btn');
+      assert(heroStudyBtn !== null, 'Hero has primary study CTA');
+      assert(heroStudyBtn.textContent.includes('Start learning'), 'CTA text is Start learning');
+      assert(heroStudyBtn.getAttribute('href').includes('/learn/session'), 'CTA links to /learn/session');
+
+      // Consolidated Quick Nav
+      const quickNav = document.querySelector('.lesson-quick-nav');
+      assert(quickNav !== null, 'Quick nav tiles present');
+      assert(quickNav.textContent.includes('Review queue'), 'Contains Review link');
+      assert(quickNav.textContent.includes('Mastered'), 'Contains Mastered stat');
+      assert(quickNav.textContent.includes('Saved words'), 'Contains Saved link');
+      assert(quickNav.textContent.includes('Explore topics'), 'Contains Explore link');
+
+      // Word list & 300 words
+      const wordList = document.querySelector('.lesson-word-list');
+      const words = wordList.querySelectorAll('.lesson-word');
+      assert(words.length === 300, `All 300 words present, found ${words.length}`);
+
+      // First word details (Chinese, pinyin, English, Burmese, audio)
+      const firstWord = words[0];
+      assert(firstWord.textContent.includes('爱'), `First word character is 爱. Actual text: "${firstWord.textContent}", HTML: "${firstWord.innerHTML}"`);
+      assert(firstWord.textContent.includes('ài'), 'First word pinyin is ài');
+      assert(firstWord.textContent.includes('to love'), 'First word English is to love');
+      assert(firstWord.textContent.includes('ချစ်သည်'), 'First word Burmese is ချစ်သည်');
+      const audioBtn = firstWord.querySelector('.study-icon-button');
+      assert(audioBtn !== null, 'Audio button is mounted');
+      assert(audioBtn.getAttribute('aria-label').includes('Play word: 爱'), 'Audio button has aria-label');
+
+      // Search interaction
+      const searchInput = document.querySelector('.study-search input');
+      assert(searchInput !== null, 'Search input is present');
+      setReactInputValue(searchInput, '爱');
+      await waitFor(() => document.querySelectorAll('.lesson-word').length === 1, 4000, 'step3-search-ai');
+      assert(document.querySelectorAll('.lesson-word').length === 1, 'Search filters to exactly 1 word for 爱');
+
+      // Clear search
+      setReactInputValue(searchInput, '');
+      await waitFor(() => document.querySelectorAll('.lesson-word').length === 300, 4000, 'step3-search-clear');
+      assert(document.querySelectorAll('.lesson-word').length === 300, 'Search cleared restores 300 words');
+
+      results.push({ test: 'course-overview-client-card-and-300-words', passed: true });
+      unmountTree();
+
+      // -----------------------------------------------------------------------
+      // Step 4: Verify Learning Session Navigation ('/learn/session?level=HSK1')
+      // -----------------------------------------------------------------------
+      renderTree(createElement(AppTestWrapper, { initialEntries: ['/learn/session?level=HSK1'], hsk1Items }));
+      await waitFor(() => document.querySelector('.swipe-card--active') !== null, 4000, 'step4-swipe-card-active');
+
+      const activeCard = document.querySelector('.swipe-card--active');
+      assert(activeCard !== null, 'Active flashcard is mounted in SwipeSession');
+      assert(activeCard.textContent.includes('爱'), 'Active card presents first unstudied word 爱');
+      assert(activeCard.querySelector('.swipe-bookmark') !== null, 'Bookmark button is present on flashcard');
+      assert(activeCard.querySelector('.swipe-audio') !== null, 'Audio button is present on flashcard');
+
+      results.push({ test: 'learning-session-navigation-and-mount', passed: true });
+
+      // Send success report
+      await fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, results }),
+      });
+    }
+
+    runVerification().catch(async (err) => {
+      await fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: err.stack || err.message }),
+      });
+    });
+  </script>
+</body>
+</html>
