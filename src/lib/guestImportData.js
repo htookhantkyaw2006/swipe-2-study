@@ -9,6 +9,7 @@ export const IMPORT_LANGUAGES = Object.freeze([
 export const IMPORT_TABLES = Object.freeze([
   'saved_words', 'review_cards', 'written_chars',
   'learned_radicals', 'learned_kana', 'learned_sounds',
+  'learned_words',
 ]);
 const FIELD = { written_chars: 'character', learned_radicals: 'radical', learned_kana: 'kana', learned_sounds: 'sound' };
 const MAX_ROWS = 10000;
@@ -17,7 +18,7 @@ const invalid = () => new Error('Some learning data could not be imported safely
 const text = value => typeof value === 'string' && value.trim().length > 0 && value.length <= 2000;
 
 export function importIdentity(table, row) {
-  if (table === 'saved_words' || table === 'review_cards') return studyWordKey(row);
+  if (table === 'saved_words' || table === 'review_cards' || table === 'learned_words') return studyWordKey(row);
   const value = row[FIELD[table]];
   return text(value) ? value.normalize('NFC').trim() : null;
 }
@@ -29,14 +30,29 @@ export function validateImportRows(raw, language, table) {
     if (!importIdentity(table, row) || (row.language !== undefined && row.language !== language)) throw invalid();
     if (row.id !== undefined && !((typeof row.id === 'string' && row.id.length > 0 && row.id.length <= 256)
       || (typeof row.id === 'number' && Number.isSafeInteger(row.id)))) throw invalid();
-    if (table === 'saved_words' || table === 'review_cards') {
+    if (table === 'saved_words' || table === 'review_cards' || table === 'learned_words') {
       for (const field of ['character', 'phrase', 'char', 'pronunciation', 'reading', 'pinyin']) {
         if (row[field] !== undefined && (typeof row[field] !== 'string' || row[field].length > 2000)) throw invalid();
       }
     }
-    if (table.startsWith('learned_') && ['seen', 'correct', 'wrong', 'streak'].some(key => row[key] !== undefined)) {
+    if (['learned_radicals', 'learned_kana', 'learned_sounds'].includes(table) && ['seen', 'correct', 'wrong', 'streak'].some(key => row[key] !== undefined)) {
       if (['seen', 'correct', 'wrong', 'streak'].some(key => !Number.isSafeInteger(row[key]) || row[key] < 0)
         || row.correct + row.wrong !== row.seen || row.streak > row.correct) throw invalid();
+    }
+    if (table === 'learned_words') {
+      if (row.seen !== undefined && (!Number.isSafeInteger(row.seen) || row.seen < 0)) throw invalid();
+      for (const field of ['level', 'status', 'last_action', 'last_reviewed_at', 'created_at', 'updated_at', 'card_id', 'lesson_name', 'definition', 'english', 'burmese', 'burmese_definition', 'part_of_speech']) {
+        if (row[field] !== undefined && (typeof row[field] !== 'string' || row[field].length > 2000)) throw invalid();
+      }
+      if (row.examples !== undefined) {
+        if (!Array.isArray(row.examples) || row.examples.length > 10) throw invalid();
+        for (const ex of row.examples) {
+          if (!ex || typeof ex !== 'object' || Array.isArray(ex)) throw invalid();
+          for (const key of ['text', 'chinese', 'reading', 'pinyin', 'english', 'burmese']) {
+            if (ex[key] !== undefined && (typeof ex[key] !== 'string' || ex[key].length > 2000)) throw invalid();
+          }
+        }
+      }
     }
   }
   return rows;
