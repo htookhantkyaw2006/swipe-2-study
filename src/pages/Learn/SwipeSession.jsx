@@ -60,10 +60,19 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
   };
   const playWord = (event) => {
     event.stopPropagation();
-    if (card?.audio_path && typeof Audio !== 'undefined') {
+    const audioPath = typeof card?.audio_path === 'string' ? card.audio_path.trim() : null;
+    if (audioPath && typeof Audio !== 'undefined') {
       try {
-        const audio = new Audio(card.audio_path);
-        audio.play().catch(() => speak(sayOf(card)));
+        const audio = new Audio(audioPath);
+        let hasFallenBack = false;
+        const fallback = () => {
+          if (!hasFallenBack) {
+            hasFallenBack = true;
+            speak(sayOf(card));
+          }
+        };
+        audio.addEventListener('error', fallback, { once: true });
+        audio.play().catch(fallback);
         return;
       } catch {
         // Fall back to speech synthesis
@@ -255,10 +264,19 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   useEffect(() => {
     const card = cards[currentIndex];
     if (card && prefs.autoPlayAudio) {
-      if (card.audio_path && typeof Audio !== 'undefined') {
+      const audioPath = typeof card?.audio_path === 'string' ? card.audio_path.trim() : null;
+      if (audioPath && typeof Audio !== 'undefined') {
         try {
-          const audio = new Audio(card.audio_path);
-          audio.play().catch(() => speak(sayOf(card)));
+          const audio = new Audio(audioPath);
+          let hasFallenBack = false;
+          const fallback = () => {
+            if (!hasFallenBack) {
+              hasFallenBack = true;
+              speak(sayOf(card));
+            }
+          };
+          audio.addEventListener('error', fallback, { once: true });
+          audio.play().catch(fallback);
           return;
         } catch {
           // Fall back to speech synthesis

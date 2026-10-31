@@ -28,7 +28,7 @@ export const HSK_PALETTE = {
 };
 
 const levels = [
-  { num: 1, words: 150,  phrases: 300,  tier: 'BEGINNER',     ...HSK_PALETTE[1], demo: { completed: 150, review: 41, phraseProgress: 100 } },
+  { num: 1, words: 300,  phrases: 300,  tier: 'BEGINNER',     ...HSK_PALETTE[1], demo: { completed: 150, review: 41, phraseProgress: 100 } },
   { num: 2, words: 200,  phrases: 200,  tier: 'BEGINNER',     ...HSK_PALETTE[2], demo: { completed: 63,  review: 12, phraseProgress: 85 } },
   { num: 3, words: 500,  phrases: 500,  tier: 'BEGINNER',     ...HSK_PALETTE[3], demo: { completed: 0,   review: 0,  phraseProgress: 42 } },
   { num: 4, words: 1000, phrases: 1000, tier: 'INTERMEDIATE', ...HSK_PALETTE[4], demo: { completed: 0,   review: 0,  phraseProgress: 12 } },

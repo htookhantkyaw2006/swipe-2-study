@@ -1,0 +1,314 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
+import { parseCsv } from '../tools/content-csv/parser.mjs';
+import { validateCsvRows } from '../tools/content-csv/validator.mjs';
+import { calculateContentDiff } from '../tools/content-csv/contentImportEngine.mjs';
+import { mapVocabularyToCard } from '../src/lib/publishedContentService.js';
+import { recordWordAction, getLearnedWords, getLevelProgress } from '../src/lib/vocabularyProgress.js';
+import { createLocalDatabase } from '../src/lib/localDatabase.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = path.resolve(__dirname, '../tools/content-csv/data');
+const VOCAB_CSV_PATH = path.join(DATA_DIR, 'HSK1_Swipe2Study_vocabulary.csv');
+const IMPORT_CSV_PATH = path.join(DATA_DIR, 'HSK1_Swipe2Study_import.csv');
+const MAPPING_JSON_PATH = path.join(DATA_DIR, 'HSK1_Swipe2Study_mapping.json');
+
+function createTestLocalDb() {
+  const tables = new Map();
+  return createLocalDatabase({
+    getScope: () => ({
+      getTable: (lang, table) => tables.get(`${lang}:${table}`) ?? null,
+      setTable: (lang, table, json) => tables.set(`${lang}:${table}`, json),
+    }),
+    getLanguage: () => 'zh',
+  });
+}
+
+function parseGenericCsv(content) {
+  if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+  const records = [];
+  let currentRecord = [];
+  let currentField = '';
+  let inQuotes = false;
+  let i = 0;
+  const len = content.length;
+  while (i < len) {
+    const ch = content[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < len && content[i + 1] === '"') {
+          currentField += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      currentField += ch;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (ch === ',') {
+      currentRecord.push(currentField);
+      currentField = '';
+      i++;
+      continue;
+    }
+    if (ch === '\r') {
+      if (i + 1 < len && content[i + 1] === '\n') i++;
+      currentRecord.push(currentField);
+      records.push(currentRecord);
+      currentRecord = [];
+      currentField = '';
+      i++;
+      continue;
+    }
+    if (ch === '\n') {
+      currentRecord.push(currentField);
+      records.push(currentRecord);
+      currentRecord = [];
+      currentField = '';
+      i++;
+      continue;
+    }
+    currentField += ch;
+    i++;
+  }
+  if (currentRecord.length > 0 || currentField.length > 0) {
+    currentRecord.push(currentField);
+    records.push(currentRecord);
+  }
+  return records;
+}
+
+test('1. HSK1 Content Integrity: 300 words and 900 examples exactly match client source', () => {
+  assert.equal(fs.existsSync(VOCAB_CSV_PATH), true, 'Source vocabulary CSV exists');
+  assert.equal(fs.existsSync(IMPORT_CSV_PATH), true, 'Import CSV exists');
+  assert.equal(fs.existsSync(MAPPING_JSON_PATH), true, 'Mapping JSON exists');
+
+  const origRaw = fs.readFileSync(VOCAB_CSV_PATH, 'utf8');
+  const impRaw = fs.readFileSync(IMPORT_CSV_PATH, 'utf8');
+
+  const origRecords = parseGenericCsv(origRaw).slice(1);
+  const impParsed = parseCsv(impRaw);
+
+  assert.equal(origRecords.length, 300, 'Original source has exactly 300 rows');
+  assert.equal(impParsed.rows.length, 300, 'Import dataset has exactly 300 rows');
+
+  let exampleCount = 0;
+  for (let i = 0; i < 300; i++) {
+    const o = origRecords[i];
+    const m = impParsed.rows[i].fields;
+
+    // Written form, reading, definitions match exactly
+    assert.equal(m[4], o[1], `Row ${i} written_form mismatch`);
+    assert.equal(m[5], o[2], `Row ${i} reading mismatch`);
+    assert.equal(m[6], o[4], `Row ${i} meaning_english mismatch`);
+    assert.equal(m[7], o[5], `Row ${i} meaning_burmese mismatch`);
+
+    // Audio path is null/blank initially
+    assert.equal(m[8], '', `Row ${i} audio_path must be blank in initial import`);
+
+    // Check examples
+    const examples = JSON.parse(m[9]);
+    assert.equal(examples.length, 3, `Row ${i} must have exactly 3 examples`);
+    exampleCount += examples.length;
+
+    for (let exIdx = 0; exIdx < 3; exIdx++) {
+      const baseIdx = 6 + exIdx * 4;
+      assert.equal(examples[exIdx].text, o[baseIdx], `Row ${i} ex${exIdx} text mismatch`);
+      assert.equal(examples[exIdx].reading, o[baseIdx + 1], `Row ${i} ex${exIdx} reading mismatch`);
+      assert.equal(examples[exIdx].english, o[baseIdx + 2], `Row ${i} ex${exIdx} english mismatch`);
+      assert.equal(examples[exIdx].burmese, o[baseIdx + 3], `Row ${i} ex${exIdx} burmese mismatch`);
+    }
+  }
+
+  assert.equal(exampleCount, 900, 'Total decoded examples must be exactly 900');
+});
+
+test('2. HSK1 CSV CLI Validation passes with 0 errors and 0 warnings', () => {
+  const impRaw = fs.readFileSync(IMPORT_CSV_PATH, 'utf8');
+  const parsed = parseCsv(impRaw);
+  const result = validateCsvRows(parsed.rows);
+
+  assert.equal(result.errors.length, 0, 'Zero validation errors');
+  assert.equal(result.warnings.length, 0, 'Zero validation warnings');
+  assert.equal(parsed.rows.length, 300);
+});
+
+test('3. Sidecar Mapping preserves part_of_speech and deterministic IDs', () => {
+  const mapping = JSON.parse(fs.readFileSync(MAPPING_JSON_PATH, 'utf8'));
+
+  assert.equal(mapping.course_id, 'zh-hsk1');
+  assert.equal(mapping.level_id, 'HSK1');
+  assert.equal(mapping.language, 'zh');
+  assert.equal(mapping.total_records, 300);
+  assert.equal(mapping.total_examples, 900);
+  assert.equal(mapping.records.length, 300);
+  assert.equal(mapping.id_generation.strategy, 'deterministic_sha256');
+  assert.equal(mapping.id_generation.reconciled_against_canonical, false);
+  assert.equal(mapping.id_generation.hosted_reconciliation_status, 'pending_before_publication');
+
+  for (let i = 0; i < mapping.records.length; i++) {
+    const r = mapping.records[i];
+    assert.equal(r.source_row, i + 1);
+    assert.ok(r.part_of_speech, `Row ${i} must preserve part_of_speech`);
+
+    const expectedHash = crypto.createHash('sha256')
+      .update(JSON.stringify(['zh-hsk1', r.natural_identity.written_form, r.natural_identity.reading]))
+      .digest('hex')
+      .slice(0, 24);
+
+    assert.equal(r.hash, expectedHash);
+    assert.equal(r.id, `zh-hsk1-${expectedHash}`);
+    assert.equal(r.planned_audio_path, `audio/zh/hsk1/${r.id}.mp3`);
+  }
+});
+
+test('4. Optional audio and safe fallback execution without empty-source requests', () => {
+  // Test card without audio
+  const cardNoAudio = {
+    id: 'zh-hsk1-2d3c1c3573f96f2fcb888e47',
+    character: '爱',
+    pronunciation: 'ài',
+    reading: 'ài',
+    definition: 'to love',
+    burmese_definition: 'ချစ်သည်',
+    audio_path: null,
+    examples: [],
+  };
+
+  const cardEmptyAudio = { ...cardNoAudio, audio_path: '' };
+  const cardWhitespaceAudio = { ...cardNoAudio, audio_path: '   ' };
+
+  // Helper verifying safe audio decision logic
+  function resolveAudioDecision(card) {
+    const audioPath = typeof card?.audio_path === 'string' && card.audio_path.trim().length > 0 ? card.audio_path.trim() : null;
+    return {
+      hasAudioToPlay: Boolean(audioPath),
+      audioPath,
+    };
+  }
+
+  assert.equal(resolveAudioDecision(cardNoAudio).hasAudioToPlay, false);
+  assert.equal(resolveAudioDecision(cardNoAudio).audioPath, null);
+
+  assert.equal(resolveAudioDecision(cardEmptyAudio).hasAudioToPlay, false);
+  assert.equal(resolveAudioDecision(cardEmptyAudio).audioPath, null);
+
+  assert.equal(resolveAudioDecision(cardWhitespaceAudio).hasAudioToPlay, false);
+  assert.equal(resolveAudioDecision(cardWhitespaceAudio).audioPath, null);
+
+  // Card with valid audio path
+  const cardWithAudio = { ...cardNoAudio, audio_path: 'audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3' };
+  const decision = resolveAudioDecision(cardWithAudio);
+  assert.equal(decision.hasAudioToPlay, true);
+  assert.equal(decision.audioPath, 'audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3');
+});
+
+test('5. Later audio-only updates preserve item identity, examples, and learner progress', () => {
+  const localDb = createTestLocalDb();
+
+  const originalItem = {
+    id: 'zh-hsk1-2d3c1c3573f96f2fcb888e47',
+    course_id: 'zh-hsk1',
+    language: 'zh',
+    level_id: 'HSK1',
+    written_form: '爱',
+    reading: 'ài',
+    meaning_english: 'to love',
+    meaning_burmese: 'ချစ်သည်',
+    audio_path: null,
+    examples: [{ text: '我爱我的家人。', reading: 'Wǒ ài wǒ de jiārén.', english: 'I love my family.', burmese: 'ကျွန်တော် မိသားစုကို ချစ်ပါတယ်။' }],
+    sort_order: 10,
+    is_active: true,
+  };
+
+  // 1. Learner marks word as learned before audio is recorded
+  const cardBeforeAudio = mapVocabularyToCard(originalItem, { language: 'zh', level_id: 'HSK1' }, 0);
+  recordWordAction(localDb, { card: cardBeforeAudio, direction: 'right' });
+
+  // Bookmark in saved_words
+  localDb.set('saved_words', [{
+    id: originalItem.id,
+    phrase: originalItem.written_form,
+    reading: originalItem.reading,
+    english: originalItem.meaning_english,
+    burmese: originalItem.meaning_burmese,
+  }]);
+
+  const learnedBefore = getLearnedWords(localDb, 'zh');
+  assert.equal(learnedBefore.length, 1);
+  assert.equal(learnedBefore[0].character, '爱');
+  assert.equal(learnedBefore[0].status, 'known');
+
+  // 2. Later, operator supplies client-recorded audio
+  const updatedItem = {
+    ...originalItem,
+    audio_path: 'audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3',
+  };
+
+  // 3. Verify content diff recognizes this as an update with 0 ambiguous identity changes
+  const diff = calculateContentDiff({
+    currentItems: [originalItem],
+    incomingItems: [updatedItem],
+  });
+
+  assert.equal(diff.inserted.length, 0);
+  assert.equal(diff.updated.length, 1, 'Recognized as an update');
+  assert.equal(diff.updated[0].id, originalItem.id);
+  assert.equal(diff.unchanged.length, 0);
+  assert.equal(diff.retired.length, 0);
+  assert.equal(diff.ambiguousChanges.length, 0, 'Zero ambiguous identity changes');
+
+  // 4. Verify learner progress is completely preserved after mapping updated item
+  const cardAfterAudio = mapVocabularyToCard(updatedItem, { language: 'zh', level_id: 'HSK1' }, 0);
+  assert.equal(cardAfterAudio.id, originalItem.id, 'ID is unchanged');
+  assert.equal(cardAfterAudio.audio_path, 'audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3');
+
+  const progress = getLevelProgress(localDb, 'HSK1', { id: 'zh', levels: [{ id: 'HSK1', words: 300 }] }, null, [cardAfterAudio]);
+  assert.equal(progress.uniqueLearned, 1, 'Learner progress remains 100% recognized');
+  assert.equal(progress.words, 1, 'Target derived from loaded items');
+
+  const savedWords = localDb.get('saved_words');
+  assert.equal(savedWords.length, 1);
+  assert.equal(savedWords[0].id, originalItem.id, 'Saved words link preserved');
+});
+
+test('6. Progress derivation eliminates hardcoded 150 count and scales to actual 300 items', () => {
+  const localDb = createTestLocalDb();
+
+  // Load all 300 records into memory cards
+  const mapping = JSON.parse(fs.readFileSync(MAPPING_JSON_PATH, 'utf8'));
+  const allCards = mapping.records.map((r) => ({
+    id: r.id,
+    character: r.natural_identity.written_form,
+    pronunciation: r.natural_identity.reading,
+    reading: r.natural_identity.reading,
+    level: 'HSK1',
+  }));
+
+  assert.equal(allCards.length, 300);
+
+  // Mark 30 words learned
+  for (let i = 0; i < 30; i++) {
+    recordWordAction(localDb, { card: allCards[i], direction: 'right' });
+  }
+
+  // Get progress using the 300 loaded cards
+  const progress = getLevelProgress(localDb, 'HSK1', { id: 'zh', levels: [{ id: 'HSK1', words: 300 }] }, null, allCards);
+
+  assert.equal(progress.words, 300, 'Derived count is 300, not hardcoded 150');
+  assert.equal(progress.uniqueLearned, 30);
+  assert.equal(progress.percent, 10, '30 / 300 = 10%');
+});

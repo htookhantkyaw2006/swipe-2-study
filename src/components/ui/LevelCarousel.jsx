@@ -62,8 +62,8 @@ export default function LevelCarousel() {
             ? 'Curriculum coming soon'
             : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
       : course.id === 'zh'
-        ? `${completed.toLocaleString()} / ${level.words.toLocaleString()} completed`
-        : `${level.words.toLocaleString()} words to explore`;
+        ? `${completed.toLocaleString()} / ${(availableCount || level.words).toLocaleString()} completed`
+        : `${(availableCount || level.words).toLocaleString()} words to explore`;
 
   return (
     <div className="course-browser" aria-label={`${course.name} flashcard levels`}>

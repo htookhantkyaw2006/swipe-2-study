@@ -1,0 +1,5121 @@
+{
+  "course_id": "zh-hsk1",
+  "level_id": "HSK1",
+  "language": "zh",
+  "total_records": 300,
+  "total_examples": 900,
+  "id_generation": {
+    "strategy": "deterministic_sha256",
+    "format": "zh-hsk1-<sha256(JSON.stringify([course_id, written_form, reading])).slice(0, 24)>",
+    "reconciled_against_canonical": false,
+    "reconciled_count": 0,
+    "hosted_reconciliation_status": "pending_before_publication"
+  },
+  "audio_attachment_convention": {
+    "recommended_storage_prefix": "audio/zh/hsk1/",
+    "filename_pattern": "<id>.mp3",
+    "example": "audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3"
+  },
+  "records": [
+    {
+      "source_row": 1,
+      "source_csv_line": 2,
+      "id": "zh-hsk1-2d3c1c3573f96f2fcb888e47",
+      "hash": "2d3c1c3573f96f2fcb888e47",
+      "natural_identity": {
+        "written_form": "爱",
+        "reading": "ài"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to love",
+      "meaning_burmese": "ချစ်သည်",
+      "examples_count": 3,
+      "sort_order": 10,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2d3c1c3573f96f2fcb888e47.mp3"
+    },
+    {
+      "source_row": 2,
+      "source_csv_line": 3,
+      "id": "zh-hsk1-a284627bb87e4c713d94891b",
+      "hash": "a284627bb87e4c713d94891b",
+      "natural_identity": {
+        "written_form": "八",
+        "reading": "bā"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "eight",
+      "meaning_burmese": "ရှစ်",
+      "examples_count": 3,
+      "sort_order": 20,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a284627bb87e4c713d94891b.mp3"
+    },
+    {
+      "source_row": 3,
+      "source_csv_line": 4,
+      "id": "zh-hsk1-7b5294c318872c599303a5f9",
+      "hash": "7b5294c318872c599303a5f9",
+      "natural_identity": {
+        "written_form": "爸爸",
+        "reading": "bàba"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "dad",
+      "meaning_burmese": "အဖေ",
+      "examples_count": 3,
+      "sort_order": 30,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7b5294c318872c599303a5f9.mp3"
+    },
+    {
+      "source_row": 4,
+      "source_csv_line": 5,
+      "id": "zh-hsk1-bb222dd2bbc3767415eedebd",
+      "hash": "bb222dd2bbc3767415eedebd",
+      "natural_identity": {
+        "written_form": "吧",
+        "reading": "ba"
+      },
+      "part_of_speech": "auxiliary",
+      "meaning_english": "particle for a suggestion or a guess",
+      "meaning_burmese": "အကြံပြု၊ တိုက်တွန်းပြ စကားလုံး (…ရအောင်၊ …နော်)",
+      "examples_count": 3,
+      "sort_order": 40,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-bb222dd2bbc3767415eedebd.mp3"
+    },
+    {
+      "source_row": 5,
+      "source_csv_line": 6,
+      "id": "zh-hsk1-737f8aeb925bfafa53d5e9e4",
+      "hash": "737f8aeb925bfafa53d5e9e4",
+      "natural_identity": {
+        "written_form": "白天",
+        "reading": "báitiān"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "daytime",
+      "meaning_burmese": "နေ့ခင်းအချိန်",
+      "examples_count": 3,
+      "sort_order": 50,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-737f8aeb925bfafa53d5e9e4.mp3"
+    },
+    {
+      "source_row": 6,
+      "source_csv_line": 7,
+      "id": "zh-hsk1-8cc728277ad9657ecb520cb3",
+      "hash": "8cc728277ad9657ecb520cb3",
+      "natural_identity": {
+        "written_form": "百",
+        "reading": "bǎi"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "hundred",
+      "meaning_burmese": "တစ်ရာ",
+      "examples_count": 3,
+      "sort_order": 60,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8cc728277ad9657ecb520cb3.mp3"
+    },
+    {
+      "source_row": 7,
+      "source_csv_line": 8,
+      "id": "zh-hsk1-a06296f7b5e9cb5650d6f0f7",
+      "hash": "a06296f7b5e9cb5650d6f0f7",
+      "natural_identity": {
+        "written_form": "半",
+        "reading": "bàn"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "half",
+      "meaning_burmese": "တစ်ဝက်",
+      "examples_count": 3,
+      "sort_order": 70,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a06296f7b5e9cb5650d6f0f7.mp3"
+    },
+    {
+      "source_row": 8,
+      "source_csv_line": 9,
+      "id": "zh-hsk1-af0e65d3515cf86f33cc5908",
+      "hash": "af0e65d3515cf86f33cc5908",
+      "natural_identity": {
+        "written_form": "包子",
+        "reading": "bāozi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "steamed stuffed bun",
+      "meaning_burmese": "ပေါက်စီ",
+      "examples_count": 3,
+      "sort_order": 80,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-af0e65d3515cf86f33cc5908.mp3"
+    },
+    {
+      "source_row": 9,
+      "source_csv_line": 10,
+      "id": "zh-hsk1-1bf34b17c9efc141688b57a6",
+      "hash": "1bf34b17c9efc141688b57a6",
+      "natural_identity": {
+        "written_form": "杯子",
+        "reading": "bēizi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "cup, glass",
+      "meaning_burmese": "ခွက်",
+      "examples_count": 3,
+      "sort_order": 90,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-1bf34b17c9efc141688b57a6.mp3"
+    },
+    {
+      "source_row": 10,
+      "source_csv_line": 11,
+      "id": "zh-hsk1-be78f9e10543652b6459d187",
+      "hash": "be78f9e10543652b6459d187",
+      "natural_identity": {
+        "written_form": "本",
+        "reading": "běn"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "measure word for books",
+      "meaning_burmese": "စာအုပ်အတွက် အရေအတွက်ပြ စကားလုံး (…အုပ်)",
+      "examples_count": 3,
+      "sort_order": 100,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-be78f9e10543652b6459d187.mp3"
+    },
+    {
+      "source_row": 11,
+      "source_csv_line": 12,
+      "id": "zh-hsk1-5c269cadf1bb753305ee907f",
+      "hash": "5c269cadf1bb753305ee907f",
+      "natural_identity": {
+        "written_form": "边",
+        "reading": "biān"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "side",
+      "meaning_burmese": "ဘက်၊ အနား",
+      "examples_count": 3,
+      "sort_order": 110,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5c269cadf1bb753305ee907f.mp3"
+    },
+    {
+      "source_row": 12,
+      "source_csv_line": 13,
+      "id": "zh-hsk1-82f0d17101f9e51647dd892e",
+      "hash": "82f0d17101f9e51647dd892e",
+      "natural_identity": {
+        "written_form": "病",
+        "reading": "bìng"
+      },
+      "part_of_speech": "noun, verb",
+      "meaning_english": "illness; to be ill",
+      "meaning_burmese": "ဖျားနာမှု၊ ဖျားနာသည်",
+      "examples_count": 3,
+      "sort_order": 120,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-82f0d17101f9e51647dd892e.mp3"
+    },
+    {
+      "source_row": 13,
+      "source_csv_line": 14,
+      "id": "zh-hsk1-f7372476d8324678acb686a9",
+      "hash": "f7372476d8324678acb686a9",
+      "natural_identity": {
+        "written_form": "不",
+        "reading": "bù"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "not, no",
+      "meaning_burmese": "မ…ဘူး",
+      "examples_count": 3,
+      "sort_order": 130,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f7372476d8324678acb686a9.mp3"
+    },
+    {
+      "source_row": 14,
+      "source_csv_line": 15,
+      "id": "zh-hsk1-e8493a2a9d4123cd7c1aeb3d",
+      "hash": "e8493a2a9d4123cd7c1aeb3d",
+      "natural_identity": {
+        "written_form": "不客气",
+        "reading": "bú kèqi"
+      },
+      "part_of_speech": "phrase",
+      "meaning_english": "you're welcome",
+      "meaning_burmese": "ရပါတယ်၊ ကိစ္စမရှိပါဘူး",
+      "examples_count": 3,
+      "sort_order": 140,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e8493a2a9d4123cd7c1aeb3d.mp3"
+    },
+    {
+      "source_row": 15,
+      "source_csv_line": 16,
+      "id": "zh-hsk1-fb413d63e701da721b90aa74",
+      "hash": "fb413d63e701da721b90aa74",
+      "natural_identity": {
+        "written_form": "不要",
+        "reading": "búyào"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "don't; not want",
+      "meaning_burmese": "မ…နဲ့၊ မလိုဘူး",
+      "examples_count": 3,
+      "sort_order": 150,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-fb413d63e701da721b90aa74.mp3"
+    },
+    {
+      "source_row": 16,
+      "source_csv_line": 17,
+      "id": "zh-hsk1-a035032437bc1bb8ef5ebdd4",
+      "hash": "a035032437bc1bb8ef5ebdd4",
+      "natural_identity": {
+        "written_form": "菜",
+        "reading": "cài"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "vegetable; dish",
+      "meaning_burmese": "ဟင်း၊ ဟင်းသီးဟင်းရွက်",
+      "examples_count": 3,
+      "sort_order": 160,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a035032437bc1bb8ef5ebdd4.mp3"
+    },
+    {
+      "source_row": 17,
+      "source_csv_line": 18,
+      "id": "zh-hsk1-5d5bc144de1e0060dbdd64c2",
+      "hash": "5d5bc144de1e0060dbdd64c2",
+      "natural_identity": {
+        "written_form": "茶",
+        "reading": "chá"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "tea",
+      "meaning_burmese": "လက်ဖက်ရည်",
+      "examples_count": 3,
+      "sort_order": 170,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5d5bc144de1e0060dbdd64c2.mp3"
+    },
+    {
+      "source_row": 18,
+      "source_csv_line": 19,
+      "id": "zh-hsk1-451b9621f2157ff6e3dd579c",
+      "hash": "451b9621f2157ff6e3dd579c",
+      "natural_identity": {
+        "written_form": "唱",
+        "reading": "chàng"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to sing",
+      "meaning_burmese": "သီဆိုသည်",
+      "examples_count": 3,
+      "sort_order": 180,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-451b9621f2157ff6e3dd579c.mp3"
+    },
+    {
+      "source_row": 19,
+      "source_csv_line": 20,
+      "id": "zh-hsk1-0f0b41506a6f6e186cf092be",
+      "hash": "0f0b41506a6f6e186cf092be",
+      "natural_identity": {
+        "written_form": "超市",
+        "reading": "chāoshì"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "supermarket",
+      "meaning_burmese": "စူပါမားကက်",
+      "examples_count": 3,
+      "sort_order": 190,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0f0b41506a6f6e186cf092be.mp3"
+    },
+    {
+      "source_row": 20,
+      "source_csv_line": 21,
+      "id": "zh-hsk1-3405ecec34f087cf01f0a9eb",
+      "hash": "3405ecec34f087cf01f0a9eb",
+      "natural_identity": {
+        "written_form": "车",
+        "reading": "chē"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "car, vehicle",
+      "meaning_burmese": "ကား",
+      "examples_count": 3,
+      "sort_order": 200,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-3405ecec34f087cf01f0a9eb.mp3"
+    },
+    {
+      "source_row": 21,
+      "source_csv_line": 22,
+      "id": "zh-hsk1-ac42bb073ac003ea7969b603",
+      "hash": "ac42bb073ac003ea7969b603",
+      "natural_identity": {
+        "written_form": "吃",
+        "reading": "chī"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to eat",
+      "meaning_burmese": "စားသည်",
+      "examples_count": 3,
+      "sort_order": 210,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ac42bb073ac003ea7969b603.mp3"
+    },
+    {
+      "source_row": 22,
+      "source_csv_line": 23,
+      "id": "zh-hsk1-df00f0838192e102c8e9cdf2",
+      "hash": "df00f0838192e102c8e9cdf2",
+      "natural_identity": {
+        "written_form": "出租车",
+        "reading": "chūzūchē"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "taxi",
+      "meaning_burmese": "တက္ကစီ",
+      "examples_count": 3,
+      "sort_order": 220,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-df00f0838192e102c8e9cdf2.mp3"
+    },
+    {
+      "source_row": 23,
+      "source_csv_line": 24,
+      "id": "zh-hsk1-56883762471a5e8ef33822d6",
+      "hash": "56883762471a5e8ef33822d6",
+      "natural_identity": {
+        "written_form": "穿",
+        "reading": "chuān"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to wear",
+      "meaning_burmese": "ဝတ်သည်",
+      "examples_count": 3,
+      "sort_order": 230,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-56883762471a5e8ef33822d6.mp3"
+    },
+    {
+      "source_row": 24,
+      "source_csv_line": 25,
+      "id": "zh-hsk1-28171084c5922b8bd1ec2aad",
+      "hash": "28171084c5922b8bd1ec2aad",
+      "natural_identity": {
+        "written_form": "打电话",
+        "reading": "dǎ diànhuà"
+      },
+      "part_of_speech": "phrase",
+      "meaning_english": "to make a phone call",
+      "meaning_burmese": "ဖုန်းဆက်သည်",
+      "examples_count": 3,
+      "sort_order": 240,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-28171084c5922b8bd1ec2aad.mp3"
+    },
+    {
+      "source_row": 25,
+      "source_csv_line": 26,
+      "id": "zh-hsk1-4a2a2e148d3ec52ae5bfc649",
+      "hash": "4a2a2e148d3ec52ae5bfc649",
+      "natural_identity": {
+        "written_form": "大",
+        "reading": "dà"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "big",
+      "meaning_burmese": "ကြီးသည်",
+      "examples_count": 3,
+      "sort_order": 250,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-4a2a2e148d3ec52ae5bfc649.mp3"
+    },
+    {
+      "source_row": 26,
+      "source_csv_line": 27,
+      "id": "zh-hsk1-fb36f873456023eb922e00c0",
+      "hash": "fb36f873456023eb922e00c0",
+      "natural_identity": {
+        "written_form": "大家",
+        "reading": "dàjiā"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "everyone",
+      "meaning_burmese": "အားလုံး",
+      "examples_count": 3,
+      "sort_order": 260,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-fb36f873456023eb922e00c0.mp3"
+    },
+    {
+      "source_row": 27,
+      "source_csv_line": 28,
+      "id": "zh-hsk1-efce39156476446235ff8045",
+      "hash": "efce39156476446235ff8045",
+      "natural_identity": {
+        "written_form": "大学",
+        "reading": "dàxué"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "university",
+      "meaning_burmese": "တက္ကသိုလ်",
+      "examples_count": 3,
+      "sort_order": 270,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-efce39156476446235ff8045.mp3"
+    },
+    {
+      "source_row": 28,
+      "source_csv_line": 29,
+      "id": "zh-hsk1-c6e7cf317eb94eb510a8ce81",
+      "hash": "c6e7cf317eb94eb510a8ce81",
+      "natural_identity": {
+        "written_form": "大学生",
+        "reading": "dàxuéshēng"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "university student",
+      "meaning_burmese": "တက္ကသိုလ်ကျောင်းသား",
+      "examples_count": 3,
+      "sort_order": 280,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c6e7cf317eb94eb510a8ce81.mp3"
+    },
+    {
+      "source_row": 29,
+      "source_csv_line": 30,
+      "id": "zh-hsk1-f2ce20380dc382a018a37d40",
+      "hash": "f2ce20380dc382a018a37d40",
+      "natural_identity": {
+        "written_form": "到",
+        "reading": "dào"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to arrive",
+      "meaning_burmese": "ရောက်သည်",
+      "examples_count": 3,
+      "sort_order": 290,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f2ce20380dc382a018a37d40.mp3"
+    },
+    {
+      "source_row": 30,
+      "source_csv_line": 31,
+      "id": "zh-hsk1-995eef9dd365d2d8b407843a",
+      "hash": "995eef9dd365d2d8b407843a",
+      "natural_identity": {
+        "written_form": "的",
+        "reading": "de"
+      },
+      "part_of_speech": "auxiliary",
+      "meaning_english": "possessive particle (of)",
+      "meaning_burmese": "…ရဲ့ (ပိုင်ဆိုင်မှုပြ စကားလုံး)",
+      "examples_count": 3,
+      "sort_order": 300,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-995eef9dd365d2d8b407843a.mp3"
+    },
+    {
+      "source_row": 31,
+      "source_csv_line": 32,
+      "id": "zh-hsk1-ec2e2e50b0b779606d541aca",
+      "hash": "ec2e2e50b0b779606d541aca",
+      "natural_identity": {
+        "written_form": "第",
+        "reading": "dì"
+      },
+      "part_of_speech": "prefix",
+      "meaning_english": "prefix for ordinal numbers",
+      "meaning_burmese": "အစဉ်လိုက်ပြ ရှေ့ဆက် (ပထမ၊ ဒုတိယ)",
+      "examples_count": 3,
+      "sort_order": 310,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ec2e2e50b0b779606d541aca.mp3"
+    },
+    {
+      "source_row": 32,
+      "source_csv_line": 33,
+      "id": "zh-hsk1-5d0851f7b827e5ed22edf836",
+      "hash": "5d0851f7b827e5ed22edf836",
+      "natural_identity": {
+        "written_form": "弟弟",
+        "reading": "dìdi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "younger brother",
+      "meaning_burmese": "ညီလေး",
+      "examples_count": 3,
+      "sort_order": 320,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5d0851f7b827e5ed22edf836.mp3"
+    },
+    {
+      "source_row": 33,
+      "source_csv_line": 34,
+      "id": "zh-hsk1-37425fc832dd97c2b15efafe",
+      "hash": "37425fc832dd97c2b15efafe",
+      "natural_identity": {
+        "written_form": "点",
+        "reading": "diǎn"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "o'clock; dot, point",
+      "meaning_burmese": "နာရီ (အချိန်ပြ)၊ အစက်",
+      "examples_count": 3,
+      "sort_order": 330,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-37425fc832dd97c2b15efafe.mp3"
+    },
+    {
+      "source_row": 34,
+      "source_csv_line": 35,
+      "id": "zh-hsk1-8580a78f985e902961c51a31",
+      "hash": "8580a78f985e902961c51a31",
+      "natural_identity": {
+        "written_form": "店",
+        "reading": "diàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "shop, store",
+      "meaning_burmese": "ဆိုင်",
+      "examples_count": 3,
+      "sort_order": 340,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8580a78f985e902961c51a31.mp3"
+    },
+    {
+      "source_row": 35,
+      "source_csv_line": 36,
+      "id": "zh-hsk1-0ebd8049232a2a9572af7780",
+      "hash": "0ebd8049232a2a9572af7780",
+      "natural_identity": {
+        "written_form": "电话",
+        "reading": "diànhuà"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "telephone; phone call",
+      "meaning_burmese": "ဖုန်း",
+      "examples_count": 3,
+      "sort_order": 350,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0ebd8049232a2a9572af7780.mp3"
+    },
+    {
+      "source_row": 36,
+      "source_csv_line": 37,
+      "id": "zh-hsk1-09fd9005549566d1fa4c1628",
+      "hash": "09fd9005549566d1fa4c1628",
+      "natural_identity": {
+        "written_form": "电脑",
+        "reading": "diànnǎo"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "computer",
+      "meaning_burmese": "ကွန်ပျူတာ",
+      "examples_count": 3,
+      "sort_order": 360,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-09fd9005549566d1fa4c1628.mp3"
+    },
+    {
+      "source_row": 37,
+      "source_csv_line": 38,
+      "id": "zh-hsk1-c957d4ea1bcddadebe6c8b88",
+      "hash": "c957d4ea1bcddadebe6c8b88",
+      "natural_identity": {
+        "written_form": "电视",
+        "reading": "diànshì"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "television",
+      "meaning_burmese": "တီဗီ",
+      "examples_count": 3,
+      "sort_order": 370,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c957d4ea1bcddadebe6c8b88.mp3"
+    },
+    {
+      "source_row": 38,
+      "source_csv_line": 39,
+      "id": "zh-hsk1-22763fbdbb1ade0beab7451b",
+      "hash": "22763fbdbb1ade0beab7451b",
+      "natural_identity": {
+        "written_form": "电影",
+        "reading": "diànyǐng"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "movie, film",
+      "meaning_burmese": "ရုပ်ရှင်",
+      "examples_count": 3,
+      "sort_order": 380,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-22763fbdbb1ade0beab7451b.mp3"
+    },
+    {
+      "source_row": 39,
+      "source_csv_line": 40,
+      "id": "zh-hsk1-0afdf4674d200eb4cf2746b9",
+      "hash": "0afdf4674d200eb4cf2746b9",
+      "natural_identity": {
+        "written_form": "电影院",
+        "reading": "diànyǐngyuàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "cinema",
+      "meaning_burmese": "ရုပ်ရှင်ရုံ",
+      "examples_count": 3,
+      "sort_order": 390,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0afdf4674d200eb4cf2746b9.mp3"
+    },
+    {
+      "source_row": 40,
+      "source_csv_line": 41,
+      "id": "zh-hsk1-71368bc404212f43b065f17a",
+      "hash": "71368bc404212f43b065f17a",
+      "natural_identity": {
+        "written_form": "东西",
+        "reading": "dōngxi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "thing, object",
+      "meaning_burmese": "ပစ္စည်း",
+      "examples_count": 3,
+      "sort_order": 400,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-71368bc404212f43b065f17a.mp3"
+    },
+    {
+      "source_row": 41,
+      "source_csv_line": 42,
+      "id": "zh-hsk1-ac8d2b94b0b2befeb54652ac",
+      "hash": "ac8d2b94b0b2befeb54652ac",
+      "natural_identity": {
+        "written_form": "都",
+        "reading": "dōu"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "all, both",
+      "meaning_burmese": "အားလုံး",
+      "examples_count": 3,
+      "sort_order": 410,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ac8d2b94b0b2befeb54652ac.mp3"
+    },
+    {
+      "source_row": 42,
+      "source_csv_line": 43,
+      "id": "zh-hsk1-a2975d8032ef5eee13304c8b",
+      "hash": "a2975d8032ef5eee13304c8b",
+      "natural_identity": {
+        "written_form": "读",
+        "reading": "dú"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to read",
+      "meaning_burmese": "ဖတ်သည်",
+      "examples_count": 3,
+      "sort_order": 420,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a2975d8032ef5eee13304c8b.mp3"
+    },
+    {
+      "source_row": 43,
+      "source_csv_line": 44,
+      "id": "zh-hsk1-26f09446e5d8d3354dd5e29e",
+      "hash": "26f09446e5d8d3354dd5e29e",
+      "natural_identity": {
+        "written_form": "读书",
+        "reading": "dúshū"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to read; to study",
+      "meaning_burmese": "စာဖတ်သည်၊ စာလေ့လာသည်",
+      "examples_count": 3,
+      "sort_order": 430,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-26f09446e5d8d3354dd5e29e.mp3"
+    },
+    {
+      "source_row": 44,
+      "source_csv_line": 45,
+      "id": "zh-hsk1-69e0a2838cbf5404d4187e73",
+      "hash": "69e0a2838cbf5404d4187e73",
+      "natural_identity": {
+        "written_form": "对",
+        "reading": "duì"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "correct, right",
+      "meaning_burmese": "မှန်သည်",
+      "examples_count": 3,
+      "sort_order": 440,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-69e0a2838cbf5404d4187e73.mp3"
+    },
+    {
+      "source_row": 45,
+      "source_csv_line": 46,
+      "id": "zh-hsk1-3a166474c7c03929d32d97e2",
+      "hash": "3a166474c7c03929d32d97e2",
+      "natural_identity": {
+        "written_form": "对不起",
+        "reading": "duìbuqǐ"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "sorry",
+      "meaning_burmese": "ဆောရီးပါ၊ စိတ်မရှိပါနဲ့",
+      "examples_count": 3,
+      "sort_order": 450,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-3a166474c7c03929d32d97e2.mp3"
+    },
+    {
+      "source_row": 46,
+      "source_csv_line": 47,
+      "id": "zh-hsk1-bf341f44ba3c38cdac38dd76",
+      "hash": "bf341f44ba3c38cdac38dd76",
+      "natural_identity": {
+        "written_form": "多",
+        "reading": "duō"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "many, much",
+      "meaning_burmese": "များသည်",
+      "examples_count": 3,
+      "sort_order": 460,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-bf341f44ba3c38cdac38dd76.mp3"
+    },
+    {
+      "source_row": 47,
+      "source_csv_line": 48,
+      "id": "zh-hsk1-f3999892982a145af7d01cea",
+      "hash": "f3999892982a145af7d01cea",
+      "natural_identity": {
+        "written_form": "多少",
+        "reading": "duōshao"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "how many, how much",
+      "meaning_burmese": "ဘယ်နှစ်၊ ဘယ်လောက်",
+      "examples_count": 3,
+      "sort_order": 470,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f3999892982a145af7d01cea.mp3"
+    },
+    {
+      "source_row": 48,
+      "source_csv_line": 49,
+      "id": "zh-hsk1-63b4f77821eca7ce4ae14ef1",
+      "hash": "63b4f77821eca7ce4ae14ef1",
+      "natural_identity": {
+        "written_form": "儿子",
+        "reading": "érzi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "son",
+      "meaning_burmese": "သား",
+      "examples_count": 3,
+      "sort_order": 480,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-63b4f77821eca7ce4ae14ef1.mp3"
+    },
+    {
+      "source_row": 49,
+      "source_csv_line": 50,
+      "id": "zh-hsk1-da6a424b81435f57325820b8",
+      "hash": "da6a424b81435f57325820b8",
+      "natural_identity": {
+        "written_form": "二",
+        "reading": "èr"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "two",
+      "meaning_burmese": "နှစ်",
+      "examples_count": 3,
+      "sort_order": 490,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-da6a424b81435f57325820b8.mp3"
+    },
+    {
+      "source_row": 50,
+      "source_csv_line": 51,
+      "id": "zh-hsk1-f29a6a488ad517f5c3e3f424",
+      "hash": "f29a6a488ad517f5c3e3f424",
+      "natural_identity": {
+        "written_form": "饭",
+        "reading": "fàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "rice; meal",
+      "meaning_burmese": "ထမင်း၊ အစားအစာ",
+      "examples_count": 3,
+      "sort_order": 500,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f29a6a488ad517f5c3e3f424.mp3"
+    },
+    {
+      "source_row": 51,
+      "source_csv_line": 52,
+      "id": "zh-hsk1-14397acc5d94cb03190089fc",
+      "hash": "14397acc5d94cb03190089fc",
+      "natural_identity": {
+        "written_form": "饭店",
+        "reading": "fàndiàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "restaurant",
+      "meaning_burmese": "စားသောက်ဆိုင်",
+      "examples_count": 3,
+      "sort_order": 510,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-14397acc5d94cb03190089fc.mp3"
+    },
+    {
+      "source_row": 52,
+      "source_csv_line": 53,
+      "id": "zh-hsk1-1ea8301efdb5ebe034258867",
+      "hash": "1ea8301efdb5ebe034258867",
+      "natural_identity": {
+        "written_form": "房间",
+        "reading": "fángjiān"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "room",
+      "meaning_burmese": "အခန်း",
+      "examples_count": 3,
+      "sort_order": 520,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-1ea8301efdb5ebe034258867.mp3"
+    },
+    {
+      "source_row": 53,
+      "source_csv_line": 54,
+      "id": "zh-hsk1-25a6dfc74ac92226f1c6e912",
+      "hash": "25a6dfc74ac92226f1c6e912",
+      "natural_identity": {
+        "written_form": "非常",
+        "reading": "fēicháng"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "very, extremely",
+      "meaning_burmese": "အလွန်",
+      "examples_count": 3,
+      "sort_order": 530,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-25a6dfc74ac92226f1c6e912.mp3"
+    },
+    {
+      "source_row": 54,
+      "source_csv_line": 55,
+      "id": "zh-hsk1-370af6d0f4a867fb16e6411e",
+      "hash": "370af6d0f4a867fb16e6411e",
+      "natural_identity": {
+        "written_form": "飞机",
+        "reading": "fēijī"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "airplane",
+      "meaning_burmese": "လေယာဉ်",
+      "examples_count": 3,
+      "sort_order": 540,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-370af6d0f4a867fb16e6411e.mp3"
+    },
+    {
+      "source_row": 55,
+      "source_csv_line": 56,
+      "id": "zh-hsk1-85271ebb1a58a3ccbfbc88bd",
+      "hash": "85271ebb1a58a3ccbfbc88bd",
+      "natural_identity": {
+        "written_form": "分",
+        "reading": "fēn"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "minute",
+      "meaning_burmese": "မိနစ်",
+      "examples_count": 3,
+      "sort_order": 550,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-85271ebb1a58a3ccbfbc88bd.mp3"
+    },
+    {
+      "source_row": 56,
+      "source_csv_line": 57,
+      "id": "zh-hsk1-ea3aff1f405eca8363464372",
+      "hash": "ea3aff1f405eca8363464372",
+      "natural_identity": {
+        "written_form": "分钟",
+        "reading": "fēnzhōng"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "minute (duration)",
+      "meaning_burmese": "မိနစ် (အချိန်ကြာချိန်)",
+      "examples_count": 3,
+      "sort_order": 560,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ea3aff1f405eca8363464372.mp3"
+    },
+    {
+      "source_row": 57,
+      "source_csv_line": 58,
+      "id": "zh-hsk1-d9ad7711f18162044fdf877d",
+      "hash": "d9ad7711f18162044fdf877d",
+      "natural_identity": {
+        "written_form": "高兴",
+        "reading": "gāoxìng"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "happy, glad",
+      "meaning_burmese": "ဝမ်းသာသည်",
+      "examples_count": 3,
+      "sort_order": 570,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d9ad7711f18162044fdf877d.mp3"
+    },
+    {
+      "source_row": 58,
+      "source_csv_line": 59,
+      "id": "zh-hsk1-4298bf0eb1c7f852f4e3a346",
+      "hash": "4298bf0eb1c7f852f4e3a346",
+      "natural_identity": {
+        "written_form": "歌",
+        "reading": "gē"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "song",
+      "meaning_burmese": "သီချင်း",
+      "examples_count": 3,
+      "sort_order": 580,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-4298bf0eb1c7f852f4e3a346.mp3"
+    },
+    {
+      "source_row": 59,
+      "source_csv_line": 60,
+      "id": "zh-hsk1-99272c199d70ba517f86fcda",
+      "hash": "99272c199d70ba517f86fcda",
+      "natural_identity": {
+        "written_form": "哥哥",
+        "reading": "gēge"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "older brother",
+      "meaning_burmese": "အကို",
+      "examples_count": 3,
+      "sort_order": 590,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-99272c199d70ba517f86fcda.mp3"
+    },
+    {
+      "source_row": 60,
+      "source_csv_line": 61,
+      "id": "zh-hsk1-8927e3fb4c2ec29e29e630ae",
+      "hash": "8927e3fb4c2ec29e29e630ae",
+      "natural_identity": {
+        "written_form": "个",
+        "reading": "gè"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "general measure word",
+      "meaning_burmese": "အထွေထွေ အရေအတွက်ပြ စကားလုံး (…ခု၊ …ယောက်)",
+      "examples_count": 3,
+      "sort_order": 600,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8927e3fb4c2ec29e29e630ae.mp3"
+    },
+    {
+      "source_row": 61,
+      "source_csv_line": 62,
+      "id": "zh-hsk1-2a8ec11c10875712d1466046",
+      "hash": "2a8ec11c10875712d1466046",
+      "natural_identity": {
+        "written_form": "给",
+        "reading": "gěi"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to give",
+      "meaning_burmese": "ပေးသည်",
+      "examples_count": 3,
+      "sort_order": 610,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2a8ec11c10875712d1466046.mp3"
+    },
+    {
+      "source_row": 62,
+      "source_csv_line": 63,
+      "id": "zh-hsk1-552a0068844058a8ce78cb34",
+      "hash": "552a0068844058a8ce78cb34",
+      "natural_identity": {
+        "written_form": "公司",
+        "reading": "gōngsī"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "company",
+      "meaning_burmese": "ကုမ္ပဏီ",
+      "examples_count": 3,
+      "sort_order": 620,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-552a0068844058a8ce78cb34.mp3"
+    },
+    {
+      "source_row": 63,
+      "source_csv_line": 64,
+      "id": "zh-hsk1-97a55788535a5c100d0f8971",
+      "hash": "97a55788535a5c100d0f8971",
+      "natural_identity": {
+        "written_form": "工作",
+        "reading": "gōngzuò"
+      },
+      "part_of_speech": "verb, noun",
+      "meaning_english": "to work; work, job",
+      "meaning_burmese": "အလုပ်၊ အလုပ်လုပ်သည်",
+      "examples_count": 3,
+      "sort_order": 630,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-97a55788535a5c100d0f8971.mp3"
+    },
+    {
+      "source_row": 64,
+      "source_csv_line": 65,
+      "id": "zh-hsk1-f9a00867a42e061cf3485ffe",
+      "hash": "f9a00867a42e061cf3485ffe",
+      "natural_identity": {
+        "written_form": "狗",
+        "reading": "gǒu"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "dog",
+      "meaning_burmese": "ခွေး",
+      "examples_count": 3,
+      "sort_order": 640,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f9a00867a42e061cf3485ffe.mp3"
+    },
+    {
+      "source_row": 65,
+      "source_csv_line": 66,
+      "id": "zh-hsk1-908499460af6e62c7bdcaf67",
+      "hash": "908499460af6e62c7bdcaf67",
+      "natural_identity": {
+        "written_form": "贵",
+        "reading": "guì"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "expensive",
+      "meaning_burmese": "ဈေးကြီးသည်",
+      "examples_count": 3,
+      "sort_order": 650,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-908499460af6e62c7bdcaf67.mp3"
+    },
+    {
+      "source_row": 66,
+      "source_csv_line": 67,
+      "id": "zh-hsk1-7c01a6a777458e6fbb81ece7",
+      "hash": "7c01a6a777458e6fbb81ece7",
+      "natural_identity": {
+        "written_form": "国",
+        "reading": "guó"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "country",
+      "meaning_burmese": "နိုင်ငံ",
+      "examples_count": 3,
+      "sort_order": 660,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7c01a6a777458e6fbb81ece7.mp3"
+    },
+    {
+      "source_row": 67,
+      "source_csv_line": 68,
+      "id": "zh-hsk1-862ed8c3551f490e3f13a5d2",
+      "hash": "862ed8c3551f490e3f13a5d2",
+      "natural_identity": {
+        "written_form": "还",
+        "reading": "hái"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "still; also",
+      "meaning_burmese": "…တုန်း၊ ထပ်၊ လည်း",
+      "examples_count": 3,
+      "sort_order": 670,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-862ed8c3551f490e3f13a5d2.mp3"
+    },
+    {
+      "source_row": 68,
+      "source_csv_line": 69,
+      "id": "zh-hsk1-724260a89473f638c9fa0f41",
+      "hash": "724260a89473f638c9fa0f41",
+      "natural_identity": {
+        "written_form": "孩子",
+        "reading": "háizi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "child",
+      "meaning_burmese": "ကလေး",
+      "examples_count": 3,
+      "sort_order": 680,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-724260a89473f638c9fa0f41.mp3"
+    },
+    {
+      "source_row": 69,
+      "source_csv_line": 70,
+      "id": "zh-hsk1-ea310068349b26dcc34582a2",
+      "hash": "ea310068349b26dcc34582a2",
+      "natural_identity": {
+        "written_form": "汉语",
+        "reading": "Hànyǔ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "Chinese language",
+      "meaning_burmese": "တရုတ်စာ၊ တရုတ်စကား",
+      "examples_count": 3,
+      "sort_order": 690,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ea310068349b26dcc34582a2.mp3"
+    },
+    {
+      "source_row": 70,
+      "source_csv_line": 71,
+      "id": "zh-hsk1-7cd3d5ca9098d3085d5069cf",
+      "hash": "7cd3d5ca9098d3085d5069cf",
+      "natural_identity": {
+        "written_form": "汉字",
+        "reading": "Hànzì"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "Chinese character",
+      "meaning_burmese": "တရုတ်စာလုံး",
+      "examples_count": 3,
+      "sort_order": 700,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7cd3d5ca9098d3085d5069cf.mp3"
+    },
+    {
+      "source_row": 71,
+      "source_csv_line": 72,
+      "id": "zh-hsk1-dc78c4fd391bcc3687cc6669",
+      "hash": "dc78c4fd391bcc3687cc6669",
+      "natural_identity": {
+        "written_form": "好",
+        "reading": "hǎo"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "good",
+      "meaning_burmese": "ကောင်းသည်",
+      "examples_count": 3,
+      "sort_order": 710,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-dc78c4fd391bcc3687cc6669.mp3"
+    },
+    {
+      "source_row": 72,
+      "source_csv_line": 73,
+      "id": "zh-hsk1-99d601ccc570926feb9e40af",
+      "hash": "99d601ccc570926feb9e40af",
+      "natural_identity": {
+        "written_form": "好吃",
+        "reading": "hǎochī"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "delicious",
+      "meaning_burmese": "စားကောင်းသည်",
+      "examples_count": 3,
+      "sort_order": 720,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-99d601ccc570926feb9e40af.mp3"
+    },
+    {
+      "source_row": 73,
+      "source_csv_line": 74,
+      "id": "zh-hsk1-96845b5d41888780ce3cb300",
+      "hash": "96845b5d41888780ce3cb300",
+      "natural_identity": {
+        "written_form": "好看",
+        "reading": "hǎokàn"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "good-looking",
+      "meaning_burmese": "လှသည်၊ ကြည့်လို့ကောင်းသည်",
+      "examples_count": 3,
+      "sort_order": 730,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-96845b5d41888780ce3cb300.mp3"
+    },
+    {
+      "source_row": 74,
+      "source_csv_line": 75,
+      "id": "zh-hsk1-66c22cfb942394f7e1079870",
+      "hash": "66c22cfb942394f7e1079870",
+      "natural_identity": {
+        "written_form": "好听",
+        "reading": "hǎotīng"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "pleasant to listen to",
+      "meaning_burmese": "နားဝင်ချိုသည်",
+      "examples_count": 3,
+      "sort_order": 740,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-66c22cfb942394f7e1079870.mp3"
+    },
+    {
+      "source_row": 75,
+      "source_csv_line": 76,
+      "id": "zh-hsk1-f290fbe1a3a011800a1f615a",
+      "hash": "f290fbe1a3a011800a1f615a",
+      "natural_identity": {
+        "written_form": "好玩儿",
+        "reading": "hǎowánr"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "fun, amusing",
+      "meaning_burmese": "ပျော်ဖို့ကောင်းသည်၊ စိတ်ဝင်စားဖို့ကောင်းသည်",
+      "examples_count": 3,
+      "sort_order": 750,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f290fbe1a3a011800a1f615a.mp3"
+    },
+    {
+      "source_row": 76,
+      "source_csv_line": 77,
+      "id": "zh-hsk1-0dad30747775e29625a49ab3",
+      "hash": "0dad30747775e29625a49ab3",
+      "natural_identity": {
+        "written_form": "号",
+        "reading": "hào"
+      },
+      "part_of_speech": "noun, classifier",
+      "meaning_english": "date; number",
+      "meaning_burmese": "ရက်စွဲ၊ နံပါတ်",
+      "examples_count": 3,
+      "sort_order": 760,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0dad30747775e29625a49ab3.mp3"
+    },
+    {
+      "source_row": 77,
+      "source_csv_line": 78,
+      "id": "zh-hsk1-81c443450b48cc623c00aa52",
+      "hash": "81c443450b48cc623c00aa52",
+      "natural_identity": {
+        "written_form": "喝",
+        "reading": "hē"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to drink",
+      "meaning_burmese": "သောက်သည်",
+      "examples_count": 3,
+      "sort_order": 770,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-81c443450b48cc623c00aa52.mp3"
+    },
+    {
+      "source_row": 78,
+      "source_csv_line": 79,
+      "id": "zh-hsk1-65f0887f0b6ec75f986fd63d",
+      "hash": "65f0887f0b6ec75f986fd63d",
+      "natural_identity": {
+        "written_form": "和",
+        "reading": "hé"
+      },
+      "part_of_speech": "conjunction",
+      "meaning_english": "and, with",
+      "meaning_burmese": "နှင့်",
+      "examples_count": 3,
+      "sort_order": 780,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-65f0887f0b6ec75f986fd63d.mp3"
+    },
+    {
+      "source_row": 79,
+      "source_csv_line": 80,
+      "id": "zh-hsk1-7dcf7b772890ffafd117e785",
+      "hash": "7dcf7b772890ffafd117e785",
+      "natural_identity": {
+        "written_form": "很",
+        "reading": "hěn"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "very",
+      "meaning_burmese": "အရမ်း",
+      "examples_count": 3,
+      "sort_order": 790,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7dcf7b772890ffafd117e785.mp3"
+    },
+    {
+      "source_row": 80,
+      "source_csv_line": 81,
+      "id": "zh-hsk1-0ff999fa19e98cf10dfe5e1e",
+      "hash": "0ff999fa19e98cf10dfe5e1e",
+      "natural_identity": {
+        "written_form": "后",
+        "reading": "hòu"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "behind; after",
+      "meaning_burmese": "နောက်",
+      "examples_count": 3,
+      "sort_order": 800,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0ff999fa19e98cf10dfe5e1e.mp3"
+    },
+    {
+      "source_row": 81,
+      "source_csv_line": 82,
+      "id": "zh-hsk1-b8c55786a0fccffa31244188",
+      "hash": "b8c55786a0fccffa31244188",
+      "natural_identity": {
+        "written_form": "回",
+        "reading": "huí"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to return",
+      "meaning_burmese": "ပြန်သည်",
+      "examples_count": 3,
+      "sort_order": 810,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b8c55786a0fccffa31244188.mp3"
+    },
+    {
+      "source_row": 82,
+      "source_csv_line": 83,
+      "id": "zh-hsk1-fd907bdbc34c326e431634de",
+      "hash": "fd907bdbc34c326e431634de",
+      "natural_identity": {
+        "written_form": "会",
+        "reading": "huì"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "can, to know how to",
+      "meaning_burmese": "တတ်သည်၊ နိုင်သည်",
+      "examples_count": 3,
+      "sort_order": 820,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-fd907bdbc34c326e431634de.mp3"
+    },
+    {
+      "source_row": 83,
+      "source_csv_line": 84,
+      "id": "zh-hsk1-0b9f8eae0be7c5bb887c3732",
+      "hash": "0b9f8eae0be7c5bb887c3732",
+      "natural_identity": {
+        "written_form": "火车",
+        "reading": "huǒchē"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "train",
+      "meaning_burmese": "ရထား",
+      "examples_count": 3,
+      "sort_order": 830,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0b9f8eae0be7c5bb887c3732.mp3"
+    },
+    {
+      "source_row": 84,
+      "source_csv_line": 85,
+      "id": "zh-hsk1-2801e0f124a5ac3178f804e3",
+      "hash": "2801e0f124a5ac3178f804e3",
+      "natural_identity": {
+        "written_form": "鸡蛋",
+        "reading": "jīdàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "egg",
+      "meaning_burmese": "ကြက်ဥ",
+      "examples_count": 3,
+      "sort_order": 840,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2801e0f124a5ac3178f804e3.mp3"
+    },
+    {
+      "source_row": 85,
+      "source_csv_line": 86,
+      "id": "zh-hsk1-5b97516b642c1915b4e9db97",
+      "hash": "5b97516b642c1915b4e9db97",
+      "natural_identity": {
+        "written_form": "几",
+        "reading": "jǐ"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "how many; a few",
+      "meaning_burmese": "ဘယ်နှစ်",
+      "examples_count": 3,
+      "sort_order": 850,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5b97516b642c1915b4e9db97.mp3"
+    },
+    {
+      "source_row": 86,
+      "source_csv_line": 87,
+      "id": "zh-hsk1-a363bd137a221059f60eaf48",
+      "hash": "a363bd137a221059f60eaf48",
+      "natural_identity": {
+        "written_form": "家",
+        "reading": "jiā"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "home, family",
+      "meaning_burmese": "အိမ်၊ မိသားစု",
+      "examples_count": 3,
+      "sort_order": 860,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a363bd137a221059f60eaf48.mp3"
+    },
+    {
+      "source_row": 87,
+      "source_csv_line": 88,
+      "id": "zh-hsk1-ae3977c1ddfd2ef58c197dcf",
+      "hash": "ae3977c1ddfd2ef58c197dcf",
+      "natural_identity": {
+        "written_form": "家人",
+        "reading": "jiārén"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "family member",
+      "meaning_burmese": "မိသားစုဝင်",
+      "examples_count": 3,
+      "sort_order": 870,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ae3977c1ddfd2ef58c197dcf.mp3"
+    },
+    {
+      "source_row": 88,
+      "source_csv_line": 89,
+      "id": "zh-hsk1-d110702259213c8865e96fab",
+      "hash": "d110702259213c8865e96fab",
+      "natural_identity": {
+        "written_form": "见",
+        "reading": "jiàn"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to see, to meet",
+      "meaning_burmese": "တွေ့သည်",
+      "examples_count": 3,
+      "sort_order": 880,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d110702259213c8865e96fab.mp3"
+    },
+    {
+      "source_row": 89,
+      "source_csv_line": 90,
+      "id": "zh-hsk1-2dd2029c7ee34c8e42df4b7d",
+      "hash": "2dd2029c7ee34c8e42df4b7d",
+      "natural_identity": {
+        "written_form": "件",
+        "reading": "jiàn"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "measure word for clothes and items",
+      "meaning_burmese": "အဝတ်အစား၊ ပစ္စည်းအတွက် အရေအတွက်ပြ စကားလုံး (…ထည်)",
+      "examples_count": 3,
+      "sort_order": 890,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2dd2029c7ee34c8e42df4b7d.mp3"
+    },
+    {
+      "source_row": 90,
+      "source_csv_line": 91,
+      "id": "zh-hsk1-bdc54e2e741f7ae5f138f5a7",
+      "hash": "bdc54e2e741f7ae5f138f5a7",
+      "natural_identity": {
+        "written_form": "饺子",
+        "reading": "jiǎozi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "dumpling",
+      "meaning_burmese": "ဖက်ထုပ် (ဂျောင်စီ)",
+      "examples_count": 3,
+      "sort_order": 900,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-bdc54e2e741f7ae5f138f5a7.mp3"
+    },
+    {
+      "source_row": 91,
+      "source_csv_line": 92,
+      "id": "zh-hsk1-743e7585fa0b50ee50f69e3a",
+      "hash": "743e7585fa0b50ee50f69e3a",
+      "natural_identity": {
+        "written_form": "叫",
+        "reading": "jiào"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to be called; to call",
+      "meaning_burmese": "…လို့ ခေါ်သည်",
+      "examples_count": 3,
+      "sort_order": 910,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-743e7585fa0b50ee50f69e3a.mp3"
+    },
+    {
+      "source_row": 92,
+      "source_csv_line": 93,
+      "id": "zh-hsk1-14cbde024872859072e6dee0",
+      "hash": "14cbde024872859072e6dee0",
+      "natural_identity": {
+        "written_form": "姐姐",
+        "reading": "jiějie"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "older sister",
+      "meaning_burmese": "အစ်မ",
+      "examples_count": 3,
+      "sort_order": 920,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-14cbde024872859072e6dee0.mp3"
+    },
+    {
+      "source_row": 93,
+      "source_csv_line": 94,
+      "id": "zh-hsk1-f31c4d28b703e1015f9c2c31",
+      "hash": "f31c4d28b703e1015f9c2c31",
+      "natural_identity": {
+        "written_form": "今年",
+        "reading": "jīnnián"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "this year",
+      "meaning_burmese": "ဒီနှစ်",
+      "examples_count": 3,
+      "sort_order": 930,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f31c4d28b703e1015f9c2c31.mp3"
+    },
+    {
+      "source_row": 94,
+      "source_csv_line": 95,
+      "id": "zh-hsk1-b02933e862a4b10f35f4c0f5",
+      "hash": "b02933e862a4b10f35f4c0f5",
+      "natural_identity": {
+        "written_form": "今天",
+        "reading": "jīntiān"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "today",
+      "meaning_burmese": "ဒီနေ့",
+      "examples_count": 3,
+      "sort_order": 940,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b02933e862a4b10f35f4c0f5.mp3"
+    },
+    {
+      "source_row": 95,
+      "source_csv_line": 96,
+      "id": "zh-hsk1-5c2efc9a0df68c15dfb8f62e",
+      "hash": "5c2efc9a0df68c15dfb8f62e",
+      "natural_identity": {
+        "written_form": "九",
+        "reading": "jiǔ"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "nine",
+      "meaning_burmese": "ကိုး",
+      "examples_count": 3,
+      "sort_order": 950,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5c2efc9a0df68c15dfb8f62e.mp3"
+    },
+    {
+      "source_row": 96,
+      "source_csv_line": 97,
+      "id": "zh-hsk1-920c306433e803ecf8c39ce8",
+      "hash": "920c306433e803ecf8c39ce8",
+      "natural_identity": {
+        "written_form": "觉得",
+        "reading": "juéde"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to feel, to think",
+      "meaning_burmese": "ထင်သည်၊ ခံစားသည်",
+      "examples_count": 3,
+      "sort_order": 960,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-920c306433e803ecf8c39ce8.mp3"
+    },
+    {
+      "source_row": 97,
+      "source_csv_line": 98,
+      "id": "zh-hsk1-6b8fdef60243061f5fec1817",
+      "hash": "6b8fdef60243061f5fec1817",
+      "natural_identity": {
+        "written_form": "开",
+        "reading": "kāi"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to open; to turn on",
+      "meaning_burmese": "ဖွင့်သည်",
+      "examples_count": 3,
+      "sort_order": 970,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-6b8fdef60243061f5fec1817.mp3"
+    },
+    {
+      "source_row": 98,
+      "source_csv_line": 99,
+      "id": "zh-hsk1-47058f550faf5a5b89213726",
+      "hash": "47058f550faf5a5b89213726",
+      "natural_identity": {
+        "written_form": "开车",
+        "reading": "kāichē"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to drive",
+      "meaning_burmese": "ကားမောင်းသည်",
+      "examples_count": 3,
+      "sort_order": 980,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-47058f550faf5a5b89213726.mp3"
+    },
+    {
+      "source_row": 99,
+      "source_csv_line": 100,
+      "id": "zh-hsk1-d947303c2c183c95e5e45cea",
+      "hash": "d947303c2c183c95e5e45cea",
+      "natural_identity": {
+        "written_form": "看",
+        "reading": "kàn"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to look, to watch, to read",
+      "meaning_burmese": "ကြည့်သည်",
+      "examples_count": 3,
+      "sort_order": 990,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d947303c2c183c95e5e45cea.mp3"
+    },
+    {
+      "source_row": 100,
+      "source_csv_line": 101,
+      "id": "zh-hsk1-9df8af4a1a44b435aff1c7ad",
+      "hash": "9df8af4a1a44b435aff1c7ad",
+      "natural_identity": {
+        "written_form": "看病",
+        "reading": "kànbìng"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to see a doctor",
+      "meaning_burmese": "ဆရာဝန်ပြသည်",
+      "examples_count": 3,
+      "sort_order": 1000,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9df8af4a1a44b435aff1c7ad.mp3"
+    },
+    {
+      "source_row": 101,
+      "source_csv_line": 102,
+      "id": "zh-hsk1-991e31d8ff895685f7a80f92",
+      "hash": "991e31d8ff895685f7a80f92",
+      "natural_identity": {
+        "written_form": "看见",
+        "reading": "kànjiàn"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to see",
+      "meaning_burmese": "မြင်သည်",
+      "examples_count": 3,
+      "sort_order": 1010,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-991e31d8ff895685f7a80f92.mp3"
+    },
+    {
+      "source_row": 102,
+      "source_csv_line": 103,
+      "id": "zh-hsk1-3c4d2f6577566ae91516abca",
+      "hash": "3c4d2f6577566ae91516abca",
+      "natural_identity": {
+        "written_form": "可以",
+        "reading": "kěyǐ"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "can, may",
+      "meaning_burmese": "ရသည်၊ …နိုင်သည်",
+      "examples_count": 3,
+      "sort_order": 1020,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-3c4d2f6577566ae91516abca.mp3"
+    },
+    {
+      "source_row": 103,
+      "source_csv_line": 104,
+      "id": "zh-hsk1-6a8dfe28d7c249d68db8f146",
+      "hash": "6a8dfe28d7c249d68db8f146",
+      "natural_identity": {
+        "written_form": "课",
+        "reading": "kè"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "class, lesson",
+      "meaning_burmese": "သင်ခန်းစာ၊ အတန်း",
+      "examples_count": 3,
+      "sort_order": 1030,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-6a8dfe28d7c249d68db8f146.mp3"
+    },
+    {
+      "source_row": 104,
+      "source_csv_line": 105,
+      "id": "zh-hsk1-bee0aa5303d858900fbe65bd",
+      "hash": "bee0aa5303d858900fbe65bd",
+      "natural_identity": {
+        "written_form": "口",
+        "reading": "kǒu"
+      },
+      "part_of_speech": "noun, classifier",
+      "meaning_english": "mouth; measure word for family members",
+      "meaning_burmese": "ပါးစပ်၊ မိသားစုဝင်အတွက် အရေအတွက်ပြ စကားလုံး",
+      "examples_count": 3,
+      "sort_order": 1040,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-bee0aa5303d858900fbe65bd.mp3"
+    },
+    {
+      "source_row": 105,
+      "source_csv_line": 106,
+      "id": "zh-hsk1-a8ebc3b1c7f99da6e201fcd0",
+      "hash": "a8ebc3b1c7f99da6e201fcd0",
+      "natural_identity": {
+        "written_form": "块",
+        "reading": "kuài"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "measure word for money and pieces",
+      "meaning_burmese": "ယွမ် (ပိုက်ဆံ)၊ တုံး",
+      "examples_count": 3,
+      "sort_order": 1050,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a8ebc3b1c7f99da6e201fcd0.mp3"
+    },
+    {
+      "source_row": 106,
+      "source_csv_line": 107,
+      "id": "zh-hsk1-2e0d6edf46e61b4ceca18551",
+      "hash": "2e0d6edf46e61b4ceca18551",
+      "natural_identity": {
+        "written_form": "来",
+        "reading": "lái"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to come",
+      "meaning_burmese": "လာသည်",
+      "examples_count": 3,
+      "sort_order": 1060,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2e0d6edf46e61b4ceca18551.mp3"
+    },
+    {
+      "source_row": 107,
+      "source_csv_line": 108,
+      "id": "zh-hsk1-a60db3af11b86a9e30f52f9e",
+      "hash": "a60db3af11b86a9e30f52f9e",
+      "natural_identity": {
+        "written_form": "老师",
+        "reading": "lǎoshī"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "teacher",
+      "meaning_burmese": "ဆရာ",
+      "examples_count": 3,
+      "sort_order": 1070,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a60db3af11b86a9e30f52f9e.mp3"
+    },
+    {
+      "source_row": 108,
+      "source_csv_line": 109,
+      "id": "zh-hsk1-b8757b801db7b79051cc2906",
+      "hash": "b8757b801db7b79051cc2906",
+      "natural_identity": {
+        "written_form": "了",
+        "reading": "le"
+      },
+      "part_of_speech": "auxiliary",
+      "meaning_english": "particle for a completed action",
+      "meaning_burmese": "အပြီးသတ်ပြ စကားလုံး (…ပြီ)",
+      "examples_count": 3,
+      "sort_order": 1080,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b8757b801db7b79051cc2906.mp3"
+    },
+    {
+      "source_row": 109,
+      "source_csv_line": 110,
+      "id": "zh-hsk1-9c0a1296b642e30b6f3b4815",
+      "hash": "9c0a1296b642e30b6f3b4815",
+      "natural_identity": {
+        "written_form": "冷",
+        "reading": "lěng"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "cold",
+      "meaning_burmese": "ချမ်းသည်",
+      "examples_count": 3,
+      "sort_order": 1090,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9c0a1296b642e30b6f3b4815.mp3"
+    },
+    {
+      "source_row": 110,
+      "source_csv_line": 111,
+      "id": "zh-hsk1-06b06dd3fd07a564999e619a",
+      "hash": "06b06dd3fd07a564999e619a",
+      "natural_identity": {
+        "written_form": "里",
+        "reading": "lǐ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "inside, in",
+      "meaning_burmese": "အထဲ",
+      "examples_count": 3,
+      "sort_order": 1100,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-06b06dd3fd07a564999e619a.mp3"
+    },
+    {
+      "source_row": 111,
+      "source_csv_line": 112,
+      "id": "zh-hsk1-27507049087f4c17a4966454",
+      "hash": "27507049087f4c17a4966454",
+      "natural_identity": {
+        "written_form": "两",
+        "reading": "liǎng"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "two",
+      "meaning_burmese": "နှစ်",
+      "examples_count": 3,
+      "sort_order": 1110,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-27507049087f4c17a4966454.mp3"
+    },
+    {
+      "source_row": 112,
+      "source_csv_line": 113,
+      "id": "zh-hsk1-9d84ed35551646555ee1be5d",
+      "hash": "9d84ed35551646555ee1be5d",
+      "natural_identity": {
+        "written_form": "零",
+        "reading": "líng"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "zero",
+      "meaning_burmese": "သုည",
+      "examples_count": 3,
+      "sort_order": 1120,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9d84ed35551646555ee1be5d.mp3"
+    },
+    {
+      "source_row": 113,
+      "source_csv_line": 114,
+      "id": "zh-hsk1-97fe1601afb7c2037f1fb730",
+      "hash": "97fe1601afb7c2037f1fb730",
+      "natural_identity": {
+        "written_form": "六",
+        "reading": "liù"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "six",
+      "meaning_burmese": "ခြောက်",
+      "examples_count": 3,
+      "sort_order": 1130,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-97fe1601afb7c2037f1fb730.mp3"
+    },
+    {
+      "source_row": 114,
+      "source_csv_line": 115,
+      "id": "zh-hsk1-27d8ea649e7042894bef302c",
+      "hash": "27d8ea649e7042894bef302c",
+      "natural_identity": {
+        "written_form": "妈妈",
+        "reading": "māma"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "mom",
+      "meaning_burmese": "အမေ",
+      "examples_count": 3,
+      "sort_order": 1140,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-27d8ea649e7042894bef302c.mp3"
+    },
+    {
+      "source_row": 115,
+      "source_csv_line": 116,
+      "id": "zh-hsk1-e8e610f97d4c120762ac104f",
+      "hash": "e8e610f97d4c120762ac104f",
+      "natural_identity": {
+        "written_form": "吗",
+        "reading": "ma"
+      },
+      "part_of_speech": "auxiliary",
+      "meaning_english": "question particle",
+      "meaning_burmese": "မေးခွန်းပြ စကားလုံး (…လား)",
+      "examples_count": 3,
+      "sort_order": 1150,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e8e610f97d4c120762ac104f.mp3"
+    },
+    {
+      "source_row": 116,
+      "source_csv_line": 117,
+      "id": "zh-hsk1-5bb3473c8447c947f2b73f6b",
+      "hash": "5bb3473c8447c947f2b73f6b",
+      "natural_identity": {
+        "written_form": "买",
+        "reading": "mǎi"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to buy",
+      "meaning_burmese": "ဝယ်သည်",
+      "examples_count": 3,
+      "sort_order": 1160,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5bb3473c8447c947f2b73f6b.mp3"
+    },
+    {
+      "source_row": 117,
+      "source_csv_line": 118,
+      "id": "zh-hsk1-18d9d8d1e770e1604720b028",
+      "hash": "18d9d8d1e770e1604720b028",
+      "natural_identity": {
+        "written_form": "卖",
+        "reading": "mài"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to sell",
+      "meaning_burmese": "ရောင်းသည်",
+      "examples_count": 3,
+      "sort_order": 1170,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-18d9d8d1e770e1604720b028.mp3"
+    },
+    {
+      "source_row": 118,
+      "source_csv_line": 119,
+      "id": "zh-hsk1-6c9f8f8450de713177283d9b",
+      "hash": "6c9f8f8450de713177283d9b",
+      "natural_identity": {
+        "written_form": "忙",
+        "reading": "máng"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "busy",
+      "meaning_burmese": "အလုပ်ရှုပ်သည်",
+      "examples_count": 3,
+      "sort_order": 1180,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-6c9f8f8450de713177283d9b.mp3"
+    },
+    {
+      "source_row": 119,
+      "source_csv_line": 120,
+      "id": "zh-hsk1-8a2dec3a3d72994ca82007bf",
+      "hash": "8a2dec3a3d72994ca82007bf",
+      "natural_identity": {
+        "written_form": "猫",
+        "reading": "māo"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "cat",
+      "meaning_burmese": "ကြောင်",
+      "examples_count": 3,
+      "sort_order": 1190,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8a2dec3a3d72994ca82007bf.mp3"
+    },
+    {
+      "source_row": 120,
+      "source_csv_line": 121,
+      "id": "zh-hsk1-25c02510c978819a126d9b47",
+      "hash": "25c02510c978819a126d9b47",
+      "natural_identity": {
+        "written_form": "没关系",
+        "reading": "méi guānxi"
+      },
+      "part_of_speech": "phrase",
+      "meaning_english": "never mind, it's okay",
+      "meaning_burmese": "ကိစ္စမရှိပါဘူး",
+      "examples_count": 3,
+      "sort_order": 1200,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-25c02510c978819a126d9b47.mp3"
+    },
+    {
+      "source_row": 121,
+      "source_csv_line": 122,
+      "id": "zh-hsk1-ab147c8ada3f911b32c3b605",
+      "hash": "ab147c8ada3f911b32c3b605",
+      "natural_identity": {
+        "written_form": "没事",
+        "reading": "méishì"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to be free; it doesn't matter",
+      "meaning_burmese": "ကိစ္စမရှိဘူး၊ အလုပ်မရှိဘူး",
+      "examples_count": 3,
+      "sort_order": 1210,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ab147c8ada3f911b32c3b605.mp3"
+    },
+    {
+      "source_row": 122,
+      "source_csv_line": 123,
+      "id": "zh-hsk1-155e161ec1f6fbe58ef51ea7",
+      "hash": "155e161ec1f6fbe58ef51ea7",
+      "natural_identity": {
+        "written_form": "没有",
+        "reading": "méiyǒu"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to not have",
+      "meaning_burmese": "မရှိဘူး",
+      "examples_count": 3,
+      "sort_order": 1220,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-155e161ec1f6fbe58ef51ea7.mp3"
+    },
+    {
+      "source_row": 123,
+      "source_csv_line": 124,
+      "id": "zh-hsk1-fdb8caef71482e752ef7644f",
+      "hash": "fdb8caef71482e752ef7644f",
+      "natural_identity": {
+        "written_form": "妹妹",
+        "reading": "mèimei"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "younger sister",
+      "meaning_burmese": "ညီမ",
+      "examples_count": 3,
+      "sort_order": 1230,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-fdb8caef71482e752ef7644f.mp3"
+    },
+    {
+      "source_row": 124,
+      "source_csv_line": 125,
+      "id": "zh-hsk1-8e882956171052278c736050",
+      "hash": "8e882956171052278c736050",
+      "natural_identity": {
+        "written_form": "们",
+        "reading": "men"
+      },
+      "part_of_speech": "suffix",
+      "meaning_english": "plural suffix",
+      "meaning_burmese": "အများကိန်းပြ ဆက်စကားလုံး (…တို့)",
+      "examples_count": 3,
+      "sort_order": 1240,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8e882956171052278c736050.mp3"
+    },
+    {
+      "source_row": 125,
+      "source_csv_line": 126,
+      "id": "zh-hsk1-383bddd2f180b8b88fb5e0ae",
+      "hash": "383bddd2f180b8b88fb5e0ae",
+      "natural_identity": {
+        "written_form": "米饭",
+        "reading": "mǐfàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "cooked rice",
+      "meaning_burmese": "ထမင်း",
+      "examples_count": 3,
+      "sort_order": 1250,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-383bddd2f180b8b88fb5e0ae.mp3"
+    },
+    {
+      "source_row": 126,
+      "source_csv_line": 127,
+      "id": "zh-hsk1-a75995d87c9c8913fbff20ba",
+      "hash": "a75995d87c9c8913fbff20ba",
+      "natural_identity": {
+        "written_form": "面包",
+        "reading": "miànbāo"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "bread",
+      "meaning_burmese": "ပေါင်မုန့်",
+      "examples_count": 3,
+      "sort_order": 1260,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a75995d87c9c8913fbff20ba.mp3"
+    },
+    {
+      "source_row": 127,
+      "source_csv_line": 128,
+      "id": "zh-hsk1-987271b73d56663c1106cf45",
+      "hash": "987271b73d56663c1106cf45",
+      "natural_identity": {
+        "written_form": "面条儿",
+        "reading": "miàntiáor"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "noodles",
+      "meaning_burmese": "ခေါက်ဆွဲ",
+      "examples_count": 3,
+      "sort_order": 1270,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-987271b73d56663c1106cf45.mp3"
+    },
+    {
+      "source_row": 128,
+      "source_csv_line": 129,
+      "id": "zh-hsk1-5170aa7a9738d4e99a10cb99",
+      "hash": "5170aa7a9738d4e99a10cb99",
+      "natural_identity": {
+        "written_form": "明年",
+        "reading": "míngnián"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "next year",
+      "meaning_burmese": "နောက်နှစ်",
+      "examples_count": 3,
+      "sort_order": 1280,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5170aa7a9738d4e99a10cb99.mp3"
+    },
+    {
+      "source_row": 129,
+      "source_csv_line": 130,
+      "id": "zh-hsk1-ea107714300a1f798b2d6298",
+      "hash": "ea107714300a1f798b2d6298",
+      "natural_identity": {
+        "written_form": "明天",
+        "reading": "míngtiān"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "tomorrow",
+      "meaning_burmese": "မနက်ဖန်",
+      "examples_count": 3,
+      "sort_order": 1290,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ea107714300a1f798b2d6298.mp3"
+    },
+    {
+      "source_row": 130,
+      "source_csv_line": 131,
+      "id": "zh-hsk1-0860ae7e3e7c4bc9c5a01f1c",
+      "hash": "0860ae7e3e7c4bc9c5a01f1c",
+      "natural_identity": {
+        "written_form": "名字",
+        "reading": "míngzi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "name",
+      "meaning_burmese": "နာမည်",
+      "examples_count": 3,
+      "sort_order": 1300,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0860ae7e3e7c4bc9c5a01f1c.mp3"
+    },
+    {
+      "source_row": 131,
+      "source_csv_line": 132,
+      "id": "zh-hsk1-9c46aa3df85c2d9bcfc09511",
+      "hash": "9c46aa3df85c2d9bcfc09511",
+      "natural_identity": {
+        "written_form": "哪",
+        "reading": "nǎ"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "which",
+      "meaning_burmese": "ဘယ်",
+      "examples_count": 3,
+      "sort_order": 1310,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9c46aa3df85c2d9bcfc09511.mp3"
+    },
+    {
+      "source_row": 132,
+      "source_csv_line": 133,
+      "id": "zh-hsk1-b58b1eaaeca387be2d12bf18",
+      "hash": "b58b1eaaeca387be2d12bf18",
+      "natural_identity": {
+        "written_form": "哪个",
+        "reading": "nǎge"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "which one",
+      "meaning_burmese": "ဘယ်ဟာ",
+      "examples_count": 3,
+      "sort_order": 1320,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b58b1eaaeca387be2d12bf18.mp3"
+    },
+    {
+      "source_row": 133,
+      "source_csv_line": 134,
+      "id": "zh-hsk1-454bbb0ee14dcc67a26c1482",
+      "hash": "454bbb0ee14dcc67a26c1482",
+      "natural_identity": {
+        "written_form": "哪里",
+        "reading": "nǎlǐ"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "where",
+      "meaning_burmese": "ဘယ်မှာ",
+      "examples_count": 3,
+      "sort_order": 1330,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-454bbb0ee14dcc67a26c1482.mp3"
+    },
+    {
+      "source_row": 134,
+      "source_csv_line": 135,
+      "id": "zh-hsk1-4de2f58e8ae512712a6672f5",
+      "hash": "4de2f58e8ae512712a6672f5",
+      "natural_identity": {
+        "written_form": "哪儿",
+        "reading": "nǎr"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "where",
+      "meaning_burmese": "ဘယ်မှာ",
+      "examples_count": 3,
+      "sort_order": 1340,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-4de2f58e8ae512712a6672f5.mp3"
+    },
+    {
+      "source_row": 135,
+      "source_csv_line": 136,
+      "id": "zh-hsk1-63e56f12ccaa0526b6851d06",
+      "hash": "63e56f12ccaa0526b6851d06",
+      "natural_identity": {
+        "written_form": "哪些",
+        "reading": "nǎxiē"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "which ones",
+      "meaning_burmese": "ဘယ်ဟာတွေ",
+      "examples_count": 3,
+      "sort_order": 1350,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-63e56f12ccaa0526b6851d06.mp3"
+    },
+    {
+      "source_row": 136,
+      "source_csv_line": 137,
+      "id": "zh-hsk1-c856fc50537a8a7d0855c345",
+      "hash": "c856fc50537a8a7d0855c345",
+      "natural_identity": {
+        "written_form": "那",
+        "reading": "nà"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "that",
+      "meaning_burmese": "အဲဒီ",
+      "examples_count": 3,
+      "sort_order": 1360,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c856fc50537a8a7d0855c345.mp3"
+    },
+    {
+      "source_row": 137,
+      "source_csv_line": 138,
+      "id": "zh-hsk1-517bf0f93f8f69934579b45a",
+      "hash": "517bf0f93f8f69934579b45a",
+      "natural_identity": {
+        "written_form": "那边",
+        "reading": "nàbiān"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "over there",
+      "meaning_burmese": "အဲဒီဘက်",
+      "examples_count": 3,
+      "sort_order": 1370,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-517bf0f93f8f69934579b45a.mp3"
+    },
+    {
+      "source_row": 138,
+      "source_csv_line": 139,
+      "id": "zh-hsk1-372f18fbdb64312040e1c87c",
+      "hash": "372f18fbdb64312040e1c87c",
+      "natural_identity": {
+        "written_form": "那个",
+        "reading": "nàge"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "that one",
+      "meaning_burmese": "အဲဒီဟာ",
+      "examples_count": 3,
+      "sort_order": 1380,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-372f18fbdb64312040e1c87c.mp3"
+    },
+    {
+      "source_row": 139,
+      "source_csv_line": 140,
+      "id": "zh-hsk1-1fda84a1e7e8129c37225a91",
+      "hash": "1fda84a1e7e8129c37225a91",
+      "natural_identity": {
+        "written_form": "那里",
+        "reading": "nàlǐ"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "there",
+      "meaning_burmese": "အဲဒီမှာ",
+      "examples_count": 3,
+      "sort_order": 1390,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-1fda84a1e7e8129c37225a91.mp3"
+    },
+    {
+      "source_row": 140,
+      "source_csv_line": 141,
+      "id": "zh-hsk1-3b42f86cf4c150341102d605",
+      "hash": "3b42f86cf4c150341102d605",
+      "natural_identity": {
+        "written_form": "那儿",
+        "reading": "nàr"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "there",
+      "meaning_burmese": "အဲဒီမှာ",
+      "examples_count": 3,
+      "sort_order": 1400,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-3b42f86cf4c150341102d605.mp3"
+    },
+    {
+      "source_row": 141,
+      "source_csv_line": 142,
+      "id": "zh-hsk1-33dc7e24baa5d68c951c7cb0",
+      "hash": "33dc7e24baa5d68c951c7cb0",
+      "natural_identity": {
+        "written_form": "那些",
+        "reading": "nàxiē"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "those",
+      "meaning_burmese": "အဲဒီဟာတွေ",
+      "examples_count": 3,
+      "sort_order": 1410,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-33dc7e24baa5d68c951c7cb0.mp3"
+    },
+    {
+      "source_row": 142,
+      "source_csv_line": 143,
+      "id": "zh-hsk1-ac4451c39918e87bfc1c5965",
+      "hash": "ac4451c39918e87bfc1c5965",
+      "natural_identity": {
+        "written_form": "男",
+        "reading": "nán"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "male",
+      "meaning_burmese": "အမျိုးသား",
+      "examples_count": 3,
+      "sort_order": 1420,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ac4451c39918e87bfc1c5965.mp3"
+    },
+    {
+      "source_row": 143,
+      "source_csv_line": 144,
+      "id": "zh-hsk1-58eb9b8d61acc17d2a07b35a",
+      "hash": "58eb9b8d61acc17d2a07b35a",
+      "natural_identity": {
+        "written_form": "男朋友",
+        "reading": "nánpéngyou"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "boyfriend",
+      "meaning_burmese": "ရည်းစား (ကောင်လေး)",
+      "examples_count": 3,
+      "sort_order": 1430,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-58eb9b8d61acc17d2a07b35a.mp3"
+    },
+    {
+      "source_row": 144,
+      "source_csv_line": 145,
+      "id": "zh-hsk1-a1993c33e11fe31b175c485e",
+      "hash": "a1993c33e11fe31b175c485e",
+      "natural_identity": {
+        "written_form": "呢",
+        "reading": "ne"
+      },
+      "part_of_speech": "auxiliary",
+      "meaning_english": "particle for a follow-up question",
+      "meaning_burmese": "ပြန်မေးရာ စကားလုံး (…ကျတော့)",
+      "examples_count": 3,
+      "sort_order": 1440,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a1993c33e11fe31b175c485e.mp3"
+    },
+    {
+      "source_row": 145,
+      "source_csv_line": 146,
+      "id": "zh-hsk1-0065253614f60fea67fa8ee1",
+      "hash": "0065253614f60fea67fa8ee1",
+      "natural_identity": {
+        "written_form": "能",
+        "reading": "néng"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "can, to be able to",
+      "meaning_burmese": "…နိုင်သည်",
+      "examples_count": 3,
+      "sort_order": 1450,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0065253614f60fea67fa8ee1.mp3"
+    },
+    {
+      "source_row": 146,
+      "source_csv_line": 147,
+      "id": "zh-hsk1-6168eae2ef47cde673543c97",
+      "hash": "6168eae2ef47cde673543c97",
+      "natural_identity": {
+        "written_form": "你",
+        "reading": "nǐ"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "you",
+      "meaning_burmese": "သင်",
+      "examples_count": 3,
+      "sort_order": 1460,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-6168eae2ef47cde673543c97.mp3"
+    },
+    {
+      "source_row": 147,
+      "source_csv_line": 148,
+      "id": "zh-hsk1-73f1e736fab2a7bd38b31c15",
+      "hash": "73f1e736fab2a7bd38b31c15",
+      "natural_identity": {
+        "written_form": "你好",
+        "reading": "nǐ hǎo"
+      },
+      "part_of_speech": "phrase",
+      "meaning_english": "hello",
+      "meaning_burmese": "မင်္ဂလာပါ",
+      "examples_count": 3,
+      "sort_order": 1470,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-73f1e736fab2a7bd38b31c15.mp3"
+    },
+    {
+      "source_row": 148,
+      "source_csv_line": 149,
+      "id": "zh-hsk1-dc1ab47fac8916f3c94b6405",
+      "hash": "dc1ab47fac8916f3c94b6405",
+      "natural_identity": {
+        "written_form": "你们",
+        "reading": "nǐmen"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "you (plural)",
+      "meaning_burmese": "သင်တို့",
+      "examples_count": 3,
+      "sort_order": 1480,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-dc1ab47fac8916f3c94b6405.mp3"
+    },
+    {
+      "source_row": 149,
+      "source_csv_line": 150,
+      "id": "zh-hsk1-000590b6a497ddb182fd995e",
+      "hash": "000590b6a497ddb182fd995e",
+      "natural_identity": {
+        "written_form": "年",
+        "reading": "nián"
+      },
+      "part_of_speech": "noun, classifier",
+      "meaning_english": "year",
+      "meaning_burmese": "နှစ်",
+      "examples_count": 3,
+      "sort_order": 1490,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-000590b6a497ddb182fd995e.mp3"
+    },
+    {
+      "source_row": 150,
+      "source_csv_line": 151,
+      "id": "zh-hsk1-7c8c439510855a87cdc28993",
+      "hash": "7c8c439510855a87cdc28993",
+      "natural_identity": {
+        "written_form": "您",
+        "reading": "nín"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "you (polite)",
+      "meaning_burmese": "ခင်ဗျား/ရှင် (ရိုရိုသေသေ)",
+      "examples_count": 3,
+      "sort_order": 1500,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7c8c439510855a87cdc28993.mp3"
+    },
+    {
+      "source_row": 151,
+      "source_csv_line": 152,
+      "id": "zh-hsk1-e59bf4b98780c481a836a01a",
+      "hash": "e59bf4b98780c481a836a01a",
+      "natural_identity": {
+        "written_form": "牛奶",
+        "reading": "niúnǎi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "milk",
+      "meaning_burmese": "နွားနို့",
+      "examples_count": 3,
+      "sort_order": 1510,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e59bf4b98780c481a836a01a.mp3"
+    },
+    {
+      "source_row": 152,
+      "source_csv_line": 153,
+      "id": "zh-hsk1-97cd00a5762a17b9cdfc1579",
+      "hash": "97cd00a5762a17b9cdfc1579",
+      "natural_identity": {
+        "written_form": "女",
+        "reading": "nǚ"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "female",
+      "meaning_burmese": "အမျိုးသမီး",
+      "examples_count": 3,
+      "sort_order": 1520,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-97cd00a5762a17b9cdfc1579.mp3"
+    },
+    {
+      "source_row": 153,
+      "source_csv_line": 154,
+      "id": "zh-hsk1-576fdfc5f0b56dead2b5e0cf",
+      "hash": "576fdfc5f0b56dead2b5e0cf",
+      "natural_identity": {
+        "written_form": "女儿",
+        "reading": "nǚ'ér"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "daughter",
+      "meaning_burmese": "သမီး",
+      "examples_count": 3,
+      "sort_order": 1530,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-576fdfc5f0b56dead2b5e0cf.mp3"
+    },
+    {
+      "source_row": 154,
+      "source_csv_line": 155,
+      "id": "zh-hsk1-32935c26ea2babb3f4b90e9d",
+      "hash": "32935c26ea2babb3f4b90e9d",
+      "natural_identity": {
+        "written_form": "女朋友",
+        "reading": "nǚpéngyou"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "girlfriend",
+      "meaning_burmese": "ရည်းစား (မိန်းကလေး)",
+      "examples_count": 3,
+      "sort_order": 1540,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-32935c26ea2babb3f4b90e9d.mp3"
+    },
+    {
+      "source_row": 155,
+      "source_csv_line": 156,
+      "id": "zh-hsk1-766a70c7b58df904b8c14065",
+      "hash": "766a70c7b58df904b8c14065",
+      "natural_identity": {
+        "written_form": "女士",
+        "reading": "nǚshì"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "lady, Ms.",
+      "meaning_burmese": "အမျိုးသမီး (ရိုသေစကား)",
+      "examples_count": 3,
+      "sort_order": 1550,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-766a70c7b58df904b8c14065.mp3"
+    },
+    {
+      "source_row": 156,
+      "source_csv_line": 157,
+      "id": "zh-hsk1-e8581019fe89b69d459a4107",
+      "hash": "e8581019fe89b69d459a4107",
+      "natural_identity": {
+        "written_form": "朋友",
+        "reading": "péngyou"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "friend",
+      "meaning_burmese": "သူငယ်ချင်း",
+      "examples_count": 3,
+      "sort_order": 1560,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e8581019fe89b69d459a4107.mp3"
+    },
+    {
+      "source_row": 157,
+      "source_csv_line": 158,
+      "id": "zh-hsk1-f7febbe4c493c25676b99a36",
+      "hash": "f7febbe4c493c25676b99a36",
+      "natural_identity": {
+        "written_form": "便宜",
+        "reading": "piányi"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "cheap",
+      "meaning_burmese": "ဈေးချိုသည်",
+      "examples_count": 3,
+      "sort_order": 1570,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f7febbe4c493c25676b99a36.mp3"
+    },
+    {
+      "source_row": 158,
+      "source_csv_line": 159,
+      "id": "zh-hsk1-576bf24e1beebe003f4f4b0d",
+      "hash": "576bf24e1beebe003f4f4b0d",
+      "natural_identity": {
+        "written_form": "漂亮",
+        "reading": "piàoliang"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "beautiful",
+      "meaning_burmese": "လှသည်",
+      "examples_count": 3,
+      "sort_order": 1580,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-576bf24e1beebe003f4f4b0d.mp3"
+    },
+    {
+      "source_row": 159,
+      "source_csv_line": 160,
+      "id": "zh-hsk1-0c2ea6f3dcf2b752bf9dfbfc",
+      "hash": "0c2ea6f3dcf2b752bf9dfbfc",
+      "natural_identity": {
+        "written_form": "苹果",
+        "reading": "píngguǒ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "apple",
+      "meaning_burmese": "ပန်းသီး",
+      "examples_count": 3,
+      "sort_order": 1590,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0c2ea6f3dcf2b752bf9dfbfc.mp3"
+    },
+    {
+      "source_row": 160,
+      "source_csv_line": 161,
+      "id": "zh-hsk1-ef36cb4e9d79b88dc068e240",
+      "hash": "ef36cb4e9d79b88dc068e240",
+      "natural_identity": {
+        "written_form": "七",
+        "reading": "qī"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "seven",
+      "meaning_burmese": "ခုနစ်",
+      "examples_count": 3,
+      "sort_order": 1600,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ef36cb4e9d79b88dc068e240.mp3"
+    },
+    {
+      "source_row": 161,
+      "source_csv_line": 162,
+      "id": "zh-hsk1-548436bdc28b37224f72b560",
+      "hash": "548436bdc28b37224f72b560",
+      "natural_identity": {
+        "written_form": "起床",
+        "reading": "qǐchuáng"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to get up",
+      "meaning_burmese": "အိပ်ရာထသည်",
+      "examples_count": 3,
+      "sort_order": 1610,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-548436bdc28b37224f72b560.mp3"
+    },
+    {
+      "source_row": 162,
+      "source_csv_line": 163,
+      "id": "zh-hsk1-68af2dfb754770023b37cc80",
+      "hash": "68af2dfb754770023b37cc80",
+      "natural_identity": {
+        "written_form": "千",
+        "reading": "qiān"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "thousand",
+      "meaning_burmese": "တစ်ထောင်",
+      "examples_count": 3,
+      "sort_order": 1620,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-68af2dfb754770023b37cc80.mp3"
+    },
+    {
+      "source_row": 163,
+      "source_csv_line": 164,
+      "id": "zh-hsk1-d242402e963a91ee8b23fc89",
+      "hash": "d242402e963a91ee8b23fc89",
+      "natural_identity": {
+        "written_form": "前",
+        "reading": "qián"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "front; before",
+      "meaning_burmese": "ရှေ့",
+      "examples_count": 3,
+      "sort_order": 1630,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d242402e963a91ee8b23fc89.mp3"
+    },
+    {
+      "source_row": 164,
+      "source_csv_line": 165,
+      "id": "zh-hsk1-07b574a2cec88658ff96f2c6",
+      "hash": "07b574a2cec88658ff96f2c6",
+      "natural_identity": {
+        "written_form": "钱",
+        "reading": "qián"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "money",
+      "meaning_burmese": "ပိုက်ဆံ",
+      "examples_count": 3,
+      "sort_order": 1640,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-07b574a2cec88658ff96f2c6.mp3"
+    },
+    {
+      "source_row": 165,
+      "source_csv_line": 166,
+      "id": "zh-hsk1-4520e0e86274c40e06048264",
+      "hash": "4520e0e86274c40e06048264",
+      "natural_identity": {
+        "written_form": "请",
+        "reading": "qǐng"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "please",
+      "meaning_burmese": "ကျေးဇူးပြုပြီး",
+      "examples_count": 3,
+      "sort_order": 1650,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-4520e0e86274c40e06048264.mp3"
+    },
+    {
+      "source_row": 166,
+      "source_csv_line": 167,
+      "id": "zh-hsk1-b8e6c08591d788e5f9022572",
+      "hash": "b8e6c08591d788e5f9022572",
+      "natural_identity": {
+        "written_form": "请问",
+        "reading": "qǐngwèn"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "may I ask",
+      "meaning_burmese": "မေးပါရစေ",
+      "examples_count": 3,
+      "sort_order": 1660,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b8e6c08591d788e5f9022572.mp3"
+    },
+    {
+      "source_row": 167,
+      "source_csv_line": 168,
+      "id": "zh-hsk1-98e3d6979f297a5b79d4d147",
+      "hash": "98e3d6979f297a5b79d4d147",
+      "natural_identity": {
+        "written_form": "去",
+        "reading": "qù"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to go",
+      "meaning_burmese": "သွားသည်",
+      "examples_count": 3,
+      "sort_order": 1670,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-98e3d6979f297a5b79d4d147.mp3"
+    },
+    {
+      "source_row": 168,
+      "source_csv_line": 169,
+      "id": "zh-hsk1-94bf51c48a4361c5db5681b9",
+      "hash": "94bf51c48a4361c5db5681b9",
+      "natural_identity": {
+        "written_form": "去年",
+        "reading": "qùnián"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "last year",
+      "meaning_burmese": "မနှစ်",
+      "examples_count": 3,
+      "sort_order": 1680,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-94bf51c48a4361c5db5681b9.mp3"
+    },
+    {
+      "source_row": 169,
+      "source_csv_line": 170,
+      "id": "zh-hsk1-2056319a22db5295991fb69f",
+      "hash": "2056319a22db5295991fb69f",
+      "natural_identity": {
+        "written_form": "热",
+        "reading": "rè"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "hot",
+      "meaning_burmese": "ပူသည်",
+      "examples_count": 3,
+      "sort_order": 1690,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2056319a22db5295991fb69f.mp3"
+    },
+    {
+      "source_row": 170,
+      "source_csv_line": 171,
+      "id": "zh-hsk1-7ac846cd55099a5882839397",
+      "hash": "7ac846cd55099a5882839397",
+      "natural_identity": {
+        "written_form": "人",
+        "reading": "rén"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "person",
+      "meaning_burmese": "လူ",
+      "examples_count": 3,
+      "sort_order": 1700,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7ac846cd55099a5882839397.mp3"
+    },
+    {
+      "source_row": 171,
+      "source_csv_line": 172,
+      "id": "zh-hsk1-59279a85a51340a8329ae299",
+      "hash": "59279a85a51340a8329ae299",
+      "natural_identity": {
+        "written_form": "认识",
+        "reading": "rènshi"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to know, to meet",
+      "meaning_burmese": "သိသည်၊ မိတ်ဆက်သည်",
+      "examples_count": 3,
+      "sort_order": 1710,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-59279a85a51340a8329ae299.mp3"
+    },
+    {
+      "source_row": 172,
+      "source_csv_line": 173,
+      "id": "zh-hsk1-e2d708dffb28a6aa5266cae1",
+      "hash": "e2d708dffb28a6aa5266cae1",
+      "natural_identity": {
+        "written_form": "日",
+        "reading": "rì"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "day; sun",
+      "meaning_burmese": "ရက်၊ နေ",
+      "examples_count": 3,
+      "sort_order": 1720,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e2d708dffb28a6aa5266cae1.mp3"
+    },
+    {
+      "source_row": 173,
+      "source_csv_line": 174,
+      "id": "zh-hsk1-7432641351f98e0489be4f3f",
+      "hash": "7432641351f98e0489be4f3f",
+      "natural_identity": {
+        "written_form": "三",
+        "reading": "sān"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "three",
+      "meaning_burmese": "သုံး",
+      "examples_count": 3,
+      "sort_order": 1730,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7432641351f98e0489be4f3f.mp3"
+    },
+    {
+      "source_row": 174,
+      "source_csv_line": 175,
+      "id": "zh-hsk1-5156f6cd4f46cff2865eea36",
+      "hash": "5156f6cd4f46cff2865eea36",
+      "natural_identity": {
+        "written_form": "商店",
+        "reading": "shāngdiàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "store, shop",
+      "meaning_burmese": "ဆိုင်",
+      "examples_count": 3,
+      "sort_order": 1740,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5156f6cd4f46cff2865eea36.mp3"
+    },
+    {
+      "source_row": 175,
+      "source_csv_line": 176,
+      "id": "zh-hsk1-9327740cac57d576a760d870",
+      "hash": "9327740cac57d576a760d870",
+      "natural_identity": {
+        "written_form": "上",
+        "reading": "shàng"
+      },
+      "part_of_speech": "noun, verb",
+      "meaning_english": "up, on; to go up",
+      "meaning_burmese": "အပေါ်၊ တက်သည်",
+      "examples_count": 3,
+      "sort_order": 1750,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9327740cac57d576a760d870.mp3"
+    },
+    {
+      "source_row": 176,
+      "source_csv_line": 177,
+      "id": "zh-hsk1-e935aea825c3f52e86d294bb",
+      "hash": "e935aea825c3f52e86d294bb",
+      "natural_identity": {
+        "written_form": "上班",
+        "reading": "shàngbān"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to go to work",
+      "meaning_burmese": "အလုပ်သွားသည်",
+      "examples_count": 3,
+      "sort_order": 1760,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e935aea825c3f52e86d294bb.mp3"
+    },
+    {
+      "source_row": 177,
+      "source_csv_line": 178,
+      "id": "zh-hsk1-d059e443111722dfa49230e0",
+      "hash": "d059e443111722dfa49230e0",
+      "natural_identity": {
+        "written_form": "上课",
+        "reading": "shàngkè"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to attend class",
+      "meaning_burmese": "အတန်းတက်သည်",
+      "examples_count": 3,
+      "sort_order": 1770,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d059e443111722dfa49230e0.mp3"
+    },
+    {
+      "source_row": 178,
+      "source_csv_line": 179,
+      "id": "zh-hsk1-3131054318a4349c987bc543",
+      "hash": "3131054318a4349c987bc543",
+      "natural_identity": {
+        "written_form": "上午",
+        "reading": "shàngwǔ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "morning",
+      "meaning_burmese": "မနက်ပိုင်း",
+      "examples_count": 3,
+      "sort_order": 1780,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-3131054318a4349c987bc543.mp3"
+    },
+    {
+      "source_row": 179,
+      "source_csv_line": 180,
+      "id": "zh-hsk1-6d7d257e0d041720874fd9ed",
+      "hash": "6d7d257e0d041720874fd9ed",
+      "natural_identity": {
+        "written_form": "上学",
+        "reading": "shàngxué"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to go to school",
+      "meaning_burmese": "ကျောင်းသွားသည်",
+      "examples_count": 3,
+      "sort_order": 1790,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-6d7d257e0d041720874fd9ed.mp3"
+    },
+    {
+      "source_row": 180,
+      "source_csv_line": 181,
+      "id": "zh-hsk1-849b7b2ac1a2b6614d5502cd",
+      "hash": "849b7b2ac1a2b6614d5502cd",
+      "natural_identity": {
+        "written_form": "少",
+        "reading": "shǎo"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "few, little",
+      "meaning_burmese": "နည်းသည်",
+      "examples_count": 3,
+      "sort_order": 1800,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-849b7b2ac1a2b6614d5502cd.mp3"
+    },
+    {
+      "source_row": 181,
+      "source_csv_line": 182,
+      "id": "zh-hsk1-c6c7550bc56c55973f6b3bed",
+      "hash": "c6c7550bc56c55973f6b3bed",
+      "natural_identity": {
+        "written_form": "谁",
+        "reading": "shéi"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "who",
+      "meaning_burmese": "ဘယ်သူ",
+      "examples_count": 3,
+      "sort_order": 1810,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c6c7550bc56c55973f6b3bed.mp3"
+    },
+    {
+      "source_row": 182,
+      "source_csv_line": 183,
+      "id": "zh-hsk1-5e2a9aa9b40bd603c6f8e721",
+      "hash": "5e2a9aa9b40bd603c6f8e721",
+      "natural_identity": {
+        "written_form": "什么",
+        "reading": "shénme"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "what",
+      "meaning_burmese": "ဘာ",
+      "examples_count": 3,
+      "sort_order": 1820,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5e2a9aa9b40bd603c6f8e721.mp3"
+    },
+    {
+      "source_row": 183,
+      "source_csv_line": 184,
+      "id": "zh-hsk1-799f7d0388719ed38da0b0d2",
+      "hash": "799f7d0388719ed38da0b0d2",
+      "natural_identity": {
+        "written_form": "生病",
+        "reading": "shēngbìng"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to get sick",
+      "meaning_burmese": "ဖျားသည်",
+      "examples_count": 3,
+      "sort_order": 1830,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-799f7d0388719ed38da0b0d2.mp3"
+    },
+    {
+      "source_row": 184,
+      "source_csv_line": 185,
+      "id": "zh-hsk1-917dcc4d23042f71aa4bca4d",
+      "hash": "917dcc4d23042f71aa4bca4d",
+      "natural_identity": {
+        "written_form": "十",
+        "reading": "shí"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "ten",
+      "meaning_burmese": "ဆယ်",
+      "examples_count": 3,
+      "sort_order": 1840,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-917dcc4d23042f71aa4bca4d.mp3"
+    },
+    {
+      "source_row": 185,
+      "source_csv_line": 186,
+      "id": "zh-hsk1-43a4b49bd5421bf4034b2e28",
+      "hash": "43a4b49bd5421bf4034b2e28",
+      "natural_identity": {
+        "written_form": "时候",
+        "reading": "shíhou"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "time, moment",
+      "meaning_burmese": "အချိန်",
+      "examples_count": 3,
+      "sort_order": 1850,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-43a4b49bd5421bf4034b2e28.mp3"
+    },
+    {
+      "source_row": 186,
+      "source_csv_line": 187,
+      "id": "zh-hsk1-decf2594571015e8f4c80b8c",
+      "hash": "decf2594571015e8f4c80b8c",
+      "natural_identity": {
+        "written_form": "时间",
+        "reading": "shíjiān"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "time",
+      "meaning_burmese": "အချိန်",
+      "examples_count": 3,
+      "sort_order": 1860,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-decf2594571015e8f4c80b8c.mp3"
+    },
+    {
+      "source_row": 187,
+      "source_csv_line": 188,
+      "id": "zh-hsk1-40aff1c13cee0c794c8f5c74",
+      "hash": "40aff1c13cee0c794c8f5c74",
+      "natural_identity": {
+        "written_form": "事",
+        "reading": "shì"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "matter, thing",
+      "meaning_burmese": "အကိစ္စ",
+      "examples_count": 3,
+      "sort_order": 1870,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-40aff1c13cee0c794c8f5c74.mp3"
+    },
+    {
+      "source_row": 188,
+      "source_csv_line": 189,
+      "id": "zh-hsk1-c03c2a3934a34ec17e864031",
+      "hash": "c03c2a3934a34ec17e864031",
+      "natural_identity": {
+        "written_form": "是",
+        "reading": "shì"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to be",
+      "meaning_burmese": "ဖြစ်သည်",
+      "examples_count": 3,
+      "sort_order": 1880,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c03c2a3934a34ec17e864031.mp3"
+    },
+    {
+      "source_row": 189,
+      "source_csv_line": 190,
+      "id": "zh-hsk1-2a9f348d02b9ae60c8422abd",
+      "hash": "2a9f348d02b9ae60c8422abd",
+      "natural_identity": {
+        "written_form": "手机",
+        "reading": "shǒujī"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "cell phone",
+      "meaning_burmese": "ဖုန်း",
+      "examples_count": 3,
+      "sort_order": 1890,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2a9f348d02b9ae60c8422abd.mp3"
+    },
+    {
+      "source_row": 190,
+      "source_csv_line": 191,
+      "id": "zh-hsk1-71baead56a8f2cb1ed8d1dfb",
+      "hash": "71baead56a8f2cb1ed8d1dfb",
+      "natural_identity": {
+        "written_form": "书",
+        "reading": "shū"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "book",
+      "meaning_burmese": "စာအုပ်",
+      "examples_count": 3,
+      "sort_order": 1900,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-71baead56a8f2cb1ed8d1dfb.mp3"
+    },
+    {
+      "source_row": 191,
+      "source_csv_line": 192,
+      "id": "zh-hsk1-5f9f46b27a77793ffd4c2760",
+      "hash": "5f9f46b27a77793ffd4c2760",
+      "natural_identity": {
+        "written_form": "书店",
+        "reading": "shūdiàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "bookstore",
+      "meaning_burmese": "စာအုပ်ဆိုင်",
+      "examples_count": 3,
+      "sort_order": 1910,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5f9f46b27a77793ffd4c2760.mp3"
+    },
+    {
+      "source_row": 192,
+      "source_csv_line": 193,
+      "id": "zh-hsk1-a8ced8ea7e3cb6ae0b7efc5d",
+      "hash": "a8ced8ea7e3cb6ae0b7efc5d",
+      "natural_identity": {
+        "written_form": "水",
+        "reading": "shuǐ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "water",
+      "meaning_burmese": "ရေ",
+      "examples_count": 3,
+      "sort_order": 1920,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a8ced8ea7e3cb6ae0b7efc5d.mp3"
+    },
+    {
+      "source_row": 193,
+      "source_csv_line": 194,
+      "id": "zh-hsk1-577c1fdf0cb10f7ef16a69ea",
+      "hash": "577c1fdf0cb10f7ef16a69ea",
+      "natural_identity": {
+        "written_form": "水果",
+        "reading": "shuǐguǒ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "fruit",
+      "meaning_burmese": "အသီးအနှံ",
+      "examples_count": 3,
+      "sort_order": 1930,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-577c1fdf0cb10f7ef16a69ea.mp3"
+    },
+    {
+      "source_row": 194,
+      "source_csv_line": 195,
+      "id": "zh-hsk1-f9a6f831ca7f1265870d59a2",
+      "hash": "f9a6f831ca7f1265870d59a2",
+      "natural_identity": {
+        "written_form": "睡",
+        "reading": "shuì"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to sleep",
+      "meaning_burmese": "အိပ်သည်",
+      "examples_count": 3,
+      "sort_order": 1940,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f9a6f831ca7f1265870d59a2.mp3"
+    },
+    {
+      "source_row": 195,
+      "source_csv_line": 196,
+      "id": "zh-hsk1-d4403c68f975f58d1e0125e3",
+      "hash": "d4403c68f975f58d1e0125e3",
+      "natural_identity": {
+        "written_form": "睡觉",
+        "reading": "shuìjiào"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to sleep, to go to bed",
+      "meaning_burmese": "အိပ်သည်",
+      "examples_count": 3,
+      "sort_order": 1950,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d4403c68f975f58d1e0125e3.mp3"
+    },
+    {
+      "source_row": 196,
+      "source_csv_line": 197,
+      "id": "zh-hsk1-fc334179912150bfd9904152",
+      "hash": "fc334179912150bfd9904152",
+      "natural_identity": {
+        "written_form": "说",
+        "reading": "shuō"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to speak, to say",
+      "meaning_burmese": "ပြောသည်",
+      "examples_count": 3,
+      "sort_order": 1960,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-fc334179912150bfd9904152.mp3"
+    },
+    {
+      "source_row": 197,
+      "source_csv_line": 198,
+      "id": "zh-hsk1-7829df44905893423773e222",
+      "hash": "7829df44905893423773e222",
+      "natural_identity": {
+        "written_form": "说话",
+        "reading": "shuōhuà"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to talk",
+      "meaning_burmese": "စကားပြောသည်",
+      "examples_count": 3,
+      "sort_order": 1970,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7829df44905893423773e222.mp3"
+    },
+    {
+      "source_row": 198,
+      "source_csv_line": 199,
+      "id": "zh-hsk1-a148c61c8c42c160ee65b990",
+      "hash": "a148c61c8c42c160ee65b990",
+      "natural_identity": {
+        "written_form": "四",
+        "reading": "sì"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "four",
+      "meaning_burmese": "လေး",
+      "examples_count": 3,
+      "sort_order": 1980,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a148c61c8c42c160ee65b990.mp3"
+    },
+    {
+      "source_row": 199,
+      "source_csv_line": 200,
+      "id": "zh-hsk1-b74ba670e250e1a4e9ff38ba",
+      "hash": "b74ba670e250e1a4e9ff38ba",
+      "natural_identity": {
+        "written_form": "岁",
+        "reading": "suì"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "years old",
+      "meaning_burmese": "အသက် (…နှစ်)",
+      "examples_count": 3,
+      "sort_order": 1990,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b74ba670e250e1a4e9ff38ba.mp3"
+    },
+    {
+      "source_row": 200,
+      "source_csv_line": 201,
+      "id": "zh-hsk1-7ab0942cde05cf702559c121",
+      "hash": "7ab0942cde05cf702559c121",
+      "natural_identity": {
+        "written_form": "他",
+        "reading": "tā"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "he, him",
+      "meaning_burmese": "သူ",
+      "examples_count": 3,
+      "sort_order": 2000,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-7ab0942cde05cf702559c121.mp3"
+    },
+    {
+      "source_row": 201,
+      "source_csv_line": 202,
+      "id": "zh-hsk1-08963ea34fd478101af8abae",
+      "hash": "08963ea34fd478101af8abae",
+      "natural_identity": {
+        "written_form": "它",
+        "reading": "tā"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "it",
+      "meaning_burmese": "အဲဒါ (တိရစ္ဆာန်၊ အရာဝတ္ထု)",
+      "examples_count": 3,
+      "sort_order": 2010,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-08963ea34fd478101af8abae.mp3"
+    },
+    {
+      "source_row": 202,
+      "source_csv_line": 203,
+      "id": "zh-hsk1-e984a32f8dcc7da920bf31d7",
+      "hash": "e984a32f8dcc7da920bf31d7",
+      "natural_identity": {
+        "written_form": "她",
+        "reading": "tā"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "she, her",
+      "meaning_burmese": "သူမ",
+      "examples_count": 3,
+      "sort_order": 2020,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e984a32f8dcc7da920bf31d7.mp3"
+    },
+    {
+      "source_row": 203,
+      "source_csv_line": 204,
+      "id": "zh-hsk1-8607aeb06f0f0c2606fda496",
+      "hash": "8607aeb06f0f0c2606fda496",
+      "natural_identity": {
+        "written_form": "他们",
+        "reading": "tāmen"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "they (people)",
+      "meaning_burmese": "သူတို့",
+      "examples_count": 3,
+      "sort_order": 2030,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8607aeb06f0f0c2606fda496.mp3"
+    },
+    {
+      "source_row": 204,
+      "source_csv_line": 205,
+      "id": "zh-hsk1-c4fdc07460734e846eb34daa",
+      "hash": "c4fdc07460734e846eb34daa",
+      "natural_identity": {
+        "written_form": "它们",
+        "reading": "tāmen"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "they (things, animals)",
+      "meaning_burmese": "အဲဒါတွေ",
+      "examples_count": 3,
+      "sort_order": 2040,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c4fdc07460734e846eb34daa.mp3"
+    },
+    {
+      "source_row": 205,
+      "source_csv_line": 206,
+      "id": "zh-hsk1-ae9bb923a3da837c044efe11",
+      "hash": "ae9bb923a3da837c044efe11",
+      "natural_identity": {
+        "written_form": "她们",
+        "reading": "tāmen"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "they (female)",
+      "meaning_burmese": "သူမတို့",
+      "examples_count": 3,
+      "sort_order": 2050,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ae9bb923a3da837c044efe11.mp3"
+    },
+    {
+      "source_row": 206,
+      "source_csv_line": 207,
+      "id": "zh-hsk1-ff3d754cb2fbc8d4b9998d09",
+      "hash": "ff3d754cb2fbc8d4b9998d09",
+      "natural_identity": {
+        "written_form": "太",
+        "reading": "tài"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "too, extremely",
+      "meaning_burmese": "အရမ်း",
+      "examples_count": 3,
+      "sort_order": 2060,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ff3d754cb2fbc8d4b9998d09.mp3"
+    },
+    {
+      "source_row": 207,
+      "source_csv_line": 208,
+      "id": "zh-hsk1-b860af9c35498ea06f264baf",
+      "hash": "b860af9c35498ea06f264baf",
+      "natural_identity": {
+        "written_form": "天",
+        "reading": "tiān"
+      },
+      "part_of_speech": "noun, classifier",
+      "meaning_english": "day",
+      "meaning_burmese": "ရက်၊ နေ့",
+      "examples_count": 3,
+      "sort_order": 2070,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b860af9c35498ea06f264baf.mp3"
+    },
+    {
+      "source_row": 208,
+      "source_csv_line": 209,
+      "id": "zh-hsk1-d616ef307ebf3f045bd64f9a",
+      "hash": "d616ef307ebf3f045bd64f9a",
+      "natural_identity": {
+        "written_form": "天气",
+        "reading": "tiānqì"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "weather",
+      "meaning_burmese": "ရာသီဥတု",
+      "examples_count": 3,
+      "sort_order": 2080,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d616ef307ebf3f045bd64f9a.mp3"
+    },
+    {
+      "source_row": 209,
+      "source_csv_line": 210,
+      "id": "zh-hsk1-11d448b2d867adaafbbac967",
+      "hash": "11d448b2d867adaafbbac967",
+      "natural_identity": {
+        "written_form": "听",
+        "reading": "tīng"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to listen",
+      "meaning_burmese": "နားထောင်သည်",
+      "examples_count": 3,
+      "sort_order": 2090,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-11d448b2d867adaafbbac967.mp3"
+    },
+    {
+      "source_row": 210,
+      "source_csv_line": 211,
+      "id": "zh-hsk1-205c7130ac0f6396f49291f1",
+      "hash": "205c7130ac0f6396f49291f1",
+      "natural_identity": {
+        "written_form": "听见",
+        "reading": "tīngjiàn"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to hear",
+      "meaning_burmese": "ကြားသည်",
+      "examples_count": 3,
+      "sort_order": 2100,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-205c7130ac0f6396f49291f1.mp3"
+    },
+    {
+      "source_row": 211,
+      "source_csv_line": 212,
+      "id": "zh-hsk1-670921db32dc145432054918",
+      "hash": "670921db32dc145432054918",
+      "natural_identity": {
+        "written_form": "同学",
+        "reading": "tóngxué"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "classmate",
+      "meaning_burmese": "အတန်းဖော်",
+      "examples_count": 3,
+      "sort_order": 2110,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-670921db32dc145432054918.mp3"
+    },
+    {
+      "source_row": 212,
+      "source_csv_line": 213,
+      "id": "zh-hsk1-b4f43956e43bf2f706c4b28a",
+      "hash": "b4f43956e43bf2f706c4b28a",
+      "natural_identity": {
+        "written_form": "外",
+        "reading": "wài"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "outside",
+      "meaning_burmese": "အပြင်",
+      "examples_count": 3,
+      "sort_order": 2120,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b4f43956e43bf2f706c4b28a.mp3"
+    },
+    {
+      "source_row": 213,
+      "source_csv_line": 214,
+      "id": "zh-hsk1-fcbfdafe6baf0c6df592a391",
+      "hash": "fcbfdafe6baf0c6df592a391",
+      "natural_identity": {
+        "written_form": "外边",
+        "reading": "wàibian"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "outside",
+      "meaning_burmese": "အပြင်ဘက်",
+      "examples_count": 3,
+      "sort_order": 2130,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-fcbfdafe6baf0c6df592a391.mp3"
+    },
+    {
+      "source_row": 214,
+      "source_csv_line": 215,
+      "id": "zh-hsk1-9aff4fa69dd28100d35efee5",
+      "hash": "9aff4fa69dd28100d35efee5",
+      "natural_identity": {
+        "written_form": "玩",
+        "reading": "wán"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to play",
+      "meaning_burmese": "ကစားသည်",
+      "examples_count": 3,
+      "sort_order": 2140,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9aff4fa69dd28100d35efee5.mp3"
+    },
+    {
+      "source_row": 215,
+      "source_csv_line": 216,
+      "id": "zh-hsk1-fc91ae2002c2c93eb434ea89",
+      "hash": "fc91ae2002c2c93eb434ea89",
+      "natural_identity": {
+        "written_form": "晚",
+        "reading": "wǎn"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "late",
+      "meaning_burmese": "နောက်ကျသည်",
+      "examples_count": 3,
+      "sort_order": 2150,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-fc91ae2002c2c93eb434ea89.mp3"
+    },
+    {
+      "source_row": 216,
+      "source_csv_line": 217,
+      "id": "zh-hsk1-125455b4ee0e7db59c22e3eb",
+      "hash": "125455b4ee0e7db59c22e3eb",
+      "natural_identity": {
+        "written_form": "晚饭",
+        "reading": "wǎnfàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "dinner",
+      "meaning_burmese": "ညစာ",
+      "examples_count": 3,
+      "sort_order": 2160,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-125455b4ee0e7db59c22e3eb.mp3"
+    },
+    {
+      "source_row": 217,
+      "source_csv_line": 218,
+      "id": "zh-hsk1-19a350f03f5cc666231f6050",
+      "hash": "19a350f03f5cc666231f6050",
+      "natural_identity": {
+        "written_form": "晚上",
+        "reading": "wǎnshang"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "evening",
+      "meaning_burmese": "ညနေ",
+      "examples_count": 3,
+      "sort_order": 2170,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-19a350f03f5cc666231f6050.mp3"
+    },
+    {
+      "source_row": 218,
+      "source_csv_line": 219,
+      "id": "zh-hsk1-02f2bfcb2dc01ae63dda3ca3",
+      "hash": "02f2bfcb2dc01ae63dda3ca3",
+      "natural_identity": {
+        "written_form": "喂",
+        "reading": "wèi"
+      },
+      "part_of_speech": "interjection",
+      "meaning_english": "hello (on the phone)",
+      "meaning_burmese": "ဟယ်လို (ဖုန်းဖြေသည်)",
+      "examples_count": 3,
+      "sort_order": 2180,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-02f2bfcb2dc01ae63dda3ca3.mp3"
+    },
+    {
+      "source_row": 219,
+      "source_csv_line": 220,
+      "id": "zh-hsk1-b97f65539d2e3925e7093bb0",
+      "hash": "b97f65539d2e3925e7093bb0",
+      "natural_identity": {
+        "written_form": "问",
+        "reading": "wèn"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to ask",
+      "meaning_burmese": "မေးသည်",
+      "examples_count": 3,
+      "sort_order": 2190,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b97f65539d2e3925e7093bb0.mp3"
+    },
+    {
+      "source_row": 220,
+      "source_csv_line": 221,
+      "id": "zh-hsk1-d2eb2ebdfb854f1fc28e7f30",
+      "hash": "d2eb2ebdfb854f1fc28e7f30",
+      "natural_identity": {
+        "written_form": "问题",
+        "reading": "wèntí"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "question, problem",
+      "meaning_burmese": "မေးခွန်း၊ ပြဿနာ",
+      "examples_count": 3,
+      "sort_order": 2200,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d2eb2ebdfb854f1fc28e7f30.mp3"
+    },
+    {
+      "source_row": 221,
+      "source_csv_line": 222,
+      "id": "zh-hsk1-f8fa5cd35d859d9b655e54e0",
+      "hash": "f8fa5cd35d859d9b655e54e0",
+      "natural_identity": {
+        "written_form": "我",
+        "reading": "wǒ"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "I, me",
+      "meaning_burmese": "ကျွန်တော်",
+      "examples_count": 3,
+      "sort_order": 2210,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f8fa5cd35d859d9b655e54e0.mp3"
+    },
+    {
+      "source_row": 222,
+      "source_csv_line": 223,
+      "id": "zh-hsk1-2f32b1935f74318b8984bf8a",
+      "hash": "2f32b1935f74318b8984bf8a",
+      "natural_identity": {
+        "written_form": "我们",
+        "reading": "wǒmen"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "we, us",
+      "meaning_burmese": "ကျွန်တော်တို့",
+      "examples_count": 3,
+      "sort_order": 2220,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2f32b1935f74318b8984bf8a.mp3"
+    },
+    {
+      "source_row": 223,
+      "source_csv_line": 224,
+      "id": "zh-hsk1-8cb651254c25f919dc59f9ea",
+      "hash": "8cb651254c25f919dc59f9ea",
+      "natural_identity": {
+        "written_form": "五",
+        "reading": "wǔ"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "five",
+      "meaning_burmese": "ငါး",
+      "examples_count": 3,
+      "sort_order": 2230,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8cb651254c25f919dc59f9ea.mp3"
+    },
+    {
+      "source_row": 224,
+      "source_csv_line": 225,
+      "id": "zh-hsk1-2751136fa7b0071f6ea7d776",
+      "hash": "2751136fa7b0071f6ea7d776",
+      "natural_identity": {
+        "written_form": "午饭",
+        "reading": "wǔfàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "lunch",
+      "meaning_burmese": "နေ့လယ်စာ",
+      "examples_count": 3,
+      "sort_order": 2240,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2751136fa7b0071f6ea7d776.mp3"
+    },
+    {
+      "source_row": 225,
+      "source_csv_line": 226,
+      "id": "zh-hsk1-78aa10ad8a413e8f607e3636",
+      "hash": "78aa10ad8a413e8f607e3636",
+      "natural_identity": {
+        "written_form": "喜欢",
+        "reading": "xǐhuan"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to like",
+      "meaning_burmese": "ကြိုက်သည်",
+      "examples_count": 3,
+      "sort_order": 2250,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-78aa10ad8a413e8f607e3636.mp3"
+    },
+    {
+      "source_row": 226,
+      "source_csv_line": 227,
+      "id": "zh-hsk1-2994304f6638181c58d52a77",
+      "hash": "2994304f6638181c58d52a77",
+      "natural_identity": {
+        "written_form": "下",
+        "reading": "xià"
+      },
+      "part_of_speech": "noun, verb",
+      "meaning_english": "down, below; to go down",
+      "meaning_burmese": "အောက်၊ ဆင်းသည်",
+      "examples_count": 3,
+      "sort_order": 2260,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2994304f6638181c58d52a77.mp3"
+    },
+    {
+      "source_row": 227,
+      "source_csv_line": 228,
+      "id": "zh-hsk1-5cadf6bfdefe636ca94c1f16",
+      "hash": "5cadf6bfdefe636ca94c1f16",
+      "natural_identity": {
+        "written_form": "下雨",
+        "reading": "xià yǔ"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to rain",
+      "meaning_burmese": "မိုးရွာသည်",
+      "examples_count": 3,
+      "sort_order": 2270,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5cadf6bfdefe636ca94c1f16.mp3"
+    },
+    {
+      "source_row": 228,
+      "source_csv_line": 229,
+      "id": "zh-hsk1-a8ed4dae694da9137f1200bf",
+      "hash": "a8ed4dae694da9137f1200bf",
+      "natural_identity": {
+        "written_form": "下班",
+        "reading": "xiàbān"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to get off work",
+      "meaning_burmese": "အလုပ်ဆင်းသည်",
+      "examples_count": 3,
+      "sort_order": 2280,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a8ed4dae694da9137f1200bf.mp3"
+    },
+    {
+      "source_row": 229,
+      "source_csv_line": 230,
+      "id": "zh-hsk1-654864bcee1f06421469c4b5",
+      "hash": "654864bcee1f06421469c4b5",
+      "natural_identity": {
+        "written_form": "下课",
+        "reading": "xiàkè"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to finish class",
+      "meaning_burmese": "အတန်းဆင်းသည်",
+      "examples_count": 3,
+      "sort_order": 2290,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-654864bcee1f06421469c4b5.mp3"
+    },
+    {
+      "source_row": 230,
+      "source_csv_line": 231,
+      "id": "zh-hsk1-f8f4463016add067cad3e688",
+      "hash": "f8f4463016add067cad3e688",
+      "natural_identity": {
+        "written_form": "下午",
+        "reading": "xiàwǔ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "afternoon",
+      "meaning_burmese": "မွန်းလွဲပိုင်း",
+      "examples_count": 3,
+      "sort_order": 2300,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-f8f4463016add067cad3e688.mp3"
+    },
+    {
+      "source_row": 231,
+      "source_csv_line": 232,
+      "id": "zh-hsk1-b6d7fcf5174409c80abfc16b",
+      "hash": "b6d7fcf5174409c80abfc16b",
+      "natural_identity": {
+        "written_form": "先生",
+        "reading": "xiānsheng"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "Mr., sir; husband",
+      "meaning_burmese": "ဦး/ခင်ဗျား (အမျိုးသား ရိုသေစကား)၊ ခင်ပွန်း",
+      "examples_count": 3,
+      "sort_order": 2310,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b6d7fcf5174409c80abfc16b.mp3"
+    },
+    {
+      "source_row": 232,
+      "source_csv_line": 233,
+      "id": "zh-hsk1-4a927849b75fdac0b343a1d3",
+      "hash": "4a927849b75fdac0b343a1d3",
+      "natural_identity": {
+        "written_form": "现在",
+        "reading": "xiànzài"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "now",
+      "meaning_burmese": "အခု",
+      "examples_count": 3,
+      "sort_order": 2320,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-4a927849b75fdac0b343a1d3.mp3"
+    },
+    {
+      "source_row": 233,
+      "source_csv_line": 234,
+      "id": "zh-hsk1-820ef582bc66edd502a84956",
+      "hash": "820ef582bc66edd502a84956",
+      "natural_identity": {
+        "written_form": "想",
+        "reading": "xiǎng"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to want; to think",
+      "meaning_burmese": "ချင်သည်၊ စဉ်းစားသည်",
+      "examples_count": 3,
+      "sort_order": 2330,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-820ef582bc66edd502a84956.mp3"
+    },
+    {
+      "source_row": 234,
+      "source_csv_line": 235,
+      "id": "zh-hsk1-87a2148fdffdf65a6dbf335d",
+      "hash": "87a2148fdffdf65a6dbf335d",
+      "natural_identity": {
+        "written_form": "小",
+        "reading": "xiǎo"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "small; young",
+      "meaning_burmese": "သေးသည်၊ ငယ်သည်",
+      "examples_count": 3,
+      "sort_order": 2340,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-87a2148fdffdf65a6dbf335d.mp3"
+    },
+    {
+      "source_row": 235,
+      "source_csv_line": 236,
+      "id": "zh-hsk1-83fc6165d01055e92d4a5643",
+      "hash": "83fc6165d01055e92d4a5643",
+      "natural_identity": {
+        "written_form": "小朋友",
+        "reading": "xiǎopéngyǒu"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "child, little one",
+      "meaning_burmese": "ကလေးငယ်",
+      "examples_count": 3,
+      "sort_order": 2350,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-83fc6165d01055e92d4a5643.mp3"
+    },
+    {
+      "source_row": 236,
+      "source_csv_line": 237,
+      "id": "zh-hsk1-8b44194081410c95a635bf41",
+      "hash": "8b44194081410c95a635bf41",
+      "natural_identity": {
+        "written_form": "小时",
+        "reading": "xiǎoshí"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "hour",
+      "meaning_burmese": "နာရီ (အချိန်ကြာချိန်)",
+      "examples_count": 3,
+      "sort_order": 2360,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8b44194081410c95a635bf41.mp3"
+    },
+    {
+      "source_row": 237,
+      "source_csv_line": 238,
+      "id": "zh-hsk1-dbdefc95ee6e5070cd8c108d",
+      "hash": "dbdefc95ee6e5070cd8c108d",
+      "natural_identity": {
+        "written_form": "小学",
+        "reading": "xiǎoxué"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "primary school",
+      "meaning_burmese": "မူလတန်းကျောင်း",
+      "examples_count": 3,
+      "sort_order": 2370,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-dbdefc95ee6e5070cd8c108d.mp3"
+    },
+    {
+      "source_row": 238,
+      "source_csv_line": 239,
+      "id": "zh-hsk1-dda2f6bed2612986ed31ea79",
+      "hash": "dda2f6bed2612986ed31ea79",
+      "natural_identity": {
+        "written_form": "小学生",
+        "reading": "xiǎoxuéshēng"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "primary school student",
+      "meaning_burmese": "မူလတန်းကျောင်းသား",
+      "examples_count": 3,
+      "sort_order": 2380,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-dda2f6bed2612986ed31ea79.mp3"
+    },
+    {
+      "source_row": 239,
+      "source_csv_line": 240,
+      "id": "zh-hsk1-0c109bff8663c4389ebffac0",
+      "hash": "0c109bff8663c4389ebffac0",
+      "natural_identity": {
+        "written_form": "些",
+        "reading": "xiē"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "some, a few",
+      "meaning_burmese": "အချို့",
+      "examples_count": 3,
+      "sort_order": 2390,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0c109bff8663c4389ebffac0.mp3"
+    },
+    {
+      "source_row": 240,
+      "source_csv_line": 241,
+      "id": "zh-hsk1-68ff28c639c7b5bea433ff6c",
+      "hash": "68ff28c639c7b5bea433ff6c",
+      "natural_identity": {
+        "written_form": "写",
+        "reading": "xiě"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to write",
+      "meaning_burmese": "ရေးသည်",
+      "examples_count": 3,
+      "sort_order": 2400,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-68ff28c639c7b5bea433ff6c.mp3"
+    },
+    {
+      "source_row": 241,
+      "source_csv_line": 242,
+      "id": "zh-hsk1-24d74d746b218fcba2058b50",
+      "hash": "24d74d746b218fcba2058b50",
+      "natural_identity": {
+        "written_form": "谢谢",
+        "reading": "xièxie"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to thank; thank you",
+      "meaning_burmese": "ကျေးဇူးတင်ပါတယ်",
+      "examples_count": 3,
+      "sort_order": 2410,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-24d74d746b218fcba2058b50.mp3"
+    },
+    {
+      "source_row": 242,
+      "source_csv_line": 243,
+      "id": "zh-hsk1-9ce876de317591c60ab99e86",
+      "hash": "9ce876de317591c60ab99e86",
+      "natural_identity": {
+        "written_form": "新",
+        "reading": "xīn"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "new",
+      "meaning_burmese": "အသစ်",
+      "examples_count": 3,
+      "sort_order": 2420,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9ce876de317591c60ab99e86.mp3"
+    },
+    {
+      "source_row": 243,
+      "source_csv_line": 244,
+      "id": "zh-hsk1-d7440a4b1107ed9a131f6d20",
+      "hash": "d7440a4b1107ed9a131f6d20",
+      "natural_identity": {
+        "written_form": "星期",
+        "reading": "xīngqī"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "week",
+      "meaning_burmese": "အပတ်",
+      "examples_count": 3,
+      "sort_order": 2430,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d7440a4b1107ed9a131f6d20.mp3"
+    },
+    {
+      "source_row": 244,
+      "source_csv_line": 245,
+      "id": "zh-hsk1-02ecba01689858d0c9542d53",
+      "hash": "02ecba01689858d0c9542d53",
+      "natural_identity": {
+        "written_form": "星期日",
+        "reading": "xīngqīrì"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "Sunday",
+      "meaning_burmese": "တနင်္ဂနွေနေ့",
+      "examples_count": 3,
+      "sort_order": 2440,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-02ecba01689858d0c9542d53.mp3"
+    },
+    {
+      "source_row": 245,
+      "source_csv_line": 246,
+      "id": "zh-hsk1-6a720d0cb28d0333adb9d889",
+      "hash": "6a720d0cb28d0333adb9d889",
+      "natural_identity": {
+        "written_form": "星期天",
+        "reading": "xīngqītiān"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "Sunday",
+      "meaning_burmese": "တနင်္ဂနွေနေ့",
+      "examples_count": 3,
+      "sort_order": 2450,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-6a720d0cb28d0333adb9d889.mp3"
+    },
+    {
+      "source_row": 246,
+      "source_csv_line": 247,
+      "id": "zh-hsk1-6f010b694cba0b0c8fa76a22",
+      "hash": "6f010b694cba0b0c8fa76a22",
+      "natural_identity": {
+        "written_form": "休息",
+        "reading": "xiūxi"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to rest",
+      "meaning_burmese": "အနားယူသည်",
+      "examples_count": 3,
+      "sort_order": 2460,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-6f010b694cba0b0c8fa76a22.mp3"
+    },
+    {
+      "source_row": 247,
+      "source_csv_line": 248,
+      "id": "zh-hsk1-09798f944df36e54b89ed942",
+      "hash": "09798f944df36e54b89ed942",
+      "natural_identity": {
+        "written_form": "学",
+        "reading": "xué"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to learn, to study",
+      "meaning_burmese": "သင်သည်",
+      "examples_count": 3,
+      "sort_order": 2470,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-09798f944df36e54b89ed942.mp3"
+    },
+    {
+      "source_row": 248,
+      "source_csv_line": 249,
+      "id": "zh-hsk1-ec851b434ae6e6f83737893e",
+      "hash": "ec851b434ae6e6f83737893e",
+      "natural_identity": {
+        "written_form": "学生",
+        "reading": "xuéshēng"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "student",
+      "meaning_burmese": "ကျောင်းသား",
+      "examples_count": 3,
+      "sort_order": 2480,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ec851b434ae6e6f83737893e.mp3"
+    },
+    {
+      "source_row": 249,
+      "source_csv_line": 250,
+      "id": "zh-hsk1-3ebd764191ceb57218e8958b",
+      "hash": "3ebd764191ceb57218e8958b",
+      "natural_identity": {
+        "written_form": "学习",
+        "reading": "xuéxí"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to study",
+      "meaning_burmese": "လေ့လာသင်ယူသည်",
+      "examples_count": 3,
+      "sort_order": 2490,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-3ebd764191ceb57218e8958b.mp3"
+    },
+    {
+      "source_row": 250,
+      "source_csv_line": 251,
+      "id": "zh-hsk1-06c27159d9811062391c3ee8",
+      "hash": "06c27159d9811062391c3ee8",
+      "natural_identity": {
+        "written_form": "学校",
+        "reading": "xuéxiào"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "school",
+      "meaning_burmese": "ကျောင်း",
+      "examples_count": 3,
+      "sort_order": 2500,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-06c27159d9811062391c3ee8.mp3"
+    },
+    {
+      "source_row": 251,
+      "source_csv_line": 252,
+      "id": "zh-hsk1-0b9a76e02459649906131d62",
+      "hash": "0b9a76e02459649906131d62",
+      "natural_identity": {
+        "written_form": "雪",
+        "reading": "xuě"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "snow",
+      "meaning_burmese": "မိုးပွင့်",
+      "examples_count": 3,
+      "sort_order": 2510,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-0b9a76e02459649906131d62.mp3"
+    },
+    {
+      "source_row": 252,
+      "source_csv_line": 253,
+      "id": "zh-hsk1-670bda4a060dde2c882627ef",
+      "hash": "670bda4a060dde2c882627ef",
+      "natural_identity": {
+        "written_form": "要",
+        "reading": "yào"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to want, to need",
+      "meaning_burmese": "လိုသည်၊ ချင်သည်",
+      "examples_count": 3,
+      "sort_order": 2520,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-670bda4a060dde2c882627ef.mp3"
+    },
+    {
+      "source_row": 253,
+      "source_csv_line": 254,
+      "id": "zh-hsk1-3a232beefa02f28455fc773a",
+      "hash": "3a232beefa02f28455fc773a",
+      "natural_identity": {
+        "written_form": "也",
+        "reading": "yě"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "also, too",
+      "meaning_burmese": "လည်း",
+      "examples_count": 3,
+      "sort_order": 2530,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-3a232beefa02f28455fc773a.mp3"
+    },
+    {
+      "source_row": 254,
+      "source_csv_line": 255,
+      "id": "zh-hsk1-ef26d19253139ecad672b313",
+      "hash": "ef26d19253139ecad672b313",
+      "natural_identity": {
+        "written_form": "一",
+        "reading": "yī"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "one",
+      "meaning_burmese": "တစ်",
+      "examples_count": 3,
+      "sort_order": 2540,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ef26d19253139ecad672b313.mp3"
+    },
+    {
+      "source_row": 255,
+      "source_csv_line": 256,
+      "id": "zh-hsk1-eccd8059d465144c0dfc283d",
+      "hash": "eccd8059d465144c0dfc283d",
+      "natural_identity": {
+        "written_form": "衣服",
+        "reading": "yīfu"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "clothes",
+      "meaning_burmese": "အဝတ်အစား",
+      "examples_count": 3,
+      "sort_order": 2550,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-eccd8059d465144c0dfc283d.mp3"
+    },
+    {
+      "source_row": 256,
+      "source_csv_line": 257,
+      "id": "zh-hsk1-272bfe61c34f8bfef382f3c9",
+      "hash": "272bfe61c34f8bfef382f3c9",
+      "natural_identity": {
+        "written_form": "医生",
+        "reading": "yīshēng"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "doctor",
+      "meaning_burmese": "ဆရာဝန်",
+      "examples_count": 3,
+      "sort_order": 2560,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-272bfe61c34f8bfef382f3c9.mp3"
+    },
+    {
+      "source_row": 257,
+      "source_csv_line": 258,
+      "id": "zh-hsk1-28172f5e49393338c357936a",
+      "hash": "28172f5e49393338c357936a",
+      "natural_identity": {
+        "written_form": "医院",
+        "reading": "yīyuàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "hospital",
+      "meaning_burmese": "ဆေးရုံ",
+      "examples_count": 3,
+      "sort_order": 2570,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-28172f5e49393338c357936a.mp3"
+    },
+    {
+      "source_row": 258,
+      "source_csv_line": 259,
+      "id": "zh-hsk1-8a89c120452e37891b38e76b",
+      "hash": "8a89c120452e37891b38e76b",
+      "natural_identity": {
+        "written_form": "一半",
+        "reading": "yíbàn"
+      },
+      "part_of_speech": "number",
+      "meaning_english": "half",
+      "meaning_burmese": "တစ်ဝက်",
+      "examples_count": 3,
+      "sort_order": 2580,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8a89c120452e37891b38e76b.mp3"
+    },
+    {
+      "source_row": 259,
+      "source_csv_line": 260,
+      "id": "zh-hsk1-4333549925c5dc90cdcf9e58",
+      "hash": "4333549925c5dc90cdcf9e58",
+      "natural_identity": {
+        "written_form": "一下",
+        "reading": "yíxià"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "once; for a moment",
+      "meaning_burmese": "ခဏ၊ တစ်ချက်",
+      "examples_count": 3,
+      "sort_order": 2590,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-4333549925c5dc90cdcf9e58.mp3"
+    },
+    {
+      "source_row": 260,
+      "source_csv_line": 261,
+      "id": "zh-hsk1-8df6cae5f136e1d88bb55eed",
+      "hash": "8df6cae5f136e1d88bb55eed",
+      "natural_identity": {
+        "written_form": "椅子",
+        "reading": "yǐzi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "chair",
+      "meaning_burmese": "ကုလားထိုင်",
+      "examples_count": 3,
+      "sort_order": 2600,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8df6cae5f136e1d88bb55eed.mp3"
+    },
+    {
+      "source_row": 261,
+      "source_csv_line": 262,
+      "id": "zh-hsk1-a227f471cb406056481f5f0b",
+      "hash": "a227f471cb406056481f5f0b",
+      "natural_identity": {
+        "written_form": "一点儿",
+        "reading": "yìdiǎnr"
+      },
+      "part_of_speech": "number-classifier",
+      "meaning_english": "a little, a bit",
+      "meaning_burmese": "နည်းနည်း",
+      "examples_count": 3,
+      "sort_order": 2610,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a227f471cb406056481f5f0b.mp3"
+    },
+    {
+      "source_row": 262,
+      "source_csv_line": 263,
+      "id": "zh-hsk1-d12d1593dad39d2b014bdecc",
+      "hash": "d12d1593dad39d2b014bdecc",
+      "natural_identity": {
+        "written_form": "一些",
+        "reading": "yìxiē"
+      },
+      "part_of_speech": "number-classifier",
+      "meaning_english": "some, a few",
+      "meaning_burmese": "အချို့",
+      "examples_count": 3,
+      "sort_order": 2620,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-d12d1593dad39d2b014bdecc.mp3"
+    },
+    {
+      "source_row": 263,
+      "source_csv_line": 264,
+      "id": "zh-hsk1-4347da3d0fd931773f8456a3",
+      "hash": "4347da3d0fd931773f8456a3",
+      "natural_identity": {
+        "written_form": "有",
+        "reading": "yǒu"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to have; there is",
+      "meaning_burmese": "ရှိသည်",
+      "examples_count": 3,
+      "sort_order": 2630,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-4347da3d0fd931773f8456a3.mp3"
+    },
+    {
+      "source_row": 264,
+      "source_csv_line": 265,
+      "id": "zh-hsk1-de42fa2ca62bd2035e50774d",
+      "hash": "de42fa2ca62bd2035e50774d",
+      "natural_identity": {
+        "written_form": "有的",
+        "reading": "yǒude"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "some (of them)",
+      "meaning_burmese": "တချို့",
+      "examples_count": 3,
+      "sort_order": 2640,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-de42fa2ca62bd2035e50774d.mp3"
+    },
+    {
+      "source_row": 265,
+      "source_csv_line": 266,
+      "id": "zh-hsk1-a858631122872ebf8680d357",
+      "hash": "a858631122872ebf8680d357",
+      "natural_identity": {
+        "written_form": "有点儿",
+        "reading": "yǒudiǎnr"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "a little, slightly",
+      "meaning_burmese": "နည်းနည်း",
+      "examples_count": 3,
+      "sort_order": 2650,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a858631122872ebf8680d357.mp3"
+    },
+    {
+      "source_row": 266,
+      "source_csv_line": 267,
+      "id": "zh-hsk1-e55a53cd875b9b42a09e6efc",
+      "hash": "e55a53cd875b9b42a09e6efc",
+      "natural_identity": {
+        "written_form": "有些",
+        "reading": "yǒuxiē"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "some, some of",
+      "meaning_burmese": "တချို့",
+      "examples_count": 3,
+      "sort_order": 2660,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e55a53cd875b9b42a09e6efc.mp3"
+    },
+    {
+      "source_row": 267,
+      "source_csv_line": 268,
+      "id": "zh-hsk1-cd9d62bc4fdcc06879a5c68c",
+      "hash": "cd9d62bc4fdcc06879a5c68c",
+      "natural_identity": {
+        "written_form": "雨",
+        "reading": "yǔ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "rain",
+      "meaning_burmese": "မိုး",
+      "examples_count": 3,
+      "sort_order": 2670,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-cd9d62bc4fdcc06879a5c68c.mp3"
+    },
+    {
+      "source_row": 268,
+      "source_csv_line": 269,
+      "id": "zh-hsk1-e9ce72cb1b8371d2067bce68",
+      "hash": "e9ce72cb1b8371d2067bce68",
+      "natural_identity": {
+        "written_form": "元",
+        "reading": "yuán"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "yuan (Chinese currency)",
+      "meaning_burmese": "ယွမ် (တရုတ်ပိုက်ဆံ)",
+      "examples_count": 3,
+      "sort_order": 2680,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e9ce72cb1b8371d2067bce68.mp3"
+    },
+    {
+      "source_row": 269,
+      "source_csv_line": 270,
+      "id": "zh-hsk1-e69d4d8715c9bed3d6d55e57",
+      "hash": "e69d4d8715c9bed3d6d55e57",
+      "natural_identity": {
+        "written_form": "月",
+        "reading": "yuè"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "month; moon",
+      "meaning_burmese": "လ",
+      "examples_count": 3,
+      "sort_order": 2690,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-e69d4d8715c9bed3d6d55e57.mp3"
+    },
+    {
+      "source_row": 270,
+      "source_csv_line": 271,
+      "id": "zh-hsk1-72522bdb759646a064aabf8d",
+      "hash": "72522bdb759646a064aabf8d",
+      "natural_identity": {
+        "written_form": "再",
+        "reading": "zài"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "again, then",
+      "meaning_burmese": "ထပ်",
+      "examples_count": 3,
+      "sort_order": 2700,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-72522bdb759646a064aabf8d.mp3"
+    },
+    {
+      "source_row": 271,
+      "source_csv_line": 272,
+      "id": "zh-hsk1-c9a0da61951ea4191c3f57cd",
+      "hash": "c9a0da61951ea4191c3f57cd",
+      "natural_identity": {
+        "written_form": "在",
+        "reading": "zài"
+      },
+      "part_of_speech": "verb, preposition",
+      "meaning_english": "to be at; at, in",
+      "meaning_burmese": "မှာ၊ ရှိသည်",
+      "examples_count": 3,
+      "sort_order": 2710,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c9a0da61951ea4191c3f57cd.mp3"
+    },
+    {
+      "source_row": 272,
+      "source_csv_line": 273,
+      "id": "zh-hsk1-53aa369e4bb8cf2963e4a3d2",
+      "hash": "53aa369e4bb8cf2963e4a3d2",
+      "natural_identity": {
+        "written_form": "再见",
+        "reading": "zàijiàn"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "goodbye",
+      "meaning_burmese": "တာ့တာ၊ ပြန်တွေ့ကြမယ်",
+      "examples_count": 3,
+      "sort_order": 2720,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-53aa369e4bb8cf2963e4a3d2.mp3"
+    },
+    {
+      "source_row": 273,
+      "source_csv_line": 274,
+      "id": "zh-hsk1-8f25674180c588ac04ef1428",
+      "hash": "8f25674180c588ac04ef1428",
+      "natural_identity": {
+        "written_form": "早",
+        "reading": "zǎo"
+      },
+      "part_of_speech": "adjective",
+      "meaning_english": "early",
+      "meaning_burmese": "စောသည်",
+      "examples_count": 3,
+      "sort_order": 2730,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8f25674180c588ac04ef1428.mp3"
+    },
+    {
+      "source_row": 274,
+      "source_csv_line": 275,
+      "id": "zh-hsk1-4b005752d286ea9d33c21ebd",
+      "hash": "4b005752d286ea9d33c21ebd",
+      "natural_identity": {
+        "written_form": "早饭",
+        "reading": "zǎofàn"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "breakfast",
+      "meaning_burmese": "မနက်စာ",
+      "examples_count": 3,
+      "sort_order": 2740,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-4b005752d286ea9d33c21ebd.mp3"
+    },
+    {
+      "source_row": 275,
+      "source_csv_line": 276,
+      "id": "zh-hsk1-bb90f58e0fd36f13944f7aa2",
+      "hash": "bb90f58e0fd36f13944f7aa2",
+      "natural_identity": {
+        "written_form": "早上",
+        "reading": "zǎoshang"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "morning",
+      "meaning_burmese": "မနက်",
+      "examples_count": 3,
+      "sort_order": 2750,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-bb90f58e0fd36f13944f7aa2.mp3"
+    },
+    {
+      "source_row": 276,
+      "source_csv_line": 277,
+      "id": "zh-hsk1-df30cb761d856db7dd1d632d",
+      "hash": "df30cb761d856db7dd1d632d",
+      "natural_identity": {
+        "written_form": "怎么",
+        "reading": "zěnme"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "how",
+      "meaning_burmese": "ဘယ်လို",
+      "examples_count": 3,
+      "sort_order": 2760,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-df30cb761d856db7dd1d632d.mp3"
+    },
+    {
+      "source_row": 277,
+      "source_csv_line": 278,
+      "id": "zh-hsk1-2b75bf28f0d4ebbd7ddc771a",
+      "hash": "2b75bf28f0d4ebbd7ddc771a",
+      "natural_identity": {
+        "written_form": "怎么样",
+        "reading": "zěnmeyàng"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "how about, how is it",
+      "meaning_burmese": "ဘယ်လိုလဲ",
+      "examples_count": 3,
+      "sort_order": 2770,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-2b75bf28f0d4ebbd7ddc771a.mp3"
+    },
+    {
+      "source_row": 278,
+      "source_csv_line": 279,
+      "id": "zh-hsk1-9e00d1fc51c032032dad7112",
+      "hash": "9e00d1fc51c032032dad7112",
+      "natural_identity": {
+        "written_form": "找",
+        "reading": "zhǎo"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to look for",
+      "meaning_burmese": "ရှာသည်",
+      "examples_count": 3,
+      "sort_order": 2780,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9e00d1fc51c032032dad7112.mp3"
+    },
+    {
+      "source_row": 279,
+      "source_csv_line": 280,
+      "id": "zh-hsk1-be5207ea5ce720d72dc12d83",
+      "hash": "be5207ea5ce720d72dc12d83",
+      "natural_identity": {
+        "written_form": "这",
+        "reading": "zhè"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "this",
+      "meaning_burmese": "ဒီ",
+      "examples_count": 3,
+      "sort_order": 2790,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-be5207ea5ce720d72dc12d83.mp3"
+    },
+    {
+      "source_row": 280,
+      "source_csv_line": 281,
+      "id": "zh-hsk1-c24f42fe6400e8d238b3ff3d",
+      "hash": "c24f42fe6400e8d238b3ff3d",
+      "natural_identity": {
+        "written_form": "这边",
+        "reading": "zhèbiān"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "here, this side",
+      "meaning_burmese": "ဒီဘက်",
+      "examples_count": 3,
+      "sort_order": 2800,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c24f42fe6400e8d238b3ff3d.mp3"
+    },
+    {
+      "source_row": 281,
+      "source_csv_line": 282,
+      "id": "zh-hsk1-c25b257056299d67e8b47909",
+      "hash": "c25b257056299d67e8b47909",
+      "natural_identity": {
+        "written_form": "这个",
+        "reading": "zhège"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "this one",
+      "meaning_burmese": "ဒီဟာ",
+      "examples_count": 3,
+      "sort_order": 2810,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-c25b257056299d67e8b47909.mp3"
+    },
+    {
+      "source_row": 282,
+      "source_csv_line": 283,
+      "id": "zh-hsk1-37729e9120e5f04be0a1103d",
+      "hash": "37729e9120e5f04be0a1103d",
+      "natural_identity": {
+        "written_form": "这里",
+        "reading": "zhèlǐ"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "here",
+      "meaning_burmese": "ဒီမှာ",
+      "examples_count": 3,
+      "sort_order": 2820,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-37729e9120e5f04be0a1103d.mp3"
+    },
+    {
+      "source_row": 283,
+      "source_csv_line": 284,
+      "id": "zh-hsk1-a7fb6c6c5802003fa3e26bbb",
+      "hash": "a7fb6c6c5802003fa3e26bbb",
+      "natural_identity": {
+        "written_form": "这儿",
+        "reading": "zhèr"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "here",
+      "meaning_burmese": "ဒီမှာ",
+      "examples_count": 3,
+      "sort_order": 2830,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a7fb6c6c5802003fa3e26bbb.mp3"
+    },
+    {
+      "source_row": 284,
+      "source_csv_line": 285,
+      "id": "zh-hsk1-24e4f6091bf373e19ca13f63",
+      "hash": "24e4f6091bf373e19ca13f63",
+      "natural_identity": {
+        "written_form": "这些",
+        "reading": "zhèxiē"
+      },
+      "part_of_speech": "pronoun",
+      "meaning_english": "these",
+      "meaning_burmese": "ဒီဟာတွေ",
+      "examples_count": 3,
+      "sort_order": 2840,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-24e4f6091bf373e19ca13f63.mp3"
+    },
+    {
+      "source_row": 285,
+      "source_csv_line": 286,
+      "id": "zh-hsk1-b40ac7719d5f4fc72db07a75",
+      "hash": "b40ac7719d5f4fc72db07a75",
+      "natural_identity": {
+        "written_form": "真",
+        "reading": "zhēn"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "really",
+      "meaning_burmese": "တကယ်",
+      "examples_count": 3,
+      "sort_order": 2850,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-b40ac7719d5f4fc72db07a75.mp3"
+    },
+    {
+      "source_row": 286,
+      "source_csv_line": 287,
+      "id": "zh-hsk1-73a32b0faf451f644df4d115",
+      "hash": "73a32b0faf451f644df4d115",
+      "natural_identity": {
+        "written_form": "正在",
+        "reading": "zhèngzài"
+      },
+      "part_of_speech": "adverb",
+      "meaning_english": "in the middle of doing",
+      "meaning_burmese": "…နေသည်",
+      "examples_count": 3,
+      "sort_order": 2860,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-73a32b0faf451f644df4d115.mp3"
+    },
+    {
+      "source_row": 287,
+      "source_csv_line": 288,
+      "id": "zh-hsk1-a94bd1e3fd4591d015ebe54e",
+      "hash": "a94bd1e3fd4591d015ebe54e",
+      "natural_identity": {
+        "written_form": "只",
+        "reading": "zhī"
+      },
+      "part_of_speech": "classifier",
+      "meaning_english": "measure word for animals",
+      "meaning_burmese": "တိရစ္ဆာန်အတွက် အရေအတွက်ပြ စကားလုံး (…ကောင်)",
+      "examples_count": 3,
+      "sort_order": 2870,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a94bd1e3fd4591d015ebe54e.mp3"
+    },
+    {
+      "source_row": 288,
+      "source_csv_line": 289,
+      "id": "zh-hsk1-54449ab54bc92f11455b23bf",
+      "hash": "54449ab54bc92f11455b23bf",
+      "natural_identity": {
+        "written_form": "知道",
+        "reading": "zhīdào"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to know",
+      "meaning_burmese": "သိသည်",
+      "examples_count": 3,
+      "sort_order": 2880,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-54449ab54bc92f11455b23bf.mp3"
+    },
+    {
+      "source_row": 289,
+      "source_csv_line": 290,
+      "id": "zh-hsk1-45c9115079f7ec95f4ed8b27",
+      "hash": "45c9115079f7ec95f4ed8b27",
+      "natural_identity": {
+        "written_form": "中国",
+        "reading": "Zhōngguó"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "China",
+      "meaning_burmese": "တရုတ်ပြည်",
+      "examples_count": 3,
+      "sort_order": 2890,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-45c9115079f7ec95f4ed8b27.mp3"
+    },
+    {
+      "source_row": 290,
+      "source_csv_line": 291,
+      "id": "zh-hsk1-ee7484a08bfff797a9f21945",
+      "hash": "ee7484a08bfff797a9f21945",
+      "natural_identity": {
+        "written_form": "中文",
+        "reading": "Zhōngwén"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "Chinese language",
+      "meaning_burmese": "တရုတ်စာ",
+      "examples_count": 3,
+      "sort_order": 2900,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-ee7484a08bfff797a9f21945.mp3"
+    },
+    {
+      "source_row": 291,
+      "source_csv_line": 292,
+      "id": "zh-hsk1-52932d049a7ed6623b93476f",
+      "hash": "52932d049a7ed6623b93476f",
+      "natural_identity": {
+        "written_form": "中午",
+        "reading": "zhōngwǔ"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "noon",
+      "meaning_burmese": "မွန်းတည့်",
+      "examples_count": 3,
+      "sort_order": 2910,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-52932d049a7ed6623b93476f.mp3"
+    },
+    {
+      "source_row": 292,
+      "source_csv_line": 293,
+      "id": "zh-hsk1-9daba9ea547d2c2a86162bbe",
+      "hash": "9daba9ea547d2c2a86162bbe",
+      "natural_identity": {
+        "written_form": "中学",
+        "reading": "zhōngxué"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "middle school",
+      "meaning_burmese": "အထက်တန်းကျောင်း",
+      "examples_count": 3,
+      "sort_order": 2920,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-9daba9ea547d2c2a86162bbe.mp3"
+    },
+    {
+      "source_row": 293,
+      "source_csv_line": 294,
+      "id": "zh-hsk1-cc933aa7c250d91fade0e2d4",
+      "hash": "cc933aa7c250d91fade0e2d4",
+      "natural_identity": {
+        "written_form": "中学生",
+        "reading": "zhōngxuéshēng"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "middle school student",
+      "meaning_burmese": "အထက်တန်းကျောင်းသား",
+      "examples_count": 3,
+      "sort_order": 2930,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-cc933aa7c250d91fade0e2d4.mp3"
+    },
+    {
+      "source_row": 294,
+      "source_csv_line": 295,
+      "id": "zh-hsk1-1b85327adc58d2ab6f6e837e",
+      "hash": "1b85327adc58d2ab6f6e837e",
+      "natural_identity": {
+        "written_form": "住",
+        "reading": "zhù"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to live, to stay",
+      "meaning_burmese": "နေသည်",
+      "examples_count": 3,
+      "sort_order": 2940,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-1b85327adc58d2ab6f6e837e.mp3"
+    },
+    {
+      "source_row": 295,
+      "source_csv_line": 296,
+      "id": "zh-hsk1-a3875633cf1cf4a234fad391",
+      "hash": "a3875633cf1cf4a234fad391",
+      "natural_identity": {
+        "written_form": "桌子",
+        "reading": "zhuōzi"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "table, desk",
+      "meaning_burmese": "စားပွဲ",
+      "examples_count": 3,
+      "sort_order": 2950,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-a3875633cf1cf4a234fad391.mp3"
+    },
+    {
+      "source_row": 296,
+      "source_csv_line": 297,
+      "id": "zh-hsk1-911bc9c8bea1fd42c0b61f63",
+      "hash": "911bc9c8bea1fd42c0b61f63",
+      "natural_identity": {
+        "written_form": "字",
+        "reading": "zì"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "character, word",
+      "meaning_burmese": "စာလုံး",
+      "examples_count": 3,
+      "sort_order": 2960,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-911bc9c8bea1fd42c0b61f63.mp3"
+    },
+    {
+      "source_row": 297,
+      "source_csv_line": 298,
+      "id": "zh-hsk1-59d53b6af4b0e87aba578a9b",
+      "hash": "59d53b6af4b0e87aba578a9b",
+      "natural_identity": {
+        "written_form": "昨天",
+        "reading": "zuótiān"
+      },
+      "part_of_speech": "noun",
+      "meaning_english": "yesterday",
+      "meaning_burmese": "မနေ့",
+      "examples_count": 3,
+      "sort_order": 2970,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-59d53b6af4b0e87aba578a9b.mp3"
+    },
+    {
+      "source_row": 298,
+      "source_csv_line": 299,
+      "id": "zh-hsk1-5a2846edd1db5c0811cd9848",
+      "hash": "5a2846edd1db5c0811cd9848",
+      "natural_identity": {
+        "written_form": "坐",
+        "reading": "zuò"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to sit; to travel by",
+      "meaning_burmese": "ထိုင်သည်၊ (ယာဉ်) စီးသည်",
+      "examples_count": 3,
+      "sort_order": 2980,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-5a2846edd1db5c0811cd9848.mp3"
+    },
+    {
+      "source_row": 299,
+      "source_csv_line": 300,
+      "id": "zh-hsk1-381a62a5de2731ff55942d4d",
+      "hash": "381a62a5de2731ff55942d4d",
+      "natural_identity": {
+        "written_form": "做",
+        "reading": "zuò"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to do, to make",
+      "meaning_burmese": "လုပ်သည်",
+      "examples_count": 3,
+      "sort_order": 2990,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-381a62a5de2731ff55942d4d.mp3"
+    },
+    {
+      "source_row": 300,
+      "source_csv_line": 301,
+      "id": "zh-hsk1-8545908e10406fb0f3fe6194",
+      "hash": "8545908e10406fb0f3fe6194",
+      "natural_identity": {
+        "written_form": "做饭",
+        "reading": "zuò fàn"
+      },
+      "part_of_speech": "verb",
+      "meaning_english": "to cook",
+      "meaning_burmese": "ထမင်းချက်သည်",
+      "examples_count": 3,
+      "sort_order": 3000,
+      "audio_path": null,
+      "planned_audio_path": "audio/zh/hsk1/zh-hsk1-8545908e10406fb0f3fe6194.mp3"
+    }
+  ]
+}

@@ -61,10 +61,19 @@ export default function LessonPicker() {
   const percent = progress.percent;
 
   const playWordAudio = (word) => {
-    if (word?.audio_path && typeof Audio !== 'undefined') {
+    const audioPath = typeof word?.audio_path === 'string' ? word.audio_path.trim() : null;
+    if (audioPath && typeof Audio !== 'undefined') {
       try {
-        const audio = new Audio(word.audio_path);
-        audio.play().catch(() => speak(sayOf(word)));
+        const audio = new Audio(audioPath);
+        let hasFallenBack = false;
+        const fallback = () => {
+          if (!hasFallenBack) {
+            hasFallenBack = true;
+            speak(sayOf(word));
+          }
+        };
+        audio.addEventListener('error', fallback, { once: true });
+        audio.play().catch(fallback);
         return;
       } catch {
         // Fall back to TTS
@@ -82,8 +91,8 @@ export default function LessonPicker() {
             ? 'Unpublished curriculum'
             : `${completed.toLocaleString()} / ${totalWords.toLocaleString()} completed`)
       : course.id === 'zh'
-        ? `${completed.toLocaleString()} / ${level.words.toLocaleString()} completed`
-        : `${level.words.toLocaleString()} vocabulary words`;
+        ? `${completed.toLocaleString()} / ${(totalWords || level.words).toLocaleString()} completed`
+        : `${(totalWords || level.words).toLocaleString()} vocabulary words`;
 
   return (
     <div className="study-page lesson-page">
