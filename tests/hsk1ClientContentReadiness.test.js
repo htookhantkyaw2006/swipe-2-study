@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { parseCsv } from '../tools/content-csv/parser.mjs';
 import { validateCsvRows } from '../tools/content-csv/validator.mjs';
-import { calculateContentDiff } from '../tools/content-csv/contentImportEngine.mjs';
+import { calculateContentDiff, isContentEqual } from '../tools/content-csv/contentImportEngine.mjs';
 import { mapVocabularyToCard } from '../src/lib/publishedContentService.js';
 import { recordWordAction, getLearnedWords, getLevelProgress } from '../src/lib/vocabularyProgress.js';
 import { createLocalDatabase } from '../src/lib/localDatabase.js';
@@ -434,4 +434,46 @@ test('6. Progress derivation eliminates hardcoded 150 count and scales to actual
   assert.equal(progress.words, 300, 'Derived count is 300, not hardcoded 150');
   assert.equal(progress.uniqueLearned, 30);
   assert.equal(progress.percent, 10, '30 / 300 = 10%');
+});
+
+test('7. Content diff comparator treats database JSONB key order as unchanged against CSV examples', () => {
+  const impRaw = fs.readFileSync(IMPORT_CSV_PATH, 'utf8');
+  const impParsed = parseCsv(impRaw);
+  const rows = impParsed.rows.slice(0, 10);
+
+  for (let i = 0; i < rows.length; i++) {
+    const f = rows[i].fields;
+    const csvExamples = JSON.parse(f[9]);
+
+    // Simulate database JSONB key ordering (e.g. sorted keys or reversed insertion order)
+    const dbExamples = csvExamples.map((ex) => ({
+      burmese: ex.burmese,
+      english: ex.english,
+      reading: ex.reading,
+      text: ex.text,
+    }));
+
+    const currentItem = {
+      id: f[0],
+      course_id: f[1],
+      written_form: f[4],
+      reading: f[5],
+      meaning_english: f[6],
+      meaning_burmese: f[7],
+      audio_path: f[8] || null,
+      examples: dbExamples,
+      sort_order: parseInt(f[10], 10),
+      is_active: true,
+    };
+
+    const incomingItem = {
+      ...currentItem,
+      examples: csvExamples,
+    };
+
+    assert.equal(isContentEqual(currentItem, incomingItem), true, `Row ${i} should be equal despite key order`);
+    const diff = calculateContentDiff({ currentItems: [currentItem], incomingItems: [incomingItem] });
+    assert.equal(diff.counts.unchanged, 1, `Row ${i} should be counted as unchanged`);
+    assert.equal(diff.counts.updated, 0, `Row ${i} should not be counted as updated`);
+  }
 });

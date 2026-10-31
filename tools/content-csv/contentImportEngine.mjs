@@ -45,6 +45,47 @@ export function mapCsvRowsToItems(parsedRows) {
 }
 
 /**
+ * Compares two JSON-compatible values for structural equality,
+ * ignoring object property insertion order while strictly preserving
+ * array element order and detecting actual value differences.
+ */
+export function areJsonValuesEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) {
+    return a === b;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!areJsonValuesEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+    if (!areJsonValuesEqual(a[key], b[key])) return false;
+  }
+  return true;
+}
+
+function coerceExamples(examples) {
+  if (typeof examples === 'string') {
+    try {
+      return JSON.parse(examples);
+    } catch {
+      return examples;
+    }
+  }
+  return examples || [];
+}
+
+/**
  * Performs content comparison between current database row and incoming item.
  */
 export function isContentEqual(current, incoming) {
@@ -57,9 +98,9 @@ export function isContentEqual(current, incoming) {
   if (Number(current.sort_order) !== Number(incoming.sort_order)) return false;
   if (Boolean(current.is_active) !== Boolean(incoming.is_active)) return false;
 
-  const curEx = JSON.stringify(current.examples || []);
-  const incEx = JSON.stringify(incoming.examples || []);
-  return curEx === incEx;
+  const curEx = coerceExamples(current.examples);
+  const incEx = coerceExamples(incoming.examples);
+  return areJsonValuesEqual(curEx, incEx);
 }
 
 /**

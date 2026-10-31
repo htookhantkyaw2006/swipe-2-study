@@ -7,6 +7,7 @@ import {
   SUPPORTED_COURSES,
   computeSha256,
   calculateContentDiff,
+  isContentEqual,
   validateIdentityCompatibility,
   exportRecoverableBackup,
   fetchCourseStatus,
@@ -845,4 +846,173 @@ test('14. CLI argument parsing safety: extra positional args, invalid target, an
   // Test --retire shorthand
   const retireShortFlags = parseCliArgs(['dry-run', 'some/path.csv', '--retire', 'zh_003']);
   assert.deepEqual(retireShortFlags.retireIds, ['zh_003']);
+});
+
+test('15. Production comparator: example property order insensitivity, value change detection, and array order sensitivity', () => {
+  const current = {
+    id: 'zh_001',
+    course_id: 'zh-hsk1',
+    written_form: '中',
+    reading: 'zhōng',
+    meaning_english: 'middle',
+    meaning_burmese: 'အလယ်',
+    audio_path: 'audio/001.mp3',
+    examples: [
+      {
+        text: '我是中国人。',
+        reading: 'Wǒ shì Zhōngguó rén.',
+        english: 'I am Chinese.',
+        burmese: 'ကျွန်တော်/မ တရုတ်လူမျိုးပါ။',
+      },
+      {
+        text: '中文字很有意思。',
+        reading: 'Zhōngwén zì hěn yǒu yìsi.',
+        english: 'Chinese characters are interesting.',
+        burmese: 'တရုတ်စာလုံးတွေက စိတ်ဝင်စားဖို့ကောင်းတယ်။',
+      },
+    ],
+    sort_order: 10,
+    is_active: true,
+  };
+
+  // 1. Reordered object properties remain unchanged
+  const incomingReorderedProperties = {
+    ...current,
+    examples: [
+      // Keys in completely reversed / mixed order compared to current
+      {
+        burmese: 'ကျွန်တော်/မ တရုတ်လူမျိုးပါ။',
+        english: 'I am Chinese.',
+        reading: 'Wǒ shì Zhōngguó rén.',
+        text: '我是中国人。',
+      },
+      {
+        reading: 'Zhōngwén zì hěn yǒu yìsi.',
+        text: '中文字很有意思。',
+        burmese: 'တရုတ်စာလုံးတွေက စိတ်ဝင်စားဖို့ကောင်းတယ်။',
+        english: 'Chinese characters are interesting.',
+      },
+    ],
+  };
+
+  assert.equal(
+    isContentEqual(current, incomingReorderedProperties),
+    true,
+    'Equivalent example objects with different property insertion order must be equal'
+  );
+
+  const diffReordered = calculateContentDiff({
+    currentItems: [current],
+    incomingItems: [incomingReorderedProperties],
+  });
+  assert.equal(diffReordered.counts.unchanged, 1);
+  assert.equal(diffReordered.counts.updated, 0);
+
+  // 2. Changed example text is detected
+  const incomingChangedText = {
+    ...current,
+    examples: [
+      {
+        ...current.examples[0],
+        text: '我不是中国人。',
+      },
+      current.examples[1],
+    ],
+  };
+
+  assert.equal(
+    isContentEqual(current, incomingChangedText),
+    false,
+    'Modified example text must be detected as different'
+  );
+
+  const diffChangedText = calculateContentDiff({
+    currentItems: [current],
+    incomingItems: [incomingChangedText],
+  });
+  assert.equal(diffChangedText.counts.unchanged, 0);
+  assert.equal(diffChangedText.counts.updated, 1);
+
+  // Changed example translation (English or Burmese) is detected
+  const incomingChangedEnglish = {
+    ...current,
+    examples: [
+      {
+        ...current.examples[0],
+        english: 'I am a Chinese citizen.',
+      },
+      current.examples[1],
+    ],
+  };
+
+  assert.equal(
+    isContentEqual(current, incomingChangedEnglish),
+    false,
+    'Modified English translation must be detected as different'
+  );
+
+  const diffChangedEnglish = calculateContentDiff({
+    currentItems: [current],
+    incomingItems: [incomingChangedEnglish],
+  });
+  assert.equal(diffChangedEnglish.counts.unchanged, 0);
+  assert.equal(diffChangedEnglish.counts.updated, 1);
+
+  const incomingChangedBurmese = {
+    ...current,
+    examples: [
+      current.examples[0],
+      {
+        ...current.examples[1],
+        burmese: 'တရုတ်စာလုံးတွေက အရမ်း စိတ်ဝင်စားဖို့ကောင်းတယ်။',
+      },
+    ],
+  };
+
+  assert.equal(
+    isContentEqual(current, incomingChangedBurmese),
+    false,
+    'Modified Burmese translation must be detected as different'
+  );
+
+  const diffChangedBurmese = calculateContentDiff({
+    currentItems: [current],
+    incomingItems: [incomingChangedBurmese],
+  });
+  assert.equal(diffChangedBurmese.counts.unchanged, 0);
+  assert.equal(diffChangedBurmese.counts.updated, 1);
+
+  // 3. Changed example array order is detected
+  const incomingReorderedArray = {
+    ...current,
+    examples: [
+      // Swapped array order: example 2 is now first, example 1 is second
+      // Keep individual object properties reordered to ensure array order check is independent
+      {
+        burmese: 'တရုတ်စာလုံးတွေက စိတ်ဝင်စားဖို့ကောင်းတယ်။',
+        english: 'Chinese characters are interesting.',
+        reading: 'Zhōngwén zì hěn yǒu yìsi.',
+        text: '中文字很有意思。',
+      },
+      {
+        burmese: 'ကျွန်တော်/မ တရုတ်လူမျိုးပါ။',
+        english: 'I am Chinese.',
+        reading: 'Wǒ shì Zhōngguó rén.',
+        text: '我是中国人。',
+      },
+    ],
+  };
+
+  assert.equal(
+    isContentEqual(current, incomingReorderedArray),
+    false,
+    'Changed example array order must be detected as different'
+  );
+
+  const diffReorderedArray = calculateContentDiff({
+    currentItems: [current],
+    incomingItems: [incomingReorderedArray],
+  });
+  assert.equal(diffReorderedArray.counts.unchanged, 0);
+  assert.equal(diffReorderedArray.counts.updated, 1);
 });
