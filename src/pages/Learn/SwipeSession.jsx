@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePresence, useReducedMotion } from 'framer-motion';
-import { ChevronLeft, Check, X, Hand, Shuffle, Volume2, RotateCw } from 'lucide-react';
+import { ChevronLeft, Check, X, Hand, Shuffle, Volume2, RotateCw, Bookmark, BookmarkMinus } from 'lucide-react';
 import { db } from '../../lib/db';
 import { speak } from '../../lib/speech';
 import { playWordAudio } from '../../lib/wordAudio';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
-import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
-import { readSessionCards, buildNormalSessionCards, buildStudiedKeySet } from '../../lib/studyWords';
+import { readingOf, textOf, sayOf, kanaOf, fitFontCss, wordOf } from '../../lib/entry';
+import { readSessionCards, buildNormalSessionCards, buildStudiedKeySet, findSavedWord, buildSavedWordRecord } from '../../lib/studyWords';
 import { phraseCards } from '../../lib/phraseCards';
 import { recordWordAction } from '../../lib/vocabularyProgress';
 import { usePublishedCourse } from '../../lib/publishedContentContext';
@@ -31,7 +31,7 @@ const ShuffleDeck = ({ reducedMotion }) => (
   </div>
 );
 
-const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, hasFlippedOnce, setHasFlippedOnce, dragOffset, reducedMotion, locked }) => {
+const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, hasFlippedOnce, setHasFlippedOnce, dragOffset, reducedMotion, locked, isPhrases, isSaved, onToggleSave }) => {
   const { prefs } = usePreferences();
   const course = useCourse();
   const [isPresent] = usePresence();
@@ -71,6 +71,7 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
     activeAudioRef.current = playWordAudio(card, { speakFn: speak });
   };
   const pronunciation = card.pronunciation ?? readingOf(card);
+  const wordLabel = card.character || wordOf(card) || 'word';
 
   return (
     <motion.div
@@ -111,9 +112,31 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
         >
           <div className="swipe-card__topline">
             <span className="swipe-card__level">{card.level || course.levels[0].name}</span>
-            <button className="swipe-audio" onPointerDown={(e) => e.stopPropagation()} onClick={playWord} aria-label="Play word">
-              <Volume2 size={20} aria-hidden="true" />
-            </button>
+            <div className="swipe-card__actions">
+              {!isPhrases && (
+                <button
+                  type="button"
+                  className={`swipe-bookmark${isSaved ? ' swipe-bookmark--saved' : ''}`}
+                  disabled={!isActive || locked}
+                  aria-pressed={isSaved}
+                  aria-label={`${isSaved ? 'Unsave' : 'Save'} ${wordLabel}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isActive || locked) return;
+                    onToggleSave?.(card);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter') e.stopPropagation();
+                  }}
+                >
+                  {isSaved ? <BookmarkMinus size={20} aria-hidden="true" /> : <Bookmark size={20} aria-hidden="true" />}
+                </button>
+              )}
+              <button className="swipe-audio" onPointerDown={(e) => e.stopPropagation()} onClick={playWord} aria-label="Play word">
+                <Volume2 size={20} aria-hidden="true" />
+              </button>
+            </div>
           </div>
           <div className="swipe-card__word">
             <h2 className="swipe-card__character" style={{ '--word-size': fitFontCss(card.character, 76) }}>{card.character}</h2>
@@ -134,9 +157,31 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
           <div className="swipe-card__answer slim-scrollbar" role="region" aria-label="Answer and examples" tabIndex={isActive && flipped ? 0 : -1}>
             <div className="swipe-card__topline">
               <span className="swipe-card__level">{card.level || course.levels[0].name}</span>
-              <button className="swipe-audio" onPointerDown={(e) => e.stopPropagation()} onClick={playWord} aria-label="Play word">
-                <Volume2 size={20} aria-hidden="true" />
-              </button>
+              <div className="swipe-card__actions">
+                {!isPhrases && (
+                  <button
+                    type="button"
+                    className={`swipe-bookmark${isSaved ? ' swipe-bookmark--saved' : ''}`}
+                    disabled={!isActive || locked}
+                    aria-pressed={isSaved}
+                    aria-label={`${isSaved ? 'Unsave' : 'Save'} ${wordLabel}`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isActive || locked) return;
+                      onToggleSave?.(card);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === ' ' || e.key === 'Enter') e.stopPropagation();
+                    }}
+                  >
+                    {isSaved ? <BookmarkMinus size={20} aria-hidden="true" /> : <Bookmark size={20} aria-hidden="true" />}
+                  </button>
+                )}
+                <button className="swipe-audio" onPointerDown={(e) => e.stopPropagation()} onClick={playWord} aria-label="Play word">
+                  <Volume2 size={20} aria-hidden="true" />
+                </button>
+              </div>
             </div>
             <div className="swipe-card__meaning">
               <h2 className="swipe-card__character" style={{ '--word-size': fitFontCss(card.character, 48) }}>{card.character}</h2>
@@ -328,6 +373,44 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     }
   }, [cards.length, course.id, targetLevel, isPhrases, isReview, isSaved]);
 
+  const [savedWords, setSavedWords] = useState(() => {
+    try { return db.get('saved_words'); } catch { return []; }
+  });
+
+  useEffect(() => {
+    const refresh = () => {
+      try { setSavedWords(db.get('saved_words')); } catch { setSavedWords([]); }
+    };
+    const unsubChange = storageOwner.subscribeChange?.(refresh);
+    const unsubOwner = storageOwner.subscribe?.(refresh);
+    return () => {
+      unsubChange?.();
+      unsubOwner?.();
+    };
+  }, []);
+
+  const handleToggleSave = (targetCard) => {
+    if (!targetCard) return;
+    try {
+      const currentSaved = db.get('saved_words');
+      const existing = findSavedWord(currentSaved, targetCard);
+      if (existing) {
+        db.remove('saved_words', existing.id);
+      } else {
+        const record = buildSavedWordRecord(targetCard);
+        db.insert('saved_words', record);
+        trackEvent('study:word_saved', { courseId: course.id });
+      }
+      setSavedWords(db.get('saved_words'));
+    } catch {
+      try {
+        setSavedWords(db.get('saved_words'));
+      } catch {
+        setSavedWords([]);
+      }
+    }
+  };
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
@@ -482,7 +565,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       <div className="swipe-empty">
         <Check size={32} aria-hidden="true" />
         <h1>{isReview ? 'All caught up!' : isSaved ? 'No saved words yet' : 'No cards yet'}</h1>
-        <p>{isPhrases ? 'Phrases for this level are not available yet. Choose another level to practise.' : isReview ? 'You have no cards to review right now.' : isSaved ? 'Bookmark words in the dictionary to study them here.' : 'Choose a course to start learning.'}</p>
+        <p>{isPhrases ? 'Phrases for this level are not available yet. Choose another level to practise.' : isReview ? 'You have no cards to review right now.' : isSaved ? 'Bookmark words during study sessions or in the dictionary to study them here.' : 'Choose a course to start learning.'}</p>
         <button className="btn-primary" onClick={() => navigate(isPhrases ? '/flashcards' : isSaved ? '/saved' : isReview ? '/learn/review' : '/learn')}>Back to {isPhrases ? 'phrases' : isSaved ? 'saved words' : isReview ? 'review' : 'courses'}</button>
       </div>
     </div>
@@ -510,7 +593,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         <AnimatePresence custom={exitData}>
           {!shuffleState && visibleCards.map((card, idx) => (
             <Flashcard
-              key={card.id}
+              key={card.card_id || card.id}
               card={card}
               isActive={idx === 0}
               flipped={idx === 0 && flipped}
@@ -522,6 +605,9 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
               dragOffset={dragOffset}
               reducedMotion={reducedMotion}
               locked={locked}
+              isPhrases={isPhrases}
+              isSaved={!isPhrases && Boolean(findSavedWord(savedWords, card))}
+              onToggleSave={handleToggleSave}
             />
           ))}
         </AnimatePresence>

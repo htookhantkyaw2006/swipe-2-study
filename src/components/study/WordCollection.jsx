@@ -40,8 +40,15 @@ export default function WordCollection({ kind, words, onUnsave, courseName, noti
           <div className="study-empty">
             <Icon size={30} aria-hidden="true" />
             <h3>{isSaved ? 'Build your word collection' : 'All caught up!'}</h3>
-            <p>{isSaved ? 'Bookmark a word in the dictionary to find it here.' : 'Swipe left during flashcard practice to add a word here.'}</p>
-            <Link className="study-text-link" to={isSaved ? '/dictionary' : '/learn'}>{isSaved ? 'Open dictionary' : 'Explore courses'}</Link>
+            <p>{isSaved ? 'Bookmark words during study sessions or in the dictionary to find them here.' : 'Swipe left during flashcard practice to add a word here.'}</p>
+            {isSaved ? (
+              <div className="study-empty__actions" style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Link className="study-text-link" to="/learn">Start learning</Link>
+                <Link className="study-text-link" to="/dictionary">Open dictionary</Link>
+              </div>
+            ) : (
+              <Link className="study-text-link" to="/learn">Explore courses</Link>
+            )}
           </div>
         ) : visibleWords.length === 0 ? (
           <div className="study-empty"><h3>No matching words</h3><p>Try another word, reading or meaning.</p><button className="btn-secondary" onClick={() => setQuery('')}>Clear search</button></div>

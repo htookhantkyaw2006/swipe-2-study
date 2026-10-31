@@ -1,4 +1,4 @@
-import { matchesQuery, readingOf, wordOf } from './entry.js';
+import { matchesQuery, readingOf, wordOf, kanaOf } from './entry.js';
 
 // IDs in old guest/account starter decks were generated independently. Compare
 // written form + pronunciation, preserving tones and distinct readings.
@@ -27,6 +27,88 @@ export function wordDetails(word) {
 
 export function filterStudyWords(words, query) {
   return query.trim() ? words.filter(word => matchesQuery(wordDetails(word), query)) : words;
+}
+
+/**
+ * Find an existing saved word matching a vocabulary card or dictionary entry.
+ * Checks canonical card_id if present, natural identity (word + pronunciation/reading,
+ * tone-preserving) to recognize compatible legacy/Dictionary bookmarks, and
+ * fallback storage/card IDs.
+ *
+ * @param {object[]} savedWords  Array of stored rows from 'saved_words'.
+ * @param {object}   card        Vocabulary card or entry to search for.
+ * @returns {object|null}        The matched stored record (with its stored id), or null.
+ */
+export function findSavedWord(savedWords, card) {
+  if (!Array.isArray(savedWords) || !card || typeof card !== 'object') return null;
+
+  // 1. Direct canonical card_id match if item has card_id and card has card_id
+  if (card.card_id) {
+    for (const item of savedWords) {
+      if (item && item.card_id === card.card_id) return item;
+    }
+  }
+
+  // 2. Natural key match (written form + reading/pronunciation), preserving tones and polyphones
+  const cardKey = studyWordKey(card);
+  if (cardKey !== null) {
+    for (const item of savedWords) {
+      if (item && studyWordKey(item) === cardKey) return item;
+    }
+  }
+
+  // 3. Fallback matching when card.id is a stable card reference matching item.card_id or item is the exact stored record by id (e.g. in saved session)
+  if (card.id) {
+    for (const item of savedWords) {
+      if (item && (item.card_id === card.id || item.id === card.id)) return item;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Build a new record for inserting into 'saved_words' from a vocabulary card.
+ * Preserves canonical card_id, level, phrase, reading, definitions, examples,
+ * and optional audio_path / part_of_speech.
+ * Does NOT set a storage 'id', allowing db.insert to assign a dedicated storage UUID,
+ * distinguishing vocabulary identity (card_id) from storage record id.
+ *
+ * @param {object} card  Vocabulary card to bookmark.
+ * @returns {object}     Payload ready for db.insert('saved_words', ...).
+ */
+export function buildSavedWordRecord(card) {
+  if (!card || typeof card !== 'object') return {};
+  const phrase = wordOf(card);
+  const reading = card.pronunciation ?? readingOf(card);
+  const english = card.definition ?? card.english ?? '';
+  const burmese = card.burmese_definition ?? card.burmese ?? '';
+  const kana = kanaOf(card);
+  const cardId = card.card_id ?? (card.id && typeof card.id === 'string' && !card.id.includes('/') ? card.id : undefined);
+
+  const record = {
+    phrase,
+    reading,
+    english,
+    burmese,
+    definition: english,
+    burmese_definition: burmese,
+  };
+
+  if (kana) record.kana = kana;
+  if (cardId) record.card_id = cardId;
+  if (card.level) record.level = card.level;
+  if (Array.isArray(card.examples) && card.examples.length > 0) {
+    record.examples = card.examples;
+  }
+  if (typeof card.audio_path === 'string' && card.audio_path) {
+    record.audio_path = card.audio_path;
+  }
+  if (typeof card.part_of_speech === 'string' && card.part_of_speech) {
+    record.part_of_speech = card.part_of_speech;
+  }
+
+  return record;
 }
 
 export function readSessionCards(database, { mode = 'learn', levelId = null } = {}) {
