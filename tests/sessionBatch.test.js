@@ -213,6 +213,74 @@ test('sessionBatch: allStudied is true and cards is empty when all words have be
   assert.equal(result.cards.length, 0);
   assert.equal(result.totalStudied, 5);
   assert.equal(result.totalActive, 5);
+  assert.equal(result.totalCourseActive, 5);
+});
+
+test('sessionBatch: zero active vocabulary returns honest uncompleted state', () => {
+  const db = createTestDb();
+  const resultGuest = buildNormalSessionCards([], studiedFrom(db), { isGuest: true, guestTrialSize: 30 });
+  assert.equal(resultGuest.allStudied, false, 'zero words is not allStudied');
+  assert.equal(resultGuest.allTrialStudied, false, 'zero words is not allTrialStudied');
+  assert.equal(resultGuest.totalActive, 0);
+  assert.equal(resultGuest.totalCourseActive, 0);
+  assert.equal(resultGuest.trialSize, 0, 'trialSize is 0 when 0 words exist');
+  assert.equal(resultGuest.cards.length, 0);
+
+  const resultSignedIn = buildNormalSessionCards([], studiedFrom(db), { isGuest: false });
+  assert.equal(resultSignedIn.allStudied, false);
+  assert.equal(resultSignedIn.allTrialStudied, false);
+  assert.equal(resultSignedIn.totalActive, 0);
+  assert.equal(resultSignedIn.totalCourseActive, 0);
+  assert.equal(resultSignedIn.trialSize, 0);
+  assert.equal(resultSignedIn.cards.length, 0);
+});
+
+test('sessionBatch: fewer than 30 active words caps effective trial size to actual count', () => {
+  const db = createTestDb();
+  const pool5 = makePool(5);
+  for (const card of pool5) swipe(db, card, 'right');
+
+  const result = buildNormalSessionCards(pool5, studiedFrom(db), {
+    isGuest: true,
+    guestTrialSize: 30,
+  });
+
+  assert.equal(result.allStudied, true);
+  assert.equal(result.allTrialStudied, true);
+  assert.equal(result.totalCourseActive, 5, 'course total is 5');
+  assert.equal(result.totalActive, 5, 'trial pool is 5');
+  assert.equal(result.trialSize, 5, 'trialSize reports actual effective pool of 5, not 30');
+  assert.equal(result.totalStudied, 5);
+  assert.equal(result.cards.length, 0);
+});
+
+test('sessionBatch: keeps normal course totals separate from trial totals', () => {
+  const db = createTestDb();
+  const pool = makePool(300);
+  for (const card of pool.slice(0, 30)) swipe(db, card, 'right');
+
+  const guestResult = buildNormalSessionCards(pool, studiedFrom(db), {
+    isGuest: true,
+    guestTrialSize: 30,
+  });
+  assert.equal(guestResult.totalCourseActive, 300, 'guest totalCourseActive reports full course size');
+  assert.equal(guestResult.totalActive, 30, 'guest totalActive reports trial pool size');
+  assert.equal(guestResult.trialSize, 30, 'guest trialSize reports 30');
+  assert.equal(guestResult.totalStudied, 30);
+  assert.equal(guestResult.allTrialStudied, true);
+
+  const signedInResult = buildNormalSessionCards(pool, studiedFrom(db), {
+    isGuest: false,
+    sessionSize: 10,
+  });
+  assert.equal(signedInResult.totalCourseActive, 300, 'signed-in totalCourseActive reports full course size');
+  assert.equal(signedInResult.totalActive, 300, 'signed-in totalActive reports full course size');
+  assert.equal(signedInResult.trialSize, 0, 'signed-in trialSize is 0');
+  assert.equal(signedInResult.totalStudied, 30);
+  assert.equal(signedInResult.allStudied, false);
+  assert.equal(signedInResult.allTrialStudied, false);
+  assert.equal(signedInResult.cards.length, 10);
+  assert.equal(signedInResult.cards[0].id, 'card-31');
 });
 
 // ---------------------------------------------------------------------------

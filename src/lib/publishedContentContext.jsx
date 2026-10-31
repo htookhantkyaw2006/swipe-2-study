@@ -17,13 +17,13 @@ const DEFAULT_STATE = Object.freeze({
   isPublished: false,
 });
 
-export function PublishedContentProvider({ children, client = null, enabledOverride = null }) {
+export function PublishedContentProvider({ children, client = null, enabledOverride = null, initialCache = null }) {
   const { languageId } = useLanguage();
   const enabled = enabledOverride !== null ? enabledOverride : isPublishedContentEnabled();
 
   // In-memory cache of published courses: { [courseId]: { status, items, version, error, isPublished } }
-  const [cache, setCache] = useState({});
-  const cacheRef = useRef({});
+  const [cache, setCache] = useState(() => initialCache || {});
+  const cacheRef = useRef(initialCache || {});
   const inFlightRef = useRef(new Map());
   const requestTokensRef = useRef(new Map());
 

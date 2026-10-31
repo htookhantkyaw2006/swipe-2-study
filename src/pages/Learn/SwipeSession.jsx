@@ -12,6 +12,7 @@ import { readSessionCards, buildNormalSessionCards, buildStudiedKeySet } from '.
 import { phraseCards } from '../../lib/phraseCards';
 import { recordWordAction } from '../../lib/vocabularyProgress';
 import { usePublishedCourse } from '../../lib/publishedContentContext';
+import { resolvePublishedCourseId } from '../../lib/publishedContentService';
 import { AuthContext } from '../../lib/authContext';
 import { storageOwner } from '../../lib/storageOwner';
 import { trackEvent } from '../../lib/analytics';
@@ -217,9 +218,11 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const isNormalLearn = !isReview && !isSaved && !isPhrases;
 
   // Guest trial policy applies strictly to Chinese HSK1.
+  // Resolve the canonical course ID using the existing published-course resolver:
+  // e.g. 'HSK1', '1', 'HSK 1' all resolve to 'zh-hsk1'.
   // Japanese N5 (and any other courses) have no trial cap.
-  const isHsk1 = (course.id === 'zh' && (!targetLevel || String(targetLevel).trim().toUpperCase() === 'HSK1')) ||
-    String(targetLevel).trim().toUpperCase() === 'HSK1';
+  const resolvedCourseId = resolvePublishedCourseId(course.id, targetLevel);
+  const isHsk1 = resolvedCourseId === 'zh-hsk1';
   const isTrialApplicable = isNormalLearn && isHsk1;
 
   // Wait for auth to resolve before confirming guest status.
@@ -230,37 +233,6 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     : (storageOwner.getOwner() === null);
   const isTrialGuest = isTrialApplicable && isConfirmedGuest;
 
-  // Completion state for normal-Learn sessions.
-  // - 'none'        : not completed (cards available or loading)
-  // - 'trial-done'  : guest finished all 30 trial words on HSK1
-  // - 'all-studied' : signed-in learner finished every active course word
-  const [completionKind, setCompletionKind] = useState(() => {
-    if (isPublishedSession && publishedCourse.isLoaded) {
-      const result = snapshotLearnSession(publishedCourse.items, {
-        isTrialGuest,
-        cardOrder: prefs.cardOrder,
-        cardsPerSession: prefs.cardsPerSession,
-      });
-      if (result.allStudied) {
-        return result.allTrialStudied ? 'trial-done' : 'all-studied';
-      }
-    } else if (isNormalLearn && !isPublishedSession) {
-      const allCards = readSessionCards(db, { mode: 'learn', levelId });
-      if (allCards.length > 0) {
-        const result = snapshotLearnSession(allCards, {
-          isTrialGuest,
-          cardOrder: prefs.cardOrder,
-          cardsPerSession: prefs.cardsPerSession,
-        });
-        if (result.allStudied) {
-          return result.allTrialStudied ? 'trial-done' : 'all-studied';
-        }
-      }
-    }
-    return 'none';
-  });
-
-  // A session snapshots its deck; preferences cannot replace cards mid-session.
   const [cards, setCards] = useState(() => {
     if (isPublishedSession) {
       if (publishedCourse.isLoaded) {
@@ -274,8 +246,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       return [];
     }
     if (isNormalLearn) {
-      // Bundled-card normal-Learn: apply studied exclusion immediately.
-      const allCards = readSessionCards(db, { mode: 'learn', levelId });
+      const allCards = readSessionCards(db, { mode: 'learn', levelId: isHsk1 ? (course.levels[0]?.id || levelId) : levelId });
       const result = snapshotLearnSession(allCards, {
         isTrialGuest,
         cardOrder: prefs.cardOrder,
@@ -288,6 +259,38 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     return (prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards).slice(0, prefs.cardsPerSession);
   });
 
+  const [completionState, setCompletionState] = useState(() => {
+    if (isPublishedSession && publishedCourse.isLoaded) {
+      const result = snapshotLearnSession(publishedCourse.items, {
+        isTrialGuest,
+        cardOrder: prefs.cardOrder,
+        cardsPerSession: prefs.cardsPerSession,
+      });
+      if (result.allStudied) {
+        return {
+          kind: result.allTrialStudied ? 'trial-done' : 'all-studied',
+          trialSize: result.trialSize,
+        };
+      }
+    } else if (isNormalLearn && !isPublishedSession) {
+      const allCards = readSessionCards(db, { mode: 'learn', levelId: isHsk1 ? (course.levels[0]?.id || levelId) : levelId });
+      if (allCards.length > 0) {
+        const result = snapshotLearnSession(allCards, {
+          isTrialGuest,
+          cardOrder: prefs.cardOrder,
+          cardsPerSession: prefs.cardsPerSession,
+        });
+        if (result.allStudied) {
+          return {
+            kind: result.allTrialStudied ? 'trial-done' : 'all-studied',
+            trialSize: result.trialSize,
+          };
+        }
+      }
+    }
+    return { kind: 'none', trialSize: 0 };
+  });
+
   const initializedRef = useRef(isPublishedSession && publishedCourse.isLoaded);
   useEffect(() => {
     if (isPublishedSession && publishedCourse.isLoaded && !initializedRef.current) {
@@ -298,33 +301,17 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         cardsPerSession: prefs.cardsPerSession,
       });
       if (result.allStudied) {
-        setCompletionKind(result.allTrialStudied ? 'trial-done' : 'all-studied');
+        setCompletionState({
+          kind: result.allTrialStudied ? 'trial-done' : 'all-studied',
+          trialSize: result.trialSize,
+        });
         setCards([]);
       } else {
+        setCompletionState({ kind: 'none', trialSize: result.trialSize });
         setCards(result.cards);
       }
     }
   }, [isPublishedSession, publishedCourse.isLoaded, publishedCourse.items, prefs.cardOrder, prefs.cardsPerSession, isTrialGuest]);
-
-  // For bundled-card normal-Learn: update completionKind after mount if needed.
-  const bundledCompletionRef = useRef(false);
-  useEffect(() => {
-    if (!isNormalLearn || isPublishedSession || bundledCompletionRef.current) return;
-    if (cards.length === 0) {
-      bundledCompletionRef.current = true;
-      const allCards = readSessionCards(db, { mode: 'learn', levelId });
-      if (allCards.length > 0) {
-        const result = snapshotLearnSession(allCards, {
-          isTrialGuest,
-          cardOrder: prefs.cardOrder,
-          cardsPerSession: prefs.cardsPerSession,
-        });
-        if (result.allStudied) {
-          setCompletionKind(result.allTrialStudied ? 'trial-done' : 'all-studied');
-        }
-      }
-    }
-  }, [isNormalLearn, isPublishedSession, cards.length, levelId, isTrialGuest, prefs.cardOrder, prefs.cardsPerSession]);
 
   const sessionStartedRef = useRef(false);
   useEffect(() => {
@@ -454,14 +441,18 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   }
 
   // Normal-Learn completion screens (guest trial done or all words studied).
-  if (isNormalLearn && completionKind === 'trial-done') {
-    const returnTo = encodeURIComponent(`/learn/level/${encodeURIComponent(targetLevel)}`);
+  if (isNormalLearn && completionState.kind === 'trial-done') {
+    const canonicalLevelId = isHsk1 ? 'HSK1' : targetLevel;
+    const returnTo = encodeURIComponent(`/learn/level/${encodeURIComponent(canonicalLevelId)}`);
+    const count = completionState.trialSize;
     return (
       <div className="swipe-session swipe-session--empty">
         <div className="swipe-empty">
           <Check size={32} aria-hidden="true" />
           <h1>Free trial complete</h1>
-          <p>You&apos;ve studied all 30 free trial words. Sign in to unlock the full course and keep your progress.</p>
+          <p>
+            You&apos;ve studied all {count} free trial {count === 1 ? 'word' : 'words'}. Sign in to unlock the full course and keep your progress.
+          </p>
           <a className="btn-primary" href={`/login?returnTo=${returnTo}`}>Sign in to continue</a>
           <button className="btn-secondary" onClick={() => navigate(backTo)} style={{ marginTop: 8 }}>Back to course</button>
         </div>
@@ -469,7 +460,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     );
   }
 
-  if (isNormalLearn && completionKind === 'all-studied') {
+  if (isNormalLearn && completionState.kind === 'all-studied') {
     const hasReview = (() => { try { return db.get('review_cards').length > 0; } catch { return false; } })();
     return (
       <div className="swipe-session swipe-session--empty">

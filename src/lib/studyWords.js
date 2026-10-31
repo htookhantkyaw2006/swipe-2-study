@@ -76,10 +76,11 @@ function shuffleInPlace(arr) {
  * @returns {{
  *   cards: object[],           Cards to present in this session (snapshotted).
  *   totalActive: number,       Total active cards in the effective pool.
+ *   totalCourseActive: number, Total active cards across the level (before trial cap).
  *   totalStudied: number,      Studied cards within the effective pool.
- *   allStudied: boolean,       Every card in the effective pool has been studied.
- *   allTrialStudied: boolean,  Guest-specific: all trial words have been studied.
- *   trialSize: number,         Guest trial pool size (0 for signed-in learners).
+ *   allStudied: boolean,       Every card in the effective pool has been studied (false if 0 cards).
+ *   allTrialStudied: boolean,  Guest-specific: all trial words have been studied (false if 0 cards).
+ *   trialSize: number,         Effective guest trial pool size (0 for signed-in learners or 0 cards).
  * }}
  */
 export function buildNormalSessionCards(activeCards, studiedKeys, {
@@ -88,9 +89,22 @@ export function buildNormalSessionCards(activeCards, studiedKeys, {
   isGuest = false,
   guestTrialSize = 30,
 } = {}) {
-  // For guests, cap the eligible pool to the first guestTrialSize cards by
-  // canonical sort_order (the caller is responsible for sort order).
-  const pool = isGuest ? activeCards.slice(0, guestTrialSize) : activeCards;
+  const totalCourseActive = Array.isArray(activeCards) ? activeCards.length : 0;
+  if (totalCourseActive === 0) {
+    return {
+      cards: [],
+      totalActive: 0,
+      totalCourseActive: 0,
+      totalStudied: 0,
+      allStudied: false,
+      allTrialStudied: false,
+      trialSize: 0,
+    };
+  }
+
+  // Effective trial size is at most the total active vocabulary available.
+  const effectiveTrialSize = isGuest ? Math.min(totalCourseActive, guestTrialSize) : 0;
+  const pool = isGuest ? activeCards.slice(0, effectiveTrialSize) : activeCards;
 
   const totalActive = pool.length;
   let studiedInPool = 0;
@@ -107,17 +121,18 @@ export function buildNormalSessionCards(activeCards, studiedKeys, {
   }
 
   const totalStudied = studiedInPool;
-  const allStudied = unstudied.length === 0;
+  const allStudied = totalActive > 0 && unstudied.length === 0;
   const allTrialStudied = isGuest && allStudied;
 
   if (allStudied) {
     return {
       cards: [],
       totalActive,
+      totalCourseActive,
       totalStudied,
       allStudied: true,
       allTrialStudied,
-      trialSize: isGuest ? guestTrialSize : 0,
+      trialSize: effectiveTrialSize,
     };
   }
 
@@ -127,10 +142,11 @@ export function buildNormalSessionCards(activeCards, studiedKeys, {
   return {
     cards,
     totalActive,
+    totalCourseActive,
     totalStudied,
     allStudied: false,
     allTrialStudied: false,
-    trialSize: isGuest ? guestTrialSize : 0,
+    trialSize: effectiveTrialSize,
   };
 }
 
