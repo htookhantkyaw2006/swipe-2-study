@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePresence, useReducedMotion } from 'framer-motion';
 import { ChevronLeft, Check, X, Hand, Shuffle, Volume2, RotateCw } from 'lucide-react';
@@ -8,10 +8,12 @@ import { playWordAudio } from '../../lib/wordAudio';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
 import { readingOf, textOf, sayOf, kanaOf, fitFontCss } from '../../lib/entry';
-import { readSessionCards } from '../../lib/studyWords';
+import { readSessionCards, buildNormalSessionCards, buildStudiedKeySet } from '../../lib/studyWords';
 import { phraseCards } from '../../lib/phraseCards';
 import { recordWordAction } from '../../lib/vocabularyProgress';
 import { usePublishedCourse } from '../../lib/publishedContentContext';
+import { AuthContext } from '../../lib/authContext';
+import { storageOwner } from '../../lib/storageOwner';
 import { trackEvent } from '../../lib/analytics';
 import './SwipeSession.css';
 
@@ -183,6 +185,25 @@ const shuffleCards = (list) => {
   return copy;
 };
 
+/**
+ * Snapshot a normal-Learn session deck from published or bundled active cards.
+ * Excludes words the learner has already swiped (seen >= 1).
+ * For confirmed guest learners on HSK1, caps the eligible pool to guestTrialSize words.
+ */
+function snapshotLearnSession(allCards, { isTrialGuest, cardOrder, cardsPerSession }) {
+  const GUEST_TRIAL_SIZE = 30;
+  const learnedWords = (() => {
+    try { return db.get('learned_words'); } catch { return []; }
+  })();
+  const studiedKeys = buildStudiedKeySet(learnedWords);
+  return buildNormalSessionCards(allCards, studiedKeys, {
+    shuffle: cardOrder === 'shuffle',
+    sessionSize: cardsPerSession,
+    isGuest: isTrialGuest,
+    guestTrialSize: GUEST_TRIAL_SIZE,
+  });
+}
+
 export default function SwipeSession({ isReview = false, isSaved = false, isPhrases = false }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -193,15 +214,74 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const targetLevel = levelId || course.levels[0]?.id;
   const publishedCourse = usePublishedCourse(targetLevel);
   const isPublishedSession = !isReview && !isSaved && !isPhrases && publishedCourse.enabled && publishedCourse.isInScope;
+  const isNormalLearn = !isReview && !isSaved && !isPhrases;
+
+  // Guest trial policy applies strictly to Chinese HSK1.
+  // Japanese N5 (and any other courses) have no trial cap.
+  const isHsk1 = (course.id === 'zh' && (!targetLevel || String(targetLevel).trim().toUpperCase() === 'HSK1')) ||
+    String(targetLevel).trim().toUpperCase() === 'HSK1';
+  const isTrialApplicable = isNormalLearn && isHsk1;
+
+  // Wait for auth to resolve before confirming guest status.
+  // If auth is loading or transitioning, we do not treat as a confirmed guest.
+  const auth = useContext(AuthContext);
+  const isConfirmedGuest = auth
+    ? (auth.isGuest && !auth.loading && !auth.isTransitioning)
+    : (storageOwner.getOwner() === null);
+  const isTrialGuest = isTrialApplicable && isConfirmedGuest;
+
+  // Completion state for normal-Learn sessions.
+  // - 'none'        : not completed (cards available or loading)
+  // - 'trial-done'  : guest finished all 30 trial words on HSK1
+  // - 'all-studied' : signed-in learner finished every active course word
+  const [completionKind, setCompletionKind] = useState(() => {
+    if (isPublishedSession && publishedCourse.isLoaded) {
+      const result = snapshotLearnSession(publishedCourse.items, {
+        isTrialGuest,
+        cardOrder: prefs.cardOrder,
+        cardsPerSession: prefs.cardsPerSession,
+      });
+      if (result.allStudied) {
+        return result.allTrialStudied ? 'trial-done' : 'all-studied';
+      }
+    } else if (isNormalLearn && !isPublishedSession) {
+      const allCards = readSessionCards(db, { mode: 'learn', levelId });
+      if (allCards.length > 0) {
+        const result = snapshotLearnSession(allCards, {
+          isTrialGuest,
+          cardOrder: prefs.cardOrder,
+          cardsPerSession: prefs.cardsPerSession,
+        });
+        if (result.allStudied) {
+          return result.allTrialStudied ? 'trial-done' : 'all-studied';
+        }
+      }
+    }
+    return 'none';
+  });
 
   // A session snapshots its deck; preferences cannot replace cards mid-session.
   const [cards, setCards] = useState(() => {
     if (isPublishedSession) {
       if (publishedCourse.isLoaded) {
-        const allCards = publishedCourse.items;
-        return (prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards).slice(0, prefs.cardsPerSession);
+        const result = snapshotLearnSession(publishedCourse.items, {
+          isTrialGuest,
+          cardOrder: prefs.cardOrder,
+          cardsPerSession: prefs.cardsPerSession,
+        });
+        return result.cards;
       }
       return [];
+    }
+    if (isNormalLearn) {
+      // Bundled-card normal-Learn: apply studied exclusion immediately.
+      const allCards = readSessionCards(db, { mode: 'learn', levelId });
+      const result = snapshotLearnSession(allCards, {
+        isTrialGuest,
+        cardOrder: prefs.cardOrder,
+        cardsPerSession: prefs.cardsPerSession,
+      });
+      return result.cards;
     }
     const allCards = isPhrases ? phraseCards(course, levelId) : readSessionCards(db, { mode: isReview ? 'review' : isSaved ? 'saved' : 'learn', levelId });
     if (isReview || isSaved) return allCards;
@@ -212,10 +292,39 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   useEffect(() => {
     if (isPublishedSession && publishedCourse.isLoaded && !initializedRef.current) {
       initializedRef.current = true;
-      const allCards = publishedCourse.items;
-      setCards((prefs.cardOrder === 'shuffle' ? shuffleCards(allCards) : allCards).slice(0, prefs.cardsPerSession));
+      const result = snapshotLearnSession(publishedCourse.items, {
+        isTrialGuest,
+        cardOrder: prefs.cardOrder,
+        cardsPerSession: prefs.cardsPerSession,
+      });
+      if (result.allStudied) {
+        setCompletionKind(result.allTrialStudied ? 'trial-done' : 'all-studied');
+        setCards([]);
+      } else {
+        setCards(result.cards);
+      }
     }
-  }, [isPublishedSession, publishedCourse.isLoaded, publishedCourse.items, prefs.cardOrder, prefs.cardsPerSession]);
+  }, [isPublishedSession, publishedCourse.isLoaded, publishedCourse.items, prefs.cardOrder, prefs.cardsPerSession, isTrialGuest]);
+
+  // For bundled-card normal-Learn: update completionKind after mount if needed.
+  const bundledCompletionRef = useRef(false);
+  useEffect(() => {
+    if (!isNormalLearn || isPublishedSession || bundledCompletionRef.current) return;
+    if (cards.length === 0) {
+      bundledCompletionRef.current = true;
+      const allCards = readSessionCards(db, { mode: 'learn', levelId });
+      if (allCards.length > 0) {
+        const result = snapshotLearnSession(allCards, {
+          isTrialGuest,
+          cardOrder: prefs.cardOrder,
+          cardsPerSession: prefs.cardsPerSession,
+        });
+        if (result.allStudied) {
+          setCompletionKind(result.allTrialStudied ? 'trial-done' : 'all-studied');
+        }
+      }
+    }
+  }, [isNormalLearn, isPublishedSession, cards.length, levelId, isTrialGuest, prefs.cardOrder, prefs.cardsPerSession]);
 
   const sessionStartedRef = useRef(false);
   useEffect(() => {
@@ -339,6 +448,39 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
           <h1>Course not published</h1>
           <p>This course has not been published yet.</p>
           <button className="btn-primary" onClick={() => navigate(backTo)}>Back to courses</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal-Learn completion screens (guest trial done or all words studied).
+  if (isNormalLearn && completionKind === 'trial-done') {
+    const returnTo = encodeURIComponent(`/learn/level/${encodeURIComponent(targetLevel)}`);
+    return (
+      <div className="swipe-session swipe-session--empty">
+        <div className="swipe-empty">
+          <Check size={32} aria-hidden="true" />
+          <h1>Free trial complete</h1>
+          <p>You&apos;ve studied all 30 free trial words. Sign in to unlock the full course and keep your progress.</p>
+          <a className="btn-primary" href={`/login?returnTo=${returnTo}`}>Sign in to continue</a>
+          <button className="btn-secondary" onClick={() => navigate(backTo)} style={{ marginTop: 8 }}>Back to course</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isNormalLearn && completionKind === 'all-studied') {
+    const hasReview = (() => { try { return db.get('review_cards').length > 0; } catch { return false; } })();
+    return (
+      <div className="swipe-session swipe-session--empty">
+        <div className="swipe-empty">
+          <Check size={32} aria-hidden="true" />
+          <h1>All words studied</h1>
+          <p>You&apos;ve worked through every word in this level. New words will appear here when the course is updated.</p>
+          {hasReview && (
+            <button className="btn-primary" onClick={() => navigate('/learn/review')}>Go to Review</button>
+          )}
+          <button className={hasReview ? 'btn-secondary' : 'btn-primary'} onClick={() => navigate(backTo)} style={hasReview ? { marginTop: 8 } : {}}>Back to course</button>
         </div>
       </div>
     );
