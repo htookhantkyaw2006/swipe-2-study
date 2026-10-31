@@ -72,6 +72,8 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
   };
   const pronunciation = card.pronunciation ?? readingOf(card);
   const wordLabel = card.character || wordOf(card) || 'word';
+  const isBookmarked = isSaved === true;
+  const isUnavailable = isSaved === null;
 
   return (
     <motion.div
@@ -116,21 +118,25 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
               {!isPhrases && (
                 <button
                   type="button"
-                  className={`swipe-bookmark${isSaved ? ' swipe-bookmark--saved' : ''}`}
-                  disabled={!isActive || locked}
-                  aria-pressed={isSaved}
-                  aria-label={`${isSaved ? 'Unsave' : 'Save'} ${wordLabel}`}
+                  className={`swipe-bookmark${isBookmarked ? ' swipe-bookmark--saved' : ''}${isUnavailable ? ' swipe-bookmark--unavailable' : ''}`}
+                  disabled={!isActive || locked || isUnavailable}
+                  aria-pressed={isUnavailable ? undefined : isBookmarked}
+                  aria-label={
+                    isUnavailable
+                      ? `Bookmark status unavailable for ${wordLabel}`
+                      : `${isBookmarked ? 'Unsave' : 'Save'} ${wordLabel}`
+                  }
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isActive || locked) return;
+                    if (!isActive || locked || isUnavailable) return;
                     onToggleSave?.(card);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === ' ' || e.key === 'Enter') e.stopPropagation();
                   }}
                 >
-                  {isSaved ? <BookmarkMinus size={20} aria-hidden="true" /> : <Bookmark size={20} aria-hidden="true" />}
+                  {isBookmarked ? <BookmarkMinus size={20} aria-hidden="true" /> : <Bookmark size={20} aria-hidden="true" />}
                 </button>
               )}
               <button className="swipe-audio" onPointerDown={(e) => e.stopPropagation()} onClick={playWord} aria-label="Play word">
@@ -161,21 +167,25 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
                 {!isPhrases && (
                   <button
                     type="button"
-                    className={`swipe-bookmark${isSaved ? ' swipe-bookmark--saved' : ''}`}
-                    disabled={!isActive || locked}
-                    aria-pressed={isSaved}
-                    aria-label={`${isSaved ? 'Unsave' : 'Save'} ${wordLabel}`}
+                    className={`swipe-bookmark${isBookmarked ? ' swipe-bookmark--saved' : ''}${isUnavailable ? ' swipe-bookmark--unavailable' : ''}`}
+                    disabled={!isActive || locked || isUnavailable}
+                    aria-pressed={isUnavailable ? undefined : isBookmarked}
+                    aria-label={
+                      isUnavailable
+                        ? `Bookmark status unavailable for ${wordLabel}`
+                        : `${isBookmarked ? 'Unsave' : 'Save'} ${wordLabel}`
+                    }
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isActive || locked) return;
+                      if (!isActive || locked || isUnavailable) return;
                       onToggleSave?.(card);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === ' ' || e.key === 'Enter') e.stopPropagation();
                     }}
                   >
-                    {isSaved ? <BookmarkMinus size={20} aria-hidden="true" /> : <Bookmark size={20} aria-hidden="true" />}
+                    {isBookmarked ? <BookmarkMinus size={20} aria-hidden="true" /> : <Bookmark size={20} aria-hidden="true" />}
                   </button>
                 )}
                 <button className="swipe-audio" onPointerDown={(e) => e.stopPropagation()} onClick={playWord} aria-label="Play word">
@@ -373,13 +383,33 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     }
   }, [cards.length, course.id, targetLevel, isPhrases, isReview, isSaved]);
 
+  const [bookmarkFeedback, setBookmarkFeedback] = useState(() => {
+    try {
+      db.get('saved_words');
+      return null;
+    } catch {
+      return 'Unable to load bookmark state.';
+    }
+  });
+
   const [savedWords, setSavedWords] = useState(() => {
-    try { return db.get('saved_words'); } catch { return []; }
+    try {
+      return db.get('saved_words');
+    } catch {
+      return null; // Null indicates unreadable state (do NOT default to [] which falsely confirms unsaved)
+    }
   });
 
   useEffect(() => {
     const refresh = () => {
-      try { setSavedWords(db.get('saved_words')); } catch { setSavedWords([]); }
+      try {
+        const words = db.get('saved_words');
+        setSavedWords(words);
+        setBookmarkFeedback(prev => (prev === 'Unable to load bookmark state.' ? null : prev));
+      } catch {
+        setSavedWords(null);
+        setBookmarkFeedback('Unable to load bookmark state.');
+      }
     };
     const unsubChange = storageOwner.subscribeChange?.(refresh);
     const unsubOwner = storageOwner.subscribe?.(refresh);
@@ -391,9 +421,11 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
 
   const handleToggleSave = (targetCard) => {
     if (!targetCard) return;
+    let isRemoving = false;
     try {
       const currentSaved = db.get('saved_words');
       const existing = findSavedWord(currentSaved, targetCard);
+      isRemoving = Boolean(existing);
       if (existing) {
         db.remove('saved_words', existing.id);
       } else {
@@ -402,11 +434,14 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         trackEvent('study:word_saved', { courseId: course.id });
       }
       setSavedWords(db.get('saved_words'));
+      setBookmarkFeedback(null);
     } catch {
+      const action = isRemoving ? 'unsave' : 'save';
+      setBookmarkFeedback(`Unable to ${action} word. Try again.`);
       try {
         setSavedWords(db.get('saved_words'));
       } catch {
-        setSavedWords([]);
+        setSavedWords(null);
       }
     }
   };
@@ -588,6 +623,20 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         </div>
       </header>
 
+      {bookmarkFeedback && (
+        <div className="swipe-session__notice" role="alert">
+          <span>{bookmarkFeedback}</span>
+          <button
+            type="button"
+            className="swipe-session__notice-dismiss"
+            onClick={() => setBookmarkFeedback(null)}
+            aria-label="Dismiss notice"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
       <div className="swipe-session__stage" aria-busy={shuffleState}>
         {shuffleState && <ShuffleDeck reducedMotion={reducedMotion} />}
         <AnimatePresence custom={exitData}>
@@ -606,7 +655,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
               reducedMotion={reducedMotion}
               locked={locked}
               isPhrases={isPhrases}
-              isSaved={!isPhrases && Boolean(findSavedWord(savedWords, card))}
+              isSaved={!isPhrases ? (savedWords === null ? null : Boolean(findSavedWord(savedWords, card))) : false}
               onToggleSave={handleToggleSave}
             />
           ))}

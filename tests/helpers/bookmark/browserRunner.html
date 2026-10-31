@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SwipeSession Bookmark Interactive Verification</title>
+  <style>
+    :root {
+      --color-ghost-blue: #EFF6FF;
+      --color-primary-blue: #2563EB;
+      --color-border: #E2E8F0;
+      --color-text-navy: #0F172A;
+      --color-page-bg: #F8FAFC;
+      --shadow-soft: 0 4px 12px rgba(0,0,0,0.06);
+      --shadow-raised: 0 8px 24px rgba(0,0,0,0.1);
+      --font-reading: system-ui, -apple-system, sans-serif;
+      --font-mono: monospace;
+    }
+    html, body { margin: 0; padding: 0; min-height: 100%; }
+    #root { width: 100%; min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React, { createElement } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter } from 'react-router-dom';
+    import { LanguageProvider } from '/src/lib/language.jsx';
+    import { PreferencesProvider } from '/src/lib/preferences.jsx';
+    import { PublishedContentProvider } from '/src/lib/publishedContentContext.jsx';
+    import { AuthContext } from '/src/lib/authContext.js';
+    import SwipeSession from '/src/pages/Learn/SwipeSession.jsx';
+    import { db } from '/src/lib/db.js';
+    import { storageOwner } from '/src/lib/storageOwner.js';
+
+    const rootElement = document.getElementById('root');
+    let reactRoot = null;
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    async function waitFor(condition, timeoutMs = 4000, intervalMs = 30) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        if (condition()) return;
+        await sleep(intervalMs);
+      }
+      throw new Error('waitFor timed out after ' + timeoutMs + 'ms');
+    }
+
+    function assert(cond, msg) {
+      if (!cond) throw new Error(msg || 'Assertion failed');
+    }
+
+    const testItems = [
+      {
+        id: 'item-1',
+        card_id: 'zh-hsk1-001',
+        course_id: 'zh-hsk1',
+        written_form: '爱',
+        character: '爱',
+        reading: 'ài',
+        pronunciation: 'ài',
+        meaning_english: 'to love',
+        definition: 'to love',
+        meaning_burmese: 'ချစ်သည်',
+        burmese_definition: 'ချစ်သည်',
+        level: 'HSK1',
+        sort_order: 1,
+        is_active: true,
+        examples: [{ text: '我爱你。', reading: 'Wǒ ài nǐ.', english: 'I love you.' }],
+        audio_path: 'audio/zh/hsk1/ai.mp3',
+      },
+      {
+        id: 'item-2',
+        card_id: 'zh-hsk1-002',
+        course_id: 'zh-hsk1',
+        written_form: '八',
+        character: '八',
+        reading: 'bā',
+        pronunciation: 'bā',
+        meaning_english: 'eight',
+        definition: 'eight',
+        meaning_burmese: 'ရှစ်',
+        burmese_definition: 'ရှစ်',
+        level: 'HSK1',
+        sort_order: 2,
+        is_active: true,
+        examples: [{ text: '八个人。', reading: 'Bā gè rén.', english: 'Eight people.' }],
+        audio_path: 'audio/zh/hsk1/ba.mp3',
+      },
+    ];
+
+    function mountSession(initialEntry = '/learn/level/HSK1') {
+      if (!reactRoot) reactRoot = createRoot(rootElement);
+      const initialCache = {
+        'zh-hsk1': {
+          status: 'loaded',
+          items: testItems,
+          version: 1,
+          error: null,
+          isPublished: true,
+        },
+      };
+
+      reactRoot.render(
+        createElement(
+          AuthContext.Provider,
+          { value: { user: null, isGuest: true, loading: false, isTransitioning: false } },
+          createElement(
+            PreferencesProvider,
+            null,
+            createElement(
+              LanguageProvider,
+              null,
+              createElement(
+                PublishedContentProvider,
+                { enabledOverride: true, initialCache },
+                createElement(
+                  MemoryRouter,
+                  { initialEntries: [initialEntry] },
+                  createElement(SwipeSession, null)
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+
+    async function runTests() {
+      const results = [];
+
+      // 0. Ensure clean initial DB state
+      db.set('saved_words', []);
+      db.set('learned_words', []);
+      db.set('review_cards', []);
+
+      // Mount the real production SwipeSession component
+      mountSession('/learn/level/HSK1');
+
+      // Wait for the active card to mount in the real DOM
+      await waitFor(() => document.querySelector('.swipe-card--active') !== null);
+
+      const activeCard = document.querySelector('.swipe-card--active');
+      const frontBtn = activeCard.querySelector('.swipe-card__front .swipe-bookmark');
+      const backBtn = activeCard.querySelector('.swipe-card__back .swipe-bookmark');
+
+      // Check 1: Front and back bookmark buttons exist and are initially unsaved
+      assert(frontBtn !== null, 'Front bookmark button must be mounted');
+      assert(backBtn !== null, 'Back bookmark button must be mounted');
+      assert(frontBtn.getAttribute('aria-pressed') === 'false', 'Front button initially aria-pressed=false');
+      assert(backBtn.getAttribute('aria-pressed') === 'false', 'Back button initially aria-pressed=false');
+      assert(frontBtn.getAttribute('aria-label') === 'Save 爱', 'Front label is Save 爱');
+      assert(backBtn.getAttribute('aria-label') === 'Save 爱', 'Back label is Save 爱');
+      results.push({ test: 'front-back-buttons-mounted-and-unsaved', passed: true });
+
+      // Check 2: Click front bookmark button to save
+      // Verify production handler runs:
+      // - persistence in db.get('saved_words')
+      // - front and back state updated to aria-pressed="true"
+      // - no card flip (front face remains visible, not flipped)
+      // - no card advance (character remains 爱)
+      // - learned_words and review_cards remain empty
+      const initialChar = activeCard.querySelector('.swipe-card__front .swipe-card__character').textContent;
+      assert(initialChar === '爱', 'Active card character is 爱');
+
+      frontBtn.click();
+      await waitFor(() => frontBtn.getAttribute('aria-pressed') === 'true');
+
+      // Assertions for Save:
+      assert(frontBtn.getAttribute('aria-pressed') === 'true', 'Front button aria-pressed updated to true');
+      assert(backBtn.getAttribute('aria-pressed') === 'true', 'Back button aria-pressed updated to true');
+      assert(frontBtn.getAttribute('aria-label') === 'Unsave 爱', 'Front label updated to Unsave 爱');
+      assert(backBtn.getAttribute('aria-label') === 'Unsave 爱', 'Back label updated to Unsave 爱');
+
+      // Persistence check
+      const savedInDb = db.get('saved_words');
+      assert(savedInDb.length === 1, 'Saved words table contains 1 record');
+      assert(savedInDb[0].phrase === '爱', 'Saved phrase is 爱');
+      assert(savedInDb[0].card_id === 'zh-hsk1-001', 'Saved card_id is zh-hsk1-001');
+      assert(typeof savedInDb[0].id === 'string', 'Saved record has generated storage ID');
+
+      // Safety checks: no flip, no advance, no learned/review mutation
+      const backFace = activeCard.querySelector('.swipe-card__back');
+      assert(backFace.hasAttribute('inert'), 'Card was NOT flipped (back face remains inert)');
+      const currentChar = activeCard.querySelector('.swipe-card__front .swipe-card__character').textContent;
+      assert(currentChar === '爱', 'Card was NOT advanced (current character remains 爱)');
+      assert(db.get('learned_words').length === 0, 'learned_words was NOT mutated');
+      assert(db.get('review_cards').length === 0, 'review_cards was NOT mutated');
+      results.push({ test: 'production-save-and-safety', passed: true });
+
+      // Check 3: Click back bookmark button to unsave (exercising back-face control)
+      backBtn.click();
+      await waitFor(() => frontBtn.getAttribute('aria-pressed') === 'false');
+
+      // Assertions for Unsave:
+      assert(frontBtn.getAttribute('aria-pressed') === 'false', 'Front button returned to aria-pressed=false');
+      assert(backBtn.getAttribute('aria-pressed') === 'false', 'Back button returned to aria-pressed=false');
+      assert(frontBtn.getAttribute('aria-label') === 'Save 爱', 'Front label returned to Save 爱');
+      assert(backBtn.getAttribute('aria-label') === 'Save 爱', 'Back label returned to Save 爱');
+      assert(db.get('saved_words').length === 0, 'saved_words is now empty');
+      assert(db.get('learned_words').length === 0, 'learned_words remains untouched');
+      assert(db.get('review_cards').length === 0, 'review_cards remains untouched');
+      results.push({ test: 'production-unsave-and-front-back-sync', passed: true });
+
+      // Check 4: Visible storage-failure feedback & recovery
+      // Force localStorage.setItem to throw for saved_words (simulating storage quota or device failure)
+      const origSetItem = localStorage.setItem;
+      localStorage.setItem = (key, val) => {
+        if (key && key.includes('saved_words')) throw new Error('QuotaExceededSimulation');
+        return origSetItem.call(localStorage, key, val);
+      };
+
+      frontBtn.click();
+      // Wait for visible error alert notice to appear in DOM
+      await waitFor(() => document.querySelector('.swipe-session__notice[role="alert"]') !== null);
+
+      const noticeElem = document.querySelector('.swipe-session__notice[role="alert"]');
+      assert(noticeElem !== null, 'Visible notice alert must be present in DOM');
+      assert(noticeElem.textContent.includes('Unable to save word. Try again.'), 'Notice states concise error feedback');
+      assert(frontBtn.getAttribute('aria-pressed') === 'false', 'Bookmark button does NOT falsely show confirmed saved state');
+      assert(db.get('saved_words').length === 0, 'No partial corrupt record saved');
+      assert(db.get('learned_words').length === 0, 'learned_words remains untouched');
+
+      // Restore localStorage.setItem and retry save
+      localStorage.setItem = origSetItem;
+      frontBtn.click();
+      await waitFor(() => frontBtn.getAttribute('aria-pressed') === 'true');
+
+      // Verify notice is cleared on successful retry
+      assert(document.querySelector('.swipe-session__notice') === null, 'Notice alert is cleared after successful retry');
+      assert(frontBtn.getAttribute('aria-pressed') === 'true', 'Bookmark button successfully saved after retry');
+      assert(db.get('saved_words').length === 1, 'saved_words contains record after retry');
+      results.push({ test: 'visible-storage-failure-feedback-and-retry', passed: true });
+
+      // Check 5: Unreadable state does not present as confirmed unsaved
+      // Simulate storage read failure via localStorage.getItem
+      const origGetItem = localStorage.getItem;
+      localStorage.getItem = (key) => {
+        if (key && key.includes('saved_words')) throw new Error('UnreadableStorageError');
+        return origGetItem.call(localStorage, key);
+      };
+
+      // Trigger storage change to cause refresh
+      storageOwner.notifyChange({ table: 'saved_words' });
+
+      // Wait for unreadable notice alert to appear
+      await waitFor(() => document.querySelector('.swipe-session__notice[role="alert"]') !== null);
+      const readNotice = document.querySelector('.swipe-session__notice[role="alert"]');
+      assert(readNotice.textContent.includes('Unable to load bookmark state.'), 'Notice states unable to load bookmark state');
+
+      // Bookmark button must be disabled and NOT present confirmed aria-pressed="false"
+      assert(frontBtn.disabled === true, 'Bookmark button disabled when bookmark state is unreadable');
+      assert(!frontBtn.hasAttribute('aria-pressed'), 'aria-pressed is omitted, NOT confirmed false');
+      assert(frontBtn.getAttribute('aria-label').includes('Bookmark status unavailable'), 'aria-label announces status unavailable');
+
+      // Restore localStorage.getItem and notify change (recovery)
+      localStorage.getItem = origGetItem;
+      storageOwner.notifyChange({ table: 'saved_words' });
+
+      await waitFor(() => document.querySelector('.swipe-session__notice') === null);
+      assert(frontBtn.disabled === false, 'Button re-enabled after storage recovery');
+      assert(frontBtn.getAttribute('aria-pressed') === 'true', 'Button accurately reflects restored saved state');
+      results.push({ test: 'unreadable-state-not-presented-as-unsaved-and-recovers', passed: true });
+
+      // Send success report
+      await fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, results }),
+      });
+    }
+
+    runTests().catch(async (err) => {
+      await fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: err.stack || err.message }),
+      });
+    });
+  </script>
+</body>
+</html>
