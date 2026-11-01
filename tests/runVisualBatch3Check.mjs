@@ -14,12 +14,20 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 
 export const OUTPUT_DIR =
   process.env.SCREENSHOT_DIR ||
-  (process.env.ARTIFACT_DIR
+  'C:\\Users\\VivoBook\\Desktop\\S2S-UI-latest';
+
+export const ARTIFACT_SCREENSHOT_DIR =
+  process.env.ARTIFACT_DIR
     ? path.join(process.env.ARTIFACT_DIR, 'screenshots')
-    : 'C:\\Users\\VivoBook\\.gemini\\antigravity\\brain\\af6d074e-22e2-4aab-9eed-5eeee69609d5\\screenshots');
+    : 'C:\\Users\\VivoBook\\.gemini\\antigravity\\brain\\af6d074e-22e2-4aab-9eed-5eeee69609d5\\screenshots';
 
 if (!fs.existsSync(OUTPUT_DIR)) {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+}
+if (!fs.existsSync(ARTIFACT_SCREENSHOT_DIR)) {
+  try {
+    fs.mkdirSync(ARTIFACT_SCREENSHOT_DIR, { recursive: true });
+  } catch {}
 }
 
 const CHROME_PATHS = [
@@ -279,31 +287,58 @@ export async function runVisualBatch3Verification() {
             mobile: true,
           },
           {
+            width: 375,
+            height: 667,
+            route: '/profile',
+            page: 'profile-guest',
+            name: 'profile-guest-375w.png',
+            desc: 'Profile Guest Mode (Mobile 375w)',
+            mobile: true,
+          },
+          {
             width: 1024,
             height: 800,
             route: '/profile',
-            page: 'profile',
-            name: 'profile-desktop-1024w.png',
-            desc: 'Profile & Danger Session Group (Desktop 1024w)',
+            page: 'profile-guest',
+            name: 'profile-guest-1024w.png',
+            desc: 'Profile Guest Mode (Tablet/Desktop 1024w)',
+            mobile: false,
+          },
+          {
+            width: 1440,
+            height: 900,
+            route: '/profile',
+            page: 'profile-guest',
+            name: 'profile-guest-1440w.png',
+            desc: 'Profile Guest Mode (Desktop Wide 1440w)',
             mobile: false,
           },
           {
             width: 375,
             height: 667,
             route: '/profile',
-            page: 'profile',
-            name: 'profile-mobile-375w.png',
-            desc: 'Profile & Danger Session Group (Mobile 375w)',
+            page: 'profile-signed-in',
+            name: 'profile-signed-in-375w.png',
+            desc: 'Profile Signed-In Mode (Mobile 375w)',
             mobile: true,
           },
           {
             width: 1440,
             height: 900,
             route: '/profile',
-            page: 'profile',
-            name: 'profile-desktop-1440w.png',
-            desc: 'Profile Layout Wide (Desktop 1440w)',
+            page: 'profile-signed-in',
+            name: 'profile-signed-in-1440w.png',
+            desc: 'Profile Signed-In Mode (Desktop Wide 1440w)',
             mobile: false,
+          },
+          {
+            width: 375,
+            height: 667,
+            route: '/profile',
+            page: 'profile-mobile-actions-scrolled',
+            name: 'profile-mobile-actions-scrolled-375w.png',
+            desc: 'Profile Scrolled to Bottom Session & Account Actions (Mobile 375w)',
+            mobile: true,
           },
           {
             width: 1024,
@@ -602,6 +637,11 @@ export async function runVisualBatch3Verification() {
 
             fs.writeFileSync(outPath, Buffer.from(screenshotBase64, 'base64'));
             const fileSize = fs.statSync(outPath).size;
+            if (fs.existsSync(ARTIFACT_SCREENSHOT_DIR)) {
+              try {
+                fs.writeFileSync(path.join(ARTIFACT_SCREENSHOT_DIR, c.name), Buffer.from(screenshotBase64, 'base64'));
+              } catch {}
+            }
 
             console.log(
               `    - ${c.desc} [requested=${c.width}px, measured=${metrics.measuredWidth}px]: verified (overflow=none) -> ${outPath} (${fileSize} bytes)`

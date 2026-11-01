@@ -24,6 +24,7 @@
     import { PreferencesProvider } from '/src/lib/preferences.jsx';
     import { PublishedContentProvider } from '/src/lib/publishedContentContext.jsx';
     import GuestImportProvider from '/src/components/GuestImportProvider.jsx';
+    import { GuestImportContext } from '/src/lib/guestImportContext.js';
     import Layout from '/src/components/Layout.jsx';
     import Home from '/src/pages/Home.jsx';
     import LevelPicker from '/src/pages/Learn/LevelPicker.jsx';
@@ -38,6 +39,9 @@
     import Signup from '/src/pages/Signup.jsx';
     import ForgotPassword from '/src/pages/ForgotPassword.jsx';
     import ResetPassword from '/src/pages/ResetPassword.jsx';
+    import { AuthContext } from '/src/lib/authContext.js';
+    import { storageOwner } from '/src/lib/storageOwner.js';
+    import { getSupabaseClient } from '/src/lib/supabase.js';
     import { db } from '/src/lib/db.js';
 
     const rootElement = document.getElementById('root');
@@ -69,7 +73,7 @@
       return await res.json();
     }
 
-    function AppTestWrapper({ initialEntries, hsk1Items, publishedEnabled = true }) {
+    function AppTestWrapper({ initialEntries, hsk1Items, publishedEnabled = true, authValue = null }) {
       const initialCache = {
         'zh-hsk1': {
           status: 'loaded',
@@ -80,49 +84,64 @@
         },
       };
 
-      return createElement(
-        AuthProvider,
+      const mockGuestImportService = {
+        inspect: async () => ({ status: 'none', count: 0 }),
+        subscribe: () => () => {},
+        choose: async () => {},
+        dismissNotice: () => {},
+        getOffer: () => null,
+      };
+
+      const inner = createElement(
+        StorageOwnerBoundary,
         null,
         createElement(
-          StorageOwnerBoundary,
+          PreferencesProvider,
           null,
           createElement(
-            PreferencesProvider,
+            LanguageProvider,
             null,
             createElement(
-              LanguageProvider,
-              null,
+              MemoryRouter,
+              { initialEntries },
               createElement(
-                MemoryRouter,
-                { initialEntries },
+                authValue ? GuestImportContext.Provider : GuestImportProvider,
+                authValue
+                  ? {
+                      value: {
+                        available: true,
+                        checking: false,
+                        pending: false,
+                        notice: null,
+                        openGuestImport: () => {},
+                        dismissNotice: () => {},
+                      },
+                    }
+                  : null,
                 createElement(
-                  GuestImportProvider,
-                  null,
+                  PublishedContentProvider,
+                  { enabledOverride: publishedEnabled, initialCache },
                   createElement(
-                    PublishedContentProvider,
-                    { enabledOverride: publishedEnabled, initialCache },
+                    Routes,
+                    null,
+                    createElement(Route, { path: '/login', element: createElement(Login) }),
+                    createElement(Route, { path: '/signup', element: createElement(Signup) }),
+                    createElement(Route, { path: '/forgot-password', element: createElement(ForgotPassword) }),
+                    createElement(Route, { path: '/reset-password', element: createElement(ResetPassword) }),
                     createElement(
-                      Routes,
-                      null,
-                      createElement(Route, { path: '/login', element: createElement(Login) }),
-                      createElement(Route, { path: '/signup', element: createElement(Signup) }),
-                      createElement(Route, { path: '/forgot-password', element: createElement(ForgotPassword) }),
-                      createElement(Route, { path: '/reset-password', element: createElement(ResetPassword) }),
-                      createElement(
-                        Route,
-                        { path: '/', element: createElement(Layout) },
-                        createElement(Route, { index: true, element: createElement(Home) }),
-                        createElement(Route, { path: 'learn', element: createElement(LevelPicker) }),
-                        createElement(Route, { path: 'learn/level/:levelId', element: createElement(LessonPicker) }),
-                        createElement(Route, { path: 'learn/session', element: createElement(SwipeSession) }),
-                        createElement(Route, { path: 'learn/review', element: createElement(ReviewWords) }),
-                        createElement(Route, { path: 'learn/review/session', element: createElement(SwipeSession, { isReview: true }) }),
-                        createElement(Route, { path: 'saved', element: createElement(SavedWords) }),
-                        createElement(Route, { path: 'saved/session', element: createElement(SwipeSession, { isSaved: true }) }),
-                        createElement(Route, { path: 'library', element: createElement(Library) }),
-                        createElement(Route, { path: 'profile', element: createElement(Profile) }),
-                        createElement(Route, { path: 'settings', element: createElement(SettingsSubpage) })
-                      )
+                      Route,
+                      { path: '/', element: createElement(Layout) },
+                      createElement(Route, { index: true, element: createElement(Home) }),
+                      createElement(Route, { path: 'learn', element: createElement(LevelPicker) }),
+                      createElement(Route, { path: 'learn/level/:levelId', element: createElement(LessonPicker) }),
+                      createElement(Route, { path: 'learn/session', element: createElement(SwipeSession) }),
+                      createElement(Route, { path: 'learn/review', element: createElement(ReviewWords) }),
+                      createElement(Route, { path: 'learn/review/session', element: createElement(SwipeSession, { isReview: true }) }),
+                      createElement(Route, { path: 'saved', element: createElement(SavedWords) }),
+                      createElement(Route, { path: 'saved/session', element: createElement(SwipeSession, { isSaved: true }) }),
+                      createElement(Route, { path: 'library', element: createElement(Library) }),
+                      createElement(Route, { path: 'profile', element: createElement(Profile) }),
+                      createElement(Route, { path: 'settings', element: createElement(SettingsSubpage) })
                     )
                   )
                 )
@@ -131,6 +150,12 @@
           )
         )
       );
+
+      if (authValue) {
+        return createElement(AuthContext.Provider, { value: authValue }, inner);
+      }
+
+      return createElement(AuthProvider, null, inner);
     }
 
     function setReactInputValue(input, val) {
@@ -443,6 +468,65 @@
 
       const isCatalogDisabled = urlParams.get('catalogDisabled') === '1' || pageName === 'library-catalog-disabled';
       const isStorageError = urlParams.get('storageError') === '1' || pageName === 'library-storage-error';
+      const isSignedIn = urlParams.get('auth') === 'user' || pageName.includes('signed-in') || pageName.includes('mobile-actions-scrolled');
+
+      let authValue = null;
+      if (isSignedIn) {
+        const mockUser = {
+          id: 'd3b07384-d113-4632-b7b8-89c0b1e42777',
+          email: 'learner@example.com',
+          user_metadata: { full_name: 'Alex Rivera' },
+          app_metadata: { providers: ['email'] },
+          identities: [{ provider: 'email' }],
+        };
+        storageOwner.setOwner(mockUser.id);
+        authValue = {
+          user: mockUser,
+          loading: false,
+          isTransitioning: false,
+          error: null,
+          clearError: () => {},
+          retryVerification: () => {},
+          signOut: async () => ({}),
+          signOutGlobal: async () => ({}),
+          canResetPassword: () => false,
+          completePasswordRecovery: () => {},
+          passwordRecoveryUserId: null,
+          captureGeneration: () => 1,
+          isCurrent: () => true,
+          isGuest: false,
+          isConfigured: true,
+          generation: 1,
+        };
+
+        const client = getSupabaseClient();
+        client.auth.getUser = async () => ({ data: { user: mockUser }, error: null });
+        client.auth.getSession = async () => ({ data: { session: { user: mockUser } }, error: null });
+        const origFrom = client.from.bind(client);
+        client.from = (table) => {
+          if (table === 'profiles') {
+            return {
+              select: () => ({
+                eq: () => ({
+                  maybeSingle: async () => ({
+                    data: {
+                      id: mockUser.id,
+                      display_name: 'Alex Rivera',
+                      avatar_path: null,
+                      created_at: '2026-01-01T00:00:00Z',
+                      updated_at: '2026-01-01T00:00:00Z',
+                    },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          return origFrom(table);
+        };
+      } else {
+        storageOwner.setOwner(null);
+      }
 
       if (isStorageError) {
         try {
@@ -454,6 +538,7 @@
         initialEntries: [targetRoute],
         hsk1Items,
         publishedEnabled: !isCatalogDisabled,
+        authValue,
       }));
 
       // Wait for the specific page element to mount
@@ -461,6 +546,13 @@
         await waitFor(() => document.querySelector('.home-page') !== null && document.querySelector('.featured-course') !== null, 4000, 'capture-home-mounted');
       } else if (pageName === 'levels' || targetRoute === '/learn') {
         await waitFor(() => document.querySelector('.level-overview__grid') !== null && document.querySelector('.level-tile') !== null, 4000, 'capture-levels-mounted');
+        if (window.innerWidth < 640) {
+          const hsk4 = document.querySelector('a[href*="HSK4"]');
+          if (hsk4) {
+            hsk4.scrollIntoView({ block: 'center' });
+            await sleep(150);
+          }
+        }
       } else if (pageName === 'course-overview' || targetRoute.includes('/level/')) {
         await waitFor(() => document.querySelector('.lesson-page') !== null && document.querySelector('.lesson-hero-card') !== null && document.querySelector('.lesson-word-list') !== null, 4000, 'capture-course-overview-mounted');
       } else if (pageName === 'session-results') {
@@ -513,8 +605,15 @@
         await waitFor(() => document.querySelector('.collection-page--saved') !== null && document.querySelector('.collection-word') !== null, 4000, 'capture-saved-collection-mounted');
       } else if (pageName === 'library' || pageName === 'library-catalog-disabled' || pageName === 'library-storage-error' || targetRoute === '/library') {
         await waitFor(() => document.querySelector('.library-page') !== null && document.querySelector('.library-intro') !== null, 4000, 'capture-library-mounted');
-      } else if (pageName === 'profile' || targetRoute === '/profile') {
+      } else if (pageName.startsWith('profile') || targetRoute === '/profile') {
         await waitFor(() => document.querySelector('.profile-page') !== null && document.querySelector('.profile-account') !== null, 4000, 'capture-profile-mounted');
+        if (pageName === 'profile-mobile-actions-scrolled') {
+          const appMain = document.querySelector('.app-main');
+          if (appMain) {
+            appMain.scrollTop = appMain.scrollHeight;
+          }
+          await sleep(200);
+        }
       } else if (pageName === 'settings' || targetRoute === '/settings') {
         await waitFor(() => document.querySelector('.settings-page') !== null && document.querySelector('.settings-group') !== null, 4000, 'capture-settings-mounted');
       } else if (pageName === 'login' || pageName === 'login-toggle-focus' || targetRoute === '/login') {
@@ -745,6 +844,14 @@
           if (!pageName.includes('scrolled') && !pageName.includes('bottom')) {
             appMain.scrollTop = originalScrollTop;
             await sleep(50);
+          }
+
+          if (pageName === 'levels' && window.innerWidth < 640) {
+            const hsk4 = document.querySelector('a[href*="HSK4"]');
+            if (hsk4) {
+              hsk4.scrollIntoView({ block: 'center' });
+              await sleep(100);
+            }
           }
         } else {
           navClearance = {

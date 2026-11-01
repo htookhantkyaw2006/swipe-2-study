@@ -177,7 +177,11 @@ test('4. Profile clearly groups destructive actions in Session & account danger 
   assert.ok(html.includes('Log out'), 'Includes Log out in session actions');
   assert.ok(html.includes('Sign out on all devices'), 'Includes Sign out on all devices');
   assert.ok(html.includes('Delete account'), 'Includes Delete account');
-  assert.ok(html.includes('Account &amp; support') || html.includes('Account & support'), 'Keeps Account & support distinct');
+  assert.ok(html.includes('Settings &amp; support') || html.includes('Settings & support'), 'Keeps Settings & support distinct');
+  assert.ok(!html.includes('profile-plan'), 'Removes promotional Free plan card');
+  assert.ok(!html.includes('Send feedback'), 'Hides nonfunctional Send feedback row');
+  assert.ok(html.includes('Learning settings'), 'Includes single clear Learning settings link');
+  assert.ok(html.includes('Learning overview'), 'Includes unified learning overview');
 });
 
 test('5. LevelOverview renders Chinese level cards with full approved gradient surface and truthful states', () => {
@@ -288,4 +292,59 @@ test('10. Carousel arrows meet minimum 44x44px touch target dimensions', () => {
   assert.match(css, /\.icon-button\s*\{[^}]*min-height:\s*44px;/, 'Icon button has min-height 44px');
   assert.match(css, /\.icon-button\s*\{[^}]*width:\s*44px;/, 'Icon button has width 44px');
   assert.match(css, /\.icon-button\s*\{[^}]*height:\s*44px;/, 'Icon button has height 44px');
+});
+
+test('11. HSK cards achieve WCAG AA contrast across all nine level palettes', async () => {
+  const { HSK_PALETTE } = await server.ssrLoadModule('/src/courses/zh.js');
+
+  function sRGBtoLinear(c) {
+    c = c / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function getLuminance(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return 0.2126 * sRGBtoLinear(r) + 0.7152 * sRGBtoLinear(g) + 0.0722 * sRGBtoLinear(b);
+  }
+  function contrastRatio(hex1, hex2) {
+    const l1 = getLuminance(hex1);
+    const l2 = getLuminance(hex2);
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  for (let num = 1; num <= 9; num++) {
+    const palette = HSK_PALETTE[num];
+    assert.ok(palette, `Palette for HSK ${num} exists`);
+
+    // Body panel uses solid white surface #FFFFFF
+    const bodySurface = '#FFFFFF';
+    const kickerRatio = contrastRatio('#075985', bodySurface);
+    const titleRatio = contrastRatio('#0C4A6E', bodySurface);
+    const countRatio = contrastRatio('#334155', bodySurface);
+
+    assert.ok(kickerRatio >= 4.5, `HSK ${num} kicker contrast ${kickerRatio.toFixed(2)} must be >= 4.5:1`);
+    assert.ok(titleRatio >= 3.0, `HSK ${num} title contrast ${titleRatio.toFixed(2)} must be >= 3.0:1`);
+    assert.ok(countRatio >= 4.5, `HSK ${num} count contrast ${countRatio.toFixed(2)} must be >= 4.5:1`);
+
+    // Badges
+    const learningBadgeRatio = contrastRatio('#0C4A6E', '#FFFFFF');
+    const soonBadgeRatio = contrastRatio('#FFFFFF', '#0F172A');
+    const errorBadgeRatio = contrastRatio('#FFFFFF', '#7F1D1D');
+    const tierBadgeRatio = contrastRatio('#FFFFFF', '#0F172A');
+
+    assert.ok(learningBadgeRatio >= 4.5, `Learning badge contrast ${learningBadgeRatio.toFixed(2)} must be >= 4.5:1`);
+    assert.ok(soonBadgeRatio >= 4.5, `Soon badge contrast ${soonBadgeRatio.toFixed(2)} must be >= 4.5:1`);
+    assert.ok(errorBadgeRatio >= 4.5, `Error badge contrast ${errorBadgeRatio.toFixed(2)} must be >= 4.5:1`);
+    assert.ok(tierBadgeRatio >= 4.5, `Tier badge contrast ${tierBadgeRatio.toFixed(2)} must be >= 4.5:1`);
+
+    // Actions
+    const activeActionRatio = contrastRatio('#075985', '#FFFFFF');
+    const disabledActionRatio = contrastRatio('#334155', '#F1F5F9');
+
+    assert.ok(activeActionRatio >= 4.5, `Active action contrast ${activeActionRatio.toFixed(2)} must be >= 4.5:1`);
+    assert.ok(disabledActionRatio >= 4.5, `Disabled action contrast ${disabledActionRatio.toFixed(2)} must be >= 4.5:1`);
+  }
 });
