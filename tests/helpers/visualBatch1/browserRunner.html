@@ -227,7 +227,8 @@
       // Second tile is HSK 2: unavailable coming soon
       const hsk2Tile = levelTiles[1];
       assert(hsk2Tile.textContent.includes('HSK 2'), 'Second tile is HSK 2');
-      assert(hsk2Tile.textContent.includes('words curriculum') || hsk2Tile.textContent.includes('Content coming soon'), 'HSK 2 reports curriculum status');
+      assert(hsk2Tile.textContent.includes('Curriculum in preparation'), 'HSK 2 shows Curriculum in preparation');
+      assert(!/\d+\s+words\s+curriculum/.test(hsk2Tile.textContent), 'HSK 2 has no numeric words curriculum total');
       assert(hsk2Tile.textContent.includes('COMING SOON'), 'HSK 2 shows COMING SOON badge');
       assert(hsk2Tile.classList.contains('level-tile--unavailable'), 'HSK 2 has unavailable class modifier');
 
