@@ -1025,6 +1025,7 @@ button:disabled { cursor: default; }
 .course-all-button { flex: 0 0 auto; white-space: nowrap; }
 @media (max-width: 639px) {
   .guest-badge, .home-course-label { display: none; }
+  .home-identity { flex: 1 1 100%; }
   .home-heading { padding: 23px 0 25px; }
   .home-name h1 { font-size: 1rem; }
   .home-header > button { flex-shrink: 0; }

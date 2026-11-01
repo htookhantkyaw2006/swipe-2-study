@@ -47,6 +47,9 @@ export default function LevelCarousel() {
   const isLevelAvailable = isInScope
     ? (isLoaded && availableCount > 0)
     : (publishedContent.enabled ? false : (availableCount > 0 || level.words > 0));
+  const isLoadedEmpty = isInScope
+    ? (isLoaded && availableCount === 0)
+    : (!publishedContent.enabled && availableCount === 0 && !level.words);
 
   const changeLevel = delta => setActiveIndex(index => Math.max(0, Math.min(course.levels.length - 1, index + delta)));
 
@@ -66,7 +69,9 @@ export default function LevelCarousel() {
           ? 'Error loading curriculum'
           : publishedState?.status === 'unpublished'
             ? 'Curriculum coming soon'
-            : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
+            : isLoadedEmpty
+              ? 'No words available yet'
+              : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
       : publishedContent.enabled
         ? 'Curriculum coming soon'
         : course.id === 'zh'
@@ -151,6 +156,15 @@ export default function LevelCarousel() {
               style={{ color: level.btnColor || level.gradientEnd }}
             >
               Retry
+            </button>
+          ) : isLoadedEmpty ? (
+            <button
+              type="button"
+              className="course-study-button course-study-button--disabled"
+              disabled
+              style={{ color: level.btnColor || level.gradientEnd }}
+            >
+              No cards available
             </button>
           ) : (
             <button

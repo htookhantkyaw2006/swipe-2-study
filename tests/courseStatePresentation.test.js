@@ -44,6 +44,7 @@ const { LanguageProvider } = await server.ssrLoadModule('/src/lib/language.jsx')
 const { PreferencesProvider } = await server.ssrLoadModule('/src/lib/preferences.jsx');
 const { PublishedContentProvider } = await server.ssrLoadModule('/src/lib/publishedContentContext.jsx');
 const { default: LevelOverview } = await server.ssrLoadModule('/src/components/study/LevelOverview.jsx');
+const { default: LevelCarousel } = await server.ssrLoadModule('/src/components/ui/LevelCarousel.jsx');
 const { default: LessonPicker } = await server.ssrLoadModule('/src/pages/Learn/LessonPicker.jsx');
 const { default: Layout } = await server.ssrLoadModule('/src/components/Layout.jsx');
 const { default: GuestImportProvider } = await server.ssrLoadModule('/src/components/GuestImportProvider.jsx');
@@ -139,6 +140,12 @@ test('Course-state presentation: LOADING state', () => {
   assert.match(pickerHtml, /lesson-hero-card__completion[^>]*>Loading curriculum\.\.\.<\/p>/);
   // Study CTA must be disabled Loading… button
   assert.match(pickerHtml, /lesson-hero-card__study-btn--disabled[^>]*disabled[^>]*>Loading…<\/button>/);
+
+  // 3. LevelCarousel
+  const carouselHtml = renderWithState({ Component: LevelCarousel, route: '/', initialCache });
+  assert.match(carouselHtml, /<span class="course-badge">LOADING<\/span>/);
+  assert.match(carouselHtml, /<p class="course-word-count">Loading curriculum\.\.\.<\/p>/);
+  assert.match(carouselHtml, /course-study-button--disabled[^>]*disabled[^>]*>Loading…<\/button>/);
 });
 
 test('Course-state presentation: ERROR state', () => {
@@ -178,6 +185,12 @@ test('Course-state presentation: ERROR state', () => {
   assert.match(pickerHtml, /lesson-hero-card__completion[^>]*>Error loading curriculum<\/p>/);
   // Action must offer Retry
   assert.match(pickerHtml, /lesson-hero-card__study-btn--retry[^>]*>Retry loading<\/button>/);
+
+  // 3. LevelCarousel
+  const carouselHtml = renderWithState({ Component: LevelCarousel, route: '/', initialCache });
+  assert.match(carouselHtml, /<span class="course-badge">UNAVAILABLE<\/span>/);
+  assert.match(carouselHtml, /<p class="course-word-count">Error loading curriculum<\/p>/);
+  assert.match(carouselHtml, /course-study-button--retry[^>]*>Retry<\/button>/);
 });
 
 test('Course-state presentation: UNPUBLISHED / COMING SOON state', () => {
@@ -211,6 +224,11 @@ test('Course-state presentation: UNPUBLISHED / COMING SOON state', () => {
   assert.doesNotMatch(pickerHtml, /lesson-hero-card__badge[^>]*>NOW LEARNING<\/span>/);
   assert.match(pickerHtml, /lesson-hero-card__completion[^>]*>Curriculum coming soon<\/p>/);
   assert.match(pickerHtml, /lesson-hero-card__study-btn--disabled[^>]*disabled[^>]*>Coming soon<\/button>/);
+
+  // 3. LevelCarousel
+  const carouselHtml = renderWithState({ Component: LevelCarousel, route: '/', initialCache });
+  assert.match(carouselHtml, /<p class="course-word-count">Curriculum coming soon<\/p>/);
+  assert.match(carouselHtml, /course-study-button--disabled[^>]*disabled[^>]*>Coming soon<\/button>/);
 });
 
 test('Course-state presentation: LOADED-EMPTY state', () => {
@@ -248,6 +266,23 @@ test('Course-state presentation: LOADED-EMPTY state', () => {
   // Subtitle indicates no words yet
   assert.match(pickerHtml, /No words available yet/);
   assert.match(pickerHtml, /lesson-hero-card__study-btn--disabled[^>]*disabled[^>]*>No cards available<\/button>/);
+
+  // 3. LevelCarousel
+  const carouselHtml = renderWithState({
+    Component: LevelCarousel,
+    route: '/',
+    initialCache,
+  });
+  // Does NOT render "Coming soon" on primary study action
+  const studyBtnMatch = carouselHtml.match(/<button[^>]*class="[^"]*course-study-button[^"]*"[^>]*>([\s\S]*?)<\/button>/);
+  assert.ok(studyBtnMatch, 'Study button is present in carousel');
+  assert.doesNotMatch(studyBtnMatch[1], /Coming soon/);
+  // Renders disabled "No cards available" action
+  assert.match(carouselHtml, /course-study-button--disabled[^>]*disabled[^>]*>No cards available<\/button>/);
+  // Word count text indicates "No words available yet"
+  assert.match(carouselHtml, /<p class="course-word-count"[^>]*>No words available yet<\/p>/);
+  // Does NOT render active NOW LEARNING badge
+  assert.doesNotMatch(carouselHtml, /course-badge--active/);
 });
 
 test('Course-state presentation: LOADED-READY state', () => {
@@ -282,6 +317,12 @@ test('Course-state presentation: LOADED-READY state', () => {
   assert.match(pickerHtml, /0 \/ 1 completed/);
   // Retains active learning link to /learn/session
   assert.match(pickerHtml, /href="\/learn\/session\?level=HSK1"[^>]*>Start learning<\/a>/);
+
+  // 3. LevelCarousel
+  const carouselHtml = renderWithState({ Component: LevelCarousel, route: '/', initialCache });
+  assert.match(carouselHtml, /course-badge--active[^>]*>NOW LEARNING<\/span>/);
+  assert.match(carouselHtml, /0 \/ 1 completed/);
+  assert.match(carouselHtml, /course-study-button[^>]*>(?:Start swiping|Start learning)<\/button>/);
 });
 
 test('Landmark semantics: single main landmark across Layout and LessonPicker', () => {

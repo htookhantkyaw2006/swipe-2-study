@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
@@ -30,6 +32,19 @@ const CHROME_PATHS = [
   '/usr/bin/chromium',
   '/usr/bin/chromium-browser',
 ].filter(Boolean);
+
+function getFreePort() {
+  return new Promise((res, rej) => {
+    const s = net.createServer();
+    s.listen(0, '127.0.0.1', () => {
+      const port = s.address().port;
+      s.close((err) => {
+        if (err) rej(err);
+        else res(port);
+      });
+    });
+  });
+}
 
 export async function runVisualBatch1Verification() {
   const browserPath = CHROME_PATHS.find((p) => fs.existsSync(p));
@@ -198,6 +213,7 @@ export async function runVisualBatch1Verification() {
             name: 'home-1440w.png',
             alias: 'hsk-card-1440w.png',
             desc: 'Home (Desktop wide)',
+            mobile: false,
           },
           {
             width: 1024,
@@ -208,6 +224,7 @@ export async function runVisualBatch1Verification() {
             alias: 'hsk-card-1024w.png',
             desc: 'Level selection (Desktop 3-column grid)',
             expectedColumns: 3,
+            mobile: false,
           },
           {
             width: 768,
@@ -217,6 +234,7 @@ export async function runVisualBatch1Verification() {
             name: 'level-selection-768w.png',
             alias: 'hsk-card-768w.png',
             desc: 'Level selection (Tablet)',
+            mobile: false,
           },
           {
             width: 375,
@@ -226,6 +244,7 @@ export async function runVisualBatch1Verification() {
             name: 'home-375w.png',
             alias: 'hsk-card-375w.png',
             desc: 'Home (Mobile standard)',
+            mobile: true,
           },
           {
             width: 320,
@@ -235,13 +254,15 @@ export async function runVisualBatch1Verification() {
             name: 'hsk1-overview-320w.png',
             alias: 'hsk-card-320w.png',
             desc: 'HSK1 course overview (Mobile small)',
+            mobile: true,
           },
         ];
 
         const screenshots = [];
         const captureMetricsList = [];
+        const unverifiedViewports = [];
 
-        console.log('\n✓ Executing Deterministic Visual Captures with Layout Verification:');
+        console.log('\n✓ Executing Deterministic Visual Captures with Exact Viewport Emulation:');
         for (const c of CAPTURES) {
           const outPath = path.join(OUTPUT_DIR, c.name);
           const aliasPath = path.join(OUTPUT_DIR, c.alias);
@@ -259,34 +280,144 @@ export async function runVisualBatch1Verification() {
             };
           });
 
-          await new Promise((resCapture, rejCapture) => {
-            const args = [
+          let metrics = null;
+          let screenshotBase64 = null;
+          let emulationFailed = false;
+          let emulationError = null;
+
+          const cdpPort = await getFreePort();
+          const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chrome-cdp-'));
+          let chromeProc = null;
+
+          try {
+            chromeProc = execFile(browserPath, [
               '--headless=new',
               '--disable-gpu',
               '--hide-scrollbars',
-              `--window-size=${c.width},${c.height}`,
-              '--virtual-time-budget=2500',
-              `--screenshot=${outPath}`,
-              captureUrl,
-            ];
+              `--remote-debugging-port=${cdpPort}`,
+              `--user-data-dir=${tmpDir}`,
+              'about:blank',
+            ]);
 
-            const proc = execFile(browserPath, args, (err) => {
-              if (err && !err.killed) {
-                return rejCapture(new Error(`Chrome failed during capture of ${c.desc}: ${err.message}`));
-              }
-              resCapture();
+            let wsUrl = null;
+            for (let i = 0; i < 40; i++) {
+              await new Promise((r) => setTimeout(r, 100));
+              try {
+                const res = await fetch(`http://127.0.0.1:${cdpPort}/json/list`);
+                if (res.ok) {
+                  const list = await res.json();
+                  const page = list.find((p) => p.type === 'page');
+                  if (page && page.webSocketDebuggerUrl) {
+                    wsUrl = page.webSocketDebuggerUrl;
+                    break;
+                  }
+                }
+              } catch {}
+            }
+
+            if (!wsUrl) {
+              throw new Error(`CDP endpoint not available on port ${cdpPort}`);
+            }
+
+            await new Promise((resWs, rejWs) => {
+              const wsTimeout = setTimeout(() => {
+                rejWs(new Error(`CDP WebSocket timeout for ${c.desc}`));
+              }, 15000);
+
+              const ws = new WebSocket(wsUrl);
+              let msgId = 1;
+              const send = (method, params = {}) => {
+                const id = msgId++;
+                ws.send(JSON.stringify({ id, method, params }));
+                return id;
+              };
+
+              let setMetricsId = null;
+              let navigateId = null;
+              let screenshotId = null;
+
+              ws.onopen = () => {
+                setMetricsId = send('Emulation.setDeviceMetricsOverride', {
+                  width: c.width,
+                  height: c.height,
+                  deviceScaleFactor: 1,
+                  mobile: Boolean(c.mobile),
+                  fitWindow: false,
+                });
+              };
+
+              ws.onmessage = async (event) => {
+                try {
+                  const data = JSON.parse(event.data);
+                  if (data.id === setMetricsId) {
+                    if (data.error) {
+                      clearTimeout(wsTimeout);
+                      ws.close();
+                      return rejWs(new Error(`Emulation.setDeviceMetricsOverride failed: ${data.error.message}`));
+                    }
+                    navigateId = send('Page.navigate', { url: captureUrl });
+                  } else if (data.id === navigateId) {
+                    if (data.error) {
+                      clearTimeout(wsTimeout);
+                      ws.close();
+                      return rejWs(new Error(`Page.navigate failed: ${data.error.message}`));
+                    }
+                    try {
+                      metrics = await captureMetricPromise;
+                    } catch (mErr) {
+                      clearTimeout(wsTimeout);
+                      ws.close();
+                      return rejWs(mErr);
+                    }
+
+                    await new Promise((r) => setTimeout(r, 100));
+                    screenshotId = send('Page.captureScreenshot', { format: 'png' });
+                  } else if (data.id === screenshotId) {
+                    clearTimeout(wsTimeout);
+                    if (data.error) {
+                      ws.close();
+                      return rejWs(new Error(`Page.captureScreenshot failed: ${data.error.message}`));
+                    }
+                    screenshotBase64 = data.result?.data;
+                    ws.close();
+                    resWs();
+                  }
+                } catch (err) {
+                  clearTimeout(wsTimeout);
+                  ws.close();
+                  rejWs(err);
+                }
+              };
+
+              ws.onerror = (err) => {
+                clearTimeout(wsTimeout);
+                rejWs(new Error(`CDP WebSocket error on ${c.desc}: ${err.message || err}`));
+              };
             });
-            activeChromeProc = proc;
-          });
-
-          if (activeChromeProc) {
-            try { activeChromeProc.kill(); } catch {}
-            activeChromeProc = null;
+          } catch (e) {
+            emulationFailed = true;
+            emulationError = e.message;
+          } finally {
+            if (chromeProc) {
+              try { chromeProc.kill(); } catch {}
+            }
+            try {
+              fs.rmSync(tmpDir, { recursive: true, force: true });
+            } catch {}
           }
 
-          const metrics = await captureMetricPromise;
-          if (!metrics.success) {
-            throw new Error(`Pre-capture verification failed for ${c.desc}: ${metrics.error}`);
+          if (emulationFailed || !metrics || !screenshotBase64) {
+            if (c.mobile) {
+              console.warn(`[VIEWPORT_SKIPPED] ${c.desc} (${c.width}px): exact emulation failed (${emulationError}). Marking mobile acceptance as unverified.`);
+              unverifiedViewports.push({
+                desc: c.desc,
+                requestedWidth: c.width,
+                measuredWidth: null,
+                reason: `Exact emulation could not run: ${emulationError}`,
+              });
+              continue;
+            }
+            throw new Error(`CDP capture failed for desktop viewport ${c.desc}: ${emulationError}`);
           }
 
           // Pre-capture assertions
@@ -300,36 +431,42 @@ export async function runVisualBatch1Verification() {
           if (c.expectedColumns && metrics.computedColumns !== c.expectedColumns) {
             throw new Error(`Computed grid columns mismatch in ${c.desc}: expected ${c.expectedColumns}, got ${metrics.computedColumns}`);
           }
-          // Record actual window.innerWidth and verify viewport bounds
-          // Note: On Windows OS, Chromium's Win32 host window has an OS-level minimum width (~504-522px)
-          const isClampedByOs = c.width < 500 && metrics.measuredWidth >= c.width && metrics.measuredWidth <= 525;
-          const targetDelta = Math.abs(metrics.measuredWidth - c.width);
-          if (!isClampedByOs && targetDelta > 30 && (!metrics.outerWidth || Math.abs(metrics.outerWidth - c.width) > 2)) {
-            throw new Error(`Window innerWidth mismatch in ${c.desc}: expected ${c.width}, got innerWidth=${metrics.measuredWidth}, outerWidth=${metrics.outerWidth}`);
+
+          // Strict exact viewport requirement: measured innerWidth must match requested width within 1px
+          const delta = Math.abs(metrics.measuredWidth - c.width);
+          if (delta > 1) {
+            if (c.mobile) {
+              console.warn(`[VIEWPORT_SKIPPED] ${c.desc}: measured innerWidth (${metrics.measuredWidth}px) did not match requested width (${c.width}px) within 1px. Marking mobile acceptance as unverified.`);
+              unverifiedViewports.push({
+                desc: c.desc,
+                requestedWidth: c.width,
+                measuredWidth: metrics.measuredWidth,
+                reason: `Viewport mismatch: requested ${c.width}px, measured ${metrics.measuredWidth}px`,
+              });
+              continue;
+            }
+            throw new Error(`Window innerWidth mismatch in ${c.desc}: requested ${c.width}px, got ${metrics.measuredWidth}px (delta: ${delta}px > 1px)`);
           }
 
-          // Verify screenshot PNG was successfully written and is not empty / 404
-          if (!fs.existsSync(outPath)) {
-            throw new Error(`Screenshot file was not created: ${outPath}`);
+          const pngBuffer = Buffer.from(screenshotBase64, 'base64');
+          if (pngBuffer.length < 10000) {
+            throw new Error(`Screenshot file is suspiciously small (${pngBuffer.length} bytes): ${outPath}`);
           }
-          const stat = fs.statSync(outPath);
-          if (stat.size < 10000) {
-            throw new Error(`Screenshot file is suspiciously small (${stat.size} bytes, possibly blank or 404): ${outPath}`);
-          }
-
-          // Also write alias file for backwards-compatible reference
+          fs.writeFileSync(outPath, pngBuffer);
           try {
             fs.copyFileSync(outPath, aliasPath);
           } catch {}
 
-          console.log(`    - ${c.desc} [${c.width}px]: verified (innerWidth=${metrics.measuredWidth}, overflow=none, computedColumns=${metrics.computedColumns ?? 'N/A'}) -> ${outPath} (${stat.size} bytes)`);
+          console.log(`    - ${c.desc} [requested=${c.width}px, measured=${metrics.measuredWidth}px]: verified (overflow=none, computedColumns=${metrics.computedColumns ?? 'N/A'}) -> ${outPath} (${pngBuffer.length} bytes)`);
 
           screenshots.push({
-            width: c.width,
+            desc: c.desc,
+            requestedWidth: c.width,
+            measuredWidth: metrics.measuredWidth,
             page: c.page,
             route: c.route,
             path: outPath,
-            size: stat.size,
+            size: pngBuffer.length,
           });
           captureMetricsList.push(metrics);
         }
@@ -337,9 +474,10 @@ export async function runVisualBatch1Verification() {
         clearTimeout(overallTimeout);
         await cleanup();
         resolve({
-          passed: true,
+          passed: unverifiedViewports.length === 0,
           results: report.results,
           screenshots,
+          unverifiedViewports,
           metrics: captureMetricsList,
           outputDir: OUTPUT_DIR,
         });
