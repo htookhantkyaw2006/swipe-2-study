@@ -11,31 +11,33 @@ export default function WordCollection({ kind, words, onUnsave, courseName, noti
   const isSaved = kind === 'saved';
   const title = isSaved ? 'Saved Words' : 'Review Words';
   const Icon = isSaved ? Bookmark : RotateCw;
-  const visibleWords = filterStudyWords(words, query);
-  const empty = words.length === 0;
+  const safeWords = Array.isArray(words) ? words : [];
+  const visibleWords = filterStudyWords(safeWords, query);
+  const empty = safeWords.length === 0;
+  const countLabel = `${safeWords.length} ${isSaved ? (safeWords.length === 1 ? 'saved word' : 'saved words') : (safeWords.length === 1 ? 'word to review' : 'words to review')}`;
 
   return (
     <div className={`study-page collection-page collection-page--${kind}`}>
       <StudyHeader title={title} subtitle={`${courseName} · Your collection`} backTo={isSaved ? '/library' : '/learn'} backLabel={isSaved ? 'Back to library' : 'Back to courses'} />
-      <section className="collection-hero" aria-label={isSaved ? 'Saved word summary' : 'Review summary'}>
-        <div className="collection-hero__icon"><Icon size={26} aria-hidden="true" /></div>
+      <section className={`collection-hero collection-hero--${kind}`} aria-label={isSaved ? 'Saved word summary' : 'Review summary'}>
+        <div className="collection-hero__icon"><Icon size={24} aria-hidden="true" /></div>
         <div className="collection-hero__copy">
-          <p className="study-eyebrow">{isSaved ? 'Keep learning' : 'A little more practice'}</p>
-          <h2>{words.length} {isSaved ? (words.length === 1 ? 'saved word' : 'saved words') : (words.length === 1 ? 'word to review' : 'words to review')}</h2>
-          <p>{isSaved ? 'Your bookmarked words, all in one place.' : 'Revisit the words you swiped left on.'}</p>
+          <p className="study-eyebrow">{isSaved ? 'SAVED WORDS' : 'REVIEW QUEUE'}</p>
+          <h2>{countLabel}</h2>
+          <p>{isSaved ? 'Your bookmarked words, ready for practice.' : 'Revisit words you marked for review.'}</p>
         </div>
-        <Link className="collection-hero__action" to={empty ? (isSaved ? '/dictionary' : '/learn') : (isSaved ? '/saved/session' : '/learn/review/session')}>
+        <Link className="collection-hero__action" to={empty ? '/learn' : (isSaved ? '/saved/session' : '/learn/review/session')}>
           <Play size={18} aria-hidden="true" />
-          {empty ? (isSaved ? 'Find words' : 'Start learning') : (isSaved ? 'Study saved words' : 'Start review')}
+          {empty ? 'Start learning' : (isSaved ? 'Study saved words' : 'Start review')}
         </Link>
       </section>
 
       <section className="collection-words" aria-labelledby="collection-list-title">
         <div className="study-section-heading">
-          <div><h2 id="collection-list-title">Word list</h2><p role="status">{visibleWords.length} of {words.length} words</p></div>
+          <div><h2 id="collection-list-title">Word list</h2><p role="status">{visibleWords.length} of {safeWords.length} words</p></div>
           {!empty && <StudySearch value={query} onChange={setQuery} label={isSaved ? 'Search saved words' : 'Search review words'} />}
         </div>
-        {notice && <p className="study-notice" role="status">{notice}</p>}
+        {notice && <p className="study-notice" role="status" aria-live="polite">{notice}</p>}
         {empty ? (
           <div className="study-empty">
             <Icon size={30} aria-hidden="true" />
@@ -44,7 +46,7 @@ export default function WordCollection({ kind, words, onUnsave, courseName, noti
             {isSaved ? (
               <div className="study-empty__actions" style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 <Link className="study-text-link" to="/learn">Start learning</Link>
-                <Link className="study-text-link" to="/dictionary">Open dictionary</Link>
+                <Link className="study-text-link study-text-link--secondary" to="/dictionary">Open dictionary</Link>
               </div>
             ) : (
               <Link className="study-text-link" to="/learn">Explore courses</Link>
@@ -58,12 +60,16 @@ export default function WordCollection({ kind, words, onUnsave, courseName, noti
               const word = wordDetails(stored);
               return (
                 <li className="collection-word" key={word.id}>
-                  <div className="collection-word__copy">
-                    <h3>{word.phrase}</h3>
-                    {kanaOf(word) && <p className="collection-word__kana" lang="ja">{kanaOf(word)}</p>}
-                    {word.reading && <p className="collection-word__reading">{word.reading}</p>}
-                    {word.english && <p className="collection-word__meaning" lang="en">{word.english}</p>}
-                    {word.burmese && <p className="collection-word__burmese" lang="my">{word.burmese}</p>}
+                  <div className="collection-word__main">
+                    <div className="collection-word__head">
+                      <h3 className="collection-word__character">{word.phrase}</h3>
+                      {kanaOf(word) && <span className="collection-word__kana" lang="ja">{kanaOf(word)}</span>}
+                      {word.reading && <span className="collection-word__reading">{word.reading}</span>}
+                    </div>
+                    <div className="collection-word__copy">
+                      {word.english && <p className="collection-word__meaning" lang="en">{word.english}</p>}
+                      {word.burmese && <p className="collection-word__burmese" lang="my">{word.burmese}</p>}
+                    </div>
                   </div>
                   <div className="collection-word__actions">
                     <button className="study-icon-button" onClick={() => speak(sayOf(stored))} aria-label={`Play word: ${word.phrase}`}><Volume2 size={20} aria-hidden="true" /></button>

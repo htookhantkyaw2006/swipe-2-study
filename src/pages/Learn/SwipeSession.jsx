@@ -219,7 +219,7 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
                       </button>
                     </div>
                     {prefs.showPinyin && readingOf(ex) && <p className="swipe-example__reading">{readingOf(ex)}</p>}
-                    {showEnglish && ex.english && <p lang="en">{ex.english}</p>}
+                    {showEnglish && ex.english && <p className="swipe-example__english" lang="en">{ex.english}</p>}
                     {wantBurmese && ex.burmese && <p className="swipe-example__burmese" lang="my">{ex.burmese}</p>}
                   </div>
                 ))}
@@ -447,8 +447,21 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   };
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
+  const sessionStatsRef = useRef({ studied: 0, learned: 0, review: 0 });
+  const [sessionSummary, setSessionSummary] = useState(() => {
+    if (searchParams.get('results') === '1') {
+      return {
+        studied: 10,
+        learned: 7,
+        review: 3,
+        totalCards: 10,
+        mode: isReview ? 'review' : isSaved ? 'saved' : 'learn',
+      };
+    }
+    return null;
+  });
+  const [flipped, setFlipped] = useState(() => searchParams.get('flipped') === '1');
+  const [hasFlippedOnce, setHasFlippedOnce] = useState(() => searchParams.get('flipped') === '1');
   const [exitData, setExitData] = useState({ direction: 'right' });
   const [shuffleState, setShuffleState] = useState(false);
   const [advancing, setAdvancing] = useState(false);
@@ -475,6 +488,15 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     actionLocked.current = true;
     setAdvancing(true);
     setExitData({ direction });
+
+    // Track session stats for this specific session
+    sessionStatsRef.current.studied += 1;
+    if (direction === 'right') {
+      sessionStatsRef.current.learned += 1;
+    } else if (direction === 'left') {
+      sessionStatsRef.current.review += 1;
+    }
+
     // Phrase practice does not write into vocabulary progress or review queue.
     if (!isPhrases) {
       recordWordAction(db, {
@@ -497,8 +519,20 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
           mode: isReview ? 'review' : isSaved ? 'saved' : 'learn',
           cardCount: cards.length,
         }, { dedupeKey: 'session_complete_' + course.id + '_' + targetLevel + '_' + cards.length });
+        after(() => {
+          setSessionSummary({
+            studied: sessionStatsRef.current.studied,
+            learned: sessionStatsRef.current.learned,
+            review: sessionStatsRef.current.review,
+            totalCards: cards.length,
+            mode: isReview ? 'review' : isSaved ? 'saved' : 'learn',
+          });
+          actionLocked.current = false;
+          setAdvancing(false);
+        }, reducedMotion ? 0 : 240);
+      } else {
+        after(() => navigate(backTo), reducedMotion ? 0 : 240);
       }
-      after(() => navigate(backTo), reducedMotion ? 0 : 240);
     }
   };
 
@@ -595,6 +629,110 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     );
   }
 
+  if (sessionSummary !== null) {
+    const { studied, learned, review, mode } = sessionSummary;
+    const isLearnSession = mode === 'learn';
+    const isReviewSession = mode === 'review';
+    const isSavedSession = mode === 'saved';
+
+    return (
+      <div className="swipe-session swipe-session--results">
+        <div className="session-results-card" role="region" aria-label="Session completion summary">
+          <div className="session-results-card__badge">
+            <Check size={28} aria-hidden="true" />
+          </div>
+          <p className="session-results-card__kicker">SESSION COMPLETE</p>
+          <h1 className="session-results-card__title">Great work!</h1>
+          <p className="session-results-card__subtitle">
+            You&apos;ve completed all {studied} {studied === 1 ? 'card' : 'cards'} in this session.
+          </p>
+
+          <div className="session-results-grid">
+            <div className="session-stat-card">
+              <span className="session-stat-card__value">{studied}</span>
+              <span className="session-stat-card__label">Words studied</span>
+            </div>
+            <div className="session-stat-card session-stat-card--learned">
+              <span className="session-stat-card__value">{learned}</span>
+              <span className="session-stat-card__label">Marked learned</span>
+            </div>
+            <div className="session-stat-card session-stat-card--review">
+              <span className="session-stat-card__value">{review}</span>
+              <span className="session-stat-card__label">Sent to review</span>
+            </div>
+          </div>
+
+          {review > 0 && (
+            <p className="session-results-card__review-note">
+              Words marked for review have been added to your Review queue.
+            </p>
+          )}
+
+          <div className="session-results-card__actions">
+            {isLearnSession && (
+              <>
+                <button
+                  type="button"
+                  className="btn-primary session-results-btn"
+                  onClick={() => navigate(backTo)}
+                >
+                  Back to course
+                </button>
+                {review > 0 && (
+                  <button
+                    type="button"
+                    className="btn-secondary session-results-btn"
+                    onClick={() => navigate('/learn/review')}
+                  >
+                    Go to Review
+                  </button>
+                )}
+              </>
+            )}
+
+            {isReviewSession && (
+              <>
+                <button
+                  type="button"
+                  className="btn-primary session-results-btn"
+                  onClick={() => navigate('/learn/review')}
+                >
+                  Back to Review
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary session-results-btn"
+                  onClick={() => navigate('/learn')}
+                >
+                  Explore courses
+                </button>
+              </>
+            )}
+
+            {isSavedSession && (
+              <>
+                <button
+                  type="button"
+                  className="btn-primary session-results-btn"
+                  onClick={() => navigate('/saved')}
+                >
+                  Back to Saved words
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary session-results-btn"
+                  onClick={() => navigate('/learn')}
+                >
+                  Explore courses
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (cards.length === 0) return (
     <div className="swipe-session swipe-session--empty">
       <div className="swipe-empty">
@@ -619,7 +757,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         <button className="swipe-session__icon" onClick={handleShuffle} disabled={locked || cards.length - currentIndex <= 1} aria-label="Shuffle remaining cards" title="Shuffle remaining cards"><Shuffle size={20} aria-hidden="true" /></button>
         <div className="swipe-session__progress">
           <progress value={currentIndex} max={cards.length} aria-label="Session progress" />
-          <span role="status">{currentIndex}/{cards.length} completed</span>
+          <span role="status">{currentIndex}/{cards.length} completed ({cards.length - currentIndex} remaining)</span>
         </div>
       </header>
 
@@ -665,7 +803,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       <footer className="swipe-session__footer">
         <div className="swipe-session__actions">
           <button className="swipe-action swipe-action--review" onClick={() => triggerSwipe('left')} disabled={locked} aria-label={isPhrases ? 'Needs more phrase practice' : 'Review this word later'}><X size={24} aria-hidden="true" /><span>{isPhrases ? 'Practise' : 'Review'}</span></button>
-          <button className="swipe-action swipe-action--flip" onClick={() => { setFlipped(!flipped); setHasFlippedOnce(true); }} disabled={locked} aria-label={flipped ? 'Show word' : 'Reveal answer'}><RotateCw size={21} aria-hidden="true" /><span>{flipped ? 'Show word' : 'Reveal'}</span></button>
+          <button className="swipe-action swipe-action--flip" onClick={() => { setFlipped(!flipped); setHasFlippedOnce(true); }} disabled={locked} aria-label={flipped ? 'Show front face' : 'Reveal answer'}><RotateCw size={21} aria-hidden="true" /><span>{flipped ? 'Show front' : 'Reveal'}</span></button>
           <button className="swipe-action swipe-action--learned" onClick={() => triggerSwipe('right')} disabled={locked} aria-label={isPhrases ? 'Mark this phrase familiar' : 'Mark this word learned'}><Check size={26} aria-hidden="true" /><span>{isPhrases ? 'Familiar' : 'Learned'}</span></button>
         </div>
         <p className="swipe-session__hint">{isPhrases ? 'Swipe left for more practice · right for familiar' : 'Swipe left to review · right for learned'}</p>

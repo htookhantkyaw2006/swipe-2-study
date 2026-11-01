@@ -5,6 +5,12 @@ import WordCollection from '../../components/study/WordCollection';
 
 export default function ReviewWords() {
   const course = useCourse();
-  const [words] = useState(() => db.get('review_cards'));
+  const [words] = useState(() => {
+    try {
+      return db.get('review_cards') || [];
+    } catch {
+      return [];
+    }
+  });
   return <WordCollection kind="review" words={words} courseName={course.name} />;
 }

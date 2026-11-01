@@ -36,6 +36,8 @@
     import LevelPicker from '/src/pages/Learn/LevelPicker.jsx';
     import LessonPicker from '/src/pages/Learn/LessonPicker.jsx';
     import SwipeSession from '/src/pages/Learn/SwipeSession.jsx';
+    import ReviewWords from '/src/pages/Learn/ReviewWords.jsx';
+    import SavedWords from '/src/pages/SavedWords.jsx';
     import { db } from '/src/lib/db.js';
 
     const rootElement = document.getElementById('root');
@@ -108,7 +110,11 @@
                         createElement(Route, { index: true, element: createElement(Home) }),
                         createElement(Route, { path: 'learn', element: createElement(LevelPicker) }),
                         createElement(Route, { path: 'learn/level/:levelId', element: createElement(LessonPicker) }),
-                        createElement(Route, { path: 'learn/session', element: createElement(SwipeSession) })
+                        createElement(Route, { path: 'learn/session', element: createElement(SwipeSession) }),
+                        createElement(Route, { path: 'learn/review', element: createElement(ReviewWords) }),
+                        createElement(Route, { path: 'learn/review/session', element: createElement(SwipeSession, { isReview: true }) }),
+                        createElement(Route, { path: 'saved', element: createElement(SavedWords) }),
+                        createElement(Route, { path: 'saved/session', element: createElement(SwipeSession, { isSaved: true }) })
                       )
                     )
                   )
@@ -333,6 +339,33 @@
       db.set('learned_words', []);
       db.set('review_cards', []);
 
+      if (pageName === 'review-collection' || targetRoute === '/learn/review') {
+        const sampleWords = hsk1Items.slice(0, 6).map((item, i) => ({
+          id: `rev-${i + 1}`,
+          word: item.character,
+          phrase: item.character,
+          reading: item.reading,
+          english: item.definition,
+          burmese: item.burmese_definition,
+          level_id: 'HSK1',
+          created_at: new Date().toISOString(),
+        }));
+        db.set('review_cards', sampleWords);
+      } else if (pageName === 'saved-collection' || targetRoute === '/saved') {
+        const sampleWords = hsk1Items.slice(0, 6).map((item, i) => ({
+          id: `save-${i + 1}`,
+          card_id: item.card_id,
+          word: item.character,
+          phrase: item.character,
+          reading: item.reading,
+          english: item.definition,
+          burmese: item.burmese_definition,
+          level_id: 'HSK1',
+          created_at: new Date().toISOString(),
+        }));
+        db.set('saved_words', sampleWords);
+      }
+
       renderTree(createElement(AppTestWrapper, { initialEntries: [targetRoute], hsk1Items }));
 
       // Wait for the specific page element to mount
@@ -342,6 +375,16 @@
         await waitFor(() => document.querySelector('.level-overview__grid') !== null && document.querySelector('.level-tile') !== null, 4000, 'capture-levels-mounted');
       } else if (pageName === 'course-overview' || targetRoute.includes('/level/')) {
         await waitFor(() => document.querySelector('.lesson-page') !== null && document.querySelector('.lesson-hero-card') !== null && document.querySelector('.lesson-word-list') !== null, 4000, 'capture-course-overview-mounted');
+      } else if (pageName === 'session-results' || targetRoute.includes('results=1')) {
+        await waitFor(() => document.querySelector('.session-results-card') !== null, 4000, 'capture-session-results-mounted');
+      } else if (pageName === 'flashcard-front' || (targetRoute.includes('/session') && !targetRoute.includes('flipped=1'))) {
+        await waitFor(() => document.querySelector('.swipe-card--active') !== null && document.querySelector('.swipe-card__front') !== null, 4000, 'capture-flashcard-front-mounted');
+      } else if (pageName === 'flashcard-back' || targetRoute.includes('flipped=1')) {
+        await waitFor(() => document.querySelector('.swipe-card--active') !== null && document.querySelector('.swipe-card__examples') !== null, 4000, 'capture-flashcard-back-mounted');
+      } else if (pageName === 'review-collection' || targetRoute === '/learn/review') {
+        await waitFor(() => document.querySelector('.collection-page--review') !== null && document.querySelector('.collection-word') !== null, 4000, 'capture-review-collection-mounted');
+      } else if (pageName === 'saved-collection' || targetRoute === '/saved') {
+        await waitFor(() => document.querySelector('.collection-page--saved') !== null && document.querySelector('.collection-word') !== null, 4000, 'capture-saved-collection-mounted');
       } else {
         await waitFor(() => document.querySelector('#main-content') !== null, 4000, 'capture-generic-mounted');
       }
@@ -370,7 +413,7 @@
       }
 
       let computedColumns = null;
-      const grid = document.querySelector('.level-overview__grid');
+      const grid = document.querySelector('.level-overview__grid') || document.querySelector('.collection-list');
       if (grid) {
         const style = window.getComputedStyle(grid);
         computedColumns = style.gridTemplateColumns.split(' ').filter(Boolean).length;
