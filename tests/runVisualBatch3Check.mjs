@@ -513,6 +513,11 @@ export async function runVisualBatch3Verification() {
                 `Horizontal overflow detected on ${c.desc}: scrollWidth=${metrics.scrollWidth}px > measuredWidth=${metrics.measuredWidth}px. Overflowing elements: ${JSON.stringify(metrics.overflowElements)}`
               );
             }
+            if (metrics.renderedFontInfo && !metrics.renderedFontInfo.matchesPlatform) {
+              throw new Error(
+                `Rendered font verification failed on platform ${metrics.renderedFontInfo.platform}: expected ${metrics.renderedFontInfo.expectedFont}, got ${metrics.renderedFontInfo.actualRendered}`
+              );
+            }
 
             fs.writeFileSync(outPath, Buffer.from(screenshotBase64, 'base64'));
             const fileSize = fs.statSync(outPath).size;
@@ -520,6 +525,11 @@ export async function runVisualBatch3Verification() {
             console.log(
               `    - ${c.desc} [requested=${c.width}px, measured=${metrics.measuredWidth}px]: verified (overflow=none) -> ${outPath} (${fileSize} bytes)`
             );
+            if (metrics.renderedFontInfo) {
+              console.log(
+                `      font: platform=${metrics.renderedFontInfo.platform}, rendered=${metrics.renderedFontInfo.actualRendered}, interLoaded=${metrics.renderedFontInfo.interChecked}`
+              );
+            }
             if (metrics.navClearance) {
               console.log(
                 `      nav clearance: hasFixedNav=${metrics.navClearance.hasFixedNav}, paddingBottom=${metrics.navClearance.paddingBottom}px, clearsNav=${metrics.navClearance.clearsNav}`

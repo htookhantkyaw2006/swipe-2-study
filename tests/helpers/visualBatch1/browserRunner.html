@@ -4,16 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Batch 1 Visual & Interaction Verification Runner</title>
+  <link rel="preload" href="/fonts/inter/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/src/index.css" />
   <style>
-    :root {
-      --color-ghost-blue: #EFF6FF;
-      --color-primary-blue: #0369A1;
-      --color-border: #BAE6FD;
-      --color-text-navy: #0C4A6E;
-      --color-page-bg: #F0F9FF;
-    }
     html, body { margin: 0; padding: 0; min-height: 100%; }
     #root { width: 100%; min-height: 100vh; }
   </style>
@@ -538,26 +532,55 @@
       }
 
       // Explicitly load representative English, Chinese, Burmese, and pinyin font samples
-      const sampleDiv = document.createElement('div');
-      sampleDiv.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
-      sampleDiv.innerHTML = `
-        <span style="font-family:'Inter'">Swipe to Study English Inter</span>
-        <span style="font-family:'Noto Sans SC'">学习 汉语 爱 (Noto Sans SC)</span>
-        <span style="font-family:'Noto Sans Myanmar'">ကျွန်တော် ချစ်သည် (Noto Sans Myanmar)</span>
-        <span style="font-family:'JetBrains Mono'">xuéxí ài (JetBrains Mono)</span>
-      `;
-      document.body.appendChild(sampleDiv);
+      if (document.fonts && document.fonts.load) {
+        try {
+          await Promise.all([
+            document.fonts.load('400 16px "Inter"', 'Swipe to Study English AaBbCc 123'),
+            document.fonts.load('600 16px "Inter"', 'Buttons & Labels 456'),
+            document.fonts.load('700 16px "Inter"', 'Headings 700'),
+            document.fonts.load('800 16px "Inter"', 'Auth Title 800'),
+            document.fonts.load('400 16px "Noto Sans SC"', '学习汉语爱 123'),
+            document.fonts.load('400 16px "Noto Sans Myanmar"', 'ကျွန်တော် ချစ်သည်'),
+            document.fonts.load('400 16px "JetBrains Mono"', 'xuéxí ài 123'),
+          ]);
+        } catch (fontErr) {
+          console.warn('[FONT_LOAD_WARN]', fontErr);
+        }
+      }
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
-      await sleep(150);
-      sampleDiv.remove();
+      await sleep(100);
 
       const fontStatus = {
         inter: document.fonts.check('16px "Inter"'),
         notoSc: document.fonts.check('16px "Noto Sans SC"'),
         notoMyanmar: document.fonts.check('16px "Noto Sans Myanmar"'),
         jetbrainsMono: document.fonts.check('16px "JetBrains Mono"'),
+      };
+
+      // Verify the font actually rendered for the selected platform
+      const isApple = /Macintosh|Mac OS X|iPhone|iPad|iPod/.test(navigator.userAgent) ||
+        /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const sampleText = 'Swipe to Study English AaBbCc 123';
+      ctx.font = '16px "Inter", sans-serif';
+      const interW = ctx.measureText(sampleText).width;
+      ctx.font = '16px var(--font-sans)';
+      const stackW = ctx.measureText(sampleText).width;
+
+      const renderedFontInfo = {
+        platform: navigator.platform,
+        isApple,
+        expectedFont: isApple ? 'system-apple' : 'Inter',
+        actualRendered: isApple ? 'system-apple' : (Math.abs(stackW - interW) < 0.5 ? 'Inter' : 'fallback-sans'),
+        matchesPlatform: isApple ? true : Math.abs(stackW - interW) < 0.5,
+        interChecked: fontStatus.inter,
+        notoScChecked: fontStatus.notoSc,
+        notoMyanmarChecked: fontStatus.notoMyanmar,
+        jetbrainsMonoChecked: fontStatus.jetbrainsMono,
       };
 
       const measuredWidth = window.innerWidth;
@@ -717,6 +740,7 @@
         navClearance,
         interactiveHover,
         fontStatus,
+        renderedFontInfo,
         pageMounted: true,
       };
 

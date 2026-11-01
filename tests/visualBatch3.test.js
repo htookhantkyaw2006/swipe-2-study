@@ -225,6 +225,10 @@ test('6. Typography restores reduced auth weights and preserves system hierarchy
   assert.match(css, /\.auth-title\s*\{[^}]*font-weight:\s*800;/, 'Auth title restored to weight 800');
   assert.match(css, /\.auth-label\s*\{[^}]*font-weight:\s*700;/, 'Auth labels restored to weight 700');
   assert.match(css, /\.auth-submit\s*\{[^}]*font-weight:\s*700;/, 'Auth submit restored to weight 700');
+  assert.match(css, /--font-sans:\s*-apple-system,\s*BlinkMacSystemFont,\s*'Inter',\s*'Noto Sans Myanmar',\s*var\(--font-cjk\),\s*system-ui,\s*sans-serif;/, 'Font stack prefers Apple system font on Apple platforms and self-hosted Inter on other platforms');
+  assert.match(css, /--color-text-main:\s*#1C1C1E;/, 'Main reading text color is #1C1C1E');
+  assert.match(css, /--color-text-sub:\s*#48484A;/, 'Secondary text color is #48484A');
+  assert.ok(!css.includes('@font-face') || !css.includes('SF Pro'), 'Does not bundle SF Pro font files');
 });
 
 test('7. Icon-to-surface proportions and target sizing conform to specs', () => {

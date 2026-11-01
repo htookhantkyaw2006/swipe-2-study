@@ -3,8 +3,8 @@
   --color-secondary-blue: #0284C7;
   --color-sky-accent: #38BDF8;
   --color-text-navy: #0C4A6E;
-  --color-text-main: #1F2937;
-  --color-text-sub: #475569;
+  --color-text-main: #1C1C1E;
+  --color-text-sub: #48484A;
   --color-text-heading: #0C4A6E;
   --color-link: #0369A1;
   --color-success-green: #22C55E;
@@ -17,7 +17,7 @@
   --bg-gradient: linear-gradient(145deg, #F0F9FF 0%, #EBF8FF 50%, #E0F2FE 100%);
 
   --font-cjk: 'Noto Sans SC', 'Noto Sans JP';
-  --font-sans: 'Inter', 'Noto Sans Myanmar', var(--font-cjk), system-ui, -apple-system, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Noto Sans Myanmar', var(--font-cjk), system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* The reading line under a word: pinyin, romaji or IPA. Monospace
@@ -47,7 +47,7 @@
 :root[data-course="ja"] { --font-cjk: 'Noto Sans JP', 'Noto Sans SC'; }
 
 :root[data-course="en"] {
-  --font-reading: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-reading: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
 }
 
 * {
@@ -348,7 +348,7 @@ button {
 .auth-input-icon {
   position: absolute;
   left: 14px;
-  color: #64748B;
+  color: var(--color-text-sub);
   pointer-events: none;
   flex-shrink: 0;
 }
@@ -384,7 +384,7 @@ button {
   right: 6px;
   background: transparent;
   border: none;
-  color: #64748B;
+  color: var(--color-text-sub);
   min-width: 44px;
   min-height: 44px;
   padding: 8px;
