@@ -69,19 +69,49 @@ export default function LessonPicker() {
     activeAudioRef.current = playWordAudio(word, { speakFn: speak });
   };
 
-  const heroSubtitle = publishedCourse.isLoading
-    ? 'Loading curriculum...'
-    : isPublishedLevel
-      ? (publishedCourse.isError
-          ? 'Error loading curriculum'
+  const courseStatus = isPublishedLevel
+    ? (publishedCourse.isLoading
+        ? 'loading'
+        : publishedCourse.isError
+          ? 'error'
           : publishedCourse.isUnpublished
-            ? 'Unpublished curriculum'
-            : `${completed.toLocaleString()} / ${totalWords.toLocaleString()} completed`)
-      : course.id === 'zh'
-        ? `${completed.toLocaleString()} / ${(totalWords || level.words).toLocaleString()} completed`
-        : `${(totalWords || level.words).toLocaleString()} vocabulary words`;
+            ? 'unpublished'
+            : words.length > 0
+              ? 'ready'
+              : 'empty')
+    : (publishedCourse.enabled
+        ? 'unpublished'
+        : (words.length > 0 ? 'ready' : 'empty'));
 
-  const isLevelAvailable = words.length > 0;
+  const isNowLearning = courseStatus === 'ready' && level.id === course.levels[0].id;
+
+  let heroBadge = level.tier || 'BEGINNER';
+  let heroBadgeClass = '';
+  if (courseStatus === 'loading') {
+    heroBadge = 'LOADING';
+    heroBadgeClass = ' lesson-hero-card__badge--loading';
+  } else if (courseStatus === 'error') {
+    heroBadge = 'UNAVAILABLE';
+    heroBadgeClass = ' lesson-hero-card__badge--error';
+  } else if (courseStatus === 'unpublished') {
+    heroBadge = 'COMING SOON';
+    heroBadgeClass = ' lesson-hero-card__badge--soon';
+  } else if (isNowLearning) {
+    heroBadge = 'NOW LEARNING';
+  }
+
+  let heroSubtitle = '';
+  if (courseStatus === 'loading') {
+    heroSubtitle = 'Loading curriculum...';
+  } else if (courseStatus === 'error') {
+    heroSubtitle = 'Error loading curriculum';
+  } else if (courseStatus === 'unpublished') {
+    heroSubtitle = 'Curriculum coming soon';
+  } else if (courseStatus === 'empty') {
+    heroSubtitle = 'No words available yet';
+  } else {
+    heroSubtitle = `${completed.toLocaleString()} / ${totalWords.toLocaleString()} completed`;
+  }
 
   return (
     <div className="study-page lesson-page">
@@ -106,7 +136,7 @@ export default function LessonPicker() {
             }}
           >
             <div className="lesson-hero-card__top">
-              <span className="lesson-hero-card__badge">NOW LEARNING</span>
+              <span className={`lesson-hero-card__badge${heroBadgeClass}`}>{heroBadge}</span>
               <Link to="/learn" className="lesson-hero-card__all-link">
                 All levels
               </Link>
@@ -119,7 +149,7 @@ export default function LessonPicker() {
             </div>
 
             <div className="lesson-hero-card__actions">
-              {isLevelAvailable ? (
+              {courseStatus === 'ready' ? (
                 <Link
                   className="lesson-hero-card__study-btn"
                   style={{ color: level.btnColor || level.gradientEnd }}
@@ -127,6 +157,33 @@ export default function LessonPicker() {
                 >
                   {completed === 0 ? 'Start learning' : 'Continue learning'}
                 </Link>
+              ) : courseStatus === 'loading' ? (
+                <button
+                  type="button"
+                  className="lesson-hero-card__study-btn lesson-hero-card__study-btn--disabled"
+                  disabled
+                  style={{ color: level.btnColor || level.gradientEnd }}
+                >
+                  Loading…
+                </button>
+              ) : courseStatus === 'error' ? (
+                <button
+                  type="button"
+                  className="lesson-hero-card__study-btn lesson-hero-card__study-btn--retry"
+                  onClick={publishedCourse.retry}
+                  style={{ color: level.btnColor || level.gradientEnd }}
+                >
+                  Retry loading
+                </button>
+              ) : courseStatus === 'empty' ? (
+                <button
+                  type="button"
+                  className="lesson-hero-card__study-btn lesson-hero-card__study-btn--disabled"
+                  disabled
+                  style={{ color: level.btnColor || level.gradientEnd }}
+                >
+                  No cards available
+                </button>
               ) : (
                 <button
                   type="button"
@@ -175,7 +232,7 @@ export default function LessonPicker() {
           </section>
         </aside>
 
-        <main className="lesson-content">
+        <div className="lesson-content">
           <section className="lesson-browser" aria-labelledby="lesson-browser-title">
             <div className="study-section-heading">
               <div>
@@ -244,7 +301,7 @@ export default function LessonPicker() {
               </ul>
             )}
           </section>
-        </main>
+        </div>
       </div>
     </div>
   );

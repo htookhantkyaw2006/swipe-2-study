@@ -97,7 +97,13 @@ export default function LevelCarousel() {
       >
         <div className="course-card-heading">
           <span className={`course-badge${isNowLearning ? ' course-badge--active' : ''}`}>
-            {isNowLearning ? 'NOW LEARNING' : level.tier}
+            {publishedState?.status === 'loading'
+              ? 'LOADING'
+              : publishedState?.status === 'error'
+                ? 'UNAVAILABLE'
+                : isNowLearning
+                  ? 'NOW LEARNING'
+                  : level.tier}
           </span>
           <Link to="/learn" className="course-all-link">
             All levels
@@ -127,6 +133,24 @@ export default function LevelCarousel() {
               onClick={handlePrimaryAction}
             >
               {completed === 0 ? (course.copy.startSwiping || 'Start learning') : 'Continue learning'}
+            </button>
+          ) : publishedState?.status === 'loading' ? (
+            <button
+              type="button"
+              className="course-study-button course-study-button--disabled"
+              disabled
+              style={{ color: level.btnColor || level.gradientEnd }}
+            >
+              Loading…
+            </button>
+          ) : publishedState?.status === 'error' ? (
+            <button
+              type="button"
+              className="course-study-button course-study-button--retry"
+              onClick={() => publishedCourseId && publishedContent.retry(publishedCourseId)}
+              style={{ color: level.btnColor || level.gradientEnd }}
+            >
+              Retry
             </button>
           ) : (
             <button

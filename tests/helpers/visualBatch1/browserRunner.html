@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Batch 1 Visual & Interaction Verification Runner</title>
+  <link rel="stylesheet" href="/src/index.css" />
   <style>
     :root {
       --color-ghost-blue: #EFF6FF;
@@ -311,13 +313,105 @@
       });
     }
 
-    runVerification().catch(async (err) => {
-      await fetch('/report', {
+    // -------------------------------------------------------------------------
+    // Execution Mode Switcher:
+    // ?mode=capture => Deterministic single-route mount & pre-capture measurement
+    // ?mode=test (default) => Full 4-stage interaction verification sequence
+    // -------------------------------------------------------------------------
+    const urlParams = new URLSearchParams(window.location.search);
+    const executionMode = urlParams.get('mode') || 'test';
+
+    async function runCaptureMode() {
+      const targetRoute = urlParams.get('route') || '/';
+      const pageName = urlParams.get('page') || 'home';
+      const expectedWidth = Number(urlParams.get('width')) || window.innerWidth;
+      const hsk1Items = await loadHsk1Items();
+
+      // Reset storage for clean deterministic capture view
+      db.set('saved_words', []);
+      db.set('learned_words', []);
+      db.set('review_cards', []);
+
+      renderTree(createElement(AppTestWrapper, { initialEntries: [targetRoute], hsk1Items }));
+
+      // Wait for the specific page element to mount
+      if (pageName === 'home' || targetRoute === '/') {
+        await waitFor(() => document.querySelector('.home-page') !== null && document.querySelector('.featured-course') !== null, 4000, 'capture-home-mounted');
+      } else if (pageName === 'levels' || targetRoute === '/learn') {
+        await waitFor(() => document.querySelector('.level-overview__grid') !== null && document.querySelector('.level-tile') !== null, 4000, 'capture-levels-mounted');
+      } else if (pageName === 'course-overview' || targetRoute.includes('/level/')) {
+        await waitFor(() => document.querySelector('.lesson-page') !== null && document.querySelector('.lesson-hero-card') !== null && document.querySelector('.lesson-word-list') !== null, 4000, 'capture-course-overview-mounted');
+      } else {
+        await waitFor(() => document.querySelector('#main-content') !== null, 4000, 'capture-generic-mounted');
+      }
+
+      // Small settle delay for responsive styles and font metrics
+      await sleep(150);
+
+      const measuredWidth = window.innerWidth;
+      const outerWidth = window.outerWidth;
+      const docScrollWidth = document.documentElement.scrollWidth;
+      const bodyScrollWidth = document.body.scrollWidth;
+      const scrollWidth = Math.max(docScrollWidth, bodyScrollWidth);
+      // Horizontal overflow check: scrollWidth must not exceed innerWidth by more than 2px (subpixel/scrollbar tolerance)
+      const hasHorizontalOverflow = scrollWidth > (measuredWidth + 2);
+      const overflowElements = [];
+      if (hasHorizontalOverflow) {
+        document.querySelectorAll('*').forEach(el => {
+          const rect = el.getBoundingClientRect();
+          if (rect.right > measuredWidth + 2) {
+            overflowElements.push({ tag: el.tagName, className: el.className, id: el.id, right: rect.right, width: rect.width });
+          }
+        });
+      }
+
+      let computedColumns = null;
+      const grid = document.querySelector('.level-overview__grid');
+      if (grid) {
+        const style = window.getComputedStyle(grid);
+        computedColumns = style.gridTemplateColumns.split(' ').filter(Boolean).length;
+      }
+
+      const metrics = {
+        success: true,
+        page: pageName,
+        route: targetRoute,
+        expectedWidth,
+        measuredWidth,
+        outerWidth,
+        hasHorizontalOverflow,
+        scrollWidth,
+        computedColumns,
+        overflowElements: overflowElements.slice(0, 5),
+        pageMounted: true,
+      };
+
+      document.body.setAttribute('data-capture-ready', 'true');
+
+      await fetch('/capture-metrics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ success: false, error: err.stack || err.message }),
+        body: JSON.stringify(metrics),
       });
-    });
+    }
+
+    if (executionMode === 'capture') {
+      runCaptureMode().catch(async (err) => {
+        await fetch('/capture-metrics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: err.stack || err.message }),
+        });
+      });
+    } else {
+      runVerification().catch(async (err) => {
+        await fetch('/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: err.stack || err.message }),
+        });
+      });
+    }
   </script>
 </body>
 </html>

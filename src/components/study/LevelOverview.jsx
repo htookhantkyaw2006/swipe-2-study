@@ -44,42 +44,69 @@ export default function LevelOverview({ phrases = false }) {
 
       <div className="level-overview__grid">
         {course.levels.map((level, index) => {
+          let status = 'unpublished';
           let countText = 'Content coming soon';
-          let hasContent = false;
+
           if (phrases) {
             const count = phraseCards(course, level.id).length;
-            hasContent = count > 0;
-            countText = count ? `${count} phrases available` : 'Content coming soon';
+            if (count > 0) {
+              status = 'ready';
+              countText = `${count} phrases available`;
+            } else {
+              status = 'unpublished';
+              countText = 'Content coming soon';
+            }
           } else if (enabled) {
             const publishedCourseId = resolvePublishedCourseId(course.id, level.id);
             if (publishedCourseId) {
               const state = getCourseState(publishedCourseId);
               if (state.status === 'loading') {
+                status = 'loading';
                 countText = 'Loading content...';
               } else if (state.status === 'error') {
+                status = 'error';
                 countText = 'Unable to load content';
               } else if (state.status === 'loaded') {
                 const count = state.items.length;
-                hasContent = count > 0;
-                countText = count ? `${count} ${count === 1 ? 'card' : 'cards'} available` : 'No cards available';
+                if (count > 0) {
+                  status = 'ready';
+                  countText = `${count} ${count === 1 ? 'card' : 'cards'} available`;
+                } else {
+                  status = 'empty';
+                  countText = 'No cards available';
+                }
               } else {
+                status = 'unpublished';
                 countText = 'Content coming soon';
               }
             } else {
+              status = 'unpublished';
               countText = 'Content coming soon';
             }
           } else {
             const count = localWords.filter(word => word.level === level.id).length;
-            hasContent = count > 0;
-            countText = count ? `${count} cards available` : 'Content coming soon';
+            if (count > 0) {
+              status = 'ready';
+              countText = `${count} cards available`;
+            } else {
+              status = 'unpublished';
+              countText = 'Content coming soon';
+            }
           }
 
-          const isNowLearning = !phrases && index === 0 && hasContent;
+          const isNowLearning = !phrases && index === 0 && status === 'ready';
+          const isUnavailable = status === 'unpublished';
+
+          let tileModifier = '';
+          if (status === 'unpublished') tileModifier = ' level-tile--unavailable';
+          else if (status === 'loading') tileModifier = ' level-tile--loading';
+          else if (status === 'error') tileModifier = ' level-tile--error';
+          else if (status === 'empty') tileModifier = ' level-tile--empty';
 
           return (
             <Link
               key={level.id}
-              className={`level-tile${!hasContent ? ' level-tile--unavailable' : ''}`}
+              className={`level-tile${tileModifier}`}
               style={{
                 '--level-accent': level.gradientEnd,
                 '--level-tint': level.gradientStart,
@@ -90,7 +117,11 @@ export default function LevelOverview({ phrases = false }) {
                 <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
                 {isNowLearning ? (
                   <span className="level-tile__badge level-tile__badge--learning">NOW LEARNING</span>
-                ) : !hasContent ? (
+                ) : status === 'loading' ? (
+                  <span className="level-tile__badge level-tile__badge--loading">LOADING</span>
+                ) : status === 'error' ? (
+                  <span className="level-tile__badge level-tile__badge--error">UNAVAILABLE</span>
+                ) : status === 'unpublished' ? (
                   <span className="level-tile__badge level-tile__badge--soon">COMING SOON</span>
                 ) : (
                   <span className="level-tile__tier">{level.tier}</span>
@@ -98,11 +129,13 @@ export default function LevelOverview({ phrases = false }) {
               </div>
               <h3>{level.name}</h3>
               <p>{countText}</p>
-              <span className={`level-tile__action${!hasContent ? ' level-tile__action--disabled' : ''}`}>
-                {hasContent ? (
-                  <>Explore level <ChevronRight size={15} aria-hidden="true" /></>
-                ) : (
+              <span className={`level-tile__action${isUnavailable ? ' level-tile__action--disabled' : status === 'loading' ? ' level-tile__action--loading' : ''}`}>
+                {isUnavailable ? (
                   <>Coming soon</>
+                ) : status === 'loading' ? (
+                  <>Loading…</>
+                ) : (
+                  <>Explore level <ChevronRight size={15} aria-hidden="true" /></>
                 )}
               </span>
               <span className="level-tile__watermark" aria-hidden="true">{level.numeral || level.badge}</span>
