@@ -45,7 +45,11 @@ export default function LevelOverview({ phrases = false }) {
       <div className="level-overview__grid">
         {course.levels.map((level, index) => {
           let status = 'unpublished';
-          let countText = 'Content coming soon';
+          const plannedCount = phrases ? level.phrases : level.words;
+          const plannedText = plannedCount
+            ? `${plannedCount.toLocaleString()} ${phrases ? 'phrases' : 'words'} curriculum`
+            : 'Curriculum in preparation';
+          let countText = plannedText;
 
           if (phrases) {
             const count = phraseCards(course, level.id).length;
@@ -54,7 +58,7 @@ export default function LevelOverview({ phrases = false }) {
               countText = `${count} phrases available`;
             } else {
               status = 'unpublished';
-              countText = 'Content coming soon';
+              countText = plannedText;
             }
           } else if (enabled) {
             const publishedCourseId = resolvePublishedCourseId(course.id, level.id);
@@ -77,11 +81,11 @@ export default function LevelOverview({ phrases = false }) {
                 }
               } else {
                 status = 'unpublished';
-                countText = 'Content coming soon';
+                countText = plannedText;
               }
             } else {
               status = 'unpublished';
-              countText = 'Content coming soon';
+              countText = plannedText;
             }
           } else {
             const count = localWords.filter(word => word.level === level.id).length;
@@ -90,7 +94,7 @@ export default function LevelOverview({ phrases = false }) {
               countText = `${count} cards available`;
             } else {
               status = 'unpublished';
-              countText = 'Content coming soon';
+              countText = plannedText;
             }
           }
 

@@ -4,9 +4,7 @@ import { ArrowRight, ArrowUpRight, Layers, Flame } from 'lucide-react';
 import LevelCarousel from '../components/ui/LevelCarousel';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import Avatar from '../components/ui/Avatar';
-import LanguageFlag from '../components/ui/LanguageFlag';
 import LearningIcon from '../components/ui/LearningIcon';
-import { useCourse } from '../lib/language';
 import { useAuth } from '../lib/useAuth.js';
 import { useProfile, displayName } from '../lib/profile.js';
 import { useAvatarUrl } from '../lib/useAvatarUrl.js';
@@ -18,7 +16,6 @@ export default function Home() {
   const { user, isGuest, loading: authLoading } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const photo = useAvatarUrl(profile?.avatar_path);
-  const course = useCourse();
   const streak = useStudyStreak();
   const [counts, setCounts] = useState({ review: null, saved: null, error: false });
   const hour = new Date().getHours();
@@ -59,11 +56,7 @@ export default function Home() {
           </div>
         </Link>
         <div className="home-header-actions">
-          <div className="home-course-badge" aria-label={`Current course: ${course.name}`}>
-            <LanguageFlag id={course.id} size={18} />
-            <span>{course.name} · {course.levelSystem}</span>
-          </div>
-          <LanguageSwitcher />
+          <LanguageSwitcher className="home-course-badge" showSystem />
         </div>
       </header>
 
@@ -72,9 +65,6 @@ export default function Home() {
           <section aria-labelledby="flashcards-heading">
             <div className="section-heading">
               <h2 id="flashcards-heading">Today&apos;s study</h2>
-              <Link to="/learn">
-                All levels <ArrowUpRight size={15} aria-hidden="true" />
-              </Link>
             </div>
             <LevelCarousel />
           </section>

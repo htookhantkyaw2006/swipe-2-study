@@ -73,7 +73,7 @@
 .level-tile > *:not(.level-tile__watermark) {
   z-index: 1;
 }
-.level-tile > .learning-icon {
+.level-tile .learning-icon {
   --icon-start: var(--level-tint);
   --icon-end: var(--level-accent);
 }
@@ -86,8 +86,8 @@
   margin-bottom: 10px;
 }
 .level-tile__top .learning-icon {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
 }
 .level-tile__tier {
   font-size: 0.625rem;
@@ -132,7 +132,7 @@
 }
 .level-tile p {
   color: var(--color-primary-blue);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   line-height: 1.5;
   margin-bottom: 14px;
   overflow-wrap: anywhere;
@@ -141,7 +141,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 650;
   color: var(--color-primary-blue);
   margin-top: auto;
@@ -160,22 +160,27 @@
   bottom: -16px;
   font-size: 4.75rem;
   font-weight: 800;
-  color: var(--color-ghost-blue);
-  opacity: 0.55;
+  color: var(--level-tint, var(--color-ghost-blue));
+  opacity: 0.18;
   pointer-events: none;
   line-height: 1;
 }
 
 .level-tile--unavailable {
   background: #F8FAFC;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--level-tint, white) 10%, white) 0%, #F8FAFC 60px);
   border-color: #E2E8F0;
-  border-top-color: #CBD5E1;
+  border-top: 3px solid var(--level-accent, var(--color-primary-blue));
+}
+.level-tile--unavailable .learning-icon {
+  opacity: 0.9;
 }
 .level-tile--unavailable h3 {
-  color: #475569;
+  color: #334155;
 }
 .level-tile--unavailable p {
   color: #64748B;
+  font-size: 0.875rem;
 }
 
 @media (hover: hover) {

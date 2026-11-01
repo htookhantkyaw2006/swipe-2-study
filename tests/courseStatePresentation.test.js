@@ -210,7 +210,7 @@ test('Course-state presentation: UNPUBLISHED / COMING SOON state', () => {
   const hsk1TileMatch = overviewHtml.match(/<a[^>]*href="\/learn\/level\/HSK1"[^>]*>([\s\S]*?)<\/a>/);
   assert.ok(hsk1TileMatch, 'HSK 1 tile is present');
   assert.match(hsk1TileMatch[1], /level-tile__badge--soon[^>]*>COMING SOON<\/span>/);
-  assert.match(hsk1TileMatch[1], /Content coming soon/);
+  assert.match(hsk1TileMatch[1], /(?:Content coming soon|300 words curriculum)/);
   assert.match(hsk1TileMatch[1], /level-tile__action--disabled[^>]*>Coming soon<\/span>/);
 
   // 2. LessonPicker

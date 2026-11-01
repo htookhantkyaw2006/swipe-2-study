@@ -18,11 +18,23 @@ export function LanguageSheet({ onClose }) {
   </AppDialog>;
 }
 
-export default function LanguageSwitcher() {
+export default function LanguageSwitcher({ className = '', showSystem = false }) {
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
+  const classes = ['language-trigger', className].filter(Boolean).join(' ');
   return <>
-    <button className="language-trigger" type="button" onClick={() => setOpen(true)} aria-label={`Learning ${language.name}. Change language`} aria-haspopup="dialog" aria-expanded={open}><LanguageFlag id={language.id} size={22} /><span>{language.name}</span><ChevronDown size={16} aria-hidden="true" /></button>
+    <button
+      className={classes}
+      type="button"
+      onClick={() => setOpen(true)}
+      aria-label={`Learning ${language.name}. Change language`}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+    >
+      <LanguageFlag id={language.id} size={20} />
+      <span>{language.name}{showSystem ? ` · ${language.levelSystem}` : ''}</span>
+      <ChevronDown size={16} aria-hidden="true" />
+    </button>
     {open && <LanguageSheet onClose={() => setOpen(false)} />}
   </>;
 }
