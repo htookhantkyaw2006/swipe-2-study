@@ -457,6 +457,62 @@
         computedColumns = style.gridTemplateColumns.split(' ').filter(Boolean).length;
       }
 
+      let heroStyles = null;
+      const hero = document.querySelector('.collection-hero');
+      if (hero) {
+        const eyebrow = hero.querySelector('.study-eyebrow');
+        const action = hero.querySelector('.collection-hero__action');
+        const heading = hero.querySelector('.collection-hero__copy h2');
+        const subtitle = hero.querySelector('.collection-hero__copy > p:last-child');
+
+        const getEffectiveOpacity = (el) => {
+          let op = 1;
+          let curr = el;
+          while (curr && curr !== document) {
+            const s = window.getComputedStyle(curr);
+            const val = parseFloat(s.opacity);
+            if (!isNaN(val)) op *= val;
+            curr = curr.parentElement;
+          }
+          return op;
+        };
+
+        let hoverBackground = null;
+        let hoverColor = null;
+        for (const sheet of document.styleSheets) {
+          try {
+            for (const rule of sheet.cssRules || []) {
+              if (rule.selectorText && (
+                rule.selectorText.includes('.collection-hero--saved .collection-hero__action:hover') ||
+                rule.selectorText.includes('.collection-hero--review .collection-hero__action:hover')
+              )) {
+                if (hero.classList.contains('collection-hero--saved') && rule.selectorText.includes('--saved')) {
+                  hoverBackground = rule.style.background || rule.style.backgroundColor;
+                  hoverColor = rule.style.color;
+                }
+                if (hero.classList.contains('collection-hero--review') && rule.selectorText.includes('--review')) {
+                  hoverBackground = rule.style.background || rule.style.backgroundColor;
+                  hoverColor = rule.style.color;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        heroStyles = {
+          heroBackground: window.getComputedStyle(hero).backgroundImage || window.getComputedStyle(hero).backgroundColor,
+          eyebrowColor: eyebrow ? window.getComputedStyle(eyebrow).color : null,
+          eyebrowOpacity: eyebrow ? getEffectiveOpacity(eyebrow) : null,
+          headingColor: heading ? window.getComputedStyle(heading).color : null,
+          subtitleColor: subtitle ? window.getComputedStyle(subtitle).color : null,
+          actionColor: action ? window.getComputedStyle(action).color : null,
+          actionBackground: action ? window.getComputedStyle(action).backgroundColor : null,
+          actionOpacity: action ? getEffectiveOpacity(action) : null,
+          hoverBackground,
+          hoverColor,
+        };
+      }
+
       const metrics = {
         success: true,
         page: pageName,
@@ -468,6 +524,7 @@
         scrollWidth,
         computedColumns,
         overflowElements: overflowElements.slice(0, 5),
+        heroStyles,
         pageMounted: true,
       };
 

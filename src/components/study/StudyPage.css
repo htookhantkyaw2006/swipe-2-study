@@ -40,15 +40,15 @@
 .collection-hero--review .collection-hero__copy h2 { color: #0C4A6E; }
 .collection-hero--review .collection-hero__copy > p:last-child { color: #1E40AF; }
 .collection-hero--review .collection-hero__action { background: #0369A1; color: white; }
-.collection-hero--review .collection-hero__action:hover { background: #0284C7; }
+.collection-hero--review .collection-hero__action:hover { background: #075985; color: white; }
 
 .collection-hero--saved { background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%); border: 1px solid #BAE6FD; color: var(--color-text-navy); }
 .collection-hero--saved .collection-hero__icon { background: #E0F2FE; border: 1px solid #BAE6FD; color: #0284C7; }
-.collection-hero--saved .study-eyebrow { color: #0284C7; }
+.collection-hero--saved .study-eyebrow { color: #0369A1; }
 .collection-hero--saved .collection-hero__copy h2 { color: #0C4A6E; }
 .collection-hero--saved .collection-hero__copy > p:last-child { color: #075985; }
 .collection-hero--saved .collection-hero__action { background: #0369A1; color: white; }
-.collection-hero--saved .collection-hero__action:hover { background: #0284C7; }
+.collection-hero--saved .collection-hero__action:hover { background: #075985; color: white; }
 
 .collection-hero--unavailable { background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border: 1px solid rgba(148, 163, 184, 0.3); }
 .collection-hero--unavailable .collection-hero__icon { background: rgba(148, 163, 184, 0.15); border: 1px solid rgba(148, 163, 184, 0.35); color: #94A3B8; }

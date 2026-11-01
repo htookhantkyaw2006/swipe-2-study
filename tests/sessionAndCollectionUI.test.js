@@ -13,6 +13,8 @@
 
 import { test, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import React, { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
@@ -357,6 +359,32 @@ test('SavedWords (unreadable collection): renders honest unavailable state, acce
   } finally {
     globalThis.localStorage.getItem = origGetItem;
   }
+});
+
+test('StudyPage.css: verifies Saved eyebrow and CTA hover contrast colors', () => {
+  const cssPath = path.resolve(projectRoot, 'src/components/study/StudyPage.css');
+  const css = fs.readFileSync(cssPath, 'utf8');
+
+  // Eyebrow in saved hero uses #0369A1 (approx 5.17:1 against #E0F2FE)
+  assert.match(
+    css,
+    /\.collection-hero--saved\s+\.study-eyebrow\s*\{\s*color:\s*#0369A1;/i,
+    'Saved banner eyebrow must use #0369A1 for WCAG AA contrast'
+  );
+
+  // Review hero CTA hover uses #075985 with white text (approx 7.56:1 contrast)
+  assert.match(
+    css,
+    /\.collection-hero--review\s+\.collection-hero__action:hover\s*\{\s*background:\s*#075985;\s*color:\s*white;/i,
+    'Review banner CTA hover must use #075985 and white text'
+  );
+
+  // Saved hero CTA hover uses #075985 with white text (approx 7.56:1 contrast)
+  assert.match(
+    css,
+    /\.collection-hero--saved\s+\.collection-hero__action:hover\s*\{\s*background:\s*#075985;\s*color:\s*white;/i,
+    'Saved banner CTA hover must use #075985 and white text'
+  );
 });
 
 // -----------------------------------------------------------------------------

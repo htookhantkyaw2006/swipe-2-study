@@ -418,6 +418,20 @@ export async function runVisualBatch2Verification() {
           fs.writeFileSync(outPath, pngBuffer);
 
           console.log(`    - ${c.desc} [requested=${c.width}px, measured=${metrics.measuredWidth}px]: verified (overflow=none, computedColumns=${metrics.computedColumns ?? 'N/A'}) -> ${outPath} (${pngBuffer.length} bytes)`);
+          if (metrics.heroStyles) {
+            console.log(`      computed colors: eyebrow=${metrics.heroStyles.eyebrowColor} (opacity=${metrics.heroStyles.eyebrowOpacity}), action=${metrics.heroStyles.actionBackground}/${metrics.heroStyles.actionColor}, hover=${metrics.heroStyles.hoverBackground}/${metrics.heroStyles.hoverColor}`);
+            if (c.page === 'saved-collection') {
+              if (metrics.heroStyles.eyebrowColor && !metrics.heroStyles.eyebrowColor.includes('3, 105, 161') && !metrics.heroStyles.eyebrowColor.toLowerCase().includes('#0369a1')) {
+                throw new Error(`Saved banner eyebrow computed color is ${metrics.heroStyles.eyebrowColor}, expected #0369A1 (rgb(3, 105, 161))`);
+              }
+              if (metrics.heroStyles.eyebrowOpacity !== null && metrics.heroStyles.eyebrowOpacity < 1) {
+                throw new Error(`Saved banner eyebrow computed effective opacity is ${metrics.heroStyles.eyebrowOpacity}, expected 1`);
+              }
+            }
+            if (metrics.heroStyles.hoverBackground && !metrics.heroStyles.hoverBackground.toLowerCase().includes('#075985') && !metrics.heroStyles.hoverBackground.includes('7, 89, 133')) {
+              throw new Error(`Collection CTA hover background is ${metrics.heroStyles.hoverBackground}, expected #075985`);
+            }
+          }
 
           screenshots.push({
             desc: c.desc,
