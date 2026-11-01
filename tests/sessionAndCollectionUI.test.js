@@ -18,6 +18,7 @@ import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { runBrowserSessionVerification } from './runBrowserSessionCheck.mjs';
 
 const oldStorage = globalThis.localStorage;
 const storageMap = new Map();
@@ -49,6 +50,8 @@ const { PublishedContentProvider } = await server.ssrLoadModule('/src/lib/publis
 const { AuthContext } = await server.ssrLoadModule('/src/lib/authContext.js');
 const { default: SwipeSession } = await server.ssrLoadModule('/src/pages/Learn/SwipeSession.jsx');
 const { default: WordCollection } = await server.ssrLoadModule('/src/components/study/WordCollection.jsx');
+const { default: ReviewWords } = await server.ssrLoadModule('/src/pages/Learn/ReviewWords.jsx');
+const { default: SavedWords } = await server.ssrLoadModule('/src/pages/SavedWords.jsx');
 const { db } = await server.ssrLoadModule('/src/lib/db.js');
 
 function createSampleItems(count = 2) {
@@ -269,80 +272,103 @@ test('WordCollection: search filtering and no-search-matches state', () => {
 });
 
 // -----------------------------------------------------------------------------
-// 3. Session Results & Early Exit Isolation
+// 3. Unreadable Collection Error Presentation
 // -----------------------------------------------------------------------------
 
-test('Session Results Component: derives accurate counts and renders session summary markup', () => {
-  // Directly verify the session summary markup and derivation using a test-mode SwipeSession state
-  // or testing the Session Results UI layout
-  const sessionSummary = {
-    studied: 5,
-    learned: 3,
-    review: 2,
-    totalCards: 5,
-    mode: 'learn',
+test('ReviewWords (unreadable collection): renders honest unavailable state, accessible alert, retry option, and no 0 counts', () => {
+  const origGetItem = globalThis.localStorage.getItem;
+  globalThis.localStorage.getItem = (key) => {
+    if (key && key.includes('review_cards')) throw new Error('UnreadableReviewStorageError');
+    return origGetItem(key);
   };
 
-  // We can render the Session Results Card markup structure directly or verify it via SSR
-  const resultsCardHtml = renderToString(
-    createElement('div', { className: 'swipe-session swipe-session--results' },
-      createElement('div', { className: 'session-results-card', role: 'region', 'aria-label': 'Session completion summary' },
-        createElement('p', { className: 'session-results-card__kicker' }, 'SESSION COMPLETE'),
-        createElement('h1', { className: 'session-results-card__title' }, 'Great work!'),
-        createElement('p', { className: 'session-results-card__subtitle' }, `You've completed all ${sessionSummary.studied} cards in this session.`),
-        createElement('div', { className: 'session-results-grid' },
-          createElement('div', { className: 'session-stat-card' },
-            createElement('span', { className: 'session-stat-card__value' }, sessionSummary.studied),
-            createElement('span', { className: 'session-stat-card__label' }, 'Words studied')
-          ),
-          createElement('div', { className: 'session-stat-card session-stat-card--learned' },
-            createElement('span', { className: 'session-stat-card__value' }, sessionSummary.learned),
-            createElement('span', { className: 'session-stat-card__label' }, 'Marked learned')
-          ),
-          createElement('div', { className: 'session-stat-card session-stat-card--review' },
-            createElement('span', { className: 'session-stat-card__value' }, sessionSummary.review),
-            createElement('span', { className: 'session-stat-card__label' }, 'Sent to review')
+  try {
+    const html = renderToString(
+      createElement(
+        AuthContext.Provider,
+        { value: { user: null, isGuest: true, loading: false, isTransitioning: false } },
+        createElement(
+          PreferencesProvider,
+          null,
+          createElement(
+            LanguageProvider,
+            null,
+            createElement(
+              MemoryRouter,
+              { initialEntries: ['/learn/review'] },
+              createElement(ReviewWords)
+            )
           )
-        ),
-        sessionSummary.review > 0 && createElement('p', { className: 'session-results-card__review-note' }, 'Words marked for review have been added to your Review queue.')
+        )
       )
-    )
-  );
+    );
 
-  assert.ok(resultsCardHtml.includes('SESSION COMPLETE'), 'Results card renders SESSION COMPLETE');
-  assert.ok(resultsCardHtml.includes('Great work!'), 'Results card renders Great work!');
-  assert.ok(resultsCardHtml.includes('Words studied'), 'Results card has Words studied tile');
-  assert.ok(resultsCardHtml.includes('Marked learned'), 'Results card has Marked learned tile');
-  assert.ok(resultsCardHtml.includes('Sent to review'), 'Results card has Sent to review tile');
-  assert.ok(resultsCardHtml.includes('Words marked for review have been added to your Review queue.'), 'Review queue note is rendered when review > 0');
+    assert.ok(html.includes('collection-hero--unavailable'), 'Hero has collection-hero--unavailable modifier');
+    assert.ok(html.includes('Collection unavailable'), 'Hero renders Collection unavailable heading');
+    assert.ok(html.includes('role="alert"'), 'Accessible role="alert" feedback container is rendered');
+    assert.ok(html.includes('Unable to load review words'), 'Renders concise failure message');
+    assert.ok(html.includes('Status unavailable'), 'Status heading reports Status unavailable');
+    assert.ok(html.includes('Try again') || html.includes('Retry'), 'Retry button is present');
+    assert.equal(html.includes('All caught up!'), false, 'Must NOT display successful empty state copy');
+    assert.equal(html.includes('0 words to review'), false, 'Must NOT report 0 words count');
+    assert.equal(html.includes('/learn/review/session'), false, 'Must NOT offer study action');
+  } finally {
+    globalThis.localStorage.getItem = origGetItem;
+  }
 });
 
-test('Early Exit Isolation: unswiped cards remain available in the next session', () => {
-  const items = createSampleItems(3);
+test('SavedWords (unreadable collection): renders honest unavailable state, accessible alert, retry option, and no 0 counts', () => {
+  const origGetItem = globalThis.localStorage.getItem;
+  globalThis.localStorage.getItem = (key) => {
+    if (key && key.includes('saved_words')) throw new Error('UnreadableSavedStorageError');
+    return origGetItem(key);
+  };
 
-  // Simulate recording word 1 as learned
-  db.insert('learned_words', {
-    word: '爱',
-    character: '爱',
-    reading: 'ài',
-    level_id: 'HSK1',
-    times_seen: 1,
-    consecutive_correct: 1,
-    learned_at: new Date().toISOString(),
-  });
+  try {
+    const html = renderToString(
+      createElement(
+        AuthContext.Provider,
+        { value: { user: null, isGuest: true, loading: false, isTransitioning: false } },
+        createElement(
+          PreferencesProvider,
+          null,
+          createElement(
+            LanguageProvider,
+            null,
+            createElement(
+              MemoryRouter,
+              { initialEntries: ['/saved'] },
+              createElement(SavedWords)
+            )
+          )
+        )
+      )
+    );
 
-  // Verify only 1 word is learned
-  const learned = db.get('learned_words');
-  assert.equal(learned.length, 1, 'Exactly 1 word recorded as learned');
-  assert.equal(learned[0].character, '爱', 'Recorded word is 爱');
+    assert.ok(html.includes('collection-hero--unavailable'), 'Hero has collection-hero--unavailable modifier');
+    assert.ok(html.includes('Collection unavailable'), 'Hero renders Collection unavailable heading');
+    assert.ok(html.includes('role="alert"'), 'Accessible role="alert" feedback container is rendered');
+    assert.ok(html.includes('Unable to load saved words'), 'Renders concise failure message');
+    assert.ok(html.includes('Status unavailable'), 'Status heading reports Status unavailable');
+    assert.ok(html.includes('Try again') || html.includes('Retry'), 'Retry button is present');
+    assert.equal(html.includes('Build your word collection'), false, 'Must NOT display successful empty state copy');
+    assert.equal(html.includes('0 saved words'), false, 'Must NOT report 0 words count');
+    assert.equal(html.includes('/saved/session'), false, 'Must NOT offer study action');
+  } finally {
+    globalThis.localStorage.getItem = origGetItem;
+  }
+});
 
-  // Verify review_cards is empty
-  const review = db.get('review_cards');
-  assert.equal(review.length, 0, 'No words sent to review');
+// -----------------------------------------------------------------------------
+// 4. Mounted Production Component Interaction Checks (Real Browser Chrome/Edge)
+// -----------------------------------------------------------------------------
 
-  // The remaining 2 cards (items 2 and 3) were never swiped and remain available
-  const studiedSet = new Set(learned.map(w => w.character));
-  const remaining = items.filter(it => !studiedSet.has(it.character));
-  assert.equal(remaining.length, 2, '2 unswiped cards remain available for future study');
-  assert.equal(remaining[0].character, '喜欢', 'Remaining card 1 is 喜欢');
+test('Real Browser: mounted SwipeSession, ReviewWords, and SavedWords interaction checks', async (t) => {
+  const result = await runBrowserSessionVerification();
+  if (result.skipped) {
+    t.skip(`Interactive acceptance unverified: ${result.reason}`);
+    return;
+  }
+  assert.equal(result.passed, true, 'Real browser verification passed');
+  assert.ok(result.results.length >= 6, 'All 6 production component interaction tests executed');
 });

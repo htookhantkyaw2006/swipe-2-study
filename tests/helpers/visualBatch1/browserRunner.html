@@ -375,12 +375,50 @@
         await waitFor(() => document.querySelector('.level-overview__grid') !== null && document.querySelector('.level-tile') !== null, 4000, 'capture-levels-mounted');
       } else if (pageName === 'course-overview' || targetRoute.includes('/level/')) {
         await waitFor(() => document.querySelector('.lesson-page') !== null && document.querySelector('.lesson-hero-card') !== null && document.querySelector('.lesson-word-list') !== null, 4000, 'capture-course-overview-mounted');
-      } else if (pageName === 'session-results' || targetRoute.includes('results=1')) {
+      } else if (pageName === 'session-results') {
+        // Complete the session through real production swipe/button actions
+        await waitFor(() => document.querySelector('.swipe-card--active') !== null, 4000, 'capture-session-first-card');
+        while (!document.querySelector('.session-results-card')) {
+          const learnedBtn = document.querySelector('.swipe-action--learned');
+          const reviewBtn = document.querySelector('.swipe-action--review');
+          if (!learnedBtn && !reviewBtn) break;
+          const currentProgress = document.querySelector('.swipe-session__progress progress');
+          const currentVal = Number(currentProgress?.getAttribute('value') || 0);
+          const targetVal = currentVal + 1;
+
+          if (currentVal % 3 === 2) {
+            reviewBtn.click();
+          } else {
+            learnedBtn.click();
+          }
+
+          // Wait for progress value to advance or results card to appear
+          await waitFor(() => {
+            if (document.querySelector('.session-results-card')) return true;
+            const p = document.querySelector('.swipe-session__progress progress');
+            return p && Number(p.getAttribute('value')) >= targetVal;
+          }, 5000, `advance-to-progress-${targetVal}`);
+
+          // Wait for locked state to unlock before clicking next action
+          await waitFor(() => {
+            if (document.querySelector('.session-results-card')) return true;
+            const lb = document.querySelector('.swipe-action--learned');
+            return lb && !lb.disabled;
+          }, 3000, `unlock-action-for-progress-${targetVal}`);
+        }
         await waitFor(() => document.querySelector('.session-results-card') !== null, 4000, 'capture-session-results-mounted');
-      } else if (pageName === 'flashcard-front' || (targetRoute.includes('/session') && !targetRoute.includes('flipped=1'))) {
+      } else if (pageName === 'flashcard-front') {
         await waitFor(() => document.querySelector('.swipe-card--active') !== null && document.querySelector('.swipe-card__front') !== null, 4000, 'capture-flashcard-front-mounted');
-      } else if (pageName === 'flashcard-back' || targetRoute.includes('flipped=1')) {
-        await waitFor(() => document.querySelector('.swipe-card--active') !== null && document.querySelector('.swipe-card__examples') !== null, 4000, 'capture-flashcard-back-mounted');
+      } else if (pageName === 'flashcard-back') {
+        // Reveal back face via real production Reveal action
+        await waitFor(() => document.querySelector('.swipe-card--active') !== null, 4000, 'capture-flashcard-active');
+        const flipBtn = document.querySelector('.swipe-action--flip');
+        assert(flipBtn !== null, 'Flip/Reveal button must be present');
+        flipBtn.click();
+        await waitFor(() => {
+          const back = document.querySelector('.swipe-card__back');
+          return back && !back.hasAttribute('inert') && document.querySelector('.swipe-card__examples') !== null;
+        }, 4000, 'capture-flashcard-back-mounted');
       } else if (pageName === 'review-collection' || targetRoute === '/learn/review') {
         await waitFor(() => document.querySelector('.collection-page--review') !== null && document.querySelector('.collection-word') !== null, 4000, 'capture-review-collection-mounted');
       } else if (pageName === 'saved-collection' || targetRoute === '/saved') {

@@ -154,7 +154,7 @@ export async function runVisualBatch2Verification() {
           {
             width: 320,
             height: 640,
-            route: '/learn/session?level=HSK1&results=1',
+            route: '/learn/session?level=HSK1',
             page: 'session-results',
             name: 'session-result-320w.png',
             desc: 'Session Results (Mobile 320w)',
@@ -172,7 +172,7 @@ export async function runVisualBatch2Verification() {
           {
             width: 768,
             height: 900,
-            route: '/learn/session?level=HSK1&flipped=1',
+            route: '/learn/session?level=HSK1',
             page: 'flashcard-back',
             name: 'flashcard-back-768w.png',
             desc: 'Flashcard Back with 3 Examples (Tablet 768w)',
@@ -277,6 +277,7 @@ export async function runVisualBatch2Verification() {
               let screenshotId = null;
 
               ws.onopen = () => {
+                send('Runtime.enable');
                 setMetricsId = send('Emulation.setDeviceMetricsOverride', {
                   width: c.width,
                   height: c.height,
@@ -289,6 +290,10 @@ export async function runVisualBatch2Verification() {
               ws.onmessage = async (event) => {
                 try {
                   const data = JSON.parse(event.data);
+                  if (data.method === 'Runtime.consoleAPICalled') {
+                    const args = (data.params.args || []).map((a) => a.value || a.description).join(' ');
+                    console.log(`[Browser Console]`, args);
+                  }
                   if (data.id === setMetricsId) {
                     if (data.error) {
                       clearTimeout(wsTimeout);
@@ -362,7 +367,7 @@ export async function runVisualBatch2Verification() {
 
           // Pre-capture assertions
           if (!metrics.pageMounted) {
-            throw new Error(`Page failed to mount before capture: ${c.desc}`);
+            throw new Error(`Page failed to mount before capture: ${c.desc}. Metrics error: ${metrics.error || 'none'}`);
           }
           if (metrics.hasHorizontalOverflow) {
             const elementsDesc = (metrics.overflowElements || []).map(e => `${e.tag}.${e.className} (w=${e.width}, right=${e.right})`).join(', ');

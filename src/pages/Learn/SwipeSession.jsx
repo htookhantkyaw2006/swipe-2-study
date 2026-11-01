@@ -448,20 +448,9 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const sessionStatsRef = useRef({ studied: 0, learned: 0, review: 0 });
-  const [sessionSummary, setSessionSummary] = useState(() => {
-    if (searchParams.get('results') === '1') {
-      return {
-        studied: 10,
-        learned: 7,
-        review: 3,
-        totalCards: 10,
-        mode: isReview ? 'review' : isSaved ? 'saved' : 'learn',
-      };
-    }
-    return null;
-  });
-  const [flipped, setFlipped] = useState(() => searchParams.get('flipped') === '1');
-  const [hasFlippedOnce, setHasFlippedOnce] = useState(() => searchParams.get('flipped') === '1');
+  const [sessionSummary, setSessionSummary] = useState(null);
+  const [flipped, setFlipped] = useState(false);
+  const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
   const [exitData, setExitData] = useState({ direction: 'right' });
   const [shuffleState, setShuffleState] = useState(false);
   const [advancing, setAdvancing] = useState(false);
@@ -486,10 +475,24 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const triggerSwipe = (direction, swipedCard = cards[currentIndex]) => {
     if (actionLocked.current || !swipedCard) return;
     actionLocked.current = true;
-    setAdvancing(true);
-    setExitData({ direction });
 
-    // Track session stats for this specific session
+    // Phrase practice does not write into vocabulary progress or review queue.
+    if (!isPhrases) {
+      try {
+        recordWordAction(db, {
+          card: swipedCard,
+          direction,
+          levelId: levelId || swipedCard.level || cards[0]?.level || course.levels[0].id,
+        });
+      } catch {
+        // Failed progress writes do not inflate summary counts or advance the deck.
+        actionLocked.current = false;
+        setBookmarkFeedback('Unable to save progress. Try again.');
+        return;
+      }
+    }
+
+    // Track session stats for this specific session only after successful action
     sessionStatsRef.current.studied += 1;
     if (direction === 'right') {
       sessionStatsRef.current.learned += 1;
@@ -497,14 +500,8 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       sessionStatsRef.current.review += 1;
     }
 
-    // Phrase practice does not write into vocabulary progress or review queue.
-    if (!isPhrases) {
-      recordWordAction(db, {
-        card: swipedCard,
-        direction,
-        levelId: levelId || swipedCard.level || cards[0]?.level || course.levels[0].id,
-      });
-    }
+    setAdvancing(true);
+    setExitData({ direction });
     setFlipped(false);
     setHasFlippedOnce(false);
     if (currentIndex < cards.length - 1) {

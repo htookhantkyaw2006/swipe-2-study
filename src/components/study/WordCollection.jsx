@@ -6,39 +6,60 @@ import { filterStudyWords, wordDetails } from '../../lib/studyWords';
 import { StudyHeader, StudySearch } from './StudyPage';
 import { useState } from 'react';
 
-export default function WordCollection({ kind, words, onUnsave, courseName, notice = '' }) {
+export default function WordCollection({ kind, words, error = null, onRetry = null, onUnsave, courseName, notice = '' }) {
   const [query, setQuery] = useState('');
   const isSaved = kind === 'saved';
   const title = isSaved ? 'Saved Words' : 'Review Words';
   const Icon = isSaved ? Bookmark : RotateCw;
+  const isUnavailable = Boolean(error || words === null);
   const safeWords = Array.isArray(words) ? words : [];
   const visibleWords = filterStudyWords(safeWords, query);
-  const empty = safeWords.length === 0;
+  const empty = !isUnavailable && safeWords.length === 0;
   const countLabel = `${safeWords.length} ${isSaved ? (safeWords.length === 1 ? 'saved word' : 'saved words') : (safeWords.length === 1 ? 'word to review' : 'words to review')}`;
 
   return (
     <div className={`study-page collection-page collection-page--${kind}`}>
       <StudyHeader title={title} subtitle={`${courseName} · Your collection`} backTo={isSaved ? '/library' : '/learn'} backLabel={isSaved ? 'Back to library' : 'Back to courses'} />
-      <section className={`collection-hero collection-hero--${kind}`} aria-label={isSaved ? 'Saved word summary' : 'Review summary'}>
+      <section className={`collection-hero collection-hero--${kind} ${isUnavailable ? 'collection-hero--unavailable' : ''}`} aria-label={isUnavailable ? (isSaved ? 'Saved words unavailable' : 'Review words unavailable') : (isSaved ? 'Saved word summary' : 'Review summary')}>
         <div className="collection-hero__icon"><Icon size={24} aria-hidden="true" /></div>
         <div className="collection-hero__copy">
           <p className="study-eyebrow">{isSaved ? 'SAVED WORDS' : 'REVIEW QUEUE'}</p>
-          <h2>{countLabel}</h2>
-          <p>{isSaved ? 'Your bookmarked words, ready for practice.' : 'Revisit words you marked for review.'}</p>
+          <h2>{isUnavailable ? 'Collection unavailable' : countLabel}</h2>
+          <p>{isUnavailable ? (error || 'Unable to load your words.') : (isSaved ? 'Your bookmarked words, ready for practice.' : 'Revisit words you marked for review.')}</p>
         </div>
-        <Link className="collection-hero__action" to={empty ? '/learn' : (isSaved ? '/saved/session' : '/learn/review/session')}>
-          <Play size={18} aria-hidden="true" />
-          {empty ? 'Start learning' : (isSaved ? 'Study saved words' : 'Start review')}
-        </Link>
+        {isUnavailable ? (
+          onRetry && (
+            <button type="button" className="collection-hero__action" onClick={onRetry}>
+              <RotateCw size={18} aria-hidden="true" />
+              Retry
+            </button>
+          )
+        ) : (
+          <Link className="collection-hero__action" to={empty ? '/learn' : (isSaved ? '/saved/session' : '/learn/review/session')}>
+            <Play size={18} aria-hidden="true" />
+            {empty ? 'Start learning' : (isSaved ? 'Study saved words' : 'Start review')}
+          </Link>
+        )}
       </section>
 
       <section className="collection-words" aria-labelledby="collection-list-title">
         <div className="study-section-heading">
-          <div><h2 id="collection-list-title">Word list</h2><p role="status">{visibleWords.length} of {safeWords.length} words</p></div>
-          {!empty && <StudySearch value={query} onChange={setQuery} label={isSaved ? 'Search saved words' : 'Search review words'} />}
+          <div><h2 id="collection-list-title">Word list</h2><p role="status">{isUnavailable ? 'Status unavailable' : `${visibleWords.length} of ${safeWords.length} words`}</p></div>
+          {!isUnavailable && !empty && <StudySearch value={query} onChange={setQuery} label={isSaved ? 'Search saved words' : 'Search review words'} />}
         </div>
         {notice && <p className="study-notice" role="status" aria-live="polite">{notice}</p>}
-        {empty ? (
+        {isUnavailable ? (
+          <div className="study-error" role="alert">
+            <RotateCw size={30} aria-hidden="true" />
+            <h3>{isSaved ? 'Unable to load saved words' : 'Unable to load review words'}</h3>
+            <p>{error || 'An error occurred while loading this collection. Please try again.'}</p>
+            {onRetry && (
+              <button type="button" className="study-text-link" onClick={onRetry}>
+                Try again
+              </button>
+            )}
+          </div>
+        ) : empty ? (
           <div className="study-empty">
             <Icon size={30} aria-hidden="true" />
             <h3>{isSaved ? 'Build your word collection' : 'All caught up!'}</h3>
