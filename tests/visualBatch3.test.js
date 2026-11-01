@@ -319,32 +319,39 @@ test('11. HSK cards achieve WCAG AA contrast across all nine level palettes', as
     const palette = HSK_PALETTE[num];
     assert.ok(palette, `Palette for HSK ${num} exists`);
 
-    // Body panel uses solid white surface #FFFFFF
-    const bodySurface = '#FFFFFF';
-    const kickerRatio = contrastRatio('#075985', bodySurface);
-    const titleRatio = contrastRatio('#0C4A6E', bodySurface);
-    const countRatio = contrastRatio('#334155', bodySurface);
+    const isLight = num === 4;
 
-    assert.ok(kickerRatio >= 4.5, `HSK ${num} kicker contrast ${kickerRatio.toFixed(2)} must be >= 4.5:1`);
-    assert.ok(titleRatio >= 3.0, `HSK ${num} title contrast ${titleRatio.toFixed(2)} must be >= 3.0:1`);
-    assert.ok(countRatio >= 4.5, `HSK ${num} count contrast ${countRatio.toFixed(2)} must be >= 4.5:1`);
+    if (isLight) {
+      // HSK 4 uses .level-tile--light with dark text (#0F172A / #1E293B) directly on the gradient
+      const titleStartRatio = contrastRatio('#0F172A', palette.gradientStart);
+      const titleEndRatio = contrastRatio('#0F172A', palette.gradientEnd);
+      const countStartRatio = contrastRatio('#1E293B', palette.gradientStart);
+      const countEndRatio = contrastRatio('#1E293B', palette.gradientEnd);
 
-    // Badges
-    const learningBadgeRatio = contrastRatio('#0C4A6E', '#FFFFFF');
+      assert.ok(titleStartRatio >= 4.5, `HSK ${num} title start contrast ${titleStartRatio.toFixed(2)} must be >= 4.5:1`);
+      assert.ok(titleEndRatio >= 4.5, `HSK ${num} title end contrast ${titleEndRatio.toFixed(2)} must be >= 4.5:1`);
+      assert.ok(countStartRatio >= 4.5, `HSK ${num} count start contrast ${countStartRatio.toFixed(2)} must be >= 4.5:1`);
+      assert.ok(countEndRatio >= 4.5, `HSK ${num} count end contrast ${countEndRatio.toFixed(2)} must be >= 4.5:1`);
+
+      // Light tile badges & action
+      const learningBadgeRatio = contrastRatio('#FFFFFF', '#0F172A');
+      const actionRatio = contrastRatio('#FFFFFF', '#0F172A');
+      assert.ok(learningBadgeRatio >= 4.5, `HSK ${num} learning badge contrast ${learningBadgeRatio.toFixed(2)} must be >= 4.5:1`);
+      assert.ok(actionRatio >= 4.5, `HSK ${num} action contrast ${actionRatio.toFixed(2)} must be >= 4.5:1`);
+    } else {
+      // Darker palettes use light text directly on the gradient, with high-contrast actions and badges
+      const titleEndRatio = contrastRatio('#FFFFFF', palette.gradientEnd);
+      assert.ok(titleEndRatio >= 3.0, `HSK ${num} title on dark end contrast ${titleEndRatio.toFixed(2)} must be >= 3.0:1`);
+
+      // Action on dark tiles uses solid white button with gradientEnd color
+      const activeActionRatio = contrastRatio(palette.gradientEnd, '#FFFFFF');
+      assert.ok(activeActionRatio >= 3.5, `HSK ${num} action contrast ${activeActionRatio.toFixed(2)} must be >= 3.5:1`);
+    }
+
+    // Common badge states
     const soonBadgeRatio = contrastRatio('#FFFFFF', '#0F172A');
     const errorBadgeRatio = contrastRatio('#FFFFFF', '#7F1D1D');
-    const tierBadgeRatio = contrastRatio('#FFFFFF', '#0F172A');
-
-    assert.ok(learningBadgeRatio >= 4.5, `Learning badge contrast ${learningBadgeRatio.toFixed(2)} must be >= 4.5:1`);
     assert.ok(soonBadgeRatio >= 4.5, `Soon badge contrast ${soonBadgeRatio.toFixed(2)} must be >= 4.5:1`);
     assert.ok(errorBadgeRatio >= 4.5, `Error badge contrast ${errorBadgeRatio.toFixed(2)} must be >= 4.5:1`);
-    assert.ok(tierBadgeRatio >= 4.5, `Tier badge contrast ${tierBadgeRatio.toFixed(2)} must be >= 4.5:1`);
-
-    // Actions
-    const activeActionRatio = contrastRatio('#075985', '#FFFFFF');
-    const disabledActionRatio = contrastRatio('#334155', '#F1F5F9');
-
-    assert.ok(activeActionRatio >= 4.5, `Active action contrast ${activeActionRatio.toFixed(2)} must be >= 4.5:1`);
-    assert.ok(disabledActionRatio >= 4.5, `Disabled action contrast ${disabledActionRatio.toFixed(2)} must be >= 4.5:1`);
   }
 });

@@ -177,6 +177,16 @@ export async function runVisualBatch3Verification() {
             mobile: true,
           },
           {
+            width: 375,
+            height: 667,
+            route: '/learn',
+            page: 'levels-scrolled-hsk4',
+            name: 'hsk-grid-scrolled-hsk4-375w.png',
+            desc: 'Simplified HSK Grid Scrolled to HSK 4 (Mobile 375w)',
+            expectedColumns: 1,
+            mobile: true,
+          },
+          {
             width: 1024,
             height: 800,
             route: '/learn',

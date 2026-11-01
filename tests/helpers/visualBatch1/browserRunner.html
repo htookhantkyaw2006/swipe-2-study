@@ -544,14 +544,18 @@
       // Wait for the specific page element to mount
       if (pageName === 'home' || targetRoute === '/') {
         await waitFor(() => document.querySelector('.home-page') !== null && document.querySelector('.featured-course') !== null, 4000, 'capture-home-mounted');
-      } else if (pageName === 'levels' || targetRoute === '/learn') {
+      } else if (pageName === 'levels' || targetRoute === '/learn' || pageName === 'levels-scrolled-hsk4') {
         await waitFor(() => document.querySelector('.level-overview__grid') !== null && document.querySelector('.level-tile') !== null, 4000, 'capture-levels-mounted');
-        if (window.innerWidth < 640) {
+        if (pageName === 'levels-scrolled-hsk4') {
           const hsk4 = document.querySelector('a[href*="HSK4"]');
           if (hsk4) {
             hsk4.scrollIntoView({ block: 'center' });
             await sleep(150);
           }
+        } else {
+          window.scrollTo(0, 0);
+          const appMain = document.querySelector('.app-main') || document.documentElement;
+          if (appMain) appMain.scrollTop = 0;
         }
       } else if (pageName === 'course-overview' || targetRoute.includes('/level/')) {
         await waitFor(() => document.querySelector('.lesson-page') !== null && document.querySelector('.lesson-hero-card') !== null && document.querySelector('.lesson-word-list') !== null, 4000, 'capture-course-overview-mounted');
@@ -846,12 +850,15 @@
             await sleep(50);
           }
 
-          if (pageName === 'levels' && window.innerWidth < 640) {
+          if (pageName === 'levels-scrolled-hsk4') {
             const hsk4 = document.querySelector('a[href*="HSK4"]');
             if (hsk4) {
               hsk4.scrollIntoView({ block: 'center' });
               await sleep(100);
             }
+          } else if (pageName === 'levels') {
+            appMain.scrollTop = 0;
+            await sleep(50);
           }
         } else {
           navClearance = {

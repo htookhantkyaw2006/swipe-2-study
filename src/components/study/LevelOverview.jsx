@@ -94,6 +94,7 @@ export default function LevelOverview({ phrases = false }) {
 
           const isNowLearning = !phrases && index === 0 && status === 'ready';
           const isUnavailable = status === 'unpublished';
+          const isLight = level.num === 4 || level.badge === '4' || level.badge === 'B2' || (level.gradientEnd === '#CA8A04');
 
           let tileModifier = '';
           if (status === 'unpublished') tileModifier = ' level-tile--unavailable';
@@ -104,7 +105,7 @@ export default function LevelOverview({ phrases = false }) {
           return (
             <Link
               key={level.id}
-              className={`level-tile${tileModifier}`}
+              className={`level-tile${tileModifier}${isLight ? ' level-tile--light' : ''}`}
               style={{
                 '--level-accent': level.gradientEnd,
                 '--level-tint': level.gradientStart,

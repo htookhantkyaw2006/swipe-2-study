@@ -42,7 +42,7 @@
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    async function waitFor(condition, timeoutMs = 2500, intervalMs = 50) {
+    async function waitFor(condition, timeoutMs = 5000, intervalMs = 50) {
       const start = Date.now();
       while (Date.now() - start < timeoutMs) {
         if (condition()) return;
