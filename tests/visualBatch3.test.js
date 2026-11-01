@@ -48,6 +48,7 @@ const { default: Profile } = await server.ssrLoadModule('/src/pages/Profile.jsx'
 const { default: Login } = await server.ssrLoadModule('/src/pages/Login.jsx');
 const { default: Signup } = await server.ssrLoadModule('/src/pages/Signup.jsx');
 const { default: LevelOverview } = await server.ssrLoadModule('/src/components/study/LevelOverview.jsx');
+const { default: BottomNav } = await server.ssrLoadModule('/src/components/BottomNav.jsx');
 
 process.env.VITE_GOOGLE_AUTH_ENABLED = 'true';
 process.env.VITE_SUPABASE_URL = 'https://example.supabase.co';
@@ -135,7 +136,7 @@ test('3. Library integrates published course state truthfully and derives counts
   const offlineHtml = renderWithProviders(createElement(Library), {
     publishedEnabled: false,
   });
-  assert.ok(offlineHtml.includes('Content offline'), 'Truthful fallback when published content is disabled');
+  assert.ok(offlineHtml.includes('Catalog disabled'), 'Truthful fallback when published content is disabled');
 
   // C) Loading state
   const loadingHtml = renderWithProviders(createElement(Library), {
@@ -236,4 +237,55 @@ test('7. Icon-to-surface proportions and target sizing conform to specs', () => 
   assert.match(libCss, /\.library-counts\s+\.library-counts__art\s*\{[^}]*width:\s*52px;\s*height:\s*52px;/, 'Count art sized for ~25px glyph');
   assert.match(libCss, /\.library-tool\s+\.library-tool__art\s*\{[^}]*width:\s*56px;\s*height:\s*56px;/, 'Tool art sized for ~27px glyph');
   assert.match(libCss, /@media\s*\([^)]*max-width:\s*359px\)[^}]*\{\s*\.library-intro\s*\{[^}]*\}\s*\.library-intro\s+\.library-intro__art\s*\{\s*display:\s*none;/, 'Hero art hidden at 320px to prevent text squeezing');
+});
+
+test('8. Password visibility toggles are keyboard reachable and omit tabIndex={-1}', () => {
+  const loginHtml = renderWithProviders(createElement(Login));
+  assert.ok(loginHtml.includes('auth-input-toggle'), 'Login has password toggle');
+  assert.ok(!loginHtml.includes('auth-input-toggle" tabindex="-1"') && !loginHtml.includes('auth-input-toggle\' tabindex=\'-1\''), 'Login toggle must not have tabIndex={-1}');
+
+  const signupHtml = renderWithProviders(createElement(Signup));
+  assert.ok(signupHtml.includes('auth-input-toggle'), 'Signup has password toggle');
+  assert.ok(!signupHtml.includes('auth-input-toggle" tabindex="-1"') && !signupHtml.includes('auth-input-toggle\' tabindex=\'-1\''), 'Signup toggle must not have tabIndex={-1}');
+
+  const css = fs.readFileSync(path.resolve(projectRoot, 'src/index.css'), 'utf8');
+  assert.match(css, /\.auth-input-toggle:focus-visible\s*\{/, 'Has explicit :focus-visible indicator for password toggle');
+});
+
+test('9. BottomNav groups /saved and /dictionary routes under Library with active state and aria-current', () => {
+  // At /saved
+  const savedHtml = renderToString(
+    createElement(MemoryRouter, { initialEntries: ['/saved'] }, createElement(BottomNav))
+  );
+  assert.ok(savedHtml.includes('href="/library"'), 'Contains library link');
+  assert.ok(savedHtml.includes('navigation-link--library is-active'), 'Library is active when at /saved');
+  assert.ok(savedHtml.includes('aria-current="true"'), 'Library has aria-current="true" when at /saved');
+
+  // At /dictionary
+  const dictHtml = renderToString(
+    createElement(MemoryRouter, { initialEntries: ['/dictionary'] }, createElement(BottomNav))
+  );
+  assert.ok(dictHtml.includes('navigation-link--library is-active'), 'Library is active when at /dictionary');
+  assert.ok(dictHtml.includes('aria-current="true"'), 'Library has aria-current="true" when at /dictionary');
+
+  // At /library
+  const libHtml = renderToString(
+    createElement(MemoryRouter, { initialEntries: ['/library'] }, createElement(BottomNav))
+  );
+  assert.ok(libHtml.includes('navigation-link--library is-active'), 'Library is active when at /library');
+  assert.ok(libHtml.includes('aria-current="page"'), 'Library has aria-current="page" when at /library');
+
+  // At /
+  const homeHtml = renderToString(
+    createElement(MemoryRouter, { initialEntries: ['/'] }, createElement(BottomNav))
+  );
+  assert.ok(!homeHtml.includes('navigation-link--library is-active'), 'Library is not active when at /');
+});
+
+test('10. Carousel arrows meet minimum 44x44px touch target dimensions', () => {
+  const css = fs.readFileSync(path.resolve(projectRoot, 'src/index.css'), 'utf8');
+  assert.match(css, /\.icon-button\s*\{[^}]*min-width:\s*44px;/, 'Icon button has min-width 44px');
+  assert.match(css, /\.icon-button\s*\{[^}]*min-height:\s*44px;/, 'Icon button has min-height 44px');
+  assert.match(css, /\.icon-button\s*\{[^}]*width:\s*44px;/, 'Icon button has width 44px');
+  assert.match(css, /\.icon-button\s*\{[^}]*height:\s*44px;/, 'Icon button has height 44px');
 });

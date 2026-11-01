@@ -165,7 +165,6 @@ export default function Login() {
                 className="auth-input-toggle"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                tabIndex={-1}
                 disabled={busy}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

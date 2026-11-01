@@ -69,7 +69,7 @@
       return await res.json();
     }
 
-    function AppTestWrapper({ initialEntries, hsk1Items }) {
+    function AppTestWrapper({ initialEntries, hsk1Items, publishedEnabled = true }) {
       const initialCache = {
         'zh-hsk1': {
           status: 'loaded',
@@ -100,7 +100,7 @@
                   null,
                   createElement(
                     PublishedContentProvider,
-                    { enabledOverride: true, initialCache },
+                    { enabledOverride: publishedEnabled, initialCache },
                     createElement(
                       Routes,
                       null,
@@ -441,7 +441,20 @@
         db.set('saved_words', sampleWords);
       }
 
-      renderTree(createElement(AppTestWrapper, { initialEntries: [targetRoute], hsk1Items }));
+      const isCatalogDisabled = urlParams.get('catalogDisabled') === '1' || pageName === 'library-catalog-disabled';
+      const isStorageError = urlParams.get('storageError') === '1' || pageName === 'library-storage-error';
+
+      if (isStorageError) {
+        try {
+          localStorage.setItem('s2s_zh_saved_words', 'invalid JSON {{{');
+        } catch {}
+      }
+
+      renderTree(createElement(AppTestWrapper, {
+        initialEntries: [targetRoute],
+        hsk1Items,
+        publishedEnabled: !isCatalogDisabled,
+      }));
 
       // Wait for the specific page element to mount
       if (pageName === 'home' || targetRoute === '/') {
@@ -498,13 +511,13 @@
         await waitFor(() => document.querySelector('.collection-page--review') !== null && document.querySelector('.collection-word') !== null, 4000, 'capture-review-collection-mounted');
       } else if (pageName === 'saved-collection' || targetRoute === '/saved') {
         await waitFor(() => document.querySelector('.collection-page--saved') !== null && document.querySelector('.collection-word') !== null, 4000, 'capture-saved-collection-mounted');
-      } else if (pageName === 'library' || targetRoute === '/library') {
+      } else if (pageName === 'library' || pageName === 'library-catalog-disabled' || pageName === 'library-storage-error' || targetRoute === '/library') {
         await waitFor(() => document.querySelector('.library-page') !== null && document.querySelector('.library-intro') !== null, 4000, 'capture-library-mounted');
       } else if (pageName === 'profile' || targetRoute === '/profile') {
         await waitFor(() => document.querySelector('.profile-page') !== null && document.querySelector('.profile-account') !== null, 4000, 'capture-profile-mounted');
       } else if (pageName === 'settings' || targetRoute === '/settings') {
         await waitFor(() => document.querySelector('.settings-page') !== null && document.querySelector('.settings-group') !== null, 4000, 'capture-settings-mounted');
-      } else if (pageName === 'login' || targetRoute === '/login') {
+      } else if (pageName === 'login' || pageName === 'login-toggle-focus' || targetRoute === '/login') {
         await waitFor(() => document.querySelector('.auth-card') !== null && document.querySelector('.auth-submit') !== null, 4000, 'capture-login-mounted');
         assert(document.querySelector('.app-navigation') === null, 'Login must not contain bottom navigation');
         assert(document.querySelector('.app-sidebar') === null, 'Login must not contain app sidebar');
@@ -513,6 +526,13 @@
         assert(googleBtn.querySelector('svg') !== null, 'Google icon SVG must be present inside Google button');
         const guestBtn = document.querySelector('.auth-guest');
         assert(guestBtn !== null, 'Guest action button must be present on Login');
+        if (pageName === 'login-toggle-focus' || urlParams.get('focus') === 'toggle') {
+          const toggle = document.querySelector('.auth-input-toggle');
+          if (toggle) {
+            toggle.focus();
+            await sleep(100);
+          }
+        }
       } else if (pageName === 'library-scrolled-writing') {
         await waitFor(() => document.querySelector('.library-page') !== null, 4000, 'capture-library-scrolled-writing-mounted');
         const writingLink = document.querySelector('a[href="/writing"]') || Array.from(document.querySelectorAll('.library-tool')).find(t => t.textContent.includes('Writing'));
@@ -553,31 +573,51 @@
       await sleep(100);
 
       const fontStatus = {
-        inter: document.fonts.check('16px "Inter"'),
-        notoSc: document.fonts.check('16px "Noto Sans SC"'),
-        notoMyanmar: document.fonts.check('16px "Noto Sans Myanmar"'),
-        jetbrainsMono: document.fonts.check('16px "JetBrains Mono"'),
+        inter: document.fonts.check('16px "Inter"', 'Swipe to Study English AaBbCc 123'),
+        interPinyin: document.fonts.check('16px "Inter"', 'nǐ hǎo ā á ǎ à ē é ě è ī í ǐ ì ō ó ǒ ò ū ú ǔ ù ǖ ǘ ǚ ǜ'),
+        notoSc: document.fonts.check('16px "Noto Sans SC"', '汉语水平考试 学习词汇'),
+        notoMyanmar: document.fonts.check('16px "Noto Sans Myanmar"', 'မြန်မာဘာသာ'),
+        jetbrainsMono: document.fonts.check('16px "JetBrains Mono"', 'pīnyīn 123'),
       };
 
       // Verify the font actually rendered for the selected platform
       const isApple = /Macintosh|Mac OS X|iPhone|iPad|iPod/.test(navigator.userAgent) ||
         /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+      const isWindowsHost = navigator.platform.includes('Win') || /Windows/.test(navigator.userAgent);
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const sampleText = 'Swipe to Study English AaBbCc 123';
       ctx.font = '16px "Inter", sans-serif';
       const interW = ctx.measureText(sampleText).width;
-      ctx.font = '16px var(--font-sans)';
+
+      // Resolve actual CSS variable or read resolved DOM properties
+      const bodyComputedFont = window.getComputedStyle(document.body).fontFamily;
+      ctx.font = `16px ${bodyComputedFont}`;
       const stackW = ctx.measureText(sampleText).width;
+
+      // Check whether Apple system font is actually rendered or if running on non-Apple/Windows host
+      let actualRendered = 'fallback-sans';
+      if (Math.abs(stackW - interW) < 0.5) {
+        actualRendered = 'Inter';
+      } else if (isApple && !isWindowsHost) {
+        actualRendered = 'system-apple';
+      }
+
+      // Do not automatically pass Apple platforms on Windows emulation:
+      // On Windows host emulation, Inter is the authentic rendered font from our stack.
+      const matchesPlatform = (actualRendered === 'Inter' || (!isWindowsHost && isApple && actualRendered === 'system-apple'));
 
       const renderedFontInfo = {
         platform: navigator.platform,
         isApple,
-        expectedFont: isApple ? 'system-apple' : 'Inter',
-        actualRendered: isApple ? 'system-apple' : (Math.abs(stackW - interW) < 0.5 ? 'Inter' : 'fallback-sans'),
-        matchesPlatform: isApple ? true : Math.abs(stackW - interW) < 0.5,
+        isWindowsHost,
+        expectedFont: (!isWindowsHost && isApple) ? 'system-apple' : 'Inter',
+        actualRendered,
+        resolvedFontFamily: bodyComputedFont,
+        matchesPlatform,
         interChecked: fontStatus.inter,
+        interPinyinChecked: fontStatus.interPinyin,
         notoScChecked: fontStatus.notoSc,
         notoMyanmarChecked: fontStatus.notoMyanmar,
         jetbrainsMonoChecked: fontStatus.jetbrainsMono,
@@ -676,6 +716,7 @@
         const isBottomNav = isFixed && window.innerWidth < 768 && navRect.top > (window.innerHeight / 2);
 
         if (isBottomNav) {
+          const originalScrollTop = appMain.scrollTop;
           // Scroll actual appMain container to end
           appMain.scrollTop = appMain.scrollHeight;
           await sleep(50);
@@ -699,6 +740,12 @@
             paddingBottom,
             clearsNav: true,
           };
+
+          // Restore scroll position so non-scrolled mobile captures match intended viewports
+          if (!pageName.includes('scrolled') && !pageName.includes('bottom')) {
+            appMain.scrollTop = originalScrollTop;
+            await sleep(50);
+          }
         } else {
           navClearance = {
             hasFixedNav: isFixed,

@@ -222,8 +222,8 @@ export async function runVisualBatch1Verification() {
             page: 'levels',
             name: 'level-selection-1024w.png',
             alias: 'hsk-card-1024w.png',
-            desc: 'Level selection (Desktop 3-column grid)',
-            expectedColumns: 3,
+            desc: 'Level selection (Desktop 2-column grid with sidebar)',
+            expectedColumns: 2,
             mobile: false,
           },
           {

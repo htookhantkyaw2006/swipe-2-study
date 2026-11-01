@@ -5,7 +5,6 @@ import { db } from '../../lib/db';
 import { phraseCards } from '../../lib/phraseCards';
 import { usePublishedContent } from '../../lib/publishedContentContext';
 import { resolvePublishedCourseId } from '../../lib/publishedContentService';
-import LearningIcon from '../ui/LearningIcon';
 import { StudyHeader } from './StudyPage';
 import './LevelOverview.css';
 
@@ -23,13 +22,12 @@ export default function LevelOverview({ phrases = false }) {
         backLabel="Back to Home"
       />
 
-      <section className="level-overview__hero">
-        <div className="level-overview__hero-content">
+      <section className="level-overview__intro">
+        <div className="level-overview__intro-content">
           <p className="study-eyebrow">{phrases ? 'WORDS IN CONTEXT' : 'YOUR LEARNING PATH'}</p>
           <h2>{phrases ? 'Small phrases. Real conversations.' : course.copy.pickerHeadline}</h2>
-          <p>{phrases ? 'Choose a level and practise everyday expressions.' : 'Build your vocabulary with short, focused practice.'}</p>
+          <p>{phrases ? 'Practise everyday expressions in context.' : 'Build your vocabulary with short, focused practice.'}</p>
         </div>
-        <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
       </section>
 
       <div className="study-section-heading">
@@ -115,25 +113,25 @@ export default function LevelOverview({ phrases = false }) {
               to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}
             >
               <div className="level-tile__top">
-                <div className="level-tile__top-left">
-                  <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
-                  {isNowLearning ? (
-                    <span className="level-tile__badge level-tile__badge--learning">NOW LEARNING</span>
-                  ) : status === 'loading' ? (
-                    <span className="level-tile__badge level-tile__badge--loading">LOADING</span>
-                  ) : status === 'error' ? (
-                    <span className="level-tile__badge level-tile__badge--error">UNAVAILABLE</span>
-                  ) : status === 'unpublished' ? (
-                    <span className="level-tile__badge level-tile__badge--soon">COMING SOON</span>
-                  ) : (
-                    <span className="level-tile__tier">{level.tier}</span>
-                  )}
-                </div>
-                <span className="level-tile__tag">{course.copy.allLevels || 'All levels'}</span>
+                {isNowLearning ? (
+                  <span className="level-tile__badge level-tile__badge--learning">NOW LEARNING</span>
+                ) : status === 'loading' ? (
+                  <span className="level-tile__badge level-tile__badge--loading">LOADING</span>
+                ) : status === 'error' ? (
+                  <span className="level-tile__badge level-tile__badge--error">UNAVAILABLE</span>
+                ) : status === 'unpublished' ? (
+                  <span className="level-tile__badge level-tile__badge--soon">COMING SOON</span>
+                ) : status === 'empty' ? (
+                  <span className="level-tile__badge level-tile__badge--empty level-tile__tier">NO CARDS</span>
+                ) : (
+                  <span className="level-tile__badge level-tile__tier">{level.tier || 'AVAILABLE'}</span>
+                )}
               </div>
-              <p className="level-tile__kicker">{level.kicker || `LEVEL ${level.num}`}</p>
-              <h3>{level.name}</h3>
-              <p>{countText}</p>
+              <div className="level-tile__body">
+                <p className="level-tile__kicker">{level.kicker || `LEVEL ${level.num}`}</p>
+                <h3>{level.name}</h3>
+                <p className="level-tile__count">{countText}</p>
+              </div>
               <span className={`level-tile__action${isUnavailable ? ' level-tile__action--disabled' : status === 'loading' ? ' level-tile__action--loading' : ''}`}>
                 {isUnavailable ? (
                   <>Coming soon</>

@@ -69,26 +69,43 @@ export default function Library() {
     }
   }, [publishedEnabled, supportedCourseIds, getCourseState, loadCourse]);
 
+  const [storageError, setStorageError] = useState(null);
   let savedCount = 0;
   let reviewCount = 0;
   let learnedCount = 0;
+  let isStorageUnavailable = Boolean(storageError);
+
   try {
-    savedCount = db.get('saved_words').length;
-    reviewCount = db.get('review_cards').length;
+    const saved = db.get('saved_words');
+    const review = db.get('review_cards');
     const progress = getCourseProgress(db, course);
+    savedCount = saved ? saved.length : 0;
+    reviewCount = review ? review.length : 0;
     learnedCount = progress.uniqueLearned ?? 0;
   } catch {
-    // Keep safe defaults
+    isStorageUnavailable = true;
   }
+
+  const handleRetryStorage = () => {
+    try {
+      db.get('saved_words');
+      db.get('review_cards');
+      getCourseProgress(db, course);
+      setStorageError(null);
+      setDataVersion((v) => v + 1);
+    } catch {
+      setStorageError('Unable to read local collections. Please try again.');
+    }
+  };
 
   let cardStatus = 'disabled';
   let cardCountDisplay = '—';
-  let cardCountLabel = 'Content offline';
+  let cardCountLabel = 'Catalog disabled';
 
   if (!publishedEnabled) {
     cardStatus = 'disabled';
     cardCountDisplay = '—';
-    cardCountLabel = 'Content offline';
+    cardCountLabel = 'Catalog disabled';
   } else if (supportedCourseIds.length === 0) {
     cardStatus = 'unpublished';
     cardCountDisplay = '—';
@@ -140,13 +157,13 @@ export default function Library() {
     {
       key: 'review',
       title: 'Review',
-      subtitle: `${reviewCount} ${reviewCount === 1 ? 'word' : 'words'} to revisit`,
+      subtitle: isStorageUnavailable ? 'Collection unavailable' : `${reviewCount} ${reviewCount === 1 ? 'word' : 'words'} to revisit`,
       path: '/learn/review',
     },
     {
       key: 'saved',
       title: 'Saved Words',
-      subtitle: `${savedCount} bookmarked ${savedCount === 1 ? 'word' : 'words'}`,
+      subtitle: isStorageUnavailable ? 'Collection unavailable' : `${savedCount} bookmarked ${savedCount === 1 ? 'word' : 'words'}`,
       path: '/saved',
     },
     {
@@ -209,6 +226,32 @@ export default function Library() {
         <LearningIcon kind="library" className="library-intro__art" />
       </section>
 
+      {isStorageUnavailable && (
+        <div className="library-storage-error" role="alert" style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          padding: '12px 16px',
+          background: '#FEF2F2',
+          border: '1px solid #FECACA',
+          borderRadius: '14px',
+          color: '#991B1B',
+          fontSize: '0.875rem',
+          marginBottom: '16px',
+        }}>
+          <span>Device collections unavailable. Could not read study records.</span>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={handleRetryStorage}
+            style={{ padding: '6px 12px', fontSize: '0.8125rem', minHeight: '36px' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="library-counts" aria-label="Current course collections">
         <Link
           to="/learn"
@@ -222,29 +265,29 @@ export default function Library() {
         <Link
           to="/learn"
           className="library-count-card"
-          aria-label={`Learned words: ${learnedCount}`}
+          aria-label={isStorageUnavailable ? 'Learned words: unavailable' : `Learned words: ${learnedCount}`}
         >
           <LearningIcon kind="cards" className="library-counts__art" />
-          <strong>{learnedCount}</strong>
-          <span>Learned words</span>
+          <strong>{isStorageUnavailable ? '—' : learnedCount}</strong>
+          <span>{isStorageUnavailable ? 'Unavailable' : 'Learned words'}</span>
         </Link>
         <Link
           to="/saved"
           className="library-count-card"
-          aria-label={`Saved words: ${savedCount}`}
+          aria-label={isStorageUnavailable ? 'Saved words: unavailable' : `Saved words: ${savedCount}`}
         >
           <LearningIcon kind="saved" className="library-counts__art" />
-          <strong>{savedCount}</strong>
-          <span>Saved words</span>
+          <strong>{isStorageUnavailable ? '—' : savedCount}</strong>
+          <span>{isStorageUnavailable ? 'Unavailable' : 'Saved words'}</span>
         </Link>
         <Link
           to="/learn/review"
           className="library-count-card"
-          aria-label={`Review queue: ${reviewCount}`}
+          aria-label={isStorageUnavailable ? 'Review queue: unavailable' : `Review queue: ${reviewCount}`}
         >
           <LearningIcon kind="review" className="library-counts__art" />
-          <strong>{reviewCount}</strong>
-          <span>To review</span>
+          <strong>{isStorageUnavailable ? '—' : reviewCount}</strong>
+          <span>{isStorageUnavailable ? 'Unavailable' : 'To review'}</span>
         </Link>
       </div>
 

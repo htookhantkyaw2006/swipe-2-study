@@ -164,7 +164,8 @@ export async function runVisualBatch3Verification() {
             route: '/learn',
             page: 'levels',
             name: 'hsk-grid-375w.png',
-            desc: 'HSK Grid Selection Cards (Mobile 375w)',
+            desc: 'Simplified HSK Grid (Mobile 375w 1-column)',
+            expectedColumns: 1,
             mobile: true,
           },
           {
@@ -173,7 +174,18 @@ export async function runVisualBatch3Verification() {
             route: '/learn',
             page: 'levels',
             name: 'hsk-grid-1024w.png',
-            desc: 'HSK Grid 3x3 Selection Cards (Desktop 1024w)',
+            desc: 'Simplified HSK Grid (Desktop 1024w 2-column)',
+            expectedColumns: 2,
+            mobile: false,
+          },
+          {
+            width: 1440,
+            height: 900,
+            route: '/learn',
+            page: 'levels',
+            name: 'hsk-grid-1440w.png',
+            desc: 'Simplified HSK Grid (Desktop 1440w 3-column)',
+            expectedColumns: 3,
             mobile: false,
           },
           {
@@ -192,6 +204,24 @@ export async function runVisualBatch3Verification() {
             page: 'library',
             name: 'library-desktop-1024w.png',
             desc: 'Library Overview & Tools (Desktop 1024w)',
+            mobile: false,
+          },
+          {
+            width: 1024,
+            height: 800,
+            route: '/library',
+            page: 'library-catalog-disabled',
+            name: 'library-catalog-disabled-1024w.png',
+            desc: 'Library Catalog Disabled Truthful State (Desktop 1024w)',
+            mobile: false,
+          },
+          {
+            width: 1024,
+            height: 800,
+            route: '/library',
+            page: 'library-storage-error',
+            name: 'library-unavailable-1024w.png',
+            desc: 'Library Unreadable Collections Unavailable & Retry (Desktop 1024w)',
             mobile: false,
           },
           {
@@ -234,9 +264,9 @@ export async function runVisualBatch3Verification() {
             width: 1024,
             height: 800,
             route: '/login',
-            page: 'login',
+            page: 'login-toggle-focus',
             name: 'login-desktop-1024w.png',
-            desc: 'Login Card Desktop Outside Layout (Desktop 1024w)',
+            desc: 'Login Card with Password Toggle Focus (Desktop 1024w)',
             mobile: false,
           },
           {
@@ -386,12 +416,17 @@ export async function runVisualBatch3Verification() {
 
               let setMetricsId = null;
               let navigateId = null;
+              let getDocId = null;
+              let queryNodeId = null;
+              let getFontsId = null;
               let evalHoverId = null;
               let evalHoverStylesId = null;
               let screenshotId = null;
 
               ws.onopen = () => {
                 send('Runtime.enable');
+                send('DOM.enable');
+                send('CSS.enable');
                 setMetricsId = send('Emulation.setDeviceMetricsOverride', {
                   width: c.width,
                   height: c.height,
@@ -427,6 +462,44 @@ export async function runVisualBatch3Verification() {
                       return rejWs(mErr);
                     }
 
+                    getDocId = send('DOM.getDocument', { depth: -1 });
+                  } else if (data.id === getDocId) {
+                    const rootNodeId = data.result?.root?.nodeId;
+                    if (rootNodeId) {
+                      queryNodeId = send('DOM.querySelector', {
+                        nodeId: rootNodeId,
+                        selector: 'h1, h2, .auth-title, .course-card-copy h3, .library-intro h2, .level-tile h3',
+                      });
+                    } else {
+                      evalHoverId = send('Runtime.evaluate', {
+                        expression: `(() => {
+                          const el = document.querySelector('.collection-hero__action') || document.querySelector('.auth-submit') || document.querySelector('.btn-primary') || document.querySelector('.course-study-button');
+                          if (!el) return null;
+                          const r = el.getBoundingClientRect();
+                          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                        })()`,
+                        returnByValue: true,
+                      });
+                    }
+                  } else if (data.id === queryNodeId) {
+                    const targetNodeId = data.result?.nodeId;
+                    if (targetNodeId) {
+                      getFontsId = send('CSS.getPlatformFontsForNode', { nodeId: targetNodeId });
+                    } else {
+                      evalHoverId = send('Runtime.evaluate', {
+                        expression: `(() => {
+                          const el = document.querySelector('.collection-hero__action') || document.querySelector('.auth-submit') || document.querySelector('.btn-primary') || document.querySelector('.course-study-button');
+                          if (!el) return null;
+                          const r = el.getBoundingClientRect();
+                          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                        })()`,
+                        returnByValue: true,
+                      });
+                    }
+                  } else if (data.id === getFontsId) {
+                    if (metrics) {
+                      metrics.cdpPlatformFonts = data.result?.fonts || [];
+                    }
                     evalHoverId = send('Runtime.evaluate', {
                       expression: `(() => {
                         const el = document.querySelector('.collection-hero__action') || document.querySelector('.auth-submit') || document.querySelector('.btn-primary') || document.querySelector('.course-study-button');
@@ -502,6 +575,9 @@ export async function runVisualBatch3Verification() {
           }
 
           if (metrics && screenshotBase64) {
+            if (metrics.success === false) {
+              throw new Error(`Capture mode failed for ${c.desc}: ${metrics.error}`);
+            }
             const widthDiff = Math.abs(metrics.measuredWidth - c.width);
             if (widthDiff > 1) {
               throw new Error(
@@ -511,6 +587,11 @@ export async function runVisualBatch3Verification() {
             if (metrics.hasHorizontalOverflow) {
               throw new Error(
                 `Horizontal overflow detected on ${c.desc}: scrollWidth=${metrics.scrollWidth}px > measuredWidth=${metrics.measuredWidth}px. Overflowing elements: ${JSON.stringify(metrics.overflowElements)}`
+              );
+            }
+            if (c.expectedColumns && metrics.computedColumns && metrics.computedColumns !== c.expectedColumns) {
+              throw new Error(
+                `Computed grid columns mismatch in ${c.desc}: expected ${c.expectedColumns}, got ${metrics.computedColumns}`
               );
             }
             if (metrics.renderedFontInfo && !metrics.renderedFontInfo.matchesPlatform) {
@@ -529,6 +610,12 @@ export async function runVisualBatch3Verification() {
               console.log(
                 `      font: platform=${metrics.renderedFontInfo.platform}, rendered=${metrics.renderedFontInfo.actualRendered}, interLoaded=${metrics.renderedFontInfo.interChecked}`
               );
+            }
+            if (metrics.cdpPlatformFonts && metrics.cdpPlatformFonts.length > 0) {
+              const fontNames = metrics.cdpPlatformFonts
+                .map((f) => `${f.familyName} (${f.glyphCount} glyphs${f.isCustomFont ? ', custom' : ''})`)
+                .join(', ');
+              console.log(`      cdp platform fonts: ${fontNames}`);
             }
             if (metrics.navClearance) {
               console.log(

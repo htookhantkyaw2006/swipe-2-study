@@ -399,6 +399,11 @@ button {
 .auth-input-toggle:hover {
   color: var(--color-primary-blue);
 }
+.auth-input-toggle:focus-visible {
+  outline: 2px solid var(--color-primary-blue);
+  outline-offset: 1px;
+  color: var(--color-primary-blue);
+}
 
 .auth-submit {
   width: 100%;
@@ -787,8 +792,10 @@ button:disabled { cursor: default; }
   gap: 6px;
 }
 .icon-button {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;

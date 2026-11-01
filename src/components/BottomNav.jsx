@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useLayoutEffect, useRef } from 'react';
 import { ArrowUpRight, Home, Layers, Library, MessageCircle, User, Settings } from 'lucide-react';
 import LearningIcon from './ui/LearningIcon';
@@ -12,6 +12,16 @@ const items = [
 ];
 
 export default function BottomNav({ isCollapsed = false, isDesktop = false }) {
+  const location = useLocation();
+  const pathname = location.pathname;
+  const isLibraryChild =
+    pathname === '/saved' ||
+    pathname.startsWith('/saved/') ||
+    pathname === '/dictionary' ||
+    pathname.startsWith('/dictionary/');
+  const isLibraryActive =
+    pathname === '/library' || pathname.startsWith('/library/') || isLibraryChild;
+
   const navRef = useRef(null);
   useLayoutEffect(() => {
     const nav = navRef.current;
@@ -43,13 +53,41 @@ export default function BottomNav({ isCollapsed = false, isDesktop = false }) {
         </NavLink>
       </div>
       <div className="navigation-links">
-        {items.map(({ path, icon: Icon, kind, label }) => (
-          <NavLink key={path} to={path} end={path === '/'} className={({ isActive }) => `navigation-link${path === '/library' ? ' navigation-link--library' : ''}${isActive ? ' is-active' : ''}`}>
-            <span className="navigation-symbol" aria-hidden="true"><Icon size={22} strokeWidth={2} /></span>
-            <LearningIcon kind={kind} className="navigation-art" />
-            <span className="navigation-label">{label === 'Flashcards' ? <>Flash<wbr />cards</> : label}</span>
-          </NavLink>
-        ))}
+        {items.map(({ path, icon: Icon, kind, label }) => {
+          if (path === '/library') {
+            const ariaCurrent = isLibraryActive
+              ? (pathname === '/library' ? 'page' : 'true')
+              : undefined;
+
+            return (
+              <Link
+                key={path}
+                to={path}
+                aria-current={ariaCurrent}
+                className={`navigation-link navigation-link--library${isLibraryActive ? ' is-active' : ''}`}
+              >
+                <span className="navigation-symbol" aria-hidden="true"><Icon size={22} strokeWidth={2} /></span>
+                <LearningIcon kind={kind} className="navigation-art" />
+                <span className="navigation-label">{label}</span>
+              </Link>
+            );
+          }
+
+          return (
+            <NavLink
+              key={path}
+              to={path}
+              end={path === '/'}
+              className={({ isActive }) =>
+                `navigation-link${isActive ? ' is-active' : ''}`
+              }
+            >
+              <span className="navigation-symbol" aria-hidden="true"><Icon size={22} strokeWidth={2} /></span>
+              <LearningIcon kind={kind} className="navigation-art" />
+              <span className="navigation-label">{label === 'Flashcards' ? <>Flash<wbr />cards</> : label}</span>
+            </NavLink>
+          );
+        })}
       </div>
       <div className="navigation-footer">
         <div className="navigation-note">
