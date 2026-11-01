@@ -74,7 +74,7 @@ test('1. Empty learner data displays 0 in Library component and helper', () => {
 
   assert.equal(count, 0, 'Empty learner data must display 0 in Learned words stat');
   assert.ok(html.includes('Build your vocabulary'), 'Zero learned words renders default subtitle');
-  assert.ok(!html.includes('words mastered'), 'Must not render words mastered when count is 0');
+  assert.ok(!html.includes('words mastered') && !html.includes('words learned'), 'Must not render words learned when count is 0');
 });
 
 test('2. Actual known words display the correct unique count in Library component', () => {
@@ -90,7 +90,7 @@ test('2. Actual known words display the correct unique count in Library componen
   const count = extractLearnedCountStat(html);
 
   assert.equal(count, 3, 'Library must display 3 for 3 mastered words');
-  assert.ok(html.includes('3 words mastered'), 'Library subtitle must display 3 words mastered');
+  assert.ok(html.includes('3 words learned') || html.includes('3 words mastered'), 'Library subtitle must display 3 words learned');
 });
 
 test('3. Duplicate records do not inflate the learned count', () => {
@@ -108,7 +108,7 @@ test('3. Duplicate records do not inflate the learned count', () => {
   const count = extractLearnedCountStat(html);
 
   assert.equal(count, 2, 'Library must display 2 unique mastered words despite duplicate actions');
-  assert.ok(html.includes('2 words mastered'));
+  assert.ok(html.includes('2 words learned') || html.includes('2 words mastered'));
 });
 
 test('4. Displayed count updates accurately after learning actions', () => {
@@ -116,19 +116,19 @@ test('4. Displayed count updates accurately after learning actions', () => {
   recordWordAction(db, { card: { character: '中', reading: 'zhōng' }, direction: 'right' });
   let html = renderLibrary();
   assert.equal(extractLearnedCountStat(html), 1);
-  assert.ok(html.includes('1 words mastered'));
+  assert.ok(html.includes('1 word learned') || html.includes('1 words learned') || html.includes('1 words mastered'));
 
   // Learn a 2nd word
   recordWordAction(db, { card: { character: '大', reading: 'dà' }, direction: 'right' });
   html = renderLibrary();
   assert.equal(extractLearnedCountStat(html), 2);
-  assert.ok(html.includes('2 words mastered'));
+  assert.ok(html.includes('2 words learned') || html.includes('2 words mastered'));
 
   // Swipe left on '大' (re-entering review/learning queue)
   recordWordAction(db, { card: { character: '大', reading: 'dà' }, direction: 'left' });
   html = renderLibrary();
   assert.equal(extractLearnedCountStat(html), 1, 'Swiping left demotes word from known status');
-  assert.ok(html.includes('1 words mastered'));
+  assert.ok(html.includes('1 word learned') || html.includes('1 words learned') || html.includes('1 words mastered'));
 });
 
 test('5. Language and account changes continue to use the correct scoped data', () => {

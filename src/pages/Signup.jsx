@@ -6,6 +6,7 @@ import { safeReturnPath } from '../lib/safeReturnPath.js';
 import { trackEvent } from '../lib/analytics.js';
 import { isGoogleAuthEnabled, initiateGoogleSignIn } from '../lib/googleAuth.js';
 import { Mail, Lock, Eye, EyeOff, User, ArrowLeft, Sparkles } from 'lucide-react';
+import GoogleIcon from '../components/ui/GoogleIcon';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -242,7 +243,8 @@ export default function Signup() {
               onClick={handleGoogleSignIn}
               disabled={busy}
             >
-              {googleLoading ? 'Connecting to Google…' : 'Continue with Google'}
+              <GoogleIcon size={18} />
+              <span>{googleLoading ? 'Connecting to Google…' : 'Continue with Google'}</span>
             </button>
           </>
         )}

@@ -38,6 +38,10 @@
     import SwipeSession from '/src/pages/Learn/SwipeSession.jsx';
     import ReviewWords from '/src/pages/Learn/ReviewWords.jsx';
     import SavedWords from '/src/pages/SavedWords.jsx';
+    import Library from '/src/pages/Library.jsx';
+    import Profile from '/src/pages/Profile.jsx';
+    import SettingsSubpage from '/src/pages/SettingsSubpage.jsx';
+    import Login from '/src/pages/Login.jsx';
     import { db } from '/src/lib/db.js';
 
     const rootElement = document.getElementById('root');
@@ -114,7 +118,11 @@
                         createElement(Route, { path: 'learn/review', element: createElement(ReviewWords) }),
                         createElement(Route, { path: 'learn/review/session', element: createElement(SwipeSession, { isReview: true }) }),
                         createElement(Route, { path: 'saved', element: createElement(SavedWords) }),
-                        createElement(Route, { path: 'saved/session', element: createElement(SwipeSession, { isSaved: true }) })
+                        createElement(Route, { path: 'saved/session', element: createElement(SwipeSession, { isSaved: true }) }),
+                        createElement(Route, { path: 'library', element: createElement(Library) }),
+                        createElement(Route, { path: 'profile', element: createElement(Profile) }),
+                        createElement(Route, { path: 'settings', element: createElement(SettingsSubpage) }),
+                        createElement(Route, { path: 'login', element: createElement(Login) })
                       )
                     )
                   )
@@ -423,6 +431,14 @@
         await waitFor(() => document.querySelector('.collection-page--review') !== null && document.querySelector('.collection-word') !== null, 4000, 'capture-review-collection-mounted');
       } else if (pageName === 'saved-collection' || targetRoute === '/saved') {
         await waitFor(() => document.querySelector('.collection-page--saved') !== null && document.querySelector('.collection-word') !== null, 4000, 'capture-saved-collection-mounted');
+      } else if (pageName === 'library' || targetRoute === '/library') {
+        await waitFor(() => document.querySelector('.library-page') !== null && document.querySelector('.library-intro') !== null, 4000, 'capture-library-mounted');
+      } else if (pageName === 'profile' || targetRoute === '/profile') {
+        await waitFor(() => document.querySelector('.profile-page') !== null && document.querySelector('.profile-account') !== null, 4000, 'capture-profile-mounted');
+      } else if (pageName === 'settings' || targetRoute === '/settings') {
+        await waitFor(() => document.querySelector('.settings-page') !== null && document.querySelector('.settings-group') !== null, 4000, 'capture-settings-mounted');
+      } else if (pageName === 'login' || targetRoute === '/login') {
+        await waitFor(() => document.querySelector('.auth-card') !== null && document.querySelector('.auth-submit') !== null, 4000, 'capture-login-mounted');
       } else {
         await waitFor(() => document.querySelector('#main-content') !== null, 4000, 'capture-generic-mounted');
       }
@@ -513,6 +529,39 @@
         };
       }
 
+      // Check mobile fixed navigation clearance
+      let navClearance = null;
+      const fixedNav = document.querySelector('.app-navigation');
+      const appMain = document.querySelector('.app-main');
+      if (fixedNav && appMain) {
+        const navRect = fixedNav.getBoundingClientRect();
+        const mainStyle = window.getComputedStyle(appMain);
+        const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
+        const isFixed = window.getComputedStyle(fixedNav).position === 'fixed';
+        navClearance = {
+          hasFixedNav: isFixed,
+          navHeight: navRect.height,
+          paddingBottom,
+          clearsNav: isFixed ? paddingBottom >= navRect.height : true,
+        };
+      }
+
+      // Real interactive hover measurement
+      let interactiveHover = null;
+      const hoverTarget = document.querySelector('.collection-hero__action') || document.querySelector('.btn-primary') || document.querySelector('.auth-submit');
+      if (hoverTarget) {
+        const normalColor = window.getComputedStyle(hoverTarget).color;
+        const normalBg = window.getComputedStyle(hoverTarget).backgroundColor;
+        hoverTarget.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+        hoverTarget.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        interactiveHover = {
+          normalColor,
+          normalBg,
+          hoverColor: window.getComputedStyle(hoverTarget).color,
+          hoverBg: window.getComputedStyle(hoverTarget).backgroundColor,
+        };
+      }
+
       const metrics = {
         success: true,
         page: pageName,
@@ -525,6 +574,8 @@
         computedColumns,
         overflowElements: overflowElements.slice(0, 5),
         heroStyles,
+        navClearance,
+        interactiveHover,
         pageMounted: true,
       };
 
