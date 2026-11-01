@@ -198,6 +198,24 @@ export async function runVisualBatch2Verification() {
             expectedColumns: 2,
             mobile: false,
           },
+          {
+            width: 375,
+            height: 667,
+            route: '/learn/review',
+            page: 'review-collection',
+            name: 'review-collection-375w.png',
+            desc: 'Populated Review Collection (Mobile 375w)',
+            mobile: true,
+          },
+          {
+            width: 375,
+            height: 667,
+            route: '/saved',
+            page: 'saved-collection',
+            name: 'saved-collection-375w.png',
+            desc: 'Populated Saved Collection (Mobile 375w)',
+            mobile: true,
+          },
         ];
 
         const screenshots = [];

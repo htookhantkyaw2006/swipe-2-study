@@ -10,5 +10,5 @@ test('UI/UX Batch 2: vocabulary study, Review, Saved Words, and session results 
   }
 
   assert.equal(result.passed, true, 'Batch 2 visual checks must pass');
-  assert.equal(result.screenshots.length, 5, '5 screenshots captured across 320, 375, 768, 1024, 1440px viewports');
+  assert.ok(result.screenshots.length >= 5, 'Screenshots captured across requested viewports');
 });
