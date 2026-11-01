@@ -35,8 +35,8 @@
   color: var(--color-text-sub);
 }
 .library-intro .library-intro__art {
-  width: 76px;
-  height: 76px;
+  width: 64px;
+  height: 64px;
   flex-shrink: 0;
 }
 
@@ -50,13 +50,14 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 14px 14px;
+  padding: 12px 14px;
   gap: 4px;
   border: 1px solid var(--color-border);
   border-radius: 16px;
   background: white;
   box-shadow: var(--shadow-soft);
   min-width: 0;
+  min-height: 44px;
   text-decoration: none;
   transition: background-color 0.16s, border-color 0.16s;
 }
@@ -77,8 +78,8 @@
   overflow-wrap: anywhere;
 }
 .library-counts .library-counts__art {
-  width: 38px;
-  height: 38px;
+  width: 52px;
+  height: 52px;
   margin-bottom: 2px;
 }
 
@@ -112,7 +113,7 @@
   outline: 2px solid var(--color-primary-blue);
   outline-offset: 2px;
 }
-.library-tool .library-tool__art { width: 48px; height: 48px; flex-shrink: 0; }
+.library-tool .library-tool__art { width: 56px; height: 56px; flex-shrink: 0; }
 .library-tool__copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .library-tool__title { font-weight: 650; font-size: 0.9375rem; line-height: 1.4; color: var(--color-text-heading); }
 .library-tool__subtitle { font-size: 0.8125rem; line-height: 1.5; color: var(--color-text-sub); }
@@ -134,7 +135,7 @@
 
 .library-page--list .library-tools { grid-template-columns: minmax(0, 1fr); }
 .library-page--list .library-tool { flex-direction: row; align-items: center; gap: 14px; }
-.library-page--list .library-tool .library-tool__art { width: 42px; height: 42px; }
+.library-page--list .library-tool .library-tool__art { width: 50px; height: 50px; }
 .library-page--list .library-tool__arrow { display: block; }
 .library-page--list .library-tool__soon { flex-shrink: 0; }
 
@@ -156,6 +157,8 @@
   .library-page--list .library-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 359px) {
+  .library-intro { padding: 16px 14px; gap: 12px; }
+  .library-intro .library-intro__art { display: none; }
   .library-toolbar { flex-wrap: wrap; }
   .library-toolbar > .study-search { flex-basis: 100%; }
   .library-view { margin-left: auto; }

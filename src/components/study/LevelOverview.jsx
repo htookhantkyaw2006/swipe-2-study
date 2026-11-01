@@ -110,23 +110,28 @@ export default function LevelOverview({ phrases = false }) {
               style={{
                 '--level-accent': level.gradientEnd,
                 '--level-tint': level.gradientStart,
+                '--level-shadow': level.shadow || 'rgba(3, 105, 161, 0.3)',
               }}
               to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}
             >
               <div className="level-tile__top">
-                <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
-                {isNowLearning ? (
-                  <span className="level-tile__badge level-tile__badge--learning">NOW LEARNING</span>
-                ) : status === 'loading' ? (
-                  <span className="level-tile__badge level-tile__badge--loading">LOADING</span>
-                ) : status === 'error' ? (
-                  <span className="level-tile__badge level-tile__badge--error">UNAVAILABLE</span>
-                ) : status === 'unpublished' ? (
-                  <span className="level-tile__badge level-tile__badge--soon">COMING SOON</span>
-                ) : (
-                  <span className="level-tile__tier">{level.tier}</span>
-                )}
+                <div className="level-tile__top-left">
+                  <LearningIcon kind={phrases ? 'phrases' : 'cards'} glyph={course.copy.flashcardsWatermark} />
+                  {isNowLearning ? (
+                    <span className="level-tile__badge level-tile__badge--learning">NOW LEARNING</span>
+                  ) : status === 'loading' ? (
+                    <span className="level-tile__badge level-tile__badge--loading">LOADING</span>
+                  ) : status === 'error' ? (
+                    <span className="level-tile__badge level-tile__badge--error">UNAVAILABLE</span>
+                  ) : status === 'unpublished' ? (
+                    <span className="level-tile__badge level-tile__badge--soon">COMING SOON</span>
+                  ) : (
+                    <span className="level-tile__tier">{level.tier}</span>
+                  )}
+                </div>
+                <span className="level-tile__tag">{course.copy.allLevels || 'All levels'}</span>
               </div>
+              <p className="level-tile__kicker">{level.kicker || `LEVEL ${level.num}`}</p>
               <h3>{level.name}</h3>
               <p>{countText}</p>
               <span className={`level-tile__action${isUnavailable ? ' level-tile__action--disabled' : status === 'loading' ? ' level-tile__action--loading' : ''}`}>

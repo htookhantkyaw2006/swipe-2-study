@@ -1,5 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import React, { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
@@ -45,6 +47,7 @@ const { default: Library } = await server.ssrLoadModule('/src/pages/Library.jsx'
 const { default: Profile } = await server.ssrLoadModule('/src/pages/Profile.jsx');
 const { default: Login } = await server.ssrLoadModule('/src/pages/Login.jsx');
 const { default: Signup } = await server.ssrLoadModule('/src/pages/Signup.jsx');
+const { default: LevelOverview } = await server.ssrLoadModule('/src/components/study/LevelOverview.jsx');
 
 process.env.VITE_GOOGLE_AUTH_ENABLED = 'true';
 process.env.VITE_SUPABASE_URL = 'https://example.supabase.co';
@@ -174,4 +177,59 @@ test('4. Profile clearly groups destructive actions in Session & account danger 
   assert.ok(html.includes('Sign out on all devices'), 'Includes Sign out on all devices');
   assert.ok(html.includes('Delete account'), 'Includes Delete account');
   assert.ok(html.includes('Account &amp; support') || html.includes('Account & support'), 'Keeps Account & support distinct');
+});
+
+test('5. LevelOverview renders Chinese level cards with full approved gradient surface and truthful states', () => {
+  const html = renderWithProviders(createElement(LevelOverview), {
+    publishedEnabled: true,
+    initialCache: {
+      'zh-hsk1': {
+        status: 'loaded',
+        items: new Array(300).fill({ id: 'item' }),
+        version: 1,
+        error: null,
+        isPublished: true,
+      },
+      'zh-hsk2': {
+        status: 'unpublished',
+        items: [],
+        version: null,
+        error: null,
+        isPublished: false,
+      },
+    },
+  });
+
+  // HSK 1: Available, NOW LEARNING, Start / Explore level, approved gradient palette
+  assert.ok(html.includes('HSK 1'), 'Renders HSK 1');
+  assert.ok(html.includes('NOW LEARNING'), 'HSK 1 shows NOW LEARNING');
+  assert.ok(html.includes('300 cards available'), 'HSK 1 shows loaded card count');
+  assert.ok(html.includes('Explore level'), 'HSK 1 action is Explore level');
+  assert.ok(html.includes('#7DD3FC') && html.includes('#0369A1'), 'HSK 1 includes approved gradient stops #7DD3FC -> #0369A1');
+
+  // HSK 2: Coming soon, truthful empty copy, disabled action, red gradient palette
+  assert.ok(html.includes('HSK 2'), 'Renders HSK 2');
+  assert.ok(html.includes('COMING SOON'), 'HSK 2 shows COMING SOON');
+  assert.ok(html.includes('Curriculum in preparation'), 'HSK 2 shows Curriculum in preparation');
+  assert.ok(!html.includes('200 words curriculum'), 'Unpublished levels do not fabricate numeric curriculum totals');
+  assert.ok(html.includes('Coming soon'), 'HSK 2 action is disabled Coming soon');
+  assert.ok(html.includes('#FCA5A5') && html.includes('#DC2626'), 'HSK 2 includes approved gradient stops #FCA5A5 -> #DC2626');
+
+  // Remaining HSK levels render approved gradients
+  assert.ok(html.includes('#FDBA74') && html.includes('#EA580C'), 'HSK 3 orange gradient stops');
+  assert.ok(html.includes('#FDE047') && html.includes('#CA8A04'), 'HSK 4 yellow gradient stops');
+});
+
+test('6. Typography restores reduced auth weights and preserves system hierarchy', () => {
+  const css = fs.readFileSync(path.resolve(projectRoot, 'src/index.css'), 'utf8');
+  assert.match(css, /\.auth-title\s*\{[^}]*font-weight:\s*800;/, 'Auth title restored to weight 800');
+  assert.match(css, /\.auth-label\s*\{[^}]*font-weight:\s*700;/, 'Auth labels restored to weight 700');
+  assert.match(css, /\.auth-submit\s*\{[^}]*font-weight:\s*700;/, 'Auth submit restored to weight 700');
+});
+
+test('7. Icon-to-surface proportions and target sizing conform to specs', () => {
+  const libCss = fs.readFileSync(path.resolve(projectRoot, 'src/pages/Library.css'), 'utf8');
+  assert.match(libCss, /\.library-counts\s+\.library-counts__art\s*\{[^}]*width:\s*52px;\s*height:\s*52px;/, 'Count art sized for ~25px glyph');
+  assert.match(libCss, /\.library-tool\s+\.library-tool__art\s*\{[^}]*width:\s*56px;\s*height:\s*56px;/, 'Tool art sized for ~27px glyph');
+  assert.match(libCss, /@media\s*\([^)]*max-width:\s*359px\)[^}]*\{\s*\.library-intro\s*\{[^}]*\}\s*\.library-intro\s+\.library-intro__art\s*\{\s*display:\s*none;/, 'Hero art hidden at 320px to prevent text squeezing');
 });

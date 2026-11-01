@@ -150,6 +150,42 @@ export async function runVisualBatch3Verification() {
       try {
         const CAPTURES = [
           {
+            width: 375,
+            height: 667,
+            route: '/',
+            page: 'home',
+            name: 'home-course-hero-375w.png',
+            desc: 'Home and Course Hero (Mobile 375w)',
+            mobile: true,
+          },
+          {
+            width: 375,
+            height: 667,
+            route: '/learn',
+            page: 'levels',
+            name: 'hsk-grid-375w.png',
+            desc: 'HSK Grid Selection Cards (Mobile 375w)',
+            mobile: true,
+          },
+          {
+            width: 1024,
+            height: 800,
+            route: '/learn',
+            page: 'levels',
+            name: 'hsk-grid-1024w.png',
+            desc: 'HSK Grid 3x3 Selection Cards (Desktop 1024w)',
+            mobile: false,
+          },
+          {
+            width: 375,
+            height: 667,
+            route: '/learn/level/HSK1',
+            page: 'course-overview',
+            name: 'course-overview-375w.png',
+            desc: 'HSK 1 Course Overview (Mobile 375w)',
+            mobile: true,
+          },
+          {
             width: 1024,
             height: 800,
             route: '/library',
@@ -174,6 +210,42 @@ export async function runVisualBatch3Verification() {
             page: 'library',
             name: 'library-mobile-320w.png',
             desc: 'Library Narrow Check (Mobile 320w)',
+            mobile: true,
+          },
+          {
+            width: 375,
+            height: 667,
+            route: '/library',
+            page: 'library-scrolled-writing',
+            name: 'library-scrolled-writing-375w.png',
+            desc: 'Scrolled Library Showing Writing Entry (Mobile 375w)',
+            mobile: true,
+          },
+          {
+            width: 375,
+            height: 667,
+            route: '/library',
+            page: 'bottom-clearance',
+            name: 'bottom-clearance-375w.png',
+            desc: 'Mobile Bottom Clearance above Navigation (Mobile 375w)',
+            mobile: true,
+          },
+          {
+            width: 1024,
+            height: 800,
+            route: '/login',
+            page: 'login',
+            name: 'login-desktop-1024w.png',
+            desc: 'Login Card Desktop Outside Layout (Desktop 1024w)',
+            mobile: false,
+          },
+          {
+            width: 375,
+            height: 667,
+            route: '/login',
+            page: 'login',
+            name: 'login-mobile-375w.png',
+            desc: 'Login Card on Mobile Outside Layout (Mobile 375w)',
             mobile: true,
           },
           {
@@ -219,24 +291,6 @@ export async function runVisualBatch3Verification() {
             page: 'settings',
             name: 'settings-mobile-375w.png',
             desc: 'Settings Subpage (Mobile 375w)',
-            mobile: true,
-          },
-          {
-            width: 1024,
-            height: 800,
-            route: '/login',
-            page: 'login',
-            name: 'login-desktop-1024w.png',
-            desc: 'Login Card with Official Google Icon (Desktop 1024w)',
-            mobile: false,
-          },
-          {
-            width: 375,
-            height: 667,
-            route: '/login',
-            page: 'login',
-            name: 'login-mobile-375w.png',
-            desc: 'Login Card on Mobile (Mobile 375w)',
             mobile: true,
           },
           {
@@ -332,6 +386,8 @@ export async function runVisualBatch3Verification() {
 
               let setMetricsId = null;
               let navigateId = null;
+              let evalHoverId = null;
+              let evalHoverStylesId = null;
               let screenshotId = null;
 
               ws.onopen = () => {
@@ -371,7 +427,46 @@ export async function runVisualBatch3Verification() {
                       return rejWs(mErr);
                     }
 
-                    await new Promise((r) => setTimeout(r, 150));
+                    evalHoverId = send('Runtime.evaluate', {
+                      expression: `(() => {
+                        const el = document.querySelector('.collection-hero__action') || document.querySelector('.auth-submit') || document.querySelector('.btn-primary') || document.querySelector('.course-study-button');
+                        if (!el) return null;
+                        const r = el.getBoundingClientRect();
+                        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                      })()`,
+                      returnByValue: true,
+                    });
+                  } else if (data.id === evalHoverId) {
+                    const coords = data.result?.result?.value;
+                    if (coords && coords.x && coords.y) {
+                      send('Input.dispatchMouseEvent', {
+                        type: 'mouseMoved',
+                        x: Math.round(coords.x),
+                        y: Math.round(coords.y),
+                      });
+                      await new Promise((r) => setTimeout(r, 80));
+                      evalHoverStylesId = send('Runtime.evaluate', {
+                        expression: `(() => {
+                          const el = document.querySelector('.collection-hero__action') || document.querySelector('.auth-submit') || document.querySelector('.btn-primary') || document.querySelector('.course-study-button');
+                          if (!el) return null;
+                          const s = window.getComputedStyle(el);
+                          return {
+                            color: s.color,
+                            backgroundColor: s.backgroundColor,
+                            backgroundImage: s.backgroundImage,
+                          };
+                        })()`,
+                        returnByValue: true,
+                      });
+                    } else {
+                      await new Promise((r) => setTimeout(r, 120));
+                      screenshotId = send('Page.captureScreenshot', { format: 'png' });
+                    }
+                  } else if (data.id === evalHoverStylesId) {
+                    if (metrics && data.result?.result?.value) {
+                      metrics.cdpHoverStyles = data.result.result.value;
+                    }
+                    await new Promise((r) => setTimeout(r, 120));
                     screenshotId = send('Page.captureScreenshot', { format: 'png' });
                   } else if (data.id === screenshotId) {
                     clearTimeout(wsTimeout);

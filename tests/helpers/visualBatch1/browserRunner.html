@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Batch 1 Visual & Interaction Verification Runner</title>
+  <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="stylesheet" href="/src/index.css" />
   <style>
     :root {
@@ -12,8 +13,6 @@
       --color-border: #BAE6FD;
       --color-text-navy: #0C4A6E;
       --color-page-bg: #F0F9FF;
-      --font-reading: system-ui, -apple-system, sans-serif;
-      --font-mono: monospace;
     }
     html, body { margin: 0; padding: 0; min-height: 100%; }
     #root { width: 100%; min-height: 100vh; }
@@ -42,6 +41,9 @@
     import Profile from '/src/pages/Profile.jsx';
     import SettingsSubpage from '/src/pages/SettingsSubpage.jsx';
     import Login from '/src/pages/Login.jsx';
+    import Signup from '/src/pages/Signup.jsx';
+    import ForgotPassword from '/src/pages/ForgotPassword.jsx';
+    import ResetPassword from '/src/pages/ResetPassword.jsx';
     import { db } from '/src/lib/db.js';
 
     const rootElement = document.getElementById('root');
@@ -108,6 +110,10 @@
                     createElement(
                       Routes,
                       null,
+                      createElement(Route, { path: '/login', element: createElement(Login) }),
+                      createElement(Route, { path: '/signup', element: createElement(Signup) }),
+                      createElement(Route, { path: '/forgot-password', element: createElement(ForgotPassword) }),
+                      createElement(Route, { path: '/reset-password', element: createElement(ResetPassword) }),
                       createElement(
                         Route,
                         { path: '/', element: createElement(Layout) },
@@ -121,8 +127,7 @@
                         createElement(Route, { path: 'saved/session', element: createElement(SwipeSession, { isSaved: true }) }),
                         createElement(Route, { path: 'library', element: createElement(Library) }),
                         createElement(Route, { path: 'profile', element: createElement(Profile) }),
-                        createElement(Route, { path: 'settings', element: createElement(SettingsSubpage) }),
-                        createElement(Route, { path: 'login', element: createElement(Login) })
+                        createElement(Route, { path: 'settings', element: createElement(SettingsSubpage) })
                       )
                     )
                   )
@@ -319,6 +324,74 @@
       assert(activeCard.querySelector('.swipe-audio') !== null, 'Audio button is present on flashcard');
 
       results.push({ test: 'learning-session-navigation-and-mount', passed: true });
+      unmountTree();
+
+      // -----------------------------------------------------------------------
+      // Step 5: Verify Auth (/login) Standalone Mounting & Reachability
+      // -----------------------------------------------------------------------
+      renderTree(createElement(AppTestWrapper, { initialEntries: ['/login'], hsk1Items }));
+      await waitFor(() => document.querySelector('.auth-card') !== null, 4000, 'step5-login-mounted');
+
+      // Verify no Layout elements (no app-navigation, no app-sidebar)
+      assert(document.querySelector('.app-navigation') === null, 'Auth screen does not mount app-navigation');
+      assert(document.querySelector('.app-sidebar') === null, 'Auth screen does not mount app-sidebar');
+
+      // Verify Google auth button with icon & >=44px height if enabled
+      const googleBtn = document.querySelector('.auth-provider-btn');
+      if (googleBtn) {
+        assert(googleBtn.querySelector('svg') !== null, 'Google icon SVG is present inside button');
+        const googleRect = googleBtn.getBoundingClientRect();
+        assert(googleRect.height >= 44, 'Google sign-in button meets >=44px touch target');
+      }
+
+      // Verify Guest action button & >=44px height
+      const guestBtn = document.querySelector('.auth-guest') || document.querySelector('.btn-secondary');
+      assert(guestBtn !== null, 'Guest action button is present');
+      const guestRect = guestBtn.getBoundingClientRect();
+      assert(guestRect.height >= 44, 'Guest action button meets >=44px touch target');
+
+      results.push({ test: 'auth-standalone-and-reachability', passed: true });
+      unmountTree();
+
+      // -----------------------------------------------------------------------
+      // Step 6: Verify Library Search and View Controls
+      // -----------------------------------------------------------------------
+      renderTree(createElement(AppTestWrapper, { initialEntries: ['/library'], hsk1Items }));
+      await waitFor(() => document.querySelector('.library-page') !== null && document.querySelector('.library-toolbar') !== null, 4000, 'step6-library-mounted');
+
+      // View toggle: grid -> list
+      const listBtn = document.querySelector('.library-view button[aria-label="List view"]');
+      const gridBtn = document.querySelector('.library-view button[aria-label="Grid view"]');
+      assert(listBtn !== null && gridBtn !== null, 'View toggle buttons exist');
+      listBtn.click();
+      await waitFor(() => document.querySelector('.library-page--list') !== null, 4000, 'step6-list-view');
+      assert(listBtn.getAttribute('aria-pressed') === 'true', 'List view button has aria-pressed="true"');
+
+      // View toggle: list -> grid
+      gridBtn.click();
+      await waitFor(() => document.querySelector('.library-page--grid') !== null, 4000, 'step6-grid-view');
+      assert(gridBtn.getAttribute('aria-pressed') === 'true', 'Grid view button has aria-pressed="true"');
+
+      // Search input interaction
+      const libSearchInput = document.querySelector('.library-toolbar .study-search input');
+      assert(libSearchInput !== null, 'Library search input is present');
+      setReactInputValue(libSearchInput, 'Writing');
+      await waitFor(() => document.querySelector('.library-results') !== null, 4000, 'step6-search-writing');
+      assert(document.querySelector('.library-results').textContent.includes('tool found'), 'Reports tools found');
+
+      // Clear search
+      setReactInputValue(libSearchInput, '');
+      await waitFor(() => document.querySelector('.library-results') === null, 4000, 'step6-search-cleared');
+
+      results.push({ test: 'library-search-and-view-controls', passed: true });
+      unmountTree();
+
+      // -----------------------------------------------------------------------
+      // Step 7: Verify Settings Preferences Mounting
+      // -----------------------------------------------------------------------
+      renderTree(createElement(AppTestWrapper, { initialEntries: ['/settings'], hsk1Items }));
+      await waitFor(() => document.querySelector('.settings-page') !== null && document.querySelectorAll('.settings-group').length > 0, 4000, 'step7-settings-mounted');
+      results.push({ test: 'settings-preferences-mounted', passed: true });
 
       // Send success report
       await fetch('/report', {
@@ -439,15 +512,53 @@
         await waitFor(() => document.querySelector('.settings-page') !== null && document.querySelector('.settings-group') !== null, 4000, 'capture-settings-mounted');
       } else if (pageName === 'login' || targetRoute === '/login') {
         await waitFor(() => document.querySelector('.auth-card') !== null && document.querySelector('.auth-submit') !== null, 4000, 'capture-login-mounted');
+        assert(document.querySelector('.app-navigation') === null, 'Login must not contain bottom navigation');
+        assert(document.querySelector('.app-sidebar') === null, 'Login must not contain app sidebar');
+        const googleBtn = document.querySelector('.auth-provider-btn');
+        assert(googleBtn !== null, 'Google sign-in button must be present on Login');
+        assert(googleBtn.querySelector('svg') !== null, 'Google icon SVG must be present inside Google button');
+        const guestBtn = document.querySelector('.auth-guest');
+        assert(guestBtn !== null, 'Guest action button must be present on Login');
+      } else if (pageName === 'library-scrolled-writing') {
+        await waitFor(() => document.querySelector('.library-page') !== null, 4000, 'capture-library-scrolled-writing-mounted');
+        const writingLink = document.querySelector('a[href="/writing"]') || Array.from(document.querySelectorAll('.library-tool')).find(t => t.textContent.includes('Writing'));
+        if (writingLink) {
+          writingLink.scrollIntoView({ block: 'center' });
+        }
+        await sleep(150);
+      } else if (pageName === 'bottom-clearance') {
+        await waitFor(() => document.querySelector('.library-page') !== null, 4000, 'capture-bottom-clearance-mounted');
+        const appMain = document.querySelector('.app-main');
+        if (appMain) {
+          appMain.scrollTop = appMain.scrollHeight;
+        }
+        await sleep(150);
       } else {
         await waitFor(() => document.querySelector('#main-content') !== null, 4000, 'capture-generic-mounted');
       }
 
-      // Small settle delay for responsive styles and font metrics
+      // Explicitly load representative English, Chinese, Burmese, and pinyin font samples
+      const sampleDiv = document.createElement('div');
+      sampleDiv.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
+      sampleDiv.innerHTML = `
+        <span style="font-family:'Inter'">Swipe to Study English Inter</span>
+        <span style="font-family:'Noto Sans SC'">学习 汉语 爱 (Noto Sans SC)</span>
+        <span style="font-family:'Noto Sans Myanmar'">ကျွန်တော် ချစ်သည် (Noto Sans Myanmar)</span>
+        <span style="font-family:'JetBrains Mono'">xuéxí ài (JetBrains Mono)</span>
+      `;
+      document.body.appendChild(sampleDiv);
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
-      await sleep(200);
+      await sleep(150);
+      sampleDiv.remove();
+
+      const fontStatus = {
+        inter: document.fonts.check('16px "Inter"'),
+        notoSc: document.fonts.check('16px "Noto Sans SC"'),
+        notoMyanmar: document.fonts.check('16px "Noto Sans Myanmar"'),
+        jetbrainsMono: document.fonts.check('16px "JetBrains Mono"'),
+      };
 
       const measuredWidth = window.innerWidth;
       const outerWidth = window.outerWidth;
@@ -537,13 +648,42 @@
         const navRect = fixedNav.getBoundingClientRect();
         const mainStyle = window.getComputedStyle(appMain);
         const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
-        const isFixed = window.getComputedStyle(fixedNav).position === 'fixed';
-        navClearance = {
-          hasFixedNav: isFixed,
-          navHeight: navRect.height,
-          paddingBottom,
-          clearsNav: isFixed ? paddingBottom >= navRect.height : true,
-        };
+        const navStyle = window.getComputedStyle(fixedNav);
+        const isFixed = navStyle.position === 'fixed' && navStyle.display !== 'none';
+        const isBottomNav = isFixed && window.innerWidth < 768 && navRect.top > (window.innerHeight / 2);
+
+        if (isBottomNav) {
+          // Scroll actual appMain container to end
+          appMain.scrollTop = appMain.scrollHeight;
+          await sleep(50);
+
+          const controls = Array.from(appMain.querySelectorAll('button:not([disabled]), a[href], input, select, textarea, [tabindex="0"]'))
+            .filter(el => {
+              const rect = el.getBoundingClientRect();
+              return rect.width > 0 && rect.height > 0;
+            });
+          const lastControl = controls[controls.length - 1];
+          const lastRect = lastControl ? lastControl.getBoundingClientRect() : null;
+          const clearsNav = lastRect ? (lastRect.bottom <= navRect.top + 1) : true;
+          if (!clearsNav) {
+            throw new Error(`Navigation clearance check failed: final control (${lastControl?.tagName}.${lastControl?.className}) at bottom y=${lastRect?.bottom}px is obscured behind fixed navigation at top y=${navRect.top}px`);
+          }
+          navClearance = {
+            hasFixedNav: true,
+            navHeight: navRect.height,
+            navTop: navRect.top,
+            lastControlBottom: lastRect ? lastRect.bottom : null,
+            paddingBottom,
+            clearsNav: true,
+          };
+        } else {
+          navClearance = {
+            hasFixedNav: isFixed,
+            navHeight: navRect.height,
+            paddingBottom,
+            clearsNav: true,
+          };
+        }
       }
 
       // Real interactive hover measurement
@@ -576,6 +716,7 @@
         heroStyles,
         navClearance,
         interactiveHover,
+        fontStatus,
         pageMounted: true,
       };
 
