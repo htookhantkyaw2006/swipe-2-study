@@ -191,6 +191,29 @@ export function parseCliArgs(argv) {
   return flags;
 }
 
+function loadSidecarMapping(csvPath) {
+  if (!csvPath || typeof csvPath !== 'string') return null;
+  const dir = path.dirname(csvPath);
+  const base = path.basename(csvPath, path.extname(csvPath));
+  const candidateNames = [
+    `${base.replace(/_import$/, '')}_mapping.json`,
+    `${base}_mapping.json`,
+    'N5_Swipe2Study_mapping.json',
+    'HSK1_Swipe2Study_mapping.json',
+  ];
+  for (const name of candidateNames) {
+    const candidatePath = path.join(dir, name);
+    if (fs.existsSync(candidatePath)) {
+      try {
+        return JSON.parse(fs.readFileSync(candidatePath, 'utf8'));
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return null;
+}
+
 function resolveDbClient(options = {}) {
   // If an injected client is supplied (e.g. in tests)
   if (options.dbClient) {
@@ -312,7 +335,8 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
       return;
     }
 
-    const incomingItems = mapCsvRowsToItems(fileData.parsed.rows);
+    const sidecarMapping = loadSidecarMapping(flags.csvPath);
+    const incomingItems = mapCsvRowsToItems(fileData.parsed.rows, { mapping: sidecarMapping });
     const courseId = incomingItems[0]?.course_id;
 
     if (!SUPPORTED_COURSES.has(courseId)) {
@@ -460,7 +484,8 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
       return;
     }
 
-    const incomingItems = mapCsvRowsToItems(fileData.parsed.rows);
+    const sidecarMapping = loadSidecarMapping(flags.csvPath);
+    const incomingItems = mapCsvRowsToItems(fileData.parsed.rows, { mapping: sidecarMapping });
     const courseId = incomingItems[0]?.course_id;
 
     if (!SUPPORTED_COURSES.has(courseId)) {
@@ -551,7 +576,8 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
       return;
     }
 
-    const incomingItems = mapCsvRowsToItems(fileData.parsed.rows);
+    const sidecarMapping = loadSidecarMapping(flags.csvPath);
+    const incomingItems = mapCsvRowsToItems(fileData.parsed.rows, { mapping: sidecarMapping });
     const courseId = incomingItems[0]?.course_id;
 
     if (!SUPPORTED_COURSES.has(courseId)) {

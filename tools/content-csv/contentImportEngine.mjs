@@ -14,9 +14,17 @@ export function computeSha256(data) {
 /**
  * Maps validated CSV rows into database-compatible vocabulary item objects.
  */
-export function mapCsvRowsToItems(parsedRows) {
+export function mapCsvRowsToItems(parsedRows, { mapping = null } = {}) {
+  const mappingById = new Map();
+  if (mapping && Array.isArray(mapping.records)) {
+    for (const rec of mapping.records) {
+      if (rec && rec.id) mappingById.set(rec.id, rec);
+    }
+  }
+
   return parsedRows.map((row) => {
     const f = row.fields;
+    const id = f[0].trim();
     const examplesRaw = f[9].trim();
     let examples = [];
     if (examplesRaw) {
@@ -27,8 +35,10 @@ export function mapCsvRowsToItems(parsedRows) {
       }
     }
 
+    const rec = mappingById.get(id);
+
     return {
-      id: f[0].trim(),
+      id,
       course_id: f[1].trim(),
       language: f[2].trim(),
       level_id: f[3].trim(),
@@ -40,6 +50,9 @@ export function mapCsvRowsToItems(parsedRows) {
       examples,
       sort_order: parseInt(f[10].trim(), 10),
       is_active: true,
+      ...(rec?.kana ? { kana: rec.kana } : {}),
+      ...(rec?.romaji ? { romaji: rec.romaji } : {}),
+      ...(rec?.part_of_speech ? { part_of_speech: rec.part_of_speech } : {}),
     };
   });
 }
@@ -97,6 +110,9 @@ export function isContentEqual(current, incoming) {
   if ((current.audio_path || null) !== (incoming.audio_path || null)) return false;
   if (Number(current.sort_order) !== Number(incoming.sort_order)) return false;
   if (Boolean(current.is_active) !== Boolean(incoming.is_active)) return false;
+  if (incoming.kana !== undefined && (current.kana || '') !== (incoming.kana || '')) return false;
+  if (incoming.romaji !== undefined && (current.romaji || '') !== (incoming.romaji || '')) return false;
+  if (incoming.part_of_speech !== undefined && (current.part_of_speech || '') !== (incoming.part_of_speech || '')) return false;
 
   const curEx = coerceExamples(current.examples);
   const incEx = coerceExamples(incoming.examples);
@@ -272,27 +288,48 @@ export async function fetchCurrentCourseContent({ db, courseId }) {
   }
 
   if (typeof db.query === 'function') {
-    const res = await db.query(
-      `select id, course_id, written_form, reading, meaning_english, meaning_burmese,
-              audio_path, examples, sort_order, is_active
-         from public.vocabulary
-        where course_id = $1
-        order by sort_order, id`,
-      [courseId]
-    );
-    return res.rows;
+    try {
+      const res = await db.query(
+        `select id, course_id, written_form, reading, meaning_english, meaning_burmese,
+                audio_path, examples, sort_order, is_active, kana, romaji, part_of_speech
+           from public.vocabulary
+          where course_id = $1
+          order by sort_order, id`,
+        [courseId]
+      );
+      return res.rows;
+    } catch {
+      const fallbackRes = await db.query(
+        `select id, course_id, written_form, reading, meaning_english, meaning_burmese,
+                audio_path, examples, sort_order, is_active
+           from public.vocabulary
+          where course_id = $1
+          order by sort_order, id`,
+        [courseId]
+      );
+      return fallbackRes.rows;
+    }
   }
 
   if (typeof db.from === 'function') {
     const { data, error } = await db
       .from('vocabulary')
-      .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active')
+      .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active, kana, romaji, part_of_speech')
       .eq('course_id', courseId)
       .order('sort_order', { ascending: true })
       .order('id', { ascending: true });
 
     if (error) {
-      throw new Error(`Failed to fetch current course content: ${error.message}`);
+      const fallback = await db
+        .from('vocabulary')
+        .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active')
+        .eq('course_id', courseId)
+        .order('sort_order', { ascending: true })
+        .order('id', { ascending: true });
+      if (fallback.error) {
+        throw new Error(`Failed to fetch current course content: ${fallback.error.message}`);
+      }
+      return fallback.data || [];
     }
     return data || [];
   }

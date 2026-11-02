@@ -42,15 +42,26 @@ export function mapVocabularyToCard(vocab, courseData, index = 0) {
   const reading = vocab.reading || '';
   const levelId = courseData?.level_id || (vocab.course_id === 'zh-hsk1' ? 'HSK1' : 'N5');
 
+  // Handle Japanese kana and romaji cleanly without mislabelling
+  const kana = vocab.kana || (isJa ? reading : undefined);
+  const romaji = vocab.romaji || (isJa && vocab.pronunciation && vocab.pronunciation !== reading ? vocab.pronunciation : undefined);
+  const pronunciation = vocab.pronunciation || romaji || reading;
+  const partOfSpeech = vocab.part_of_speech || undefined;
+  const senseKey = vocab.sense_key || undefined;
+
   return {
     id: vocab.id,
+    card_id: vocab.id,
     course_id: vocab.course_id,
     language: courseData?.language || (vocab.course_id === 'zh-hsk1' ? 'zh' : 'ja'),
     level: levelId,
     character: vocab.written_form,
-    pronunciation: reading,
-    reading,
-    ...(isJa ? { kana: reading } : {}),
+    pronunciation,
+    reading: romaji || reading,
+    ...(isJa ? { kana } : {}),
+    ...(romaji ? { romaji } : {}),
+    ...(partOfSpeech ? { part_of_speech: partOfSpeech } : {}),
+    ...(senseKey ? { sense_key: senseKey } : {}),
     definition: vocab.meaning_english || '',
     burmese_definition: vocab.meaning_burmese || '',
     audio_path: vocab.audio_path || null,
@@ -118,17 +129,33 @@ export async function fetchPublishedCourseContent(courseId, { client = null, pag
     let inconsistent = false;
 
     while (true) {
-      const { data: rows, error: vocabError } = await dbClient
+      let rows;
+      const res = await dbClient
         .from('vocabulary')
-        .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active')
+        .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active, kana, romaji, part_of_speech')
         .eq('course_id', courseId)
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
         .order('id', { ascending: true })
         .range(from, from + pageSize - 1);
 
-      if (vocabError) {
-        throw new Error(`Failed to query vocabulary for course '${courseId}': ${vocabError.message}`);
+      if (res.error) {
+        // Fallback for database instances where optional linguistic columns are not yet present
+        const fallback = await dbClient
+          .from('vocabulary')
+          .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active')
+          .eq('course_id', courseId)
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1);
+
+        if (fallback.error) {
+          throw new Error(`Failed to query vocabulary for course '${courseId}': ${fallback.error.message}`);
+        }
+        rows = fallback.data;
+      } else {
+        rows = res.data;
       }
 
       if (rows && rows.length > 0) {

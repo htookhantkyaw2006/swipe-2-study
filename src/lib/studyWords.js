@@ -1,14 +1,54 @@
 import { matchesQuery, readingOf, wordOf, kanaOf } from './entry.js';
 
+export const HOMONYM_SENSE_WORDS = new Set(['あの', 'ある', 'かける', 'キロ', 'もう']);
+
+function extractCanonicalId(word) {
+  if (!word || typeof word !== 'object') return null;
+  if (typeof word.card_id === 'string' && word.card_id.trim()) {
+    return word.card_id.trim();
+  }
+  if (typeof word.id === 'string') {
+    if (word.id.startsWith('pw_')) return word.id.slice(3);
+    if (/^(?:ja|zh)-/i.test(word.id)) return word.id;
+  }
+  return null;
+}
+
 // IDs in old guest/account starter decks were generated independently. Compare
 // written form + pronunciation, preserving tones and distinct readings.
+// For words with intentional multiple senses (e.g. Japanese N5 homonyms), incorporate
+// canonical course ID or sense discriminator so senses remain distinct and independent.
 export function studyWordKey(word) {
+  if (!word || typeof word !== 'object') return null;
   const normalize = value => typeof value === 'string' ? value.normalize('NFC').trim().replace(/\s+/gu, ' ').toLowerCase() : '';
   const written = normalize(wordOf(word));
-  return written ? JSON.stringify([written, normalize(word?.pronunciation ?? readingOf(word))]) : null;
+  if (!written) return null;
+
+  const pronunciation = normalize(word?.pronunciation ?? readingOf(word));
+  const isHomonym = HOMONYM_SENSE_WORDS.has(written) || Boolean(word.sense_key || word.sense_id);
+
+  if (isHomonym) {
+    const canonicalId = extractCanonicalId(word);
+    const sense = normalize(word.sense_key ?? word.sense_id ?? canonicalId ?? word.definition ?? word.english ?? word.meaning_english ?? word.part_of_speech ?? '');
+    if (sense) {
+      return JSON.stringify([written, pronunciation, sense]);
+    }
+  }
+
+  return JSON.stringify([written, pronunciation]);
 }
 
 export function sameStudyWord(left, right) {
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+
+  const leftCanonicalId = extractCanonicalId(left);
+  const rightCanonicalId = extractCanonicalId(right);
+
+  // If both have canonical course IDs, match strictly on canonical ID
+  if (leftCanonicalId && rightCanonicalId && /^(?:ja|zh)-/i.test(leftCanonicalId) && /^(?:ja|zh)-/i.test(rightCanonicalId)) {
+    return leftCanonicalId === rightCanonicalId;
+  }
+
   const key = studyWordKey(left);
   return key !== null ? key === studyWordKey(right) : left?.id !== undefined && left.id === right?.id;
 }
@@ -42,18 +82,25 @@ export function filterStudyWords(words, query) {
 export function findSavedWord(savedWords, card) {
   if (!Array.isArray(savedWords) || !card || typeof card !== 'object') return null;
 
-  // 1. Direct canonical card_id match if item has card_id and card has card_id
-  if (card.card_id) {
+  const cardCanonicalId = extractCanonicalId(card);
+
+  // 1. Direct canonical card_id match if item has card_id and card has canonical ID
+  if (cardCanonicalId) {
     for (const item of savedWords) {
-      if (item && item.card_id === card.card_id) return item;
+      if (item && (item.card_id === cardCanonicalId || item.id === cardCanonicalId)) return item;
     }
   }
 
-  // 2. Natural key match (written form + reading/pronunciation), preserving tones and polyphones
+  // 2. Natural key match (written form + reading/pronunciation), preserving tones, polyphones, and sense disambiguation
   const cardKey = studyWordKey(card);
   if (cardKey !== null) {
     for (const item of savedWords) {
-      if (item && studyWordKey(item) === cardKey) return item;
+      if (!item) continue;
+      const itemCanonicalId = extractCanonicalId(item);
+      if (cardCanonicalId && itemCanonicalId && cardCanonicalId !== itemCanonicalId) {
+        continue;
+      }
+      if (studyWordKey(item) === cardKey) return item;
     }
   }
 
@@ -70,7 +117,7 @@ export function findSavedWord(savedWords, card) {
 /**
  * Build a new record for inserting into 'saved_words' from a vocabulary card.
  * Preserves canonical card_id, level, phrase, reading, definitions, examples,
- * and optional audio_path / part_of_speech.
+ * and optional audio_path / part_of_speech / sense_key.
  * Does NOT set a storage 'id', allowing db.insert to assign a dedicated storage UUID,
  * distinguishing vocabulary identity (card_id) from storage record id.
  *
@@ -98,6 +145,8 @@ export function buildSavedWordRecord(card) {
   if (kana) record.kana = kana;
   if (cardId) record.card_id = cardId;
   if (card.level) record.level = card.level;
+  if (card.sense_key) record.sense_key = card.sense_key;
+  if (card.part_of_speech) record.part_of_speech = card.part_of_speech;
   if (Array.isArray(card.examples) && card.examples.length > 0) {
     record.examples = card.examples;
   }

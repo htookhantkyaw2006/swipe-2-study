@@ -1,5 +1,5 @@
 import { wordOf, readingOf } from './entry.js';
-import { sameStudyWord } from './studyWords.js';
+import { sameStudyWord, studyWordKey, HOMONYM_SENSE_WORDS } from './studyWords.js';
 
 /**
  * Vocabulary Learning Progress Store & Completion Rules
@@ -59,6 +59,7 @@ export function recordWordAction(database, {
   } else {
     resultRow = database.insert('learned_words', {
       id: card.id ? `pw_${card.id}` : undefined,
+      card_id: card.card_id || (typeof card.id === 'string' && /^(?:ja|zh)-/i.test(card.id) ? card.id : undefined),
       character: written.trim(),
       pronunciation: reading.trim(),
       level,
@@ -68,6 +69,10 @@ export function recordWordAction(database, {
       last_reviewed_at: nowIso,
       created_at: nowIso,
       updated_at: nowIso,
+      ...(card.sense_key ? { sense_key: card.sense_key } : {}),
+      ...(card.part_of_speech ? { part_of_speech: card.part_of_speech } : {}),
+      ...(card.definition ? { definition: card.definition, english: card.definition } : {}),
+      ...(card.burmese_definition ? { burmese_definition: card.burmese_definition, burmese: card.burmese_definition } : {}),
     });
   }
 
@@ -108,7 +113,7 @@ export function getCourseProgress(database, course, language = null) {
     const written = wordOf(row);
     if (!written) continue;
     const reading = row.pronunciation ?? readingOf(row) ?? '';
-    const key = `${written}:${reading}`.toLowerCase();
+    const key = studyWordKey(row) || `${written}:${reading}`.toLowerCase();
 
     if ((row.seen || 0) >= 1) {
       seenMap.set(key, row);
@@ -133,7 +138,7 @@ export function getCourseProgress(database, course, language = null) {
         const written = wordOf(row);
         if (!written) continue;
         const reading = row.pronunciation ?? readingOf(row) ?? '';
-        const key = `${written}:${reading}`.toLowerCase();
+        const key = studyWordKey(row) || `${written}:${reading}`.toLowerCase();
 
         if ((row.seen || 0) >= 1) {
           levelSeenMap.add(key);
@@ -202,6 +207,8 @@ export function getLevelProgress(database, levelId, course, language = null, tar
 
     const knownIds = new Set();
     const seenIds = new Set();
+    const knownKeys = new Set();
+    const seenKeys = new Set();
     const knownNaturalKeys = new Set();
     const seenNaturalKeys = new Set();
 
@@ -209,26 +216,33 @@ export function getLevelProgress(database, levelId, course, language = null, tar
       if (!row || typeof row !== 'object') continue;
       const written = wordOf(row);
       const reading = (row.pronunciation ?? readingOf(row) ?? '').trim().toLowerCase();
-      const naturalKey = written ? `${written}:${reading}` : null;
+      const rowKey = studyWordKey(row);
+      const isHomonym = HOMONYM_SENSE_WORDS.has(written);
+      const naturalKey = written && !isHomonym ? `${written}:${reading}` : null;
 
-      if (row.id) {
-        knownIds.add(String(row.id));
-        seenIds.add(String(row.id));
-      }
-      if (row.card_id) {
-        knownIds.add(String(row.card_id));
-        seenIds.add(String(row.card_id));
-      }
+      const rawId = row.id ? String(row.id) : null;
+      const bareId = rawId && rawId.startsWith('pw_') ? rawId.slice(3) : rawId;
+      const cardId = row.card_id ? String(row.card_id) : null;
 
       if ((row.seen || 0) >= 1) {
-        if (row.id) seenIds.add(String(row.id));
+        if (rawId) seenIds.add(rawId);
+        if (bareId) seenIds.add(bareId);
+        if (cardId) seenIds.add(cardId);
+        if (rowKey) seenKeys.add(rowKey);
         if (naturalKey) seenNaturalKeys.add(naturalKey);
       }
+
       if (row.status === 'known') {
-        if (row.id) knownIds.add(String(row.id));
+        if (rawId) knownIds.add(rawId);
+        if (bareId) knownIds.add(bareId);
+        if (cardId) knownIds.add(cardId);
+        if (rowKey) knownKeys.add(rowKey);
         if (naturalKey) knownNaturalKeys.add(naturalKey);
       } else {
-        if (row.id) knownIds.delete(String(row.id));
+        if (rawId) knownIds.delete(rawId);
+        if (bareId) knownIds.delete(bareId);
+        if (cardId) knownIds.delete(cardId);
+        if (rowKey) knownKeys.delete(rowKey);
         if (naturalKey) knownNaturalKeys.delete(naturalKey);
       }
     }
@@ -241,16 +255,20 @@ export function getLevelProgress(database, levelId, course, language = null, tar
       const itemId = item.id ? String(item.id) : null;
       const written = item.character || item.written_form || wordOf(item);
       const reading = (item.pronunciation ?? item.reading ?? readingOf(item) ?? '').trim().toLowerCase();
-      const naturalKey = written ? `${written}:${reading}` : null;
+      const isHomonym = HOMONYM_SENSE_WORDS.has(written);
+      const naturalKey = written && !isHomonym ? `${written}:${reading}` : null;
+      const itemKey = studyWordKey(item);
 
       const isKnown = Boolean(
         (itemId && (knownIds.has(itemId) || knownIds.has(`pw_${itemId}`))) ||
+        (itemKey && knownKeys.has(itemKey)) ||
         (naturalKey && knownNaturalKeys.has(naturalKey))
       );
 
       const isSeen = Boolean(
         isKnown ||
         (itemId && (seenIds.has(itemId) || seenIds.has(`pw_${itemId}`))) ||
+        (itemKey && seenKeys.has(itemKey)) ||
         (naturalKey && seenNaturalKeys.has(naturalKey))
       );
 
