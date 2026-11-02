@@ -198,6 +198,7 @@ function loadSidecarMapping(csvPath) {
   const candidateNames = [
     `${base.replace(/_import$/, '')}_mapping.json`,
     `${base}_mapping.json`,
+    'N5_mapping.json',
     'N5_Swipe2Study_mapping.json',
     'HSK1_Swipe2Study_mapping.json',
   ];

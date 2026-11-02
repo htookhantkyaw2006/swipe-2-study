@@ -1,0 +1,43 @@
+{
+  "file": "/workspace/scratch/6eff62e5b921/outputs/n5-handoff/N5_Swipe2Study_import.csv",
+  "valid": true,
+  "summary": {
+    "total_rows": 706,
+    "valid_rows": 706,
+    "error_count": 0,
+    "warning_count": 5
+  },
+  "errors": [],
+  "warnings": [
+    {
+      "row": 29,
+      "column": "written_form",
+      "code": "DUPLICATE_VOCABULARY_IDENTITY",
+      "message": "Possible duplicate word identity 'あの' (あの) in course 'ja-n5' (previously seen at row 28)."
+    },
+    {
+      "row": 38,
+      "column": "written_form",
+      "code": "DUPLICATE_VOCABULARY_IDENTITY",
+      "message": "Possible duplicate word identity 'ある' (ある) in course 'ja-n5' (previously seen at row 37)."
+    },
+    {
+      "row": 149,
+      "column": "written_form",
+      "code": "DUPLICATE_VOCABULARY_IDENTITY",
+      "message": "Possible duplicate word identity 'かける' (かける) in course 'ja-n5' (previously seen at row 148)."
+    },
+    {
+      "row": 212,
+      "column": "written_form",
+      "code": "DUPLICATE_VOCABULARY_IDENTITY",
+      "message": "Possible duplicate word identity 'キロ' (きろ) in course 'ja-n5' (previously seen at row 211)."
+    },
+    {
+      "row": 626,
+      "column": "written_form",
+      "code": "DUPLICATE_VOCABULARY_IDENTITY",
+      "message": "Possible duplicate word identity 'もう' (もう) in course 'ja-n5' (previously seen at row 625)."
+    }
+  ]
+}

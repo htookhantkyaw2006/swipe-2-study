@@ -40,6 +40,7 @@ const DATA_DIR = path.join(ROOT_DIR, 'tools/content-csv/data');
 const SOURCE_CSV_PATH = path.join(DATA_DIR, 'swipe2study_N5_vocab.csv');
 const IMPORT_CSV_PATH = path.join(DATA_DIR, 'N5_Swipe2Study_import.csv');
 const MAPPING_JSON_PATH = path.join(DATA_DIR, 'N5_Swipe2Study_mapping.json');
+const REGISTRY_JSON_PATH = path.join(DATA_DIR, 'N5_mapping.json');
 
 function createTestJaDb() {
   const tables = new Map();
@@ -56,6 +57,7 @@ test('1. N5 Content Integrity: Exactly 706 entries and 2,118 examples match clie
   assert.ok(fs.existsSync(SOURCE_CSV_PATH), 'Source CSV exists at tools/content-csv/data/swipe2study_N5_vocab.csv');
   assert.ok(fs.existsSync(IMPORT_CSV_PATH), 'Import CSV exists at tools/content-csv/data/N5_Swipe2Study_import.csv');
   assert.ok(fs.existsSync(MAPPING_JSON_PATH), 'Mapping JSON exists at tools/content-csv/data/N5_Swipe2Study_mapping.json');
+  assert.ok(fs.existsSync(REGISTRY_JSON_PATH), 'Authoritative registry exists at tools/content-csv/data/N5_mapping.json');
 
   const sourceRaw = fs.readFileSync(SOURCE_CSV_PATH, 'utf8');
   const importRaw = fs.readFileSync(IMPORT_CSV_PATH, 'utf8');
@@ -109,6 +111,10 @@ test('1. N5 Content Integrity: Exactly 706 entries and 2,118 examples match clie
     assert.equal(mapRec.meaning_english, sDef);
     assert.equal(mapRec.meaning_burmese, sBurmese);
     assert.equal(mapRec.planned_audio_path, `audio/ja/n5/${mapRec.id}.mp3`);
+    assert.equal(mapRec.word_metadata?.kana, sKana);
+    assert.equal(mapRec.word_metadata?.romaji, sPronunciation);
+    assert.equal(mapRec.word_metadata?.part_of_speech, sPos);
+    assert.equal(mapRec.source?.character, sChar);
 
     // Decoded examples
     const examples = JSON.parse(imp[9]);
@@ -138,6 +144,8 @@ test('2. Intentional Duplicate-Identity Pairs: All 5 pairs have unique IDs and d
   const expectedHomonyms = [
     {
       word: 'あの',
+      sense1Id: 'ja-n5-30b41e909eda7b2138b738ba',
+      sense2Id: 'ja-n5-169266c82fffcbc797986059',
       sense1Pos: 'pre-noun adjective',
       sense1Def: 'that (over there)',
       sense2Pos: 'interjection',
@@ -145,6 +153,8 @@ test('2. Intentional Duplicate-Identity Pairs: All 5 pairs have unique IDs and d
     },
     {
       word: 'ある',
+      sense1Id: 'ja-n5-267fbf4b6103d64c8b612c89',
+      sense2Id: 'ja-n5-a717402433c77c6c13aae907',
       sense1Pos: 'verb',
       sense1Def: 'to be; to exist (for things)',
       sense2Pos: 'verb',
@@ -152,6 +162,8 @@ test('2. Intentional Duplicate-Identity Pairs: All 5 pairs have unique IDs and d
     },
     {
       word: 'かける',
+      sense1Id: 'ja-n5-666ae0ddfc16943493fe36d4',
+      sense2Id: 'ja-n5-5c1bf9d3fd0a1a77997b8c8c',
       sense1Pos: 'verb',
       sense1Def: 'to wear (glasses); to hang; to put on',
       sense2Pos: 'verb',
@@ -159,6 +171,8 @@ test('2. Intentional Duplicate-Identity Pairs: All 5 pairs have unique IDs and d
     },
     {
       word: 'キロ',
+      sense1Id: 'ja-n5-dc98b4e48f82ee7c4053d4e8',
+      sense2Id: 'ja-n5-faf10d3dd84de688e9209abc',
       sense1Pos: 'counter',
       sense1Def: 'kilogram (short for キログラム)',
       sense2Pos: 'counter',
@@ -166,6 +180,8 @@ test('2. Intentional Duplicate-Identity Pairs: All 5 pairs have unique IDs and d
     },
     {
       word: 'もう',
+      sense1Id: 'ja-n5-cf8b6eae70ae546c8a5088a3',
+      sense2Id: 'ja-n5-6bd03c3d2021a1d5f2962d07',
       sense1Pos: 'adverb',
       sense1Def: 'already; yet',
       sense2Pos: 'adverb',
@@ -178,6 +194,8 @@ test('2. Intentional Duplicate-Identity Pairs: All 5 pairs have unique IDs and d
     assert.equal(senses.length, 2, `Word '${h.word}' must have exactly 2 senses`);
 
     const [s1, s2] = senses;
+    assert.equal(s1.id, h.sense1Id, `Sense 1 of '${h.word}' must match authoritative registry ID`);
+    assert.equal(s2.id, h.sense2Id, `Sense 2 of '${h.word}' must match authoritative registry ID`);
     assert.notEqual(s1.id, s2.id, `Sense 1 and Sense 2 of '${h.word}' must have distinct IDs`);
     assert.equal(s1.is_intentional_homonym_sense, true);
     assert.equal(s2.is_intentional_homonym_sense, true);

@@ -36,6 +36,9 @@ export function mapCsvRowsToItems(parsedRows, { mapping = null } = {}) {
     }
 
     const rec = mappingById.get(id);
+    const kana = rec?.kana || rec?.word_metadata?.kana || rec?.source?.kana;
+    const romaji = rec?.romaji || rec?.word_metadata?.romaji || rec?.source?.pronunciation;
+    const partOfSpeech = rec?.part_of_speech || rec?.word_metadata?.part_of_speech || rec?.source?.part_of_speech;
 
     return {
       id,
@@ -50,9 +53,9 @@ export function mapCsvRowsToItems(parsedRows, { mapping = null } = {}) {
       examples,
       sort_order: parseInt(f[10].trim(), 10),
       is_active: true,
-      ...(rec?.kana ? { kana: rec.kana } : {}),
-      ...(rec?.romaji ? { romaji: rec.romaji } : {}),
-      ...(rec?.part_of_speech ? { part_of_speech: rec.part_of_speech } : {}),
+      ...(kana ? { kana } : {}),
+      ...(romaji ? { romaji } : {}),
+      ...(partOfSpeech ? { part_of_speech: partOfSpeech } : {}),
     };
   });
 }

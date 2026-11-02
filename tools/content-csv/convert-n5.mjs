@@ -98,10 +98,8 @@ export function escapeCsvField(val) {
 /**
  * Computes deterministic sense-specific hash for N5 vocabulary item.
  */
-export function computeN5ItemHash(courseId, writtenForm, reading, senseIndex, isHomonym) {
-  const payload = isHomonym
-    ? [courseId, writtenForm, reading, senseIndex]
-    : [courseId, writtenForm, reading];
+export function computeN5ItemHash(courseId, writtenForm, reading, senseIndex = 1) {
+  const payload = [courseId, writtenForm, reading, senseIndex];
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 24);
 }
 
@@ -140,6 +138,35 @@ export function convertN5Dataset({ sourcePath = SOURCE_CSV_PATH, importCsvPath =
     throw new Error(`Expected exactly 706 data rows, found ${dataRows.length}`);
   }
 
+  // Load existing authoritative registry if present
+  let previousMapping = null;
+  const candidateMappingPaths = [
+    mappingJsonPath,
+    path.join(path.dirname(mappingJsonPath), 'N5_mapping.json'),
+    path.join(path.dirname(mappingJsonPath), 'N5_Swipe2Study_mapping.json'),
+  ];
+  for (const p of candidateMappingPaths) {
+    if (fs.existsSync(p)) {
+      try {
+        previousMapping = JSON.parse(fs.readFileSync(p, 'utf8'));
+        break;
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const oldGroups = new Map();
+  if (previousMapping && Array.isArray(previousMapping.records)) {
+    for (const entry of previousMapping.records) {
+      const char = entry?.source?.character || entry?.character;
+      const kn = entry?.source?.kana || entry?.kana;
+      const key = JSON.stringify(['ja-n5', char, kn]);
+      if (!oldGroups.has(key)) oldGroups.set(key, []);
+      oldGroups.get(key).push(entry);
+    }
+  }
+
   const homonymCounts = new Map();
   const seenIds = new Set();
   const mappingRecords = [];
@@ -170,14 +197,38 @@ export function convertN5Dataset({ sourcePath = SOURCE_CSV_PATH, importCsvPath =
     if (!burmeseDefinition) throw new Error(`Row ${sourceRowNumber}: missing burmese_definition`);
 
     const isHomonym = HOMONYM_SENSE_WORDS.has(character);
-    let senseIndex = 1;
-    if (isHomonym) {
-      senseIndex = (homonymCounts.get(character) || 0) + 1;
-      homonymCounts.set(character, senseIndex);
-    }
+    const senseIndex = (homonymCounts.get(character) || 0) + 1;
+    homonymCounts.set(character, senseIndex);
 
-    const hash = computeN5ItemHash('ja-n5', character, kana, senseIndex, isHomonym);
-    const id = `ja-n5-${hash}`;
+    const key = JSON.stringify(['ja-n5', character, kana]);
+    const candidates = oldGroups.get(key) || [];
+    let id;
+    let ordinal;
+
+    if (candidates.length === 1 && !isHomonym) {
+      id = candidates[0].id;
+      ordinal = candidates[0].sense_ordinal || candidates[0].sense_index || 1;
+    } else if (candidates.length > 0) {
+      const rowSig = JSON.stringify([partOfSpeech, definition, burmeseDefinition]);
+      const match = candidates.find((c) => {
+        const cSig = JSON.stringify([
+          c?.source?.part_of_speech || c?.part_of_speech,
+          c?.source?.definition || c?.meaning_english,
+          c?.source?.burmese_definition || c?.meaning_burmese,
+        ]);
+        return cSig === rowSig;
+      });
+      if (match) {
+        id = match.id;
+        ordinal = match.sense_ordinal || match.sense_index || senseIndex;
+      } else {
+        ordinal = senseIndex;
+        id = `ja-n5-${computeN5ItemHash('ja-n5', character, kana, ordinal)}`;
+      }
+    } else {
+      ordinal = senseIndex;
+      id = `ja-n5-${computeN5ItemHash('ja-n5', character, kana, ordinal)}`;
+    }
 
     if (seenIds.has(id)) {
       throw new Error(`Critical collision: generated duplicate ID '${id}' at row ${sourceRowNumber}`);
@@ -211,35 +262,62 @@ export function convertN5Dataset({ sourcePath = SOURCE_CSV_PATH, importCsvPath =
     const sortOrder = (i + 1) * 10;
     const plannedAudioPath = `audio/ja/n5/${id}.mp3`;
 
+    const sourceObj = {
+      level,
+      character,
+      kana,
+      pronunciation,
+      part_of_speech: partOfSpeech,
+      definition,
+      burmese_definition: burmeseDefinition,
+      ex1_text: (row[7] || '').trim(),
+      ex1_reading: (row[8] || '').trim(),
+      ex1_romaji: (row[9] || '').trim(),
+      ex1_english: (row[10] || '').trim(),
+      ex1_burmese: (row[11] || '').trim(),
+      ex2_text: (row[12] || '').trim(),
+      ex2_reading: (row[13] || '').trim(),
+      ex2_romaji: (row[14] || '').trim(),
+      ex2_english: (row[15] || '').trim(),
+      ex2_burmese: (row[16] || '').trim(),
+      ex3_text: (row[17] || '').trim(),
+      ex3_reading: (row[18] || '').trim(),
+      ex3_romaji: (row[19] || '').trim(),
+      ex3_english: (row[20] || '').trim(),
+      ex3_burmese: (row[21] || '').trim(),
+    };
+
+    const wordMetadata = {
+      kana,
+      romaji: pronunciation,
+      part_of_speech: partOfSpeech,
+    };
+
     // 1. Record in persistent mapping JSON
     mappingRecords.push({
-      source_row: sourceRowNumber,
-      source_csv_line: sourceCsvLine,
       id,
-      hash,
-      natural_identity: {
-        written_form: character,
-        reading: kana,
-        kana,
-        romaji: pronunciation,
-      },
-      part_of_speech: partOfSpeech,
+      source_csv_row: sourceCsvLine,
+      sense_ordinal: ordinal,
+      source: sourceObj,
+      word_metadata: wordMetadata,
+      // Backward-compatible accessors
+      source_row: sourceRowNumber,
       character,
       kana,
       pronunciation,
       romaji: pronunciation,
+      part_of_speech: partOfSpeech,
       meaning_english: definition,
       meaning_burmese: burmeseDefinition,
       examples_count: 3,
       sort_order: sortOrder,
       audio_path: null,
       planned_audio_path: plannedAudioPath,
-      sense_index: isHomonym ? senseIndex : 1,
+      sense_index: ordinal,
       is_intentional_homonym_sense: isHomonym,
     });
 
     // 2. Format import CSV row
-    // Contract: id,course_id,language,level_id,written_form,reading,meaning_english,meaning_burmese,audio_path,examples_json,sort_order
     const csvFields = [
       escapeCsvField(id),
       escapeCsvField('ja-n5'),
@@ -264,31 +342,62 @@ export function convertN5Dataset({ sourcePath = SOURCE_CSV_PATH, importCsvPath =
     }
   }
 
-  // Write import CSV (UTF-8)
-  fs.writeFileSync(importCsvPath, importCsvLines.join('\n') + '\n', 'utf8');
+  // Write import CSV (UTF-8 with BOM and CRLF to match client contract)
+  fs.writeFileSync(importCsvPath, '\uFEFF' + importCsvLines.join('\r\n') + '\r\n', 'utf8');
 
   // Write mapping JSON (UTF-8, formatted)
   const mappingDocument = {
     course_id: 'ja-n5',
-    level_id: 'N5',
     language: 'ja',
+    level_id: 'N5',
+    source_sha256: crypto.createHash('sha256').update(fs.readFileSync(sourcePath)).digest('hex'),
     total_records: dataRows.length,
     total_examples: dataRows.length * 3,
-    id_generation: {
-      strategy: 'deterministic_sha256_sense_disambiguated',
-      format: 'ja-n5-<sha256(JSON.stringify([course_id, written_form, reading, sense_index?])).slice(0, 24)>',
-      reconciled_against_canonical: false,
-      reconciled_count: 0,
-      hosted_reconciliation_status: 'pending_before_publication',
-      duplicate_identity_pairs_handled: 5,
-    },
-    audio_attachment_convention: {
-      directory: 'audio/ja/n5',
-      file_pattern: 'ja-n5-{hash}.mp3',
-    },
+    id_policy: 'Initial IDs hash course, written form, kana and initial sense ordinal. The persisted registry is authoritative thereafter. Never regenerate IDs from edited content or current row positions.',
+    reading_policy: 'Import reading is kana, as required by current Japanese speech/card mapping. Word romaji and POS are retained here for agent integration; example romaji is also preserved in examples_json.',
+    publish_prerequisites: [
+      'Independent sense identity throughout learner state',
+      'Word romaji/POS integration from companion metadata',
+      'Staging dry-run and verification',
+    ],
+    intentional_same_identity_pairs: [
+      {
+        written_form: 'あの',
+        kana: 'あの',
+        ids: ['ja-n5-30b41e909eda7b2138b738ba', 'ja-n5-169266c82fffcbc797986059'],
+      },
+      {
+        written_form: 'ある',
+        kana: 'ある',
+        ids: ['ja-n5-267fbf4b6103d64c8b612c89', 'ja-n5-a717402433c77c6c13aae907'],
+      },
+      {
+        written_form: 'かける',
+        kana: 'かける',
+        ids: ['ja-n5-666ae0ddfc16943493fe36d4', 'ja-n5-5c1bf9d3fd0a1a77997b8c8c'],
+      },
+      {
+        written_form: 'キロ',
+        kana: 'きろ',
+        ids: ['ja-n5-dc98b4e48f82ee7c4053d4e8', 'ja-n5-faf10d3dd84de688e9209abc'],
+      },
+      {
+        written_form: 'もう',
+        kana: 'もう',
+        ids: ['ja-n5-cf8b6eae70ae546c8a5088a3', 'ja-n5-6bd03c3d2021a1d5f2962d07'],
+      },
+    ],
     records: mappingRecords,
   };
-  fs.writeFileSync(mappingJsonPath, JSON.stringify(mappingDocument, null, 2) + '\n', 'utf8');
+
+  const jsonStr = JSON.stringify(mappingDocument, null, 2) + '\n';
+  fs.writeFileSync(mappingJsonPath, jsonStr, 'utf8');
+
+  // Also ensure N5_mapping.json is synced if mappingJsonPath is N5_Swipe2Study_mapping.json
+  const altMappingPath = path.join(path.dirname(mappingJsonPath), 'N5_mapping.json');
+  if (path.resolve(altMappingPath) !== path.resolve(mappingJsonPath)) {
+    fs.writeFileSync(altMappingPath, jsonStr, 'utf8');
+  }
 
   return {
     totalRecords: dataRows.length,
@@ -337,3 +446,4 @@ if (isMain) {
     process.exit(1);
   }
 }
+
