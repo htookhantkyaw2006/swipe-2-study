@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveAudioUrl, playWordAudio } from '../src/lib/wordAudio.js';
+import { resolveAudioUrl, playWordAudio, resolvePlaybackRate } from '../src/lib/wordAudio.js';
 import { speechLang } from '../src/lib/speech.js';
 import { setActiveLanguageId } from '../src/lib/activeLanguage.js';
 
@@ -262,4 +262,80 @@ test('6. Playback cancellation: halts active audio and prevents delayed fallback
   assert.equal(paused, true, 'Must pause audio on cancel');
   assert.equal(emptied, true, 'Must reset src on cancel');
   assert.equal(spoken, false, 'Cancel must not trigger fallback');
+});
+
+test('7. Recorded audio playback rate: applies user speed preference (slow: 0.6, normal: 1.0, fast: 1.4) without compounding', () => {
+  // Test resolvePlaybackRate helper
+  assert.equal(resolvePlaybackRate('slow'), 0.6);
+  assert.equal(resolvePlaybackRate('normal'), 1.0);
+  assert.equal(resolvePlaybackRate('fast'), 1.4);
+  assert.equal(resolvePlaybackRate(0.85), 0.85);
+
+  let assignedPlaybackRate = null;
+  let assignedDefaultRate = null;
+
+  class RateTrackingAudio {
+    constructor(src) {
+      this.src = src;
+      this.playbackRate = 1.0;
+      this.defaultPlaybackRate = 1.0;
+      this.listeners = {};
+    }
+    addEventListener(event, fn) {
+      if (!this.listeners[event]) this.listeners[event] = [];
+      this.listeners[event].push(fn);
+    }
+    removeEventListener() {}
+    play() {
+      assignedPlaybackRate = this.playbackRate;
+      assignedDefaultRate = this.defaultPlaybackRate;
+      return Promise.resolve();
+    }
+  }
+
+  const word = { character: '书', audio_path: 'audio/zh/hsk1/shu.mp3' };
+
+  // Slow speed
+  playWordAudio(word, { audioCtor: RateTrackingAudio, speed: 'slow' });
+  assert.equal(assignedPlaybackRate, 0.6, 'playbackRate must be 0.6 for slow');
+  assert.equal(assignedDefaultRate, 0.6);
+
+  // Fast speed
+  playWordAudio(word, { audioCtor: RateTrackingAudio, speed: 'fast' });
+  assert.equal(assignedPlaybackRate, 1.4, 'playbackRate must be 1.4 for fast');
+
+  // Normal speed
+  playWordAudio(word, { audioCtor: RateTrackingAudio, speed: 'normal' });
+  assert.equal(assignedPlaybackRate, 1.0, 'playbackRate must be 1.0 for normal');
+
+  // Fallback rate forwarding without compounding
+  let fallbackOptions = null;
+  class FailingRateAudio {
+    constructor(src) {
+      this.src = src;
+      this.playbackRate = 1.0;
+      this.listeners = {};
+    }
+    addEventListener(event, fn) {
+      if (!this.listeners[event]) this.listeners[event] = [];
+      this.listeners[event].push(fn);
+    }
+    removeEventListener() {}
+    play() {
+      return Promise.reject(new Error('Audio load failure'));
+    }
+  }
+
+  playWordAudio(word, {
+    audioCtor: FailingRateAudio,
+    speed: 'slow',
+    speakFn: (text, opts) => {
+      fallbackOptions = opts;
+    },
+  });
+
+  return Promise.resolve().then(() => {
+    assert.ok(fallbackOptions);
+    assert.equal(fallbackOptions.rate, 0.6, 'Fallback must receive target rate 0.6 without squaring or re-multiplying');
+  });
 });

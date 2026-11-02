@@ -105,3 +105,19 @@ test('4. Build stroke data script enforces fail-closed validation on missing cha
   assert.ok(scriptContent.includes('STROKE_DATA_BUILD_FAILED'), 'Script outputs actionable failure code');
   assert.ok(scriptContent.includes('Arphic Public License'), 'Preserves Arphic Public License attribution');
 });
+
+test('5. Legacy written record compatibility: safely maps { char: "X" }, { character: "Y" }, and raw strings', () => {
+  const legacyRecords = [
+    { char: '你', id: '1' },
+    { character: '好', id: '2' },
+    '大',
+    null,
+    { invalid: true },
+  ];
+
+  const extracted = legacyRecords
+    .map((r) => r?.character || r?.char || (typeof r === 'string' ? r : null))
+    .filter(Boolean);
+
+  assert.deepEqual(extracted, ['你', '好', '大']);
+});

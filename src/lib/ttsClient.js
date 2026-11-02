@@ -1,16 +1,10 @@
 /**
- * Provider-independent client for requesting synthesized audio from a
- * server-side Text-to-Speech (TTS) endpoint.
+ * Text-to-Speech (TTS) client scaffold (INACTIVE).
  *
- * Security & Architectural Rules:
- * 1. Provider credentials (e.g. Google Cloud, OpenAI, Azure API keys) must NEVER
- *    be embedded in client environment variables or bundled code.
- * 2. If configured, requests are made to a secure server-side endpoint or Supabase
- *    Edge Function (e.g. VITE_TTS_API_URL or /api/tts).
- * 3. If unconfigured or disabled, isTtsApiConfigured() returns false and the client
- *    immediately falls back to device/browser speech synthesis (window.speechSynthesis).
- * 4. Synthesized audio URLs are cached in-memory per session to eliminate redundant
- *    network requests and prevent unnecessary recurring provider costs.
+ * Current Status: INACTIVE and OUTSIDE current delivery scope.
+ * VITE_TTS_API_URL is unset. Audio playback uses client-supplied recordings
+ * and device speech synthesis fallback.
+ * Provider credentials must never be exposed to the client bundle.
  */
 
 let endpointOverride = null;

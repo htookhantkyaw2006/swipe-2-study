@@ -2,6 +2,7 @@ import { sayOf } from './entry.js';
 import { speak } from './speech.js';
 import { requestTtsAudio, isTtsApiConfigured } from './ttsClient.js';
 import { getActiveLanguageId } from './activeLanguage.js';
+import { readPreferences, SPEECH_RATES } from './preferencesDefaults.js';
 
 /**
  * Resolves a vocabulary audio path against the application origin root,
@@ -34,6 +35,28 @@ export function resolveAudioUrl(audioPath, baseOrigin = null) {
 }
 
 /**
+ * Resolves the numeric playback rate (0.6, 1.0, 1.4, etc.) for recorded audio and speech fallback.
+ * By default, reads the user's stored speechRate preference ('slow' -> 0.6, 'normal' -> 1.0, 'fast' -> 1.4).
+ */
+export function resolvePlaybackRate(speedOption = null) {
+  if (typeof speedOption === 'number' && Number.isFinite(speedOption) && speedOption > 0) {
+    return speedOption;
+  }
+  if (typeof speedOption === 'string' && speedOption in SPEECH_RATES) {
+    return SPEECH_RATES[speedOption];
+  }
+  try {
+    const pref = readPreferences()?.speechRate;
+    if (pref && pref in SPEECH_RATES) {
+      return SPEECH_RATES[pref];
+    }
+  } catch {
+    // Ignore preferences read errors in mock environments
+  }
+  return SPEECH_RATES.normal ?? 1.0;
+}
+
+/**
  * Default speech fallback for browser environments, honoring active course language and user speech rate.
  */
 function defaultBrowserSpeak(text, options = {}) {
@@ -55,7 +78,8 @@ function defaultBrowserSpeak(text, options = {}) {
  * Guarantees:
  * - Null, blank, or whitespace audio_path never instantiates Audio; immediately triggers speech fallback.
  * - Relative audio paths resolve to application origin root regardless of active route.
- * - On media loading error or play() rejection, falls back to speech synthesis exactly once.
+ * - Applies user speech rate preference (slow: 0.6, normal: 1.0, fast: 1.4) to recorded audio and fallback speech.
+ * - On media loading error or play() rejection, falls back to speech synthesis exactly once without compounding rate.
  * - Cancelling/disposing playback prevents stale/delayed fallback speech if the card changes or session ends.
  * - Preserves Chinese/Japanese language selection and speech speed settings.
  */
@@ -69,10 +93,11 @@ export function playWordAudio(word, {
   onError = null,
   ttsFn = requestTtsAudio,
   language = null,
-  speed = 1.0,
+  speed = null,
 } = {}) {
   const fallbackText = typeof word === 'string' ? word : sayFn(word);
   const resolvedUrl = typeof word === 'string' ? null : resolveAudioUrl(word?.audio_path, baseOrigin);
+  const targetRate = resolvePlaybackRate(speed);
 
   let cancelled = false;
   let hasFallenBack = false;
@@ -83,7 +108,7 @@ export function playWordAudio(word, {
     hasFallenBack = true;
     const speaker = typeof speakFn === 'function' ? speakFn : defaultBrowserSpeak;
     try {
-      speaker(fallbackText, { onStart, onEnd: onEnded, onError });
+      speaker(fallbackText, { onStart, onEnd: onEnded, onError, rate: targetRate });
     } catch (e) {
       if (onError && typeof onError === 'function') onError(e);
     }
@@ -108,6 +133,12 @@ export function playWordAudio(word, {
   const playWithAudioCtor = (url) => {
     try {
       audio = new audioCtor(url);
+      try {
+        audio.playbackRate = targetRate;
+        audio.defaultPlaybackRate = targetRate;
+      } catch {
+        // Mock or restricted environment
+      }
       audio.addEventListener('error', fallback, { once: true });
       if (onStart && typeof onStart === 'function') {
         audio.addEventListener('play', () => { if (!cancelled) onStart(); }, { once: true });
@@ -132,16 +163,17 @@ export function playWordAudio(word, {
       cancel,
       hasAudio: true,
       url: resolvedUrl,
+      playbackRate: targetRate,
       get audio() {
         return audio;
       },
     };
   }
 
-  // 2. External API / TTS endpoint if configured
+  // 2. External API / TTS endpoint if configured (inactive by default)
   if (isTtsApiConfigured() && audioCtor && fallbackText) {
     const lang = language || (typeof getActiveLanguageId === 'function' ? getActiveLanguageId() : 'zh');
-    ttsFn({ text: fallbackText, language: lang, speed })
+    ttsFn({ text: fallbackText, language: lang, speed: targetRate })
       .then((ttsUrl) => {
         if (cancelled) return;
         if (!ttsUrl) {
@@ -156,6 +188,7 @@ export function playWordAudio(word, {
       cancel,
       hasAudio: true,
       url: null,
+      playbackRate: targetRate,
       get audio() {
         return audio;
       },
@@ -168,6 +201,7 @@ export function playWordAudio(word, {
     cancel,
     hasAudio: false,
     url: null,
+    playbackRate: targetRate,
     audio: null,
   };
 }

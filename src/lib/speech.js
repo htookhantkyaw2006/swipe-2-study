@@ -25,15 +25,13 @@ export function speechLang() {
   return valid ? chosen : course.speech.defaultAccent;
 }
 
-export function speak(text, { onStart = null, onEnd = null, onError = null } = {}) {
+export function speak(text, { onStart = null, onEnd = null, onError = null, rate = null } = {}) {
   if (!text || typeof window === 'undefined' || !('speechSynthesis' in window)) {
     if (onError && typeof onError === 'function') {
       onError(new Error('Speech synthesis is unavailable in this environment.'));
     }
     return;
   }
-
-  const { speechRate } = readPreferences();
 
   // Cancel anything still playing so rapid taps do not queue up.
   try {
@@ -42,7 +40,14 @@ export function speak(text, { onStart = null, onEnd = null, onError = null } = {
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = speechLang();
-  utterance.rate = SPEECH_RATES[speechRate] ?? 1;
+
+  // If a numeric rate was explicitly provided, use it directly. Otherwise resolve from preference.
+  if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) {
+    utterance.rate = rate;
+  } else {
+    const { speechRate } = readPreferences();
+    utterance.rate = SPEECH_RATES[speechRate] ?? 1;
+  }
 
   if (onStart && typeof onStart === 'function') {
     utterance.onstart = () => onStart();

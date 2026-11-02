@@ -338,7 +338,11 @@ function WritingPractice({ writingChars, writingWords }) {
   }, [writingChars, words]);
 
   useEffect(() => {
-    setMastered(db.get('written_chars').map((r) => r.character));
+    const records = db.get('written_chars') || [];
+    const list = records
+      .map((r) => r?.character || r?.char || (typeof r === 'string' ? r : null))
+      .filter(Boolean);
+    setMastered(Array.from(new Set(list)));
   }, []);
 
   // Handle URL deep-linking: ?char=X or ?word=Y
@@ -373,7 +377,9 @@ function WritingPractice({ writingChars, writingWords }) {
   }, [searchParams, words]);
 
   const handleMastered = useCallback((character) => {
-    if (db.findOne('written_chars', { character })) return;
+    if (!character) return;
+    const existing = db.get('written_chars') || [];
+    if (existing.some((r) => (r?.character || r?.char || (typeof r === 'string' ? r : null)) === character)) return;
     db.insert('written_chars', { character });
     setMastered((prev) => (prev.includes(character) ? prev : [...prev, character]));
   }, []);
