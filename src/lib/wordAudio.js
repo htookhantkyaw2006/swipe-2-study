@@ -1,5 +1,7 @@
 import { sayOf } from './entry.js';
 import { speak } from './speech.js';
+import { requestTtsAudio, isTtsApiConfigured } from './ttsClient.js';
+import { getActiveLanguageId } from './activeLanguage.js';
 
 /**
  * Resolves a vocabulary audio path against the application origin root,
@@ -65,12 +67,16 @@ export function playWordAudio(word, {
   onStart = null,
   onEnded = null,
   onError = null,
+  ttsFn = requestTtsAudio,
+  language = null,
+  speed = 1.0,
 } = {}) {
   const fallbackText = typeof word === 'string' ? word : sayFn(word);
   const resolvedUrl = typeof word === 'string' ? null : resolveAudioUrl(word?.audio_path, baseOrigin);
 
   let cancelled = false;
   let hasFallenBack = false;
+  let audio = null;
 
   const fallback = (_err) => {
     if (cancelled || hasFallenBack) return;
@@ -82,38 +88,6 @@ export function playWordAudio(word, {
       if (onError && typeof onError === 'function') onError(e);
     }
   };
-
-  // If no audio path or Audio constructor unavailable, immediately trigger speech fallback
-  if (!resolvedUrl || !audioCtor) {
-    fallback();
-    return {
-      cancel: () => {
-        cancelled = true;
-      },
-      hasAudio: false,
-      url: null,
-      audio: null,
-    };
-  }
-
-  let audio = null;
-  try {
-    audio = new audioCtor(resolvedUrl);
-    audio.addEventListener('error', fallback, { once: true });
-    if (onStart && typeof onStart === 'function') {
-      audio.addEventListener('play', () => { if (!cancelled) onStart(); }, { once: true });
-    }
-    if (onEnded && typeof onEnded === 'function') {
-      audio.addEventListener('ended', () => { if (!cancelled) onEnded(); }, { once: true });
-    }
-
-    const playPromise = audio.play();
-    if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch(fallback);
-    }
-  } catch (e) {
-    fallback(e);
-  }
 
   const cancel = () => {
     if (cancelled) return;
@@ -131,10 +105,69 @@ export function playWordAudio(word, {
     }
   };
 
+  const playWithAudioCtor = (url) => {
+    try {
+      audio = new audioCtor(url);
+      audio.addEventListener('error', fallback, { once: true });
+      if (onStart && typeof onStart === 'function') {
+        audio.addEventListener('play', () => { if (!cancelled) onStart(); }, { once: true });
+      }
+      if (onEnded && typeof onEnded === 'function') {
+        audio.addEventListener('ended', () => { if (!cancelled) onEnded(); }, { once: true });
+      }
+
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(fallback);
+      }
+    } catch (e) {
+      fallback(e);
+    }
+  };
+
+  // 1. Static audio file playback
+  if (resolvedUrl && audioCtor) {
+    playWithAudioCtor(resolvedUrl);
+    return {
+      cancel,
+      hasAudio: true,
+      url: resolvedUrl,
+      get audio() {
+        return audio;
+      },
+    };
+  }
+
+  // 2. External API / TTS endpoint if configured
+  if (isTtsApiConfigured() && audioCtor && fallbackText) {
+    const lang = language || (typeof getActiveLanguageId === 'function' ? getActiveLanguageId() : 'zh');
+    ttsFn({ text: fallbackText, language: lang, speed })
+      .then((ttsUrl) => {
+        if (cancelled) return;
+        if (!ttsUrl) {
+          fallback();
+          return;
+        }
+        playWithAudioCtor(ttsUrl);
+      })
+      .catch(fallback);
+
+    return {
+      cancel,
+      hasAudio: true,
+      url: null,
+      get audio() {
+        return audio;
+      },
+    };
+  }
+
+  // 3. Fallback: Browser speech synthesis
+  fallback();
   return {
     cancel,
-    hasAudio: true,
-    url: resolvedUrl,
-    audio,
+    hasAudio: false,
+    url: null,
+    audio: null,
   };
 }
