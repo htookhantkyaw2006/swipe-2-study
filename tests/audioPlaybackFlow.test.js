@@ -139,3 +139,127 @@ test('4. Audio fallback: falls back to speech synthesis when audio errors or is 
     assert.equal(spoken[0], '你好');
   });
 });
+
+test('5. Audio across views: vocabulary list, flashcards, Saved/Review, dictionary, and examples', () => {
+  const playedUrls = [];
+  class TrackingAudio {
+    constructor(src) {
+      this.src = src;
+      playedUrls.push(src);
+      this.listeners = {};
+    }
+    addEventListener(event, fn) {
+      if (!this.listeners[event]) this.listeners[event] = [];
+      this.listeners[event].push(fn);
+    }
+    removeEventListener() {}
+    play() {
+      return Promise.resolve();
+    }
+    pause() {}
+  }
+
+  const baseOrigin = 'https://swipe2study.com';
+
+  // 1. Vocabulary list / Flashcard word
+  const vocabCard = {
+    character: '中国',
+    reading: 'zhōng guó',
+    audio_path: 'audio/zh/hsk1/001.mp3',
+  };
+  const p1 = playWordAudio(vocabCard, { audioCtor: TrackingAudio, baseOrigin });
+  assert.equal(p1.hasAudio, true);
+  assert.equal(p1.url, 'https://swipe2study.com/audio/zh/hsk1/001.mp3');
+
+  // 2. Saved / Review word format (stored record with phrase)
+  const savedRecord = {
+    phrase: '谢谢',
+    reading: 'xièxie',
+    audio_path: 'audio/zh/hsk1/003.mp3',
+  };
+  const p2 = playWordAudio(savedRecord, { audioCtor: TrackingAudio, baseOrigin });
+  assert.equal(p2.hasAudio, true);
+  assert.equal(p2.url, 'https://swipe2study.com/audio/zh/hsk1/003.mp3');
+
+  // 3. Dictionary entry format
+  const dictWord = {
+    phrase: '再见',
+    reading: 'zàijiàn',
+    audio_path: 'audio/zh/hsk1/004.mp3',
+  };
+  const p3 = playWordAudio(dictWord, { audioCtor: TrackingAudio, baseOrigin });
+  assert.equal(p3.hasAudio, true);
+  assert.equal(p3.url, 'https://swipe2study.com/audio/zh/hsk1/004.mp3');
+
+  // 4. Example sentence object with client-supplied audio_path
+  const exampleWithAudio = {
+    text: '我是中国人。',
+    reading: 'Wǒ shì Zhōngguó rén.',
+    audio_path: 'audio/zh/hsk1/ex_001.mp3',
+  };
+  const p4 = playWordAudio(exampleWithAudio, { audioCtor: TrackingAudio, baseOrigin });
+  assert.equal(p4.hasAudio, true);
+  assert.equal(p4.url, 'https://swipe2study.com/audio/zh/hsk1/ex_001.mp3');
+
+  // 5. Example sentence without audio_path: falls back to speech synthesis reading the sentence text
+  let spokenExample = null;
+  const exampleWithoutAudio = {
+    text: '你好吗？',
+    reading: 'Nǐ hǎo ma?',
+  };
+  const p5 = playWordAudio(exampleWithoutAudio, {
+    audioCtor: TrackingAudio,
+    baseOrigin,
+    speakFn: (t) => { spokenExample = t; },
+  });
+  assert.equal(p5.hasAudio, false);
+  assert.equal(spokenExample, '你好吗？');
+
+  assert.equal(playedUrls.length, 4);
+});
+
+test('6. Playback cancellation: halts active audio and prevents delayed fallback', () => {
+  let paused = false;
+  let emptied = false;
+  class CancellableAudio {
+    constructor(src) {
+      this.src = src;
+      this.listeners = {};
+    }
+    addEventListener(event, fn) {
+      if (!this.listeners[event]) this.listeners[event] = [];
+      this.listeners[event].push(fn);
+    }
+    removeEventListener(event, fn) {
+      if (this.listeners[event]) {
+        this.listeners[event] = this.listeners[event].filter((f) => f !== fn);
+      }
+    }
+    play() {
+      return new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    pause() {
+      paused = true;
+    }
+    set src(v) {
+      this._src = v;
+      if (v === '') emptied = true;
+    }
+    get src() {
+      return this._src;
+    }
+  }
+
+  let spoken = false;
+  const word = { character: '水', audio_path: 'audio/zh/hsk1/shui.mp3' };
+  const playback = playWordAudio(word, {
+    audioCtor: CancellableAudio,
+    speakFn: () => { spoken = true; },
+  });
+
+  // Cancel immediately before play finishes
+  playback.cancel();
+  assert.equal(paused, true, 'Must pause audio on cancel');
+  assert.equal(emptied, true, 'Must reset src on cancel');
+  assert.equal(spoken, false, 'Cancel must not trigger fallback');
+});

@@ -1,13 +1,20 @@
 /**
- * Server-side HTTP handler for the Text-to-Speech (TTS) intermediary proxy.
+ * Server-side HTTP handler for the Text-to-Speech (TTS) intermediary proxy scaffold.
+ *
+ * NOTE: This scaffold is INACTIVE and OUTSIDE the current delivery scope.
+ * External TTS setup and audio generation are not part of this delivery unless
+ * separately agreed; client supplies production content and audio files.
+ * This scaffold is not production-ready: CORS origin filtering alone does not provide
+ * user authentication, anti-abuse protection, or rate limiting.
  *
  * Security & Architectural Rules:
  * 1. Provider credentials (e.g. Google Cloud, OpenAI, Azure keys) are accessed ONLY
  *    here on the server via environment variables, never on the client.
- * 2. Origin validation enforces strict CORS headers against allowlisted origins.
+ * 2. Origin validation enforces strict CORS headers against allowlisted origins,
+ *    rejecting unauthorized browser cross-origin OPTIONS preflight AND POST requests with 403.
  * 3. Input validation enforces bounded string lengths and valid language codes.
  * 4. Pluggable provider adapter interface decouples the HTTP transport from
- *    the specific vendor (Google Cloud TTS, OpenAI Audio, or Azure Speech).
+ *    the specific vendor.
  * 5. Returns 503 TTS_SERVICE_UNCONFIGURED if no vendor adapter or credentials exist.
  */
 
@@ -71,7 +78,15 @@ export function createTtsHttpHandler({ getEnv, ttsAdapter = null } = {}) {
       return jsonResponse(405, { error: 'METHOD_NOT_ALLOWED', message: 'Only POST and OPTIONS are supported.' });
     }
 
-    // 3. Parse and validate body
+    // 3. Reject disallowed browser cross-origin requests before invoking adapter
+    if (reqOrigin && !cors.isAllowed) {
+      return new Response(JSON.stringify({ error: 'CORS_ORIGIN_DENIED', message: 'Origin not allowed by CORS policy.' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 4. Parse and validate body
     let body = null;
     try {
       body = await request.json();

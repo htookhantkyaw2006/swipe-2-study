@@ -20,12 +20,12 @@ const getEnv = () => {
 };
 
 /**
- * Server-side TTS Edge Function handler.
+ * Server-side TTS Edge Function handler (INACTIVE).
  *
- * Current Status: Scaffolding and secure proxy contract in place.
- * Pending Operator Decision: Selection of provider (Google Cloud TTS / OpenAI TTS / Azure Speech)
- * and server-side secret configuration (TTS_API_KEY / GCP Service Account).
- * Unconfigured requests return 503 TTS_SERVICE_UNCONFIGURED.
+ * Current Status: INACTIVE and OUTSIDE the current delivery scope.
+ * The client supplies production content and audio files.
+ * External TTS setup and audio generation are not part of this delivery unless separately agreed.
+ * This function is NOT deployed. Unconfigured requests return 503 TTS_SERVICE_UNCONFIGURED.
  */
 export const handler = createTtsHttpHandler({
   getEnv,

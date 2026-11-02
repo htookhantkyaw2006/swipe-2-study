@@ -94,6 +94,17 @@ test('4. TTS Server Proxy: CORS preflight and allowlist enforcement', async () =
   });
   const badRes = await handler(badReq);
   assert.equal(badRes.status, 403);
+
+  // Disallowed origin POST is rejected with 403 before processing body or calling adapter
+  const badPost = new Request('https://api.swipe2study.com/tts', {
+    method: 'POST',
+    headers: { Origin: 'https://malicious-site.com', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: '你好', language: 'zh' }),
+  });
+  const badPostRes = await handler(badPost);
+  assert.equal(badPostRes.status, 403);
+  const badPostData = await badPostRes.json();
+  assert.equal(badPostData.error, 'CORS_ORIGIN_DENIED');
 });
 
 test('5. TTS Server Proxy: Input validation enforces bounded string lengths and valid language', async () => {
