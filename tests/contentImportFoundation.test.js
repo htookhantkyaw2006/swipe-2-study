@@ -60,17 +60,24 @@ before(async () => {
 
   await query('insert into auth.users (id, raw_user_meta_data) values ($1, $2)', [alice, { full_name: 'Alice Learner' }]);
 
-  const baseMigration = await readFile(new URL('../supabase/migrations/20261027000100_backend_foundation.sql', import.meta.url), 'utf8');
-  await db.exec(baseMigration);
-
-  const guestImportMigration = await readFile(new URL('../supabase/migrations/20261028000100_guest_import_foundation.sql', import.meta.url), 'utf8');
-  await db.exec(guestImportMigration);
-
-  const contentMigration = await readFile(new URL('../supabase/migrations/20261030000100_content_publication_foundation.sql', import.meta.url), 'utf8');
-  await db.exec(contentMigration);
-
-  const hardeningMigration = await readFile(new URL('../supabase/migrations/20261030000200_content_publication_hardening.sql', import.meta.url), 'utf8');
-  await db.exec(hardeningMigration);
+  const migrationFiles = [
+    '../supabase/migrations/20261027000100_backend_foundation.sql',
+    '../supabase/migrations/20261028000100_guest_import_foundation.sql',
+    '../supabase/migrations/20261029000100_account_deletion_foundation.sql',
+    '../supabase/migrations/20261029000200_account_deletion_attempt_reservation.sql',
+    '../supabase/migrations/20261029000300_online_sync_foundation.sql',
+    '../supabase/migrations/20261029000400_learned_words_sync.sql',
+    '../supabase/migrations/20261029000500_study_streaks_yangon.sql',
+    '../supabase/migrations/20261029000600_sync_progress_hardening.sql',
+    '../supabase/migrations/20261030000100_content_publication_foundation.sql',
+    '../supabase/migrations/20261030000200_content_publication_hardening.sql',
+    '../supabase/migrations/20261030000300_consistent_publication_reads.sql',
+    '../supabase/migrations/20261102000200_vocabulary_japanese_fields.sql',
+  ];
+  for (const file of migrationFiles) {
+    const sql = await readFile(new URL(file, import.meta.url), 'utf8');
+    await db.exec(sql);
+  }
 });
 
 after(async () => {
@@ -680,6 +687,9 @@ test('11. Cross-course ID conflict rejected at staging and publication', async (
       level_id: 'N5',
       written_form: '中',
       reading: 'なか',
+      kana: 'なか',
+      romaji: 'naka',
+      part_of_speech: 'noun',
       meaning_english: 'middle',
       meaning_burmese: 'အလယ်',
       audio_path: null,

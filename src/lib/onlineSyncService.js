@@ -1,7 +1,7 @@
 import { getSupabaseClient } from './supabase.js';
 import { storageOwner as defaultStorageOwner } from './storageOwner.js';
 import { wordOf, readingOf } from './entry.js';
-import { readSyncState, mirrorSyncStateToSidecar } from './cloudSyncState.js';
+import { readSyncState, mirrorSyncStateToSidecar, identityOfRow } from './cloudSyncState.js';
 import { restoreAccountSnapshot } from './cloudSnapshotHydration.js';
 import {
   readPendingSyncRequest,
@@ -50,13 +50,15 @@ export function extractRowData(row) {
 }
 
 export function parseItemKey(key) {
+  if (typeof key !== 'string') return null;
   const parts = key.split(':');
   if (parts.length < 3) return null;
   const language = parts[0];
   const kind = parts[1];
   const written = parts[2];
-  const reading = parts.slice(3).join(':');
-  return { language, kind, written, reading };
+  const reading = parts[3] ?? '';
+  const senseId = parts.length > 4 ? parts.slice(4).join(':') : '';
+  return { language, kind, written, reading, senseId };
 }
 
 export function createOnlineSyncService({
@@ -150,7 +152,7 @@ export function createOnlineSyncService({
       for (const [itemKey, rec] of Object.entries(syncState.records || {})) {
         const parsed = parseItemKey(itemKey);
         if (!parsed || !isSupportedSyncKind(parsed.kind)) continue;
-        const { language, kind, written, reading } = parsed;
+        const { language, kind, written, reading, senseId } = parsed;
 
         if (rec.status === 'deleted') {
           mutations.push({
@@ -159,6 +161,7 @@ export function createOnlineSyncService({
             kind,
             written_form: written,
             reading: reading || '',
+            ...(senseId ? { sense_id: senseId } : {}),
             client_id: itemKey,
             base_revision: rec.cloudRevision ? String(rec.cloudRevision) : undefined,
             observed_at: rec.deletedAt || now(),
@@ -178,11 +181,14 @@ export function createOnlineSyncService({
             continue;
           }
 
-          // Locate row matching identity
+          // Locate row matching identity, respecting sense identity for homonyms
           const row = rows.find(r => {
+            try {
+              if (identityOfRow(`${language}_${kind}`, r) === itemKey) return true;
+            } catch {}
             const w = wordOf(r);
             const red = r.pronunciation ?? readingOf(r) ?? '';
-            return w === written && (red === reading || (!reading && !red));
+            return !senseId && w === written && (red === reading || (!reading && !red));
           });
 
           if (row) {
@@ -193,6 +199,7 @@ export function createOnlineSyncService({
               kind,
               written_form: written,
               reading: reading || '',
+              ...(senseId ? { sense_id: senseId } : {}),
               client_id: itemKey,
               base_revision: rec.cloudRevision ? String(rec.cloudRevision) : undefined,
               observed_at: row.updated_at || row.created_at || rec.updatedAt || now(),
@@ -403,9 +410,12 @@ export function createOnlineSyncService({
                 rows = rawTable ? JSON.parse(rawTable) : [];
               } catch {}
               const currentRow = rows.find(r => {
+                try {
+                  if (identityOfRow(`${parsed.language}_${parsed.kind}`, r) === itemKey) return true;
+                } catch {}
                 const w = wordOf(r);
                 const red = r.pronunciation ?? readingOf(r) ?? '';
-                return w === parsed.written && (red === parsed.reading || (!parsed.reading && !red));
+                return !parsed.senseId && w === parsed.written && (red === parsed.reading || (!parsed.reading && !red));
               });
               if (!currentRow || !rowsEqual(extractRowData(currentRow), snap.rowData)) {
                 hasNewerLocalChange = true;

@@ -140,7 +140,10 @@ export async function fetchPublishedCourseContent(courseId, { client = null, pag
         .range(from, from + pageSize - 1);
 
       if (res.error) {
-        // Fallback for database instances where optional linguistic columns are not yet present
+        if (courseId === 'ja-n5') {
+          throw new Error(`Database schema missing required Japanese linguistic columns for course 'ja-n5'. Ensure migration 20261102000200_vocabulary_japanese_fields.sql is applied. Details: ${res.error.message}`);
+        }
+        // Fallback for database instances where optional linguistic columns are not yet present (e.g. legacy Chinese-only deployments)
         const fallback = await dbClient
           .from('vocabulary')
           .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active')

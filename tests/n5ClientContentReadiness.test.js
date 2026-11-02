@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -434,19 +435,41 @@ test('5. CLI CSV Validation: N5_Swipe2Study_import.csv passes with 0 errors and 
 test('6. Conversion Reproducibility: Re-running conversion produces identical files and hashes', () => {
   const hashFile = (p) => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 
-  const csvHashBefore = hashFile(IMPORT_CSV_PATH);
-  const jsonHashBefore = hashFile(MAPPING_JSON_PATH);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 's2s-n5-convert-'));
+  try {
+    const tmpCsv1 = path.join(tmpDir, 'import_run1.csv');
+    const tmpJson1 = path.join(tmpDir, 'mapping_run1.json');
+    const tmpCsv2 = path.join(tmpDir, 'import_run2.csv');
+    const tmpJson2 = path.join(tmpDir, 'mapping_run2.json');
 
-  // Re-run conversion
-  const result = convertN5Dataset();
-  assert.equal(result.totalRecords, 706);
-  assert.equal(result.totalExamples, 2118);
+    // Run 1 into temporary isolated directory
+    const result1 = convertN5Dataset({
+      sourcePath: SOURCE_CSV_PATH,
+      importCsvPath: tmpCsv1,
+      mappingJsonPath: tmpJson1,
+    });
+    assert.equal(result1.totalRecords, 706);
+    assert.equal(result1.totalExamples, 2118);
 
-  const csvHashAfter = hashFile(IMPORT_CSV_PATH);
-  const jsonHashAfter = hashFile(MAPPING_JSON_PATH);
+    // Run 2 into temporary isolated directory
+    const result2 = convertN5Dataset({
+      sourcePath: SOURCE_CSV_PATH,
+      importCsvPath: tmpCsv2,
+      mappingJsonPath: tmpJson2,
+    });
+    assert.equal(result2.totalRecords, 706);
+    assert.equal(result2.totalExamples, 2118);
 
-  assert.equal(csvHashBefore, csvHashAfter, 'Import CSV hash is 100% deterministic and reproducible');
-  assert.equal(jsonHashBefore, jsonHashAfter, 'Mapping JSON hash is 100% deterministic and reproducible');
+    // Both runs must produce byte-for-byte identical output
+    assert.equal(hashFile(tmpCsv1), hashFile(tmpCsv2), 'Import CSV hash is 100% deterministic and reproducible across runs');
+    assert.equal(hashFile(tmpJson1), hashFile(tmpJson2), 'Mapping JSON hash is 100% deterministic and reproducible across runs');
+
+    // Converted outputs in temp dir must match checked-in baseline files without modifying them
+    assert.equal(hashFile(tmpCsv1), hashFile(IMPORT_CSV_PATH), 'Converted CSV matches tracked repository artifact');
+    assert.equal(hashFile(tmpJson1), hashFile(MAPPING_JSON_PATH), 'Converted mapping JSON matches tracked repository artifact');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('7. Content Manager & Diff Comparator: Enriches mapping and accurately detects changes', () => {

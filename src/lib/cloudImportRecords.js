@@ -1,4 +1,5 @@
 import { readingOf, wordOf } from './entry.js';
+import { extractCanonicalSenseId } from './studyWords.js';
 
 export const CLOUD_KINDS = Object.freeze(['saved_words', 'review_cards', 'search_history',
   'written_chars', 'learned_radicals', 'learned_kana', 'learned_sounds', 'learned_words']);
@@ -16,13 +17,14 @@ export const validTimestamp = value => typeof value === 'string' && value.length
   && new Date(value.slice(0, 10) + 'T00:00:00Z').toISOString().slice(0, 10) === value.slice(0, 10);
 
 export function validateCloudItem(item) {
-  if (!object(item) || Object.keys(item).some(key => !['language', 'kind', 'written_form', 'reading', 'data', 'observed_at'].includes(key))
+  if (!object(item) || Object.keys(item).some(key => !['language', 'kind', 'written_form', 'reading', 'sense_id', 'data', 'observed_at'].includes(key))
     || !CLOUD_LANGUAGES.includes(item.language) || !CLOUD_KINDS.includes(item.kind)
     || !text(item.written_form) || !text(item.reading, true) || !object(item.data)
     || Object.keys(item.data).some(key => RESERVED.has(key))
     || new TextEncoder().encode(JSON.stringify(item.data)).length > 16384
     || !validTimestamp(item.observed_at)) throw invalid();
-  const fields = ['english', 'burmese', 'definition', 'burmese_definition', 'kana', 'part_of_speech', 'level', 'lesson_name', 'status', 'last_action', 'last_reviewed_at', 'card_id'];
+  if (item.sense_id !== undefined && (typeof item.sense_id !== 'string' || item.sense_id.length > 200)) throw invalid();
+  const fields = ['english', 'burmese', 'definition', 'burmese_definition', 'kana', 'part_of_speech', 'level', 'lesson_name', 'status', 'last_action', 'last_reviewed_at', 'card_id', 'sense_id'];
   for (const key of fields) if (item.data[key] !== undefined && (typeof item.data[key] !== 'string' || item.data[key].length > 10000)) throw invalid();
   if (item.data.examples !== undefined) {
     if (!Array.isArray(item.data.examples) || item.data.examples.length > 3) throw invalid();
@@ -76,7 +78,9 @@ export function buildCloudImportItems(tables) {
         if (!isWord && key === FIELDS[kind]) continue;
         Object.defineProperty(data, key, { value, enumerable: true, writable: true, configurable: true });
       }
+      const senseId = isWord ? extractCanonicalSenseId(row) : '';
       const item = { language, kind, written_form: written.normalize('NFC').trim(), reading: reading.normalize('NFC').trim(), data, observed_at: observedAt(row, kind) };
+      if (senseId) item.sense_id = senseId;
       validateCloudItem(item);
       items.push(item);
     }
@@ -92,6 +96,7 @@ export function cloudSnapshotTables(snapshot) {
   for (const language of CLOUD_LANGUAGES) for (const kind of CLOUD_KINDS) tables[`${language}_${kind}`] = [];
   for (const item of snapshot.items) {
     const row = { ...JSON.parse(JSON.stringify(item.data)), id: item.item_key, created_at: item.created_at, updated_at: item.updated_at };
+    if (item.sense_id) row.sense_id = item.sense_id;
     if (item.kind === 'saved_words') { row.phrase = item.written_form; row.reading = item.reading; }
     else if (item.kind === 'review_cards' || item.kind === 'learned_words') { row.character = item.written_form; row.pronunciation = item.reading; }
     else row[FIELDS[item.kind]] = item.written_form;

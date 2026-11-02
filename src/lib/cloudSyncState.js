@@ -1,5 +1,6 @@
 import { wordOf, readingOf } from './entry.js';
 import { parseLearningDocument } from './learningDocument.js';
+import { extractCanonicalSenseId, HOMONYM_SENSE_WORDS } from './studyWords.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -35,9 +36,13 @@ export function getSyncStateKey(ownerId) {
   return `s2s_user_${ownerId.toLowerCase()}_cloud_sync_state_v1`;
 }
 
-export function recordKey(language, kind, writtenForm, reading = '') {
+export function recordKey(language, kind, writtenForm, reading = '', senseId = '') {
   const normForm = String(writtenForm || '').normalize('NFC').trim();
   const normReading = String(reading || '').normalize('NFC').trim();
+  const normSense = String(senseId || '').normalize('NFC').trim();
+  if (normSense) {
+    return `${language}:${kind}:${normForm}:${normReading}:${normSense}`;
+  }
   return `${language}:${kind}:${normForm}:${normReading}`;
 }
 
@@ -55,6 +60,12 @@ export function identityOfRow(table, row) {
     const reading = row.pronunciation ?? readingOf(row) ?? '';
     if (typeof reading !== 'string') {
       throw new Error('Stored learning data has an unsupported format. It has been kept for recovery.');
+    }
+    const normWritten = written.normalize('NFC').trim();
+    const isHomonym = HOMONYM_SENSE_WORDS.has(normWritten) || Boolean(row.sense_key || row.sense_id);
+    const senseId = extractCanonicalSenseId(row);
+    if (isHomonym && senseId) {
+      return recordKey(language, kind, written, reading, senseId);
     }
     return recordKey(language, kind, written, reading);
   }
@@ -223,7 +234,22 @@ export function persistSyncState(storage, state) {
   }
 }
 
-export function recordLocalDeletion(storage, ownerId, language, kind, writtenForm, reading = '', now = () => new Date().toISOString()) {
+export function recordLocalDeletion(
+  storage,
+  ownerId,
+  language,
+  kind,
+  writtenForm,
+  reading = '',
+  senseId = '',
+  now = () => new Date().toISOString()
+) {
+  let resolvedSense = senseId;
+  let resolvedNow = now;
+  if (typeof senseId === 'function') {
+    resolvedNow = senseId;
+    resolvedSense = '';
+  }
   const { state, error } = readSyncState(storage, ownerId);
   if (error) {
     throw new Error(`Could not update sync state: ${error}`);
@@ -235,19 +261,34 @@ export function recordLocalDeletion(storage, ownerId, language, kind, writtenFor
     lastServerTime: null,
     records: {},
   };
-  const key = recordKey(language, kind, writtenForm, reading);
+  const key = recordKey(language, kind, writtenForm, reading, resolvedSense);
   const prevRec = nextState.records[key] ?? {};
   nextState.records[key] = {
     ...prevRec,
     status: 'deleted',
-    deletedAt: now(),
+    deletedAt: resolvedNow(),
     localMutationId: (prevRec.localMutationId || 0) + 1,
   };
-  nextState.updatedAt = now();
+  nextState.updatedAt = resolvedNow();
   persistSyncState(storage, nextState);
 }
 
-export function recordLocalDirty(storage, ownerId, language, kind, writtenForm, reading = '', now = () => new Date().toISOString()) {
+export function recordLocalDirty(
+  storage,
+  ownerId,
+  language,
+  kind,
+  writtenForm,
+  reading = '',
+  senseId = '',
+  now = () => new Date().toISOString()
+) {
+  let resolvedSense = senseId;
+  let resolvedNow = now;
+  if (typeof senseId === 'function') {
+    resolvedNow = senseId;
+    resolvedSense = '';
+  }
   const { state, error } = readSyncState(storage, ownerId);
   if (error) {
     throw new Error(`Could not update sync state: ${error}`);
@@ -259,14 +300,14 @@ export function recordLocalDirty(storage, ownerId, language, kind, writtenForm, 
     lastServerTime: null,
     records: {},
   };
-  const key = recordKey(language, kind, writtenForm, reading);
+  const key = recordKey(language, kind, writtenForm, reading, resolvedSense);
   const prevRec = nextState.records[key] ?? {};
   nextState.records[key] = {
     ...prevRec,
     status: 'dirty',
-    updatedAt: now(),
+    updatedAt: resolvedNow(),
     localMutationId: (prevRec.localMutationId || 0) + 1,
   };
-  nextState.updatedAt = now();
+  nextState.updatedAt = resolvedNow();
   persistSyncState(storage, nextState);
 }

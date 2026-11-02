@@ -345,6 +345,18 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
       return;
     }
 
+    const companionWarnings = [];
+    if (courseId === 'ja-n5') {
+      const missing = incomingItems.filter((item) => !item.kana || !item.romaji || !item.part_of_speech);
+      if (missing.length > 0) {
+        companionWarnings.push({
+          code: 'MISSING_COMPANION_METADATA',
+          message: `Course ja-n5 requires companion metadata (kana, romaji, part_of_speech) for staging and publication. Found ${missing.length} items without complete metadata.`,
+          count: missing.length,
+        });
+      }
+    }
+
     let diff = null;
     let identityValidation = null;
     let currentItems = [];
@@ -374,7 +386,7 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
             message: 'Database not connected. Provide SUPABASE_SERVICE_ROLE_KEY to see DB diff.',
           },
       ambiguous_identity_errors: identityValidation?.errors || [],
-      warnings: fileData.validation.warnings,
+      warnings: [...fileData.validation.warnings, ...companionWarnings],
       database_modified: false,
     };
 
@@ -494,6 +506,56 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
       return;
     }
 
+    // 3. Stage
+    if (courseId === 'ja-n5') {
+      const missing = incomingItems.filter((item) => !item.kana || !item.romaji || !item.part_of_speech);
+      if (missing.length > 0) {
+        safeExit(
+          1,
+          JSON.stringify(
+            {
+              action: 'stage',
+              valid: false,
+              error: 'MISSING_COMPANION_METADATA',
+              message: `Course ja-n5 requires companion metadata (kana, romaji, part_of_speech) for all items. Found ${missing.length} items without complete metadata.`,
+              sample_ids: missing.slice(0, 5).map((m) => m.id),
+            },
+            null,
+            2
+          ) + '\n',
+          process.stderr
+        );
+        return;
+      }
+    }
+
+    if (db && courseId === 'ja-n5') {
+      try {
+        if (typeof db.query === 'function') {
+          await db.query('select kana, romaji, part_of_speech from public.vocabulary limit 0');
+        } else if (typeof db.from === 'function') {
+          const { error } = await db.from('vocabulary').select('kana, romaji, part_of_speech').limit(0);
+          if (error) throw error;
+        }
+      } catch (err) {
+        safeExit(
+          1,
+          JSON.stringify(
+            {
+              action: 'stage',
+              valid: false,
+              error: 'DATABASE_CAPABILITY_ERROR',
+              message: `Database schema does not support Japanese linguistic metadata (kana, romaji, part_of_speech). Apply migration 20261102000200_vocabulary_japanese_fields.sql before staging ja-n5. Details: ${err.message}`,
+            },
+            null,
+            2
+          ) + '\n',
+          process.stderr
+        );
+        return;
+      }
+    }
+
     // Verify identity compatibility against current database
     try {
       const currentItems = await fetchCurrentCourseContent({ db, courseId });
@@ -540,6 +602,33 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
       return;
     }
 
+    if (db && flags.courseId === 'ja-n5') {
+      try {
+        if (typeof db.query === 'function') {
+          await db.query('select kana, romaji, part_of_speech from public.vocabulary limit 0');
+        } else if (typeof db.from === 'function') {
+          const { error } = await db.from('vocabulary').select('kana, romaji, part_of_speech').limit(0);
+          if (error) throw error;
+        }
+      } catch (err) {
+        safeExit(
+          1,
+          JSON.stringify(
+            {
+              action: 'publish',
+              valid: false,
+              error: 'DATABASE_CAPABILITY_ERROR',
+              message: `Database schema does not support Japanese linguistic metadata (kana, romaji, part_of_speech). Apply migration 20261102000200_vocabulary_japanese_fields.sql before publishing ja-n5. Details: ${err.message}`,
+            },
+            null,
+            2
+          ) + '\n',
+          process.stderr
+        );
+        return;
+      }
+    }
+
     try {
       const publishResult = await publishStagedContent({
         db,
@@ -584,6 +673,56 @@ export async function runCli(argv = process.argv.slice(2), { dbClient = null } =
     if (!SUPPORTED_COURSES.has(courseId)) {
       safeExit(1, `Error: Unsupported course '${courseId}'. Only 'zh-hsk1' and 'ja-n5' are permitted.\n`, process.stderr);
       return;
+    }
+
+    // 3. Stage
+    if (courseId === 'ja-n5') {
+      const missing = incomingItems.filter((item) => !item.kana || !item.romaji || !item.part_of_speech);
+      if (missing.length > 0) {
+        safeExit(
+          1,
+          JSON.stringify(
+            {
+              action: 'stage',
+              valid: false,
+              error: 'MISSING_COMPANION_METADATA',
+              message: `Course ja-n5 requires companion metadata (kana, romaji, part_of_speech) for all items. Found ${missing.length} items without complete metadata.`,
+              sample_ids: missing.slice(0, 5).map((m) => m.id),
+            },
+            null,
+            2
+          ) + '\n',
+          process.stderr
+        );
+        return;
+      }
+    }
+
+    if (db && courseId === 'ja-n5') {
+      try {
+        if (typeof db.query === 'function') {
+          await db.query('select kana, romaji, part_of_speech from public.vocabulary limit 0');
+        } else if (typeof db.from === 'function') {
+          const { error } = await db.from('vocabulary').select('kana, romaji, part_of_speech').limit(0);
+          if (error) throw error;
+        }
+      } catch (err) {
+        safeExit(
+          1,
+          JSON.stringify(
+            {
+              action: 'stage',
+              valid: false,
+              error: 'DATABASE_CAPABILITY_ERROR',
+              message: `Database schema does not support Japanese linguistic metadata (kana, romaji, part_of_speech). Apply migration 20261102000200_vocabulary_japanese_fields.sql before staging ja-n5. Details: ${err.message}`,
+            },
+            null,
+            2
+          ) + '\n',
+          process.stderr
+        );
+        return;
+      }
     }
 
     // Identity compatibility check

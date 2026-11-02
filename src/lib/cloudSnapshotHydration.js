@@ -2,6 +2,7 @@ import { readCloudSnapshot } from './cloudImportService.js';
 import { CLOUD_LANGUAGES, CLOUD_KINDS } from './cloudImportRecords.js';
 import { parseLearningRows } from './learningDocument.js';
 import { clearPendingSyncRequest } from './onlineSyncRequest.js';
+import { HOMONYM_SENSE_WORDS } from './studyWords.js';
 import {
   getSyncStateKey,
   recordKey,
@@ -58,7 +59,9 @@ export function reconcileSnapshotWithLocal({
           serverTombstonesByItemKey.set(t.item_key, t);
         }
         if (t.written_form) {
-          const k = recordKey(t.language, t.kind, t.written_form, t.reading);
+          const isHomonymT = HOMONYM_SENSE_WORDS.has(String(t.written_form || '').normalize('NFC').trim()) || Boolean(t.sense_id);
+          const tSenseId = isHomonymT ? (t.sense_id || '') : '';
+          const k = recordKey(t.language, t.kind, t.written_form, t.reading, tSenseId);
           serverTombstonesByRecordKey.set(k, t);
         }
       }
@@ -112,7 +115,9 @@ export function reconcileSnapshotWithLocal({
 
       // 1. Process cloud items
       for (const item of cloudItems) {
-        const itemKey = recordKey(item.language, item.kind, item.written_form, item.reading);
+        const isHomonymItem = HOMONYM_SENSE_WORDS.has(String(item.written_form || '').normalize('NFC').trim()) || Boolean(item.sense_id || item.data?.sense_key || item.data?.sense_id);
+        const itemSenseId = isHomonymItem ? (item.sense_id || item.data?.card_id || item.data?.sense_id || '') : '';
+        const itemKey = recordKey(item.language, item.kind, item.written_form, item.reading, itemSenseId);
         seenKeys.add(itemKey);
 
         const tracked = nextRecords[itemKey];

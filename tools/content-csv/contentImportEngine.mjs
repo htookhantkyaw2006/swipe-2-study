@@ -301,7 +301,10 @@ export async function fetchCurrentCourseContent({ db, courseId }) {
         [courseId]
       );
       return res.rows;
-    } catch {
+    } catch (err) {
+      if (courseId === 'ja-n5') {
+        throw new Error(`DATABASE_CAPABILITY_ERROR: Course ja-n5 requires vocabulary table columns (kana, romaji, part_of_speech). Apply migration 20261102000200_vocabulary_japanese_fields.sql. Details: ${err.message}`);
+      }
       const fallbackRes = await db.query(
         `select id, course_id, written_form, reading, meaning_english, meaning_burmese,
                 audio_path, examples, sort_order, is_active
@@ -323,6 +326,9 @@ export async function fetchCurrentCourseContent({ db, courseId }) {
       .order('id', { ascending: true });
 
     if (error) {
+      if (courseId === 'ja-n5') {
+        throw new Error(`DATABASE_CAPABILITY_ERROR: Course ja-n5 requires vocabulary table columns (kana, romaji, part_of_speech). Apply migration 20261102000200_vocabulary_japanese_fields.sql. Details: ${error.message}`);
+      }
       const fallback = await db
         .from('vocabulary')
         .select('id, course_id, written_form, reading, meaning_english, meaning_burmese, audio_path, examples, sort_order, is_active')

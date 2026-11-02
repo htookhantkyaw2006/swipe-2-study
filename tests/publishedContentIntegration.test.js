@@ -143,17 +143,24 @@ before(async () => {
 
   await query('insert into auth.users (id, raw_user_meta_data) values ($1, $2)', [alice, { full_name: 'Alice' }]);
 
-  const baseMigration = await readFile(new URL('../supabase/migrations/20261027000100_backend_foundation.sql', import.meta.url), 'utf8');
-  await db.exec(baseMigration);
-
-  const guestImportMigration = await readFile(new URL('../supabase/migrations/20261028000100_guest_import_foundation.sql', import.meta.url), 'utf8');
-  await db.exec(guestImportMigration);
-
-  const contentMigration = await readFile(new URL('../supabase/migrations/20261030000100_content_publication_foundation.sql', import.meta.url), 'utf8');
-  await db.exec(contentMigration);
-
-  const hardeningMigration = await readFile(new URL('../supabase/migrations/20261030000200_content_publication_hardening.sql', import.meta.url), 'utf8');
-  await db.exec(hardeningMigration);
+  const migrationFiles = [
+    '../supabase/migrations/20261027000100_backend_foundation.sql',
+    '../supabase/migrations/20261028000100_guest_import_foundation.sql',
+    '../supabase/migrations/20261029000100_account_deletion_foundation.sql',
+    '../supabase/migrations/20261029000200_account_deletion_attempt_reservation.sql',
+    '../supabase/migrations/20261029000300_online_sync_foundation.sql',
+    '../supabase/migrations/20261029000400_learned_words_sync.sql',
+    '../supabase/migrations/20261029000500_study_streaks_yangon.sql',
+    '../supabase/migrations/20261029000600_sync_progress_hardening.sql',
+    '../supabase/migrations/20261030000100_content_publication_foundation.sql',
+    '../supabase/migrations/20261030000200_content_publication_hardening.sql',
+    '../supabase/migrations/20261030000300_consistent_publication_reads.sql',
+    '../supabase/migrations/20261102000200_vocabulary_japanese_fields.sql',
+  ];
+  for (const file of migrationFiles) {
+    const sql = await readFile(new URL(file, import.meta.url), 'utf8');
+    await db.exec(sql);
+  }
 
   // Stage & Publish synthetic HSK 1 curriculum (5 items)
   const syntheticHsk1 = [
@@ -255,6 +262,9 @@ before(async () => {
       level_id: 'N5',
       written_form: '私',
       reading: 'わたし',
+      kana: 'わたし',
+      romaji: 'watashi',
+      part_of_speech: 'pronoun',
       meaning_english: 'I; me',
       meaning_burmese: 'ကျွန်တော် / ကျွန်မ',
       audio_path: 'audio/ja/n5/001.mp3',
@@ -269,6 +279,9 @@ before(async () => {
       level_id: 'N5',
       written_form: '日本',
       reading: 'にほん',
+      kana: 'にほん',
+      romaji: 'nihon',
+      part_of_speech: 'noun',
       meaning_english: 'Japan',
       meaning_burmese: 'ဂျပန်နိုင်ငံ',
       audio_path: 'audio/ja/n5/002.mp3',
@@ -283,6 +296,9 @@ before(async () => {
       level_id: 'N5',
       written_form: '学生',
       reading: 'がくせい',
+      kana: 'がくせい',
+      romaji: 'gakusei',
+      part_of_speech: 'noun',
       meaning_english: 'student',
       meaning_burmese: 'ကျောင်းသား',
       audio_path: null,
@@ -407,7 +423,7 @@ test('3. Published-only reads: public client reads published content, never draf
   assert.equal(jaCard1.id, 'ja_n5_001');
   assert.equal(jaCard1.character, '私');
   assert.equal(jaCard1.kana, 'わたし');
-  assert.equal(jaCard1.reading, 'わたし');
+  assert.equal(jaCard1.reading, 'watashi');
   assert.equal(jaCard1.definition, 'I; me');
   assert.equal(jaCard1.burmese_definition, 'ကျွန်တော် / ကျွန်မ');
 

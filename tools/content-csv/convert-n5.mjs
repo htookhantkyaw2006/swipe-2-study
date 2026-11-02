@@ -106,7 +106,12 @@ export function computeN5ItemHash(courseId, writtenForm, reading, senseIndex = 1
 /**
  * Performs conversion from client source CSV to Swipe2Study import contract.
  */
-export function convertN5Dataset({ sourcePath = SOURCE_CSV_PATH, importCsvPath = IMPORT_CSV_PATH, mappingJsonPath = MAPPING_JSON_PATH } = {}) {
+export function convertN5Dataset({
+  sourcePath = SOURCE_CSV_PATH,
+  importCsvPath = IMPORT_CSV_PATH,
+  mappingJsonPath = MAPPING_JSON_PATH,
+  registryPath = null,
+} = {}) {
   if (!fs.existsSync(sourcePath)) {
     throw new Error(`Source CSV not found at: ${sourcePath}`);
   }
@@ -141,9 +146,12 @@ export function convertN5Dataset({ sourcePath = SOURCE_CSV_PATH, importCsvPath =
   // Load existing authoritative registry if present
   let previousMapping = null;
   const candidateMappingPaths = [
+    ...(registryPath ? [registryPath] : []),
     mappingJsonPath,
     path.join(path.dirname(mappingJsonPath), 'N5_mapping.json'),
     path.join(path.dirname(mappingJsonPath), 'N5_Swipe2Study_mapping.json'),
+    path.join(ROOT_DIR, 'tools/content-csv/data/N5_mapping.json'),
+    path.join(ROOT_DIR, 'tools/content-csv/data/N5_Swipe2Study_mapping.json'),
   ];
   for (const p of candidateMappingPaths) {
     if (fs.existsSync(p)) {
@@ -446,4 +454,3 @@ if (isMain) {
     process.exit(1);
   }
 }
-

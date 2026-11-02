@@ -2,22 +2,34 @@ import { matchesQuery, readingOf, wordOf, kanaOf } from './entry.js';
 
 export const HOMONYM_SENSE_WORDS = new Set(['あの', 'ある', 'かける', 'キロ', 'もう']);
 
-function extractCanonicalId(word) {
-  if (!word || typeof word !== 'object') return null;
+export function extractCanonicalSenseId(word) {
+  if (!word || typeof word !== 'object') return '';
+  if (typeof word.sense_id === 'string' && word.sense_id.trim()) {
+    return word.sense_id.trim();
+  }
+  if (typeof word.sense_key === 'string' && word.sense_key.trim()) {
+    return word.sense_key.trim();
+  }
   if (typeof word.card_id === 'string' && word.card_id.trim()) {
     return word.card_id.trim();
   }
   if (typeof word.id === 'string') {
     if (word.id.startsWith('pw_')) return word.id.slice(3);
-    if (/^(?:ja|zh)-/i.test(word.id)) return word.id;
+    if (/^(?:ja|zh)-/i.test(word.id)) return word.id.trim();
   }
-  return null;
+  return '';
+}
+
+export function extractCanonicalId(word) {
+  const senseId = extractCanonicalSenseId(word);
+  return senseId || null;
 }
 
 // IDs in old guest/account starter decks were generated independently. Compare
 // written form + pronunciation, preserving tones and distinct readings.
 // For words with intentional multiple senses (e.g. Japanese N5 homonyms), incorporate
 // canonical course ID or sense discriminator so senses remain distinct and independent.
+// Do not encode definitions or guess ambiguous legacy senses.
 export function studyWordKey(word) {
   if (!word || typeof word !== 'object') return null;
   const normalize = value => typeof value === 'string' ? value.normalize('NFC').trim().replace(/\s+/gu, ' ').toLowerCase() : '';
@@ -28,10 +40,9 @@ export function studyWordKey(word) {
   const isHomonym = HOMONYM_SENSE_WORDS.has(written) || Boolean(word.sense_key || word.sense_id);
 
   if (isHomonym) {
-    const canonicalId = extractCanonicalId(word);
-    const sense = normalize(word.sense_key ?? word.sense_id ?? canonicalId ?? word.definition ?? word.english ?? word.meaning_english ?? word.part_of_speech ?? '');
-    if (sense) {
-      return JSON.stringify([written, pronunciation, sense]);
+    const canonicalSense = extractCanonicalSenseId(word);
+    if (canonicalSense) {
+      return JSON.stringify([written, pronunciation, canonicalSense]);
     }
   }
 
@@ -144,6 +155,7 @@ export function buildSavedWordRecord(card) {
 
   if (kana) record.kana = kana;
   if (cardId) record.card_id = cardId;
+  if (card.sense_id) record.sense_id = card.sense_id;
   if (card.level) record.level = card.level;
   if (card.sense_key) record.sense_key = card.sense_key;
   if (card.part_of_speech) record.part_of_speech = card.part_of_speech;
