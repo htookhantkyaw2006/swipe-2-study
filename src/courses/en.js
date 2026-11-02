@@ -1,4 +1,4 @@
-import { radicals, radicalCategories } from './en-wordparts';
+import { radicals, radicalCategories } from './en-wordparts.js';
 
 /* ---------------------------------------------------------------
    ENGLISH COURSE

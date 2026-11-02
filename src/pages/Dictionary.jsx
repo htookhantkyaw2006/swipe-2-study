@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Bookmark, BookmarkMinus, Clock, Search, Volume2 } from 'lucide-react';
 import { db } from '../lib/db';
 import { speak } from '../lib/speech';
+import { playWordAudio } from '../lib/wordAudio';
 import { useCourse } from '../lib/language';
 import { trackEvent } from '../lib/analytics';
-import { readingOf, sayOf, kanaOf, matchesQuery } from '../lib/entry';
+import { readingOf, kanaOf, matchesQuery } from '../lib/entry';
 import { StudyHeader, StudySearch } from '../components/study/StudyPage';
 import './Dictionary.css';
 
@@ -41,7 +42,7 @@ export default function Dictionary() {
         const isSaved = saved.some(item => item.phrase === word.phrase);
         return <article className="dictionary-word" key={word.id}>
           <div className="dictionary-word__copy"><h3>{word.phrase}</h3>{kanaOf(word) && <p className="dictionary-word__kana" lang="ja">{kanaOf(word)}</p>}<p className="dictionary-word__reading">{readingOf(word)}</p><p className="dictionary-word__english" lang="en">{word.english}</p><p className="dictionary-word__burmese" lang="my">{word.burmese}</p></div>
-          <div className="dictionary-word__actions"><button className="study-icon-button" onClick={() => toggleSave(word)} aria-label={`${isSaved ? 'Unsave' : 'Save'} ${word.phrase}`} aria-pressed={isSaved}>{isSaved ? <BookmarkMinus size={19} aria-hidden="true" /> : <Bookmark size={19} aria-hidden="true" />}</button><button className="study-icon-button" onClick={() => speak(sayOf(word))} aria-label={`Play ${word.phrase}`}><Volume2 size={19} aria-hidden="true" /></button></div>
+          <div className="dictionary-word__actions"><button className="study-icon-button" onClick={() => toggleSave(word)} aria-label={`${isSaved ? 'Unsave' : 'Save'} ${word.phrase}`} aria-pressed={isSaved}>{isSaved ? <BookmarkMinus size={19} aria-hidden="true" /> : <Bookmark size={19} aria-hidden="true" />}</button><button className="study-icon-button" onClick={() => playWordAudio(word, { speakFn: speak })} aria-label={`Play ${word.phrase}`}><Volume2 size={19} aria-hidden="true" /></button></div>
         </article>;
       })}</div>}
     </section>}

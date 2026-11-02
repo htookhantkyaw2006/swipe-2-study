@@ -1,6 +1,6 @@
-import zh from './zh';
-import ja from './ja';
-import en from './en';
+import zh from './zh.js';
+import ja from './ja.js';
+import en from './en.js';
 
 /* ---------------------------------------------------------------
    COURSE REGISTRY

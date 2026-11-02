@@ -1,4 +1,4 @@
-import { radicals, radicalCategories } from './ja-radicals';
+import { radicals, radicalCategories } from './ja-radicals.js';
 
 /* ---------------------------------------------------------------
    JAPANESE COURSE

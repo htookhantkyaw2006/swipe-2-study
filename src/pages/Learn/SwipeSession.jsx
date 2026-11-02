@@ -7,7 +7,7 @@ import { speak } from '../../lib/speech';
 import { playWordAudio } from '../../lib/wordAudio';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
-import { readingOf, textOf, sayOf, kanaOf, fitFontCss, wordOf } from '../../lib/entry';
+import { readingOf, textOf, kanaOf, fitFontCss, wordOf } from '../../lib/entry';
 import { readSessionCards, buildNormalSessionCards, buildStudiedKeySet, findSavedWord, buildSavedWordRecord } from '../../lib/studyWords';
 import { phraseCards } from '../../lib/phraseCards';
 import { recordWordAction } from '../../lib/vocabularyProgress';
@@ -212,7 +212,7 @@ const Flashcard = ({ card, isActive, onSwipe, exitData, flipped, setFlipped, has
                       <button
                         className="swipe-audio swipe-audio--example"
                         onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => { e.stopPropagation(); speak(sayOf(ex)); }}
+                        onClick={(e) => { e.stopPropagation(); playWordAudio(ex, { speakFn: speak }); }}
                         aria-label={`Play sentence: ${textOf(ex)}`}
                       >
                         <Volume2 size={18} aria-hidden="true" />

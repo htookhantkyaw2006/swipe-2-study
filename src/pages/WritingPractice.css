@@ -37,3 +37,30 @@
 .writing-panel-4.writing-panel-4 { width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 16px auto; background: linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%); box-shadow: 0 8px 16px rgba(15, 118, 110, 0.35); display: flex; align-items: center; justify-content: center; }
 .writing-heading-5.writing-heading-5 { font-size: 1.25rem; font-weight: 800; color: var(--color-text-navy); margin: 0 0 8px 0; }
 .writing-copy-4.writing-copy-4 { font-size: 0.95rem; line-height: 1.5; color: var(--color-secondary-blue); margin: 0; font-weight: 500; }
+
+/* Word-to-character multi-character support */
+.writing-reading { font-size: 1rem; font-weight: 600; color: var(--color-primary-blue); }
+.writing-char-steps { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+.writing-char-step { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 12px; border: 1px solid var(--color-border); background: #FFFFFF; cursor: pointer; font-size: 0.9rem; font-weight: 700; color: var(--color-text-navy); transition: all 0.15s ease; }
+.writing-char-step:hover { background: var(--color-ghost-blue); border-color: var(--color-primary-blue); }
+.writing-char-step--active { background: var(--color-primary-blue); color: #FFFFFF; border-color: var(--color-primary-blue); box-shadow: 0 4px 10px rgba(3, 105, 161, 0.25); }
+.writing-char-step__num { font-size: 0.75rem; opacity: 0.8; }
+.writing-char-step__char { font-size: 1.1rem; }
+.writing-active-indicator { font-size: 0.85rem; color: var(--color-secondary-blue); margin-bottom: 12px; }
+.writing-active-indicator__pos { margin-left: 6px; font-weight: 600; }
+.writing-completion-feedback { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.writing-next-char-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 9999px; background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease; }
+.writing-next-char-btn:hover { background: #D1FAE5; }
+
+/* Word picker with search */
+.writing-picker__header { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.writing-picker__search { position: relative; display: flex; align-items: center; }
+.writing-picker__search-icon { position: absolute; left: 10px; color: var(--color-secondary-blue); pointer-events: none; }
+.writing-picker__search-input { width: 100%; height: 36px; padding: 0 10px 0 32px; border-radius: 10px; border: 1px solid var(--color-border); background: #FFFFFF; font-size: 0.85rem; color: var(--color-text-navy); }
+.writing-picker__search-input:focus { outline: 2px solid var(--color-primary-blue); outline-offset: -1px; }
+
+/* Word button grid tile */
+.writing-button-5 { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px; }
+.writing-button-5__word { font-size: 1.25rem; font-weight: 800; line-height: 1.1; }
+.writing-button-5__reading { font-size: 0.7rem; font-weight: 600; color: var(--color-secondary-blue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.writing-button-5--active .writing-button-5__reading { color: var(--color-primary-blue); }

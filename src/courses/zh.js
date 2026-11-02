@@ -1,5 +1,5 @@
-import { radicals, radicalCategories } from '../data/radicals';
-import { writingChars } from '../data/writingChars';
+import { radicals, radicalCategories } from '../data/radicals.js';
+import { writingChars, writingWords, writingCharList } from '../data/writingChars.js';
 
 /* ---------------------------------------------------------------
    CHINESE COURSE
@@ -233,7 +233,7 @@ export default {
       joiner: '、'
     }
   },
-  writing: { chars: writingChars },
+  writing: { chars: writingChars, words: writingWords, charList: writingCharList },
 
   demo: { librarySwiped: '1,248', librarySaved: 42, libraryPhrases: 86, profileSwiped: 363, homeSaved: 12 }
 };

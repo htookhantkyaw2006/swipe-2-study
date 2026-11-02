@@ -1,6 +1,6 @@
-import { readPreferences, SPEECH_RATES } from './preferences.jsx';
-import { getCourse } from '../courses';
-import { getActiveLanguageId } from './activeLanguage';
+import { readPreferences, SPEECH_RATES } from './preferencesDefaults.js';
+import { getCourse } from '../courses/index.js';
+import { getActiveLanguageId } from './activeLanguage.js';
 
 /* ---------------------------------------------------------------
    SPEECH
@@ -25,17 +25,35 @@ export function speechLang() {
   return valid ? chosen : course.speech.defaultAccent;
 }
 
-export function speak(text) {
-  if (!text || !('speechSynthesis' in window)) return;
+export function speak(text, { onStart = null, onEnd = null, onError = null } = {}) {
+  if (!text || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    if (onError && typeof onError === 'function') {
+      onError(new Error('Speech synthesis is unavailable in this environment.'));
+    }
+    return;
+  }
 
   const { speechRate } = readPreferences();
 
   // Cancel anything still playing so rapid taps do not queue up.
-  window.speechSynthesis.cancel();
+  try {
+    window.speechSynthesis.cancel();
+  } catch {}
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = speechLang();
   utterance.rate = SPEECH_RATES[speechRate] ?? 1;
+
+  if (onStart && typeof onStart === 'function') {
+    utterance.onstart = () => onStart();
+  }
+  if (onEnd && typeof onEnd === 'function') {
+    utterance.onend = () => onEnd();
+  }
+  if (onError && typeof onError === 'function') {
+    utterance.onerror = (e) => onError(e);
+  }
+
   window.speechSynthesis.speak(utterance);
 }
 

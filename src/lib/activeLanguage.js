@@ -1,4 +1,4 @@
-import { isActiveCourse, DEFAULT_COURSE_ID } from '../courses';
+import { isActiveCourse, DEFAULT_COURSE_ID } from '../courses/index.js';
 import { storageOwner } from './storageOwner.js';
 
 /* ---------------------------------------------------------------

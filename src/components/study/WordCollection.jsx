@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Bookmark, BookmarkMinus, RotateCw, Play, Volume2 } from 'lucide-react';
 import { speak } from '../../lib/speech';
-import { kanaOf, sayOf } from '../../lib/entry';
+import { playWordAudio } from '../../lib/wordAudio';
+import { kanaOf } from '../../lib/entry';
 import { filterStudyWords, wordDetails } from '../../lib/studyWords';
 import { StudyHeader, StudySearch } from './StudyPage';
 import { useState } from 'react';
@@ -93,7 +94,7 @@ export default function WordCollection({ kind, words, error = null, onRetry = nu
                     </div>
                   </div>
                   <div className="collection-word__actions">
-                    <button className="study-icon-button" onClick={() => speak(sayOf(stored))} aria-label={`Play word: ${word.phrase}`}><Volume2 size={20} aria-hidden="true" /></button>
+                    <button className="study-icon-button" onClick={() => playWordAudio(stored, { speakFn: speak })} aria-label={`Play word: ${word.phrase}`}><Volume2 size={20} aria-hidden="true" /></button>
                     {isSaved && <button className="study-icon-button study-icon-button--remove" onClick={() => onUnsave(word.id, word.phrase)} aria-label={`Unsave ${word.phrase}`}><BookmarkMinus size={20} aria-hidden="true" /></button>}
                   </div>
                 </li>

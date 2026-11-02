@@ -1,4 +1,5 @@
 import { sayOf } from './entry.js';
+import { speak } from './speech.js';
 
 /**
  * Resolves a vocabulary audio path against the application origin root,
@@ -6,7 +7,8 @@ import { sayOf } from './entry.js';
  * to the same static asset URL.
  *
  * Serving convention:
- * Static recordings live in public/audio/zh/hsk1/<id>.mp3 and are served at root /audio/...
+ * Static recordings live in public/audio/zh/hsk1/<id>.mp3 or public/audio/ja/n5/<id>.mp3
+ * and are served at root /audio/...
  * Relative CSV paths like "audio/zh/hsk1/..." resolve to "/audio/zh/hsk1/..." or full origin URL.
  * Absolute URLs (http/https) are preserved as-is.
  * Blank or whitespace strings return null.
@@ -30,52 +32,54 @@ export function resolveAudioUrl(audioPath, baseOrigin = null) {
 }
 
 /**
- * Default speech fallback for browser environments without injected speaker.
+ * Default speech fallback for browser environments, honoring active course language and user speech rate.
  */
-function defaultBrowserSpeak(text) {
-  if (!text || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  try {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    window.speechSynthesis.speak(utterance);
-  } catch {
-    // Ignore speech synthesis errors
-  }
+function defaultBrowserSpeak(text, options = {}) {
+  if (!text) return;
+  speak(text, options);
 }
 
 /**
- * Centralized word audio playback helper with playback cancellation and speech fallback.
+ * Centralized word audio playback helper with playback cancellation, state tracking, and speech fallback.
  *
  * Used by:
  * - LessonPicker word list playback
  * - Flashcard manual button playback
  * - Flashcard session autoplay
+ * - Flashcard example sentence playback
+ * - WordCollection (Saved & Review) playback
+ * - Dictionary word playback
  *
  * Guarantees:
  * - Null, blank, or whitespace audio_path never instantiates Audio; immediately triggers speech fallback.
  * - Relative audio paths resolve to application origin root regardless of active route.
  * - On media loading error or play() rejection, falls back to speech synthesis exactly once.
  * - Cancelling/disposing playback prevents stale/delayed fallback speech if the card changes or session ends.
+ * - Preserves Chinese/Japanese language selection and speech speed settings.
  */
 export function playWordAudio(word, {
   speakFn = null,
   sayFn = sayOf,
   audioCtor = typeof Audio !== 'undefined' ? Audio : null,
   baseOrigin = null,
+  onStart = null,
+  onEnded = null,
+  onError = null,
 } = {}) {
-  const fallbackText = sayFn(word);
-  const resolvedUrl = resolveAudioUrl(word?.audio_path, baseOrigin);
+  const fallbackText = typeof word === 'string' ? word : sayFn(word);
+  const resolvedUrl = typeof word === 'string' ? null : resolveAudioUrl(word?.audio_path, baseOrigin);
 
   let cancelled = false;
   let hasFallenBack = false;
 
-  const fallback = () => {
+  const fallback = (_err) => {
     if (cancelled || hasFallenBack) return;
     hasFallenBack = true;
-    if (typeof speakFn === 'function') {
-      speakFn(fallbackText);
-    } else {
-      defaultBrowserSpeak(fallbackText);
+    const speaker = typeof speakFn === 'function' ? speakFn : defaultBrowserSpeak;
+    try {
+      speaker(fallbackText, { onStart, onEnd: onEnded, onError });
+    } catch (e) {
+      if (onError && typeof onError === 'function') onError(e);
     }
   };
 
@@ -96,12 +100,19 @@ export function playWordAudio(word, {
   try {
     audio = new audioCtor(resolvedUrl);
     audio.addEventListener('error', fallback, { once: true });
+    if (onStart && typeof onStart === 'function') {
+      audio.addEventListener('play', () => { if (!cancelled) onStart(); }, { once: true });
+    }
+    if (onEnded && typeof onEnded === 'function') {
+      audio.addEventListener('ended', () => { if (!cancelled) onEnded(); }, { once: true });
+    }
+
     const playPromise = audio.play();
     if (playPromise && typeof playPromise.catch === 'function') {
       playPromise.catch(fallback);
     }
-  } catch {
-    fallback();
+  } catch (e) {
+    fallback(e);
   }
 
   const cancel = () => {
