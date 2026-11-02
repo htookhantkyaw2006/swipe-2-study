@@ -181,6 +181,18 @@ test('4. Profile clearly groups destructive actions in Session & account danger 
   assert.ok(!html.includes('profile-plan'), 'Removes promotional Free plan card');
   assert.ok(!html.includes('Send feedback'), 'Hides nonfunctional Send feedback row');
   assert.ok(html.includes('Learning settings'), 'Includes single clear Learning settings link');
+  assert.ok(html.includes('Course language, audio, and display'), 'Learning settings copy excludes daily goals');
+  assert.ok(!html.includes('daily goals'), 'daily goals is removed from Profile settings copy');
+  assert.ok(html.includes('under your account'), 'Signed in storage note distinguishes account storage on device');
+
+  // Guest view check
+  const guestHtml = renderWithProviders(createElement(Profile), { authValue: { user: null, isGuest: true, isConfigured: true } });
+  assert.ok(guestHtml.includes('Guest words stay on this device'), 'Guest mode clearly states guest words stay on device');
+
+  // Keyboard focus-visible rules
+  const profileCss = fs.readFileSync(path.resolve(projectRoot, 'src/pages/Profile.css'), 'utf8');
+  assert.match(profileCss, /\.profile-setting:focus-visible\s*\{/, 'Profile setting has dedicated :focus-visible style');
+  assert.match(profileCss, /\.profile-edit-btn:focus-visible\s*\{/, 'Profile edit button has dedicated :focus-visible style');
   assert.ok(html.includes('Learning overview'), 'Includes unified learning overview');
 });
 

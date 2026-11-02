@@ -30,6 +30,7 @@ import { sendDeletionRequest, removeOwnerLocalData, UNCONFIRMED_DELETION_GUIDANC
 import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
 import { useStudyStreak } from '../lib/studyStreak.js';
 import { getLearnedWords } from '../lib/vocabularyProgress.js';
+import { useOnlineSync } from '../lib/onlineSyncContext.js';
 import DeleteAccountDialog from '../components/DeleteAccountDialog.jsx';
 import '../components/study/StudyPage.css';
 import './Profile.css';
@@ -83,7 +84,24 @@ export default function Profile() {
   const [deletionNotice, setDeletionNotice] = useState('');
   const [, retryCollections] = useState(0);
   const [, setCollectionVersion] = useState(0);
+  const { status: syncStatus } = useOnlineSync();
   const streak = useStudyStreak();
+
+  const accountStorageNote = (() => {
+    if (syncStatus === 'saved') {
+      return 'Saved words and review lists are synced with your account and saved on this device.';
+    }
+    if (syncStatus === 'syncing') {
+      return 'Syncing your saved words and review lists with your account…';
+    }
+    if (syncStatus === 'failed') {
+      return 'Account sync is unavailable. Saved words and review lists are kept on this device.';
+    }
+    if (syncStatus === 'conflict') {
+      return 'Sync conflict pending resolution. Words are kept on this device.';
+    }
+    return 'Saved words and review lists are stored on this device under your account.';
+  })();
 
   useEffect(() => {
     const unsubOwner = storageOwner.subscribe(() => setCollectionVersion(v => v + 1));
@@ -298,7 +316,7 @@ export default function Profile() {
               <Link className="profile-edit-btn" to="/profile/edit">
                 Edit profile
               </Link>
-              <p className="profile-local-note">Saved words and review lists are stored on this device.</p>
+              <p className="profile-local-note">{accountStorageNote}</p>
             </div>
           )}
 
@@ -360,7 +378,7 @@ export default function Profile() {
               to="/settings"
               icon={Settings}
               title="Learning settings"
-              subtitle="Course language, daily goals, audio, and display"
+              subtitle="Course language, audio, and display"
             />
             {user && !busy && (
               <button

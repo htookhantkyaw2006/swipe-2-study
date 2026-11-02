@@ -333,6 +333,15 @@ export async function runVisualBatch3Verification() {
             mobile: true,
           },
           {
+            width: 1024,
+            height: 800,
+            route: '/profile',
+            page: 'profile-signed-in',
+            name: 'profile-signed-in-1024w.png',
+            desc: 'Profile Signed-In Mode (Tablet/Desktop 1024w)',
+            mobile: false,
+          },
+          {
             width: 1440,
             height: 900,
             route: '/profile',
