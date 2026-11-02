@@ -59,8 +59,10 @@ export function reconcileSnapshotWithLocal({
           serverTombstonesByItemKey.set(t.item_key, t);
         }
         if (t.written_form) {
-          const isHomonymT = HOMONYM_SENSE_WORDS.has(String(t.written_form || '').normalize('NFC').trim()) || Boolean(t.sense_id);
-          const tSenseId = isHomonymT ? (t.sense_id || '') : '';
+          const normWritten = String(t.written_form || '').normalize('NFC').trim();
+          const isHomonym = HOMONYM_SENSE_WORDS.has(normWritten);
+          const hasExplicitSense = Boolean(t.sense_id && t.sense_id.trim());
+          const tSenseId = (isHomonym || hasExplicitSense) ? (t.sense_id || '') : '';
           const k = recordKey(t.language, t.kind, t.written_form, t.reading, tSenseId);
           serverTombstonesByRecordKey.set(k, t);
         }
@@ -115,8 +117,11 @@ export function reconcileSnapshotWithLocal({
 
       // 1. Process cloud items
       for (const item of cloudItems) {
-        const isHomonymItem = HOMONYM_SENSE_WORDS.has(String(item.written_form || '').normalize('NFC').trim()) || Boolean(item.sense_id || item.data?.sense_key || item.data?.sense_id);
-        const itemSenseId = isHomonymItem ? (item.sense_id || item.data?.card_id || item.data?.sense_id || '') : '';
+        const normWritten = String(item.written_form || '').normalize('NFC').trim();
+        const isHomonym = HOMONYM_SENSE_WORDS.has(normWritten);
+        const hasExplicitSense = Boolean((item.sense_id && item.sense_id.trim()) || (item.data?.sense_key && item.data.sense_key.trim()) || (item.data?.sense_id && item.data.sense_id.trim()));
+        const isDisambiguated = isHomonym || hasExplicitSense;
+        const itemSenseId = isDisambiguated ? (item.sense_id || item.data?.sense_id || item.data?.sense_key || (isHomonym ? item.data?.card_id : '') || '') : '';
         const itemKey = recordKey(item.language, item.kind, item.written_form, item.reading, itemSenseId);
         seenKeys.add(itemKey);
 

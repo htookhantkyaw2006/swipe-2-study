@@ -876,19 +876,31 @@ begin
     end if;
 
     -- Extract stable canonical sense identity
-    sense_id = coalesce(
-      nullif(btrim(mutation->>'sense_id'), ''),
-      nullif(btrim(item_data->>'sense_id'), ''),
-      nullif(btrim(item_data->>'sense_key'), ''),
-      nullif(btrim(item_data->>'card_id'), '')
-    );
+    -- Preserve four-part identities for HSK and ordinary N5 entries.
+    -- Card ID alone must not change an ordinary word's cloud identity.
+    -- Canonical sense identity is used ONLY where disambiguation is required:
+    -- 1) Intentional homonyms: written in ('あの', 'ある', 'かける', 'キロ', 'もう')
+    -- 2) Explicit sense_id or sense_key provided on mutation or item_data
+    if written in ('あの', 'ある', 'かける', 'キロ', 'もう') then
+      sense_id := coalesce(
+        nullif(btrim(mutation->>'sense_id'), ''),
+        nullif(btrim(item_data->>'sense_id'), ''),
+        nullif(btrim(item_data->>'sense_key'), ''),
+        nullif(btrim(item_data->>'card_id'), '')
+      );
+    elsif (mutation ? 'sense_id' and nullif(btrim(mutation->>'sense_id'), '') is not null)
+       or (item_data ? 'sense_id' and nullif(btrim(item_data->>'sense_id'), '') is not null)
+       or (item_data ? 'sense_key' and nullif(btrim(item_data->>'sense_key'), '') is not null) then
+      sense_id := coalesce(
+        nullif(btrim(mutation->>'sense_id'), ''),
+        nullif(btrim(item_data->>'sense_id'), ''),
+        nullif(btrim(item_data->>'sense_key'), '')
+      );
+    else
+      sense_id := null;
+    end if;
 
-    if sense_id is not null and sense_id <> '' and (
-      mutation ? 'sense_id' or
-      written in ('あの', 'ある', 'かける', 'キロ', 'もう') or
-      (mutation->'data') ? 'sense_key' or
-      (mutation->'data') ? 'sense_id'
-    ) then
+    if sense_id is not null and sense_id <> '' then
       identity_key = encode(sha256(convert_to(jsonb_build_array(
         item_language, item_kind,
         private.s2s_item_text(written),
@@ -1302,19 +1314,31 @@ begin
     end if;
 
     -- Extract stable canonical sense identity
-    sense_id = coalesce(
-      nullif(btrim(item->>'sense_id'), ''),
-      nullif(btrim(item_data->>'sense_id'), ''),
-      nullif(btrim(item_data->>'sense_key'), ''),
-      nullif(btrim(item_data->>'card_id'), '')
-    );
+    -- Preserve four-part identities for HSK and ordinary N5 entries.
+    -- Card ID alone must not change an ordinary word's cloud identity.
+    -- Canonical sense identity is used ONLY where disambiguation is required:
+    -- 1) Intentional homonyms: written in ('あの', 'ある', 'かける', 'キロ', 'もう')
+    -- 2) Explicit sense_id or sense_key provided on item or item_data
+    if written in ('あの', 'ある', 'かける', 'キロ', 'もう') then
+      sense_id := coalesce(
+        nullif(btrim(item->>'sense_id'), ''),
+        nullif(btrim(item_data->>'sense_id'), ''),
+        nullif(btrim(item_data->>'sense_key'), ''),
+        nullif(btrim(item_data->>'card_id'), '')
+      );
+    elsif (item ? 'sense_id' and nullif(btrim(item->>'sense_id'), '') is not null)
+       or (item_data ? 'sense_id' and nullif(btrim(item_data->>'sense_id'), '') is not null)
+       or (item_data ? 'sense_key' and nullif(btrim(item_data->>'sense_key'), '') is not null) then
+      sense_id := coalesce(
+        nullif(btrim(item->>'sense_id'), ''),
+        nullif(btrim(item_data->>'sense_id'), ''),
+        nullif(btrim(item_data->>'sense_key'), '')
+      );
+    else
+      sense_id := null;
+    end if;
 
-    if sense_id is not null and sense_id <> '' and (
-      item ? 'sense_id' or
-      written in ('あの', 'ある', 'かける', 'キロ', 'もう') or
-      item_data ? 'sense_key' or
-      item_data ? 'sense_id'
-    ) then
+    if sense_id is not null and sense_id <> '' then
       identity_key = encode(sha256(convert_to(jsonb_build_array(item_language, item_kind,
         private.s2s_item_text(written), private.s2s_item_text(pronunciation), sense_id)::text, 'UTF8')), 'hex');
     else

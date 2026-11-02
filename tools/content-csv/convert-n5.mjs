@@ -104,13 +104,17 @@ export function computeN5ItemHash(courseId, writtenForm, reading, senseIndex = 1
 }
 
 /**
- * Performs conversion from client source CSV to Swipe2Study import contract.
+ * Serialization policy for N5 conversion outputs:
+ * - CSV: UTF-8 with optional BOM (\uFEFF) and configurable line terminator (lineEnding, default '\r\n').
+ * - JSON: UTF-8 formatted with 2-space indentation and trailing LF ('\n').
  */
 export function convertN5Dataset({
   sourcePath = SOURCE_CSV_PATH,
   importCsvPath = IMPORT_CSV_PATH,
   mappingJsonPath = MAPPING_JSON_PATH,
   registryPath = null,
+  lineEnding = '\r\n',
+  bom = true,
 } = {}) {
   if (!fs.existsSync(sourcePath)) {
     throw new Error(`Source CSV not found at: ${sourcePath}`);
@@ -350,8 +354,9 @@ export function convertN5Dataset({
     }
   }
 
-  // Write import CSV (UTF-8 with BOM and CRLF to match client contract)
-  fs.writeFileSync(importCsvPath, '\uFEFF' + importCsvLines.join('\r\n') + '\r\n', 'utf8');
+  // Write import CSV according to serialization policy (UTF-8 with optional BOM and specified line terminator)
+  const csvContent = (bom ? '\uFEFF' : '') + importCsvLines.join(lineEnding) + lineEnding;
+  fs.writeFileSync(importCsvPath, csvContent, 'utf8');
 
   // Write mapping JSON (UTF-8, formatted)
   const mappingDocument = {

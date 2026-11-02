@@ -10,12 +10,19 @@ export function extractCanonicalSenseId(word) {
   if (typeof word.sense_key === 'string' && word.sense_key.trim()) {
     return word.sense_key.trim();
   }
-  if (typeof word.card_id === 'string' && word.card_id.trim()) {
-    return word.card_id.trim();
-  }
-  if (typeof word.id === 'string') {
-    if (word.id.startsWith('pw_')) return word.id.slice(3);
-    if (/^(?:ja|zh)-/i.test(word.id)) return word.id.trim();
+  // A card_id alone must not change an ordinary word's cloud identity.
+  // Card ID / vocab ID is used as sense discriminator ONLY when disambiguation is required
+  // (i.e. for intentional homonym words).
+  const written = wordOf(word)?.normalize('NFC').trim();
+  if (written && HOMONYM_SENSE_WORDS.has(written)) {
+    if (typeof word.card_id === 'string' && word.card_id.trim()) {
+      return word.card_id.trim();
+    }
+    if (typeof word.id === 'string') {
+      if (word.id.startsWith('pw_')) return word.id.slice(3);
+      if (/^(?:ja|zh)[-_]/i.test(word.id)) return word.id.trim();
+      return word.id.trim();
+    }
   }
   return '';
 }

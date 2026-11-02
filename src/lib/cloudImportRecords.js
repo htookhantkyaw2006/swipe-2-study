@@ -1,5 +1,5 @@
 import { readingOf, wordOf } from './entry.js';
-import { extractCanonicalSenseId } from './studyWords.js';
+import { extractCanonicalSenseId, HOMONYM_SENSE_WORDS } from './studyWords.js';
 
 export const CLOUD_KINDS = Object.freeze(['saved_words', 'review_cards', 'search_history',
   'written_chars', 'learned_radicals', 'learned_kana', 'learned_sounds', 'learned_words']);
@@ -78,8 +78,11 @@ export function buildCloudImportItems(tables) {
         if (!isWord && key === FIELDS[kind]) continue;
         Object.defineProperty(data, key, { value, enumerable: true, writable: true, configurable: true });
       }
-      const senseId = isWord ? extractCanonicalSenseId(row) : '';
-      const item = { language, kind, written_form: written.normalize('NFC').trim(), reading: reading.normalize('NFC').trim(), data, observed_at: observedAt(row, kind) };
+      const normWritten = written.normalize('NFC').trim();
+      const isHomonym = HOMONYM_SENSE_WORDS.has(normWritten);
+      const hasExplicitSense = Boolean((row.sense_id && String(row.sense_id).trim()) || (row.sense_key && String(row.sense_key).trim()));
+      const senseId = (isWord && (isHomonym || hasExplicitSense)) ? extractCanonicalSenseId(row) : '';
+      const item = { language, kind, written_form: normWritten, reading: reading.normalize('NFC').trim(), data, observed_at: observedAt(row, kind) };
       if (senseId) item.sense_id = senseId;
       validateCloudItem(item);
       items.push(item);

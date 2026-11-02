@@ -434,6 +434,7 @@ test('5. CLI CSV Validation: N5_Swipe2Study_import.csv passes with 0 errors and 
 
 test('6. Conversion Reproducibility: Re-running conversion produces identical files and hashes', () => {
   const hashFile = (p) => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+  const normalizeText = (s) => s.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 's2s-n5-convert-'));
   try {
@@ -460,13 +461,46 @@ test('6. Conversion Reproducibility: Re-running conversion produces identical fi
     assert.equal(result2.totalRecords, 706);
     assert.equal(result2.totalExamples, 2118);
 
-    // Both runs must produce byte-for-byte identical output
+    // 1. Determinism: repeated runs with same options must produce byte-for-byte identical output
     assert.equal(hashFile(tmpCsv1), hashFile(tmpCsv2), 'Import CSV hash is 100% deterministic and reproducible across runs');
     assert.equal(hashFile(tmpJson1), hashFile(tmpJson2), 'Mapping JSON hash is 100% deterministic and reproducible across runs');
 
-    // Converted outputs in temp dir must match checked-in baseline files without modifying them
-    assert.equal(hashFile(tmpCsv1), hashFile(IMPORT_CSV_PATH), 'Converted CSV matches tracked repository artifact');
-    assert.equal(hashFile(tmpJson1), hashFile(MAPPING_JSON_PATH), 'Converted mapping JSON matches tracked repository artifact');
+    // 2. Semantic & Content Preservation: parsed rows, IDs, headers, and fields match tracked repository artifacts
+    const parsedTmp = parseCsv(fs.readFileSync(tmpCsv1, 'utf8'));
+    const parsedTracked = parseCsv(fs.readFileSync(IMPORT_CSV_PATH, 'utf8'));
+    assert.deepEqual(parsedTmp.headers, parsedTracked.headers, 'CSV headers match tracked repository artifact');
+    assert.equal(parsedTmp.rows.length, 706);
+    assert.equal(parsedTracked.rows.length, 706);
+    assert.deepEqual(parsedTmp.rows, parsedTracked.rows, 'All 706 rows and IDs match tracked repository artifact');
+
+    // JSON semantic structure match
+    const jsonTmp = JSON.parse(fs.readFileSync(tmpJson1, 'utf8'));
+    const jsonTracked = JSON.parse(fs.readFileSync(MAPPING_JSON_PATH, 'utf8'));
+    assert.deepEqual(jsonTmp, jsonTracked, 'Mapping JSON semantic structure matches tracked repository artifact');
+
+    // 3. Line-ending normalized serialization verification (cross-platform Linux/Windows safety)
+    assert.equal(
+      normalizeText(fs.readFileSync(tmpCsv1, 'utf8')),
+      normalizeText(fs.readFileSync(IMPORT_CSV_PATH, 'utf8')),
+      'CSV content matches tracked artifact across Linux LF and Windows CRLF checkouts'
+    );
+    assert.equal(
+      normalizeText(fs.readFileSync(tmpJson1, 'utf8')),
+      normalizeText(fs.readFileSync(MAPPING_JSON_PATH, 'utf8')),
+      'Mapping JSON content matches tracked artifact across Linux LF and Windows CRLF checkouts'
+    );
+
+    // 4. Configurable serialization policy: supports explicit LF line endings
+    const tmpCsvLf = path.join(tmpDir, 'import_lf.csv');
+    const tmpJsonLf = path.join(tmpDir, 'mapping_lf.json');
+    convertN5Dataset({
+      sourcePath: SOURCE_CSV_PATH,
+      importCsvPath: tmpCsvLf,
+      mappingJsonPath: tmpJsonLf,
+      lineEnding: '\n',
+    });
+    const parsedLf = parseCsv(fs.readFileSync(tmpCsvLf, 'utf8'));
+    assert.deepEqual(parsedLf.rows, parsedTracked.rows, 'Explicit LF serialization preserves 100% of data rows');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
