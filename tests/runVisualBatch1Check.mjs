@@ -60,6 +60,13 @@ export async function runVisualBatch1Verification() {
   const rawItems = mapCsvRowsToItems(parsed.rows);
   const hsk1Items = rawItems.map((item, index) => mapVocabularyToCard(item, { language: 'zh', level_id: 'HSK1' }, index));
 
+  // Load the approved 706 N5 items from the repository data and map to flashcard shape
+  const n5CsvPath = path.resolve(ROOT_DIR, 'tools/content-csv/data/N5_Swipe2Study_import.csv');
+  const n5CsvContent = fs.readFileSync(n5CsvPath, 'utf8');
+  const n5Parsed = parseCsv(n5CsvContent);
+  const n5RawItems = mapCsvRowsToItems(n5Parsed.rows);
+  const n5Items = n5RawItems.map((item, index) => mapVocabularyToCard(item, { language: 'ja', level_id: 'N5' }, index));
+
   const viteServer = await createViteServer({
     server: { port: 0, hmr: false, ws: false, host: '127.0.0.1' },
     appType: 'custom',
@@ -93,6 +100,13 @@ export async function runVisualBatch1Verification() {
       if (url === '/api/hsk1-items') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(hsk1Items));
+        return;
+      }
+
+      // Endpoint serving approved 706 N5 items
+      if (url === '/api/n5-items') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(n5Items));
         return;
       }
 

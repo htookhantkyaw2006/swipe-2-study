@@ -18,8 +18,9 @@
 
   --bg-gradient: linear-gradient(145deg, #F0F9FF 0%, #EBF8FF 50%, #E0F2FE 100%);
 
+  --font-cjk: 'Noto Sans SC', 'Noto Sans JP', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Noto Sans Myanmar', var(--font-cjk), system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* The reading line under a word: pinyin, romaji or IPA. Monospace
      suits pinyin and romaji. IPA in monospace gives every mark a full
@@ -67,8 +68,13 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
   font-weight: 700;
   color: var(--color-primary-blue);
+}
+
+input, select, textarea {
+  font-family: var(--font-sans);
 }
 
 a {

@@ -19,7 +19,6 @@ import { isAccountDeletionEnabled } from '../lib/accountDeletionGate.js';
 import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
 import DeleteAccountDialog from '../components/DeleteAccountDialog.jsx';
 import { useStudyStreak } from '../lib/studyStreak.js';
-import { useOnlineSync } from '../lib/onlineSyncContext.js';
 import { getCourseProgress } from '../lib/vocabularyProgress.js';
 
 export default function Profile() {
@@ -35,7 +34,6 @@ export default function Profile() {
   const photo = useAvatarUrl(profile?.avatar_path);
   const guestImport = useGuestImport();
   const streak = useStudyStreak();
-  const { status: syncStatus } = useOnlineSync();
 
   const [swipedCount, setSwipedCount] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -185,21 +183,21 @@ export default function Profile() {
       )}
 
       {/* Identity Card */}
-      <div className="surface-card" aria-label="Learning overview" style={{ padding: '24px', borderRadius: '24px', boxShadow: '0 12px 24px rgba(0,0,0,0.06)', position: 'relative' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+      <div className="surface-card" aria-label="Learning overview" style={{ padding: '24px', borderRadius: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', position: 'relative', zIndex: 1 }}>
           {photo.url ? (
             <img
               src={photo.url}
               alt={name}
-              style={{ width: '64px', height: '64px', borderRadius: '20px', objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+              style={{ width: '64px', height: '64px', borderRadius: '18px', objectFit: 'cover', boxShadow: '0 8px 16px rgba(91, 33, 182, 0.4)' }}
             />
           ) : (
             <div style={{
-              width: '64px', height: '64px', borderRadius: '20px',
-              background: 'linear-gradient(135deg, #A855F7 0%, #7E22CE 100%)',
+              width: '64px', height: '64px', borderRadius: '18px',
+              background: 'linear-gradient(135deg, #C4B5FD 0%, #5B21B6 100%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#FFFFFF', fontSize: '1.5rem', fontWeight: 800,
-              boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)'
+              boxShadow: '0 8px 16px rgba(91, 33, 182, 0.4)'
             }}>
               {initials}
             </div>
@@ -207,7 +205,7 @@ export default function Profile() {
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {name}
               </h2>
               {user && (
@@ -217,7 +215,7 @@ export default function Profile() {
               )}
             </div>
             {email && (
-              <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: '4px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {email}
               </p>
             )}
@@ -228,26 +226,31 @@ export default function Profile() {
         </div>
 
         {/* 2 Stat Cards inside */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <h2 style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
-            Learning overview
-          </h2>
+        <div style={{ display: 'flex', gap: '12px', position: 'relative', zIndex: 1 }}>
+          <div style={{ flex: 1, backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '16px', padding: '12px 16px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <Flame size={14} color="#EA580C" strokeWidth={3} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Streak</span>
+            </div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+              {streak?.streakDays || 0} <span style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>days</span>
+            </div>
+          </div>
+
+          <div style={{ flex: 1, backgroundColor: '#F8FAFC', border: '1px solid #F1F5F9', borderRadius: '16px', padding: '12px 16px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <BookOpen size={14} color="#0369A1" strokeWidth={3} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Swiped</span>
+            </div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+              {swipedCount} <span style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>cards</span>
+            </div>
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div style={{ padding: '12px 16px', borderRadius: '16px', backgroundColor: 'var(--color-page-bg)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Flame size={20} color="#EA580C" />
-            <div>
-              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#6B7280', textTransform: 'uppercase' }}>STREAK</div>
-              <div style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>{streak?.streakDays || 0} days</div>
-            </div>
-          </div>
-          <div style={{ padding: '12px 16px', borderRadius: '16px', backgroundColor: 'var(--color-page-bg)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <BookOpen size={20} color="var(--color-primary-blue)" />
-            <div>
-              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#6B7280', textTransform: 'uppercase' }}>SWIPED</div>
-              <div style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>{swipedCount} cards</div>
-            </div>
-          </div>
+
+        {/* Big Watermark */}
+        <div style={{ position: 'absolute', right: '-20px', bottom: '-40px', fontSize: '12rem', color: 'var(--color-ghost-blue)', fontWeight: 800, opacity: 0.5, zIndex: 0, pointerEvents: 'none', lineHeight: 1 }}>
+          {course.copy?.heroWatermark || '我'}
         </div>
       </div>
 

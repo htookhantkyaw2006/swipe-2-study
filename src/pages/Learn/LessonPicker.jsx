@@ -13,6 +13,7 @@ import { getLevelProgress } from '../../lib/vocabularyProgress';
 import { filterStudyWords } from '../../lib/studyWords';
 import { usePublishedCourse } from '../../lib/publishedContentContext';
 import { storageOwner } from '../../lib/storageOwner';
+import { safeNavigateBack } from '../../lib/navigation';
 
 export default function LessonPicker() {
   const navigate = useNavigate();
@@ -133,7 +134,7 @@ export default function LessonPicker() {
 
       {/* Header Row */}
       <header className="flex justify-between items-center" style={{ marginBottom: '24px' }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'transparent', padding: '8px', marginLeft: '-8px', border: 'none', cursor: 'pointer' }}>
+        <button onClick={() => safeNavigateBack(navigate, '/learn')} style={{ background: 'transparent', padding: '8px', marginLeft: '-8px', border: 'none', cursor: 'pointer' }}>
           <ChevronLeft size={24} color="var(--color-text-navy)" />
         </button>
         <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>{level.name}</h1>

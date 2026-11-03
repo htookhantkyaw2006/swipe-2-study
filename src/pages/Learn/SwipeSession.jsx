@@ -17,6 +17,7 @@ import { resolvePublishedCourseId } from '../../lib/publishedContentService';
 import { AuthContext } from '../../lib/authContext';
 import { storageOwner } from '../../lib/storageOwner';
 import { trackEvent } from '../../lib/analytics';
+import { safeNavigateBack } from '../../lib/navigation';
 
 const ShuffleDeck = () => {
   const baseCardStyle = {
@@ -301,7 +302,7 @@ const Flashcard = ({
         </div>
 
         {card.examples && card.examples.length > 0 && (
-          <div style={{ padding: '0 24px 24px 24px', flexShrink: 0 }}>
+          <div className="swipe-card__examples" style={{ padding: '0 24px 24px 24px', flexShrink: 0 }}>
             <h3 style={{ fontSize: '14px', color: '#38BDF8', fontWeight: 500, margin: '0 0 12px 0' }}>Examples</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {card.examples.map((ex, idx) => (
@@ -830,7 +831,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         <p style={{ color: 'var(--color-secondary-blue)', maxWidth: '300px' }}>
           {isReview ? 'You have no cards to review right now.' : isSaved ? 'Bookmark words during study sessions or in the dictionary to study them here.' : 'Choose a course to start learning.'}
         </p>
-        <button onClick={() => navigate(backTo)} style={{ marginTop: '24px', padding: '12px 24px', backgroundColor: 'var(--color-primary-blue)', color: '#FFF', borderRadius: '12px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Go Back</button>
+        <button onClick={() => safeNavigateBack(navigate, backTo)} style={{ marginTop: '24px', padding: '12px 24px', backgroundColor: 'var(--color-primary-blue)', color: '#FFF', borderRadius: '12px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Go Back</button>
       </div>
     );
   }
@@ -844,7 +845,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       {/* Top Header */}
       <header className="flex items-center justify-between" style={{ marginBottom: '24px', zIndex: 10 }}>
         <button
-          onClick={() => navigate(backTo)}
+          onClick={() => safeNavigateBack(navigate, backTo)}
           style={{
             width: '40px', height: '40px', borderRadius: '50%',
             backgroundColor: '#FFFFFF', color: '#0369A1',

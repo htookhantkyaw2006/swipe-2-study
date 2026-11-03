@@ -7,6 +7,7 @@ import { db } from '../../lib/db';
 import { useCourse } from '../../lib/language';
 import { readingOf, kanaOf, wordOf } from '../../lib/entry';
 import { storageOwner } from '../../lib/storageOwner';
+import { safeNavigateBack } from '../../lib/navigation';
 
 const toListRow = (card) => ({
   id: card.id,
@@ -70,7 +71,7 @@ export default function ReviewWords() {
     return (
       <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
-          <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
+          <button onClick={() => safeNavigateBack(navigate, '/library')} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
             <ChevronLeft size={24} color="var(--color-text-navy)" strokeWidth={2.5} />
           </button>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Review Words</h1>
@@ -137,7 +138,7 @@ export default function ReviewWords() {
 
       {/* Header */}
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
-        <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
+        <button onClick={() => safeNavigateBack(navigate, '/library')} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
           <ChevronLeft size={24} color="var(--color-text-navy)" strokeWidth={2.5} />
         </button>
         <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Review Words</h1>

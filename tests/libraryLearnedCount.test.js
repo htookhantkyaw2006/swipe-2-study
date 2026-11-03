@@ -53,7 +53,9 @@ function renderLibrary() {
 }
 
 function extractLearnedCountStat(html) {
-  const match = html.match(/<strong>(\d+)<\/strong><span>Learned words<\/span>/);
+  const match = html.match(/<strong>(\d+)<\/strong><span[^>]*>Learned words<\/span>/)
+    || html.match(/Words<br\s*\/?>Swiped[\s\S]*?<strong>(\d+)<\/strong>/i)
+    || html.match(/Words<br\s*\/?>Swiped[\s\S]*?<div[^>]*>(\d+)<\/div>/i);
   return match ? parseInt(match[1], 10) : null;
 }
 

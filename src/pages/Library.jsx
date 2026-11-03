@@ -146,11 +146,11 @@ export default function Library() {
 
       {/* Header Container */}
       <div style={{ maxWidth: '500px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        <div style={{ padding: '32px 24px 24px 24px' }}>
+        <div style={{ padding: '40px 24px 32px 24px' }}>
           <header className="flex justify-between items-start">
             <div>
-              <p style={{ fontSize: '1.125rem', color: 'rgba(255, 255, 255, 0.9)', margin: '0 0 4px 0', fontWeight: 500 }}>Hello!</p>
-              <h1 style={{ fontSize: '1.75rem', color: '#FFFFFF', margin: 0, fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.2 }}>What do you want<br/>to learn today?</h1>
+              <p style={{ fontSize: '1.25rem', color: 'rgba(255, 255, 255, 0.9)', margin: '0 0 8px 0', fontWeight: 500 }}>Hello!</p>
+              <h1 style={{ fontSize: '2rem', color: '#FFFFFF', margin: 0, fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.2 }}>What do you want<br/>to learn today?</h1>
             </div>
             <button
               onClick={() => navigate('/profile')}
@@ -172,25 +172,25 @@ export default function Library() {
       {/* Main Content Sheet */}
       <div style={{
         background: 'var(--bg-gradient)',
-        borderTopLeftRadius: '32px',
-        borderTopRightRadius: '32px',
+        borderTopLeftRadius: '40px',
+        borderTopRightRadius: '40px',
         position: 'relative',
         zIndex: 1,
         marginTop: '-8px'
       }}>
-        <div style={{ maxWidth: '500px', margin: '0 auto', padding: '24px 20px 40px 20px' }}>
+        <div style={{ maxWidth: '500px', margin: '0 auto', padding: '24px 24px 100px 24px' }}>
 
           {/* Progress Tracking Section */}
           <div style={{ marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.5px', background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.5px', background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
                 Your Swipe Stats
               </h2>
               <div style={{
-                display: 'flex', alignItems: 'center', gap: '6px', color: '#0369A1', fontWeight: 900, fontSize: '1.1rem',
+                display: 'flex', alignItems: 'center', gap: '8px', color: '#0369A1', fontWeight: 900, fontSize: '1.2rem',
                 background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(224, 242, 254, 0.7) 100%)',
                 backdropFilter: 'blur(12px)',
-                padding: '6px 14px', borderRadius: '24px',
+                padding: '6px 18px', borderRadius: '24px',
                 boxShadow: '0 8px 24px rgba(2, 132, 199, 0.15), inset 0 2px 4px rgba(255, 255, 255, 1)',
                 border: '1px solid rgba(255, 255, 255, 0.9)'
               }}>

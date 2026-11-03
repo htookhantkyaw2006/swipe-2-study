@@ -6,6 +6,7 @@ import { usePublishedContent } from '../../lib/publishedContentContext';
 import { resolvePublishedCourseId } from '../../lib/publishedContentService';
 import { getLevelProgress } from '../../lib/vocabularyProgress';
 import { db } from '../../lib/db';
+import { safeNavigateBack } from '../../lib/navigation';
 
 const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => {
   const radius = (size - strokeWidth) / 2;
@@ -58,7 +59,7 @@ export default function LevelPicker() {
   return (
     <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto', paddingBottom: '100px' }}>
       <header className="flex items-center justify-center relative" style={{ marginBottom: '24px' }}>
-        <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}>
+        <button onClick={() => safeNavigateBack(navigate, '/')} style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}>
           <ChevronLeft size={24} color="var(--color-text-navy)" />
         </button>
         <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>{course.copy.coursesTitle}</h1>
@@ -92,7 +93,7 @@ export default function LevelPicker() {
       </div>
 
       {/* Levels Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+      <div className="level-picker__grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
         {levels.map((level) => {
           return (
             <div
