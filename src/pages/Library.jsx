@@ -1,350 +1,333 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronRight, User, LayoutGrid, List } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search, PenLine, Bookmark, Mic, Layers, ChevronRight, User, MessageCircle, RotateCw, BookOpen, LayoutGrid, List, Blocks, Languages, Type, AudioLines } from 'lucide-react';
 import { db } from '../lib/db';
-import { storageOwner } from '../lib/storageOwner.js';
-import { getCourseProgress } from '../lib/vocabularyProgress.js';
 import { useCourse } from '../lib/language';
 import { usePublishedContent } from '../lib/publishedContentContext.jsx';
 import { resolvePublishedCourseId } from '../lib/publishedContentService.js';
-import { StudySearch } from '../components/study/StudyPage';
-import LearningIcon from '../components/ui/LearningIcon';
-import './Library.css';
+import { getCourseProgress } from '../lib/vocabularyProgress.js';
+import { storageOwner } from '../lib/storageOwner.js';
+import { useStudyStreak } from '../lib/studyStreak.js';
 
-function ToolCard({ tool }) {
-  const available = Boolean(tool.path && tool.path !== '#');
-  const content = (
-    <>
-      <LearningIcon kind={tool.key} className="library-tool__art" />
-      <span className="library-tool__copy">
-        <span className="library-tool__title">{tool.title}</span>
-        <span className="library-tool__subtitle">{tool.subtitle}</span>
-      </span>
-      {available ? (
-        <ChevronRight className="library-tool__arrow" size={20} aria-hidden="true" />
-      ) : (
-        <span className="library-tool__soon">Soon</span>
-      )}
-    </>
-  );
-  return available ? (
-    <Link className="library-tool" to={tool.path}>
-      {content}
-    </Link>
-  ) : (
-    <div className="library-tool library-tool--soon" aria-label={`${tool.title}, coming soon`}>
-      {content}
+/* One tool tile matching original client presentation */
+const ToolCard = ({ tool, isGridView, onClick }) => (
+  <div
+    className="surface-card"
+    style={{
+      display: 'flex',
+      flexDirection: isGridView ? 'column' : 'row',
+      alignItems: isGridView ? 'flex-start' : 'center',
+      justifyContent: isGridView ? 'center' : 'space-between',
+      padding: isGridView ? '24px 20px' : '20px 24px',
+      borderRadius: '24px',
+      position: 'relative',
+      overflow: 'hidden',
+      cursor: tool.path === '#' ? 'default' : 'pointer',
+      transition: 'transform 0.2s, box-shadow 0.2s',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+    }}
+    onMouseOver={(e) => { if (tool.path === '#') return; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.08)'; }}
+    onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)'; }}
+    onClick={onClick}
+  >
+    <div style={{ display: 'flex', flexDirection: isGridView ? 'column' : 'row', alignItems: isGridView ? 'flex-start' : 'center', gap: isGridView ? '12px' : '16px', zIndex: 1 }}>
+      <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: tool.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: `0 4px 12px ${tool.shadow}` }}>
+        <tool.icon size={24} color="#FFFFFF" />
+      </div>
+      <div>
+        <h3 style={{ fontSize: isGridView ? '1rem' : '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {tool.title}
+          {tool.path === '#' && (
+            <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)', backgroundColor: 'var(--color-ghost-blue)', padding: '2px 8px', borderRadius: '999px' }}>
+              Soon
+            </span>
+          )}
+        </h3>
+        <p style={{ fontSize: isGridView ? '0.75rem' : '0.875rem', color: 'var(--color-secondary-blue)', margin: 0 }}>{tool.subtitle}</p>
+      </div>
     </div>
-  );
-}
+    {!isGridView && tool.path !== '#' && <ChevronRight size={24} color="var(--color-secondary-blue)" style={{ zIndex: 1, opacity: 0.5 }} />}
+    <div style={{ position: 'absolute', right: isGridView ? '5px' : '20px', bottom: isGridView ? '-15px' : '-25px', fontSize: isGridView ? '6rem' : '8rem', color: tool.charColor, fontWeight: 800, opacity: isGridView ? 0.3 : 0.6, zIndex: 0, pointerEvents: 'none', transition: 'all 0.3s' }}>{tool.char}</div>
+  </div>
+);
+
+const EXPLORE_STYLE = {
+  scriptDictionary: { icon: Languages, gradient: 'linear-gradient(135deg, #FCD34D 0%, #B45309 100%)', shadow: 'rgba(180, 83, 9, 0.4)', charColor: '#FEF3C7' },
+  sounds:           { icon: AudioLines, gradient: 'linear-gradient(135deg, #67E8F9 0%, #0891B2 100%)', shadow: 'rgba(8, 145, 178, 0.4)', charColor: '#CFFAFE' },
+  kana:             { icon: Type,      gradient: 'linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)', shadow: 'rgba(219, 39, 119, 0.4)', charColor: '#FCE7F3' },
+  radicals:         { icon: Blocks,    gradient: 'linear-gradient(135deg, #A5B4FC 0%, #4338CA 100%)', shadow: 'rgba(67, 56, 202, 0.4)', charColor: '#E0E7FF' },
+  interest:         { icon: Layers,    gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', charColor: '#F3E8FF' },
+  writing:          { icon: PenLine,   gradient: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)', shadow: 'rgba(15, 118, 110, 0.4)', charColor: '#CCFBF1' },
+  twisters:         { icon: Mic,       gradient: 'linear-gradient(135deg, #FDA4AF 0%, #E11D48 100%)', shadow: 'rgba(225, 29, 72, 0.4)', charColor: '#FFE4E6' }
+};
 
 export default function Library() {
+  const navigate = useNavigate();
   const course = useCourse();
-  const { enabled: publishedEnabled, getCourseState, loadCourse } = usePublishedContent();
-  const [isGrid, setIsGrid] = useState(true);
-  const [query, setQuery] = useState('');
-  const [, setDataVersion] = useState(0);
+  const chars = course.toolChars || {};
+  const publishedContent = usePublishedContent();
+  const streak = useStudyStreak();
+
+  const [savedCount, setSavedCount] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [swipedCount, setSwipedCount] = useState(0);
+  const [isGridView, setIsGridView] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const updateStats = () => {
+    try {
+      const reviewCards = db.get('review_cards') || [];
+      const saved = db.get('saved_words') || [];
+      const learned = db.get('learned_words') || [];
+      setReviewCount(reviewCards.length);
+      setSavedCount(saved.length);
+      setSwipedCount(learned.length);
+    } catch {
+      setReviewCount(0);
+      setSavedCount(0);
+      setSwipedCount(0);
+    }
+  };
 
   useEffect(() => {
-    const unsubChange = storageOwner.subscribeChange(() => setDataVersion((v) => v + 1));
-    const unsubOwner = storageOwner.subscribe(() => setDataVersion((v) => v + 1));
+    updateStats();
+    const unsubChange = storageOwner.subscribeChange(updateStats);
+    const unsubOwner = storageOwner.subscribe(updateStats);
     return () => {
       unsubChange?.();
       unsubOwner?.();
     };
   }, []);
 
-  const supportedCourseIds = (course.levels || [])
-    .map((level) => resolvePublishedCourseId(course.id, level.id))
-    .filter(Boolean);
+  // Published course state check
+  const level1 = course.levels[0];
+  const publishedCourseId = level1 ? resolvePublishedCourseId(course.id, level1.id) : null;
+  const publishedState = publishedCourseId ? publishedContent.getCourseState(publishedCourseId) : null;
+  const isLoaded = publishedState?.status === 'loaded';
+  const availableCards = isLoaded ? (publishedState.items?.length || 0) : 0;
 
-  useEffect(() => {
-    if (publishedEnabled && supportedCourseIds.length > 0) {
-      for (const id of supportedCourseIds) {
-        const state = getCourseState(id);
-        if (state.status === 'idle') {
-          loadCourse(id).catch(() => {});
-        }
-      }
-    }
-  }, [publishedEnabled, supportedCourseIds, getCourseState, loadCourse]);
+  const flashcardsSubtitle = !publishedContent.enabled
+    ? 'Catalog disabled'
+    : publishedState?.status === 'loading'
+      ? 'Loading cards…'
+      : isLoaded && availableCards === 0
+        ? 'No cards available'
+        : isLoaded
+          ? `${availableCards} cards available`
+          : 'Daily practice';
 
-  const [storageError, setStorageError] = useState(null);
-  let savedCount = 0;
-  let reviewCount = 0;
-  let learnedCount = 0;
-  let isStorageUnavailable = Boolean(storageError);
-
-  try {
-    const saved = db.get('saved_words');
-    const review = db.get('review_cards');
-    const progress = getCourseProgress(db, course);
-    savedCount = saved ? saved.length : 0;
-    reviewCount = review ? review.length : 0;
-    learnedCount = progress.uniqueLearned ?? 0;
-  } catch {
-    isStorageUnavailable = true;
-  }
-
-  const handleRetryStorage = () => {
-    try {
-      db.get('saved_words');
-      db.get('review_cards');
-      getCourseProgress(db, course);
-      setStorageError(null);
-      setDataVersion((v) => v + 1);
-    } catch {
-      setStorageError('Unable to read local collections. Please try again.');
-    }
-  };
-
-  let cardStatus = 'disabled';
-  let cardCountDisplay = '—';
-  let cardCountLabel = 'Catalog disabled';
-
-  if (!publishedEnabled) {
-    cardStatus = 'disabled';
-    cardCountDisplay = '—';
-    cardCountLabel = 'Catalog disabled';
-  } else if (supportedCourseIds.length === 0) {
-    cardStatus = 'unpublished';
-    cardCountDisplay = '—';
-    cardCountLabel = 'In preparation';
-  } else {
-    const states = supportedCourseIds.map((id) => getCourseState(id));
-    const isLoading = states.some((s) => s.status === 'loading' || s.status === 'idle');
-    const hasError = states.some((s) => s.status === 'error') && !states.some((s) => s.status === 'loaded');
-
-    if (isLoading) {
-      cardStatus = 'loading';
-      cardCountDisplay = '…';
-      cardCountLabel = 'Loading cards…';
-    } else if (hasError) {
-      cardStatus = 'error';
-      cardCountDisplay = '!';
-      cardCountLabel = 'Unable to load';
-    } else {
-      const loadedStates = states.filter((s) => s.status === 'loaded');
-      if (loadedStates.length > 0) {
-        const totalCards = loadedStates.reduce((acc, s) => acc + (s.items?.length || 0), 0);
-        if (totalCards > 0) {
-          cardStatus = 'ready';
-          cardCountDisplay = String(totalCards);
-          cardCountLabel = `${totalCards} ${totalCards === 1 ? 'card' : 'cards'} available`;
-        } else {
-          cardStatus = 'empty';
-          cardCountDisplay = '0';
-          cardCountLabel = 'No cards available';
-        }
-      } else {
-        cardStatus = 'unpublished';
-        cardCountDisplay = '—';
-        cardCountLabel = 'In preparation';
-      }
-    }
-  }
-
-  const coreTools = [
-    {
-      key: 'cards',
-      title: 'Flashcards',
-      subtitle:
-        learnedCount > 0
-          ? `${learnedCount} ${learnedCount === 1 ? 'word' : 'words'} learned`
-          : 'Build your vocabulary',
-      path: '/learn',
-    },
-    {
-      key: 'review',
-      title: 'Review',
-      subtitle: isStorageUnavailable ? 'Collection unavailable' : `${reviewCount} ${reviewCount === 1 ? 'word' : 'words'} to revisit`,
-      path: '/learn/review',
-    },
-    {
-      key: 'saved',
-      title: 'Saved Words',
-      subtitle: isStorageUnavailable ? 'Collection unavailable' : `${savedCount} bookmarked ${savedCount === 1 ? 'word' : 'words'}`,
-      path: '/saved',
-    },
-    {
-      key: 'dictionary',
-      title: 'Dictionary',
-      subtitle: course.copy.dictionarySubtitle,
-      path: '/dictionary',
-    },
-    {
-      key: 'phrases',
-      title: 'Learn Phrases',
-      subtitle: 'Everyday expressions',
-      path: '/flashcards',
-    },
+  // Learn & Review tools
+  const learnAndReviewTools = [
+    { title: 'Flashcards', subtitle: flashcardsSubtitle, icon: Layers, gradient: 'linear-gradient(135deg, #7DD3FC 0%, #0284C7 100%)', shadow: 'rgba(2, 132, 199, 0.4)', path: '/learn', char: chars.flashcards || '卡', charColor: 'var(--color-ghost-blue)' },
+    { title: 'Review', subtitle: `${reviewCount} words due`, icon: RotateCw, gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', shadow: 'rgba(220, 38, 38, 0.4)', path: '/learn/review', char: chars.review || '复', charColor: '#FEE2E2' },
+    { title: 'Saved Words', subtitle: `${savedCount} bookmarked words`, icon: Bookmark, gradient: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)', shadow: 'rgba(220, 38, 38, 0.4)', path: '/saved', char: chars.saved || '藏', charColor: '#DCFCE7' },
+    { title: 'Dictionary', subtitle: course.copy?.dictionarySubtitle || 'Look up words', icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: chars.dictionary || '典', charColor: '#FFEDD5' },
+    { title: 'Learn Phrases', subtitle: 'Master common expressions', icon: MessageCircle, gradient: 'linear-gradient(135deg, #93C5FD 0%, #2563EB 100%)', shadow: 'rgba(37, 99, 235, 0.4)', path: '/flashcards', char: chars.phrases || '话', charColor: '#DBEAFE' }
   ];
 
-  const sections = [
-    { title: 'Learn & Review', tools: coreTools },
-    {
-      title: 'Explore & Practise',
-      tools: course.exploreTools.map((tool) => ({
-        ...tool,
-        subtitle:
-          tool.key === 'writing' && !tool.path
-            ? 'Character writing practice'
-            : tool.subtitle,
-      })),
-    },
-  ].map((section) => ({
-    ...section,
-    tools: section.tools.filter((tool) =>
-      `${tool.title} ${tool.subtitle}`.toLowerCase().includes(query.trim().toLowerCase())
-    ),
+  // Explore & Practise tools
+  const exploreAndPractiseTools = (course.exploreTools || []).map((tool) => ({
+    ...(EXPLORE_STYLE[tool.key] || {}),
+    ...tool,
+    path: tool.path || '#'
   }));
 
-  const matchCount = sections.reduce((total, section) => total + section.tools.length, 0);
+  const filterTools = (tools) => {
+    if (!searchQuery.trim()) return tools;
+    const q = searchQuery.toLowerCase().trim();
+    return tools.filter(t => t.title.toLowerCase().includes(q) || t.subtitle.toLowerCase().includes(q));
+  };
+
+  const filteredLearn = filterTools(learnAndReviewTools);
+  const filteredExplore = filterTools(exploreAndPractiseTools);
 
   return (
-    <div
-      className={`study-page library-page${
-        isGrid ? ' library-page--grid' : ' library-page--list'
-      }`}
-    >
-      <header className="library-header">
-        <div>
-          <p>{course.name} · Learning tools</p>
-          <h1>Your library</h1>
-        </div>
-        <Link className="study-icon-button" to="/profile" aria-label="Open profile">
-          <User size={21} aria-hidden="true" />
-        </Link>
-      </header>
+    <div style={{ background: 'transparent', width: '100%', minHeight: '100vh', position: 'relative', paddingBottom: '100px' }}>
+      {/* Background that matches HSK 1 card dimensions */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '280px', background: 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)', zIndex: 0 }}></div>
 
-      <section className="library-intro" aria-label="Library overview">
-        <div>
-          <p className="study-eyebrow">One word at a time</p>
-          <h2>Make room for a little practice.</h2>
-          <p>Learn something new or revisit your favourites.</p>
-        </div>
-        <LearningIcon kind="library" className="library-intro__art" />
-      </section>
-
-      {isStorageUnavailable && (
-        <div className="library-storage-error" role="alert" style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          padding: '12px 16px',
-          background: '#FEF2F2',
-          border: '1px solid #FECACA',
-          borderRadius: '14px',
-          color: '#991B1B',
-          fontSize: '0.875rem',
-          marginBottom: '16px',
-        }}>
-          <span>Device collections unavailable. Could not read study records.</span>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={handleRetryStorage}
-            style={{ padding: '6px 12px', fontSize: '0.8125rem', minHeight: '36px' }}
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      <div className="library-counts" aria-label="Current course collections">
-        <Link
-          to="/learn"
-          className={`library-count-card library-count-card--${cardStatus}`}
-          aria-label={`Flashcards: ${cardCountLabel}`}
-        >
-          <LearningIcon kind="cards" className="library-counts__art" />
-          <strong>{cardCountDisplay}</strong>
-          <span>{cardCountLabel}</span>
-        </Link>
-        <Link
-          to="/learn"
-          className="library-count-card"
-          aria-label={isStorageUnavailable ? 'Learned words: unavailable' : `Learned words: ${learnedCount}`}
-        >
-          <LearningIcon kind="cards" className="library-counts__art" />
-          <strong>{isStorageUnavailable ? '—' : learnedCount}</strong>
-          <span>{isStorageUnavailable ? 'Unavailable' : 'Learned words'}</span>
-        </Link>
-        <Link
-          to="/saved"
-          className="library-count-card"
-          aria-label={isStorageUnavailable ? 'Saved words: unavailable' : `Saved words: ${savedCount}`}
-        >
-          <LearningIcon kind="saved" className="library-counts__art" />
-          <strong>{isStorageUnavailable ? '—' : savedCount}</strong>
-          <span>{isStorageUnavailable ? 'Unavailable' : 'Saved words'}</span>
-        </Link>
-        <Link
-          to="/learn/review"
-          className="library-count-card"
-          aria-label={isStorageUnavailable ? 'Review queue: unavailable' : `Review queue: ${reviewCount}`}
-        >
-          <LearningIcon kind="review" className="library-counts__art" />
-          <strong>{isStorageUnavailable ? '—' : reviewCount}</strong>
-          <span>{isStorageUnavailable ? 'Unavailable' : 'To review'}</span>
-        </Link>
-      </div>
-
-      <div className="library-toolbar">
-        <StudySearch label="Find a learning tool" value={query} onChange={setQuery} />
-        <div className="library-view" role="group" aria-label="Tool layout">
-          <button
-            className="study-icon-button"
-            aria-label="Grid view"
-            aria-pressed={isGrid}
-            onClick={() => setIsGrid(true)}
-          >
-            <LayoutGrid size={20} aria-hidden="true" />
-          </button>
-          <button
-            className="study-icon-button"
-            aria-label="List view"
-            aria-pressed={!isGrid}
-            onClick={() => setIsGrid(false)}
-          >
-            <List size={21} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-
-      {query.trim() && (
-        <p className="library-results" role="status">
-          {matchCount} {matchCount === 1 ? 'tool' : 'tools'} found
-        </p>
-      )}
-
-      {matchCount === 0 ? (
-        <div className="study-empty">
-          <h2>No matching tools</h2>
-          <p>Try a tool name such as flashcards, writing or dictionary.</p>
-          <button className="btn-secondary" onClick={() => setQuery('')}>
-            Clear search
-          </button>
-        </div>
-      ) : (
-        sections
-          .filter((section) => section.tools.length > 0)
-          .map((section) => (
-            <section
-              className="library-section"
-              key={section.title}
-              aria-label={section.title}
+      {/* Header Container */}
+      <div style={{ maxWidth: '500px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        <div style={{ padding: '32px 24px 24px 24px' }}>
+          <header className="flex justify-between items-start">
+            <div>
+              <p style={{ fontSize: '1.125rem', color: 'rgba(255, 255, 255, 0.9)', margin: '0 0 4px 0', fontWeight: 500 }}>Hello!</p>
+              <h1 style={{ fontSize: '1.75rem', color: '#FFFFFF', margin: 0, fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.2 }}>What do you want<br/>to learn today?</h1>
+            </div>
+            <button
+              onClick={() => navigate('/profile')}
+              aria-label="Profile"
+              style={{
+                width: '48px', height: '48px', borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.2)', color: '#FFFFFF', backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)', cursor: 'pointer'
+              }}
             >
-              <h2>{section.title}</h2>
-              <div className="library-tools">
-                {section.tools.map((tool) => (
-                  <ToolCard key={tool.key} tool={tool} />
-                ))}
+              <User size={22} strokeWidth={2.5} />
+            </button>
+          </header>
+        </div>
+      </div>
+
+      {/* Main Content Sheet */}
+      <div style={{
+        background: 'var(--bg-gradient)',
+        borderTopLeftRadius: '32px',
+        borderTopRightRadius: '32px',
+        position: 'relative',
+        zIndex: 1,
+        marginTop: '-8px'
+      }}>
+        <div style={{ maxWidth: '500px', margin: '0 auto', padding: '24px 20px 40px 20px' }}>
+
+          {/* Progress Tracking Section */}
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.5px', background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+                Your Swipe Stats
+              </h2>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '6px', color: '#0369A1', fontWeight: 900, fontSize: '1.1rem',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(224, 242, 254, 0.7) 100%)',
+                backdropFilter: 'blur(12px)',
+                padding: '6px 14px', borderRadius: '24px',
+                boxShadow: '0 8px 24px rgba(2, 132, 199, 0.15), inset 0 2px 4px rgba(255, 255, 255, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.9)'
+              }}>
+                <span role="img" aria-label="streak fire">🔥</span>
+                <span>{streak?.streakDays || 0}</span>
               </div>
-            </section>
-          ))
-      )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+              {/* Card 1: Words Swiped */}
+              <div style={{
+                padding: '16px', borderRadius: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '100px',
+                backgroundColor: '#FFFFFF', border: '1px solid rgba(255, 255, 255, 0.8)', boxShadow: '0 4px 16px rgba(3, 105, 161, 0.04)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Words<br/>Swiped</div>
+                  <div style={{ color: '#0284C7', backgroundColor: '#E0F2FE', padding: '6px', borderRadius: '10px' }}>
+                    <Layers size={16} strokeWidth={2.5} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>{swipedCount}</div>
+              </div>
+
+              {/* Card 2: Saved Words */}
+              <div style={{
+                padding: '16px', borderRadius: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '100px',
+                backgroundColor: '#FFFFFF', border: '1px solid rgba(255, 255, 255, 0.8)', boxShadow: '0 4px 16px rgba(3, 105, 161, 0.04)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Saved<br/>Words</div>
+                  <div style={{ color: '#059669', backgroundColor: '#D1FAE5', padding: '6px', borderRadius: '10px' }}>
+                    <Bookmark size={16} strokeWidth={2.5} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#059669', lineHeight: 1 }}>{savedCount}</div>
+              </div>
+
+              {/* Card 3: Learned Phrases */}
+              <div style={{
+                padding: '16px', borderRadius: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '100px',
+                backgroundColor: '#FFFFFF', border: '1px solid rgba(255, 255, 255, 0.8)', boxShadow: '0 4px 16px rgba(3, 105, 161, 0.04)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Learned<br/>Phrases</div>
+                  <div style={{ color: '#2563EB', backgroundColor: '#DBEAFE', padding: '6px', borderRadius: '10px' }}>
+                    <MessageCircle size={16} strokeWidth={2.5} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>0</div>
+              </div>
+
+              {/* Card 4: Review Due */}
+              <div style={{
+                padding: '16px', borderRadius: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '100px',
+                backgroundColor: '#FFFFFF', border: '1px solid rgba(255, 255, 255, 0.8)', boxShadow: '0 4px 16px rgba(3, 105, 161, 0.04)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Review<br/>Due</div>
+                  <div style={{ color: '#DC2626', backgroundColor: '#FEE2E2', padding: '6px', borderRadius: '10px' }}>
+                    <RotateCw size={16} strokeWidth={2.5} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#DC2626', lineHeight: 1 }}>{reviewCount}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Section */}
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <Search size={20} color="var(--color-primary-blue)" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', zIndex: 1 }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={course.copy?.searchPlaceholder || 'Search Chinese, pinyin, English...'}
+                className="input-field"
+                style={{
+                  width: '100%',
+                  padding: '16px 20px 16px 52px',
+                  borderRadius: '20px',
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0 4px 16px rgba(3, 105, 161, 0.06)',
+                  border: '1px solid var(--color-border)',
+                  fontSize: '0.9375rem',
+                  fontWeight: 500,
+                  outline: 'none'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Learn & Review Section */}
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Learn &amp; Review</h2>
+              <button
+                onClick={() => setIsGridView(!isGridView)}
+                aria-label={isGridView ? 'Switch to list view' : 'Switch to grid view'}
+                style={{ background: 'var(--color-ghost-blue)', border: 'none', cursor: 'pointer', color: 'var(--color-primary-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', borderRadius: '12px', transition: 'background-color 0.2s' }}
+              >
+                {isGridView ? <List size={20} strokeWidth={2.5} /> : <LayoutGrid size={20} strokeWidth={2.5} />}
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isGridView ? 'repeat(2, 1fr)' : '1fr', gap: '12px' }}>
+              {filteredLearn.map((tool, idx) => (
+                <ToolCard
+                  key={idx}
+                  tool={tool}
+                  isGridView={isGridView}
+                  onClick={() => { if (tool.path !== '#') navigate(tool.path); }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Explore & Practise Section */}
+          <div style={{ marginBottom: '32px' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 16px 0' }}>Explore &amp; Practise</h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isGridView ? 'repeat(2, 1fr)' : '1fr', gap: '12px' }}>
+              {filteredExplore.map((tool, idx) => (
+                <ToolCard
+                  key={idx}
+                  tool={tool}
+                  isGridView={isGridView}
+                  onClick={() => { if (tool.path !== '#') navigate(tool.path); }}
+                />
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }

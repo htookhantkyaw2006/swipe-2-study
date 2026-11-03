@@ -1,81 +1,58 @@
 import { Outlet, useLocation } from 'react-router-dom';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { useLayoutEffect, useRef, useState, Suspense } from 'react';
 import BottomNav from './BottomNav';
-import { readCollapsedPreference, writeCollapsedPreference } from '../lib/sidebarStorage';
-import { useDesktopLayout } from '../lib/useDesktopLayout';
 import { useGuestImport } from '../lib/useGuestImport';
 import GuestImportNotice from './GuestImportNotice';
-import { Suspense } from 'react';
 import { RouteErrorBoundary, RouteLoadingFallback } from './RouteErrorBoundary';
-
-const readScrollCache = () => {
-  try {
-    const cache = JSON.parse(sessionStorage.getItem('scrollCache') || '{}');
-    return cache && typeof cache === 'object' && !Array.isArray(cache) ? cache : {};
-  } catch { return {}; }
-};
 
 export default function Layout() {
   const location = useLocation();
   const mainRef = useRef(null);
-  const scrollTimer = useRef(null);
-  const pendingScroll = useRef(null);
-  const isDesktop = useDesktopLayout();
-  const [isCollapsed, setIsCollapsed] = useState(readCollapsedPreference);
   const isSessionActive = location.pathname.endsWith('/session');
   const { learningVersion } = useGuestImport();
   const [renderVersion, setRenderVersion] = useState(learningVersion);
+
   useLayoutEffect(() => {
     // A save can finish after browser Back enters a study session. Refresh its
     // lists on exit, without replacing the session's in-memory deck mid-study.
     if (!isSessionActive) setRenderVersion(learningVersion);
   }, [isSessionActive, learningVersion]);
 
-  const toggleSidebar = () => {
-    const next = !isCollapsed;
-    setIsCollapsed(next);
-    writeCollapsedPreference(next);
-    // One persistent button keeps focus without scrolling the study content.
-  };
-  const flushScroll = useCallback(() => {
-    clearTimeout(scrollTimer.current);
-    const pending = pendingScroll.current;
-    pendingScroll.current = null;
-    if (!pending) return;
-    try {
-      const cache = readScrollCache();
-      cache[pending.path] = pending.top;
-      sessionStorage.setItem('scrollCache', JSON.stringify(cache));
-    } catch { /* Scrolling still works when storage is unavailable. */ }
-  }, []);
-
+  // Restore scroll position when route changes (synchronously before paint to prevent flicker)
   useLayoutEffect(() => {
-    flushScroll();
-    if (mainRef.current) mainRef.current.scrollTop = Number(readScrollCache()[location.pathname]) || 0;
-  }, [location.pathname, flushScroll]);
-  useEffect(() => {
-    window.addEventListener('pagehide', flushScroll);
-    return () => { window.removeEventListener('pagehide', flushScroll); flushScroll(); };
-  }, [flushScroll]);
+    if (mainRef.current) {
+      try {
+        const cache = JSON.parse(sessionStorage.getItem('scrollCache') || '{}');
+        const savedPos = cache[location.pathname] || 0;
+        mainRef.current.scrollTo(0, savedPos);
+      } catch {}
+    }
+  }, [location.pathname]);
+
+  // Track scroll position
   const handleScroll = () => {
-    pendingScroll.current = { path: location.pathname, top: mainRef.current.scrollTop };
-    clearTimeout(scrollTimer.current);
-    scrollTimer.current = setTimeout(flushScroll, 150);
+    if (mainRef.current) {
+      try {
+        const cache = JSON.parse(sessionStorage.getItem('scrollCache') || '{}');
+        cache[location.pathname] = mainRef.current.scrollTop;
+        sessionStorage.setItem('scrollCache', JSON.stringify(cache));
+      } catch {}
+    }
   };
 
   return (
-    <div className={`app-shell${isSessionActive ? ' app-shell--session' : ''}${isCollapsed ? ' app-shell--collapsed' : ''}`}>
-      <a className="skip-link" href="#main-content">Skip to content</a>
-      {!isSessionActive && <BottomNav isCollapsed={isCollapsed} isDesktop={isDesktop} />}
-      <main id="main-content" tabIndex={-1} ref={mainRef} onScroll={handleScroll} className="app-main slim-scrollbar">
-        {!isSessionActive && <div className="desktop-sidebar-toolbar">
-          <button type="button" className="sidebar-toggle" onClick={toggleSidebar}
-            aria-expanded={!isCollapsed} aria-controls="app-navigation" aria-label={isCollapsed ? 'Show sidebar' : 'Hide sidebar'}>
-            {isCollapsed ? <PanelLeftOpen size={19} aria-hidden="true" /> : <PanelLeftClose size={19} aria-hidden="true" />}
-            <span>{isCollapsed ? 'Show sidebar' : 'Hide sidebar'}</span>
-          </button>
-        </div>}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%' }}>
+      <main
+        ref={mainRef}
+        onScroll={handleScroll}
+        className="slim-scrollbar"
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingBottom: isSessionActive ? '0' : '100px'
+        }}
+      >
         {!isSessionActive && <GuestImportNotice />}
         <RouteErrorBoundary>
           <Suspense fallback={<RouteLoadingFallback />}>
@@ -83,6 +60,7 @@ export default function Layout() {
           </Suspense>
         </RouteErrorBoundary>
       </main>
+      {!isSessionActive && <BottomNav />}
     </div>
   );
 }

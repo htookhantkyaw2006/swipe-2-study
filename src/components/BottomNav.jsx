@@ -1,106 +1,101 @@
-import { Link, NavLink, useLocation } from 'react-router-dom';
-import { useLayoutEffect, useRef } from 'react';
-import { ArrowUpRight, Home, Layers, Library, MessageCircle, User, Settings } from 'lucide-react';
-import LearningIcon from './ui/LearningIcon';
+import { NavLink } from 'react-router-dom';
+import { Home, Layers, Library as LibraryIcon, MessageCircle, User } from 'lucide-react';
 
-const items = [
-  { path: '/', icon: Home, kind: 'home', label: 'Home' },
-  { path: '/learn', icon: Layers, kind: 'cards', label: 'Flashcards' },
-  { path: '/library', icon: Library, kind: 'library', label: 'Library' },
-  { path: '/flashcards', icon: MessageCircle, kind: 'phrases', label: 'Phrases' },
-  { path: '/profile', icon: User, kind: 'profile', label: 'Profile' },
-];
-
-export default function BottomNav({ isCollapsed = false, isDesktop = false }) {
-  const location = useLocation();
-  const pathname = location.pathname;
-  const isLibraryChild =
-    pathname === '/saved' ||
-    pathname.startsWith('/saved/') ||
-    pathname === '/dictionary' ||
-    pathname.startsWith('/dictionary/');
-  const isLibraryActive =
-    pathname === '/library' || pathname.startsWith('/library/') || isLibraryChild;
-
-  const navRef = useRef(null);
-  useLayoutEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const shell = nav.parentElement;
-    if (!shell) return;
-    const measure = () => {
-      if (window.matchMedia('(min-width: 1024px)').matches) {
-        shell.style.removeProperty('--navigation-height');
-        return;
-      }
-      const height = nav.getBoundingClientRect().height;
-      if (height > 0) {
-        shell.style.setProperty('--navigation-height', `${height}px`);
-      }
-    };
-    const observer = new ResizeObserver(measure);
-    measure();
-    observer.observe(nav);
-    return () => { observer.disconnect(); shell.style.removeProperty('--navigation-height'); };
-  }, []);
+export default function BottomNav() {
+  const navItems = [
+    { path: '/', icon: Home, label: 'Home' },
+    { path: '/learn', icon: Layers, label: 'Flashcards' },
+    { path: '/library', icon: LibraryIcon, label: 'Library', isProminent: true },
+    { path: '/flashcards', icon: MessageCircle, label: 'Phrases' },
+    { path: '/profile', icon: User, label: 'Profile' },
+  ];
 
   return (
-    <nav id="app-navigation" ref={navRef} className={`app-navigation${isCollapsed ? ' is-collapsed' : ''}`} aria-label="Main navigation" inert={isDesktop && isCollapsed} aria-hidden={isDesktop && isCollapsed ? true : undefined}>
-      <div className="sidebar-header">
-        <NavLink to="/" className="app-brand" aria-label="Swipe 2 Study home">
-          <span className="app-brand-mark" aria-hidden="true"><Layers size={25} /></span>
-          <span>Swipe <span className="brand-two">2</span> Study<span className="app-brand-caption">Your language companion.</span></span>
-        </NavLink>
-      </div>
-      <div className="navigation-links">
-        {items.map(({ path, icon: Icon, kind, label }) => {
-          if (path === '/library') {
-            const ariaCurrent = isLibraryActive
-              ? (pathname === '/library' ? 'page' : 'true')
-              : undefined;
+    <nav
+      aria-label="Main navigation"
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.1)',
+        borderRadius: '100px',
+        padding: '8px 16px',
+        position: 'fixed',
+        bottom: 'max(20px, calc(12px + env(safe-area-inset-bottom, 0px)))',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'calc(100% - 32px)',
+        maxWidth: '400px',
+        zIndex: 50
+      }}
+    >
+      {navItems.map((item) => (
+        <NavLink
+          key={item.path}
+          to={item.path}
+          style={{ textDecoration: 'none' }}
+          end={item.path === '/'}
+        >
+          {({ isActive }) => {
+            if (item.isProminent) {
+              return (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '56px',
+                  height: '56px',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)',
+                    color: '#FFFFFF',
+                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                    transition: 'transform 0.2s',
+                    position: 'absolute',
+                    top: '-12px'
+                  }}>
+                    <item.icon size={22} strokeWidth={2.5} />
+                  </div>
+                  <span style={{ position: 'absolute', bottom: '6px', fontSize: '10px', fontWeight: 700, color: isActive ? 'var(--color-primary-blue)' : '#9CA3AF' }}>{item.label}</span>
+                </div>
+              );
+            }
 
             return (
-              <Link
-                key={path}
-                to={path}
-                aria-current={ariaCurrent}
-                className={`navigation-link navigation-link--library${isLibraryActive ? ' is-active' : ''}`}
-              >
-                <span className="navigation-symbol" aria-hidden="true"><Icon size={22} strokeWidth={2} /></span>
-                <LearningIcon kind={kind} className="navigation-art" />
-                <span className="navigation-label">{label}</span>
-              </Link>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '56px',
+                height: '56px',
+                color: isActive ? 'var(--color-primary-blue)' : '#9CA3AF',
+                transition: 'all 0.3s ease',
+                position: 'relative'
+              }}>
+                {/* Active Background Circle */}
+                {isActive && (
+                  <div style={{ position: 'absolute', top: '2px', width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--color-ghost-blue)', zIndex: 0 }}></div>
+                )}
+                <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '24px', marginBottom: '4px' }}>
+                  <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: 700, zIndex: 1, letterSpacing: '0.2px' }}>{item.label}</span>
+              </div>
             );
-          }
-
-          return (
-            <NavLink
-              key={path}
-              to={path}
-              end={path === '/'}
-              className={({ isActive }) =>
-                `navigation-link${isActive ? ' is-active' : ''}`
-              }
-            >
-              <span className="navigation-symbol" aria-hidden="true"><Icon size={22} strokeWidth={2} /></span>
-              <LearningIcon kind={kind} className="navigation-art" />
-              <span className="navigation-label">{label === 'Flashcards' ? <>Flash<wbr />cards</> : label}</span>
-            </NavLink>
-          );
-        })}
-      </div>
-      <div className="navigation-footer">
-        <div className="navigation-note">
-          <span className="navigation-note-icon" aria-hidden="true"><Layers size={20} /></span>
-          <p>One word at a time.</p><span>Keep your curiosity going.</span>
-          <NavLink to="/learn">Explore flashcards <ArrowUpRight size={16} aria-hidden="true" /></NavLink>
-        </div>
-        <NavLink to="/settings" className={({ isActive }) => `navigation-link${isActive ? ' is-active' : ''}`}>
-          <span className="navigation-symbol" aria-hidden="true"><Settings size={22} /></span>
-          <LearningIcon kind="settings" className="navigation-art" />
-          <span className="navigation-label">Settings</span>
+          }}
         </NavLink>
-      </div>
+      ))}
     </nav>
   );
 }

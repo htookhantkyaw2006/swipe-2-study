@@ -1,4 +1,3 @@
-import './LearnKana.css';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Zap, RotateCcw } from 'lucide-react';
@@ -25,7 +24,7 @@ const SHADOW = 'rgba(219, 39, 119, 0.3)';
 
 function KanaGrid({ rows, scriptIndex, progress, playing, onPlay }) {
   return (
-    <div className="kana-grid-1" >
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
       {rows.flatMap((row) =>
         row.cells.map((cell, i) => {
           if (!cell) return <div key={`${row.key}-${i}`} aria-hidden="true" />;
@@ -37,15 +36,22 @@ function KanaGrid({ rows, scriptIndex, progress, playing, onPlay }) {
               key={kana}
               onClick={() => onPlay(kana)}
               aria-label={`${kana}, ${cell[2]}. Play`}
-              className="surface-card kana-button-1"
-              style={{ border: active ? '2px solid #DB2777' : '1px solid var(--color-border)', backgroundColor: active ? '#FDF2F8' : 'var(--color-card-surface)', transform: active ? 'scale(0.96)' : 'scale(1)' }}
+              className="surface-card"
+              style={{
+                position: 'relative', aspectRatio: '1', borderRadius: '16px', cursor: 'pointer',
+                border: active ? '2px solid #DB2777' : '1px solid var(--color-border)',
+                backgroundColor: active ? '#FDF2F8' : 'var(--color-card-surface)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: 0, transition: 'transform 0.15s, background-color 0.2s, border-color 0.2s',
+                transform: active ? 'scale(0.96)' : 'scale(1)'
+              }}
             >
-              <span className="kana-label-1" >{kana}</span>
-              <span className="kana-label-2" >{cell[2]}</span>
+              <span style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--color-text-navy)', lineHeight: 1.1 }}>{kana}</span>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-secondary-blue)', fontFamily: 'JetBrains Mono, monospace' }}>{cell[2]}</span>
               {level !== 'new' && (
-                <span className="kana-label-3"
+                <span
                   title={LEVELS[level].label}
-                  style={{ backgroundColor: LEVELS[level].color }}
+                  style={{ position: 'absolute', top: '6px', right: '6px', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: LEVELS[level].color }}
                 />
               )}
             </button>
@@ -57,11 +63,11 @@ function KanaGrid({ rows, scriptIndex, progress, playing, onPlay }) {
 }
 
 const SectionTitle = ({ children, note }) => (
-  <div className="kana-layout-1" >
-    <h3 className="kana-heading-1" >
+  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px', margin: '0 0 12px 0' }}>
+    <h3 style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--color-secondary-blue)', margin: 0 }}>
       {children}
     </h3>
-    {note && <span className="kana-label-4" >{note}</span>}
+    {note && <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-secondary-blue)', opacity: 0.8 }}>{note}</span>}
   </div>
 );
 
@@ -94,47 +100,52 @@ function LearnKana() {
   };
 
   return (
-    <div className="ui-tool-page kana-layout-2" >
+    <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
       {/* Narrower than Learn Radicals: the chart must stay five columns,
           and at 1000px each kana tile would grow to ~180px. */}
-      <div className="kana-layout-3" >
-        <div className="kana-layout-4" >
+      <div style={{ maxWidth: '640px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        <div style={{ padding: '24px 24px 16px 24px' }}>
 
-          <header data-tool-header="true" className="flex items-center justify-center relative kana-layout-5" >
-            <button className="kana-button-2"
-              onClick={() => navigate('/library')}
+          <header className="flex items-center justify-center relative" style={{ marginBottom: '32px' }}>
+            <button
+              onClick={() => navigate(-1)}
               aria-label="Back"
-
+              style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
             >
               <ChevronLeft size={24} color="var(--color-text-navy)" />
             </button>
-            <h1 className="kana-heading-2" >Learn Kana</h1>
+            <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>Learn Kana</h1>
           </header>
 
-          <div className="kana-layout-6" >
-            <h2 className="kana-heading-3" >
+          <div style={{ marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '2rem', color: 'var(--color-text-navy)', margin: '0 0 8px 0', fontWeight: 900, letterSpacing: '-0.5px', lineHeight: 1.1 }}>
               The two Japanese<br />alphabets
             </h2>
-            <p className="kana-copy-1" >
+            <p style={{ color: 'var(--color-secondary-blue)', fontSize: '1rem', margin: 0, fontWeight: 500 }}>
               Learn these and you can sound out any Japanese word.
             </p>
           </div>
 
           {/* Quiz — the primary action, as on Learn Radicals */}
-          <button className="kana-button-3"
+          <button
             onClick={() => setDrillOpen(true)}
-            style={{ background: GRADIENT, boxShadow: `0 10px 20px ${SHADOW}` }}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: '16px',
+              padding: '20px', borderRadius: '24px', border: 'none', cursor: 'pointer',
+              background: GRADIENT, boxShadow: `0 10px 20px ${SHADOW}`,
+              textAlign: 'left', marginBottom: '20px', transition: 'transform 0.2s, box-shadow 0.2s'
+            }}
             onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
             onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
           >
-            <div className="kana-panel-1" >
+            <div style={{ width: '52px', height: '52px', flexShrink: 0, borderRadius: '16px', backgroundColor: 'rgba(255, 255, 255, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Zap size={24} color="#FFFFFF" strokeWidth={2.5} />
             </div>
-            <div className="kana-layout-7" >
-              <h3 className="kana-heading-4" >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF' }}>
                 {SCRIPTS[script].label} Quiz
               </h3>
-              <p className="kana-copy-2" >
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
                 10 questions · see a kana, pick its sound
               </p>
             </div>
@@ -142,54 +153,61 @@ function LearnKana() {
           </button>
 
           {/* Progress for the script on screen */}
-          <div className="kana-layout-8" >
-            <div className="kana-layout-9" >
-              <span className="kana-label-5" >
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}>
                 {known} of {all.length} {SCRIPTS[script].label.toLowerCase()} known
               </span>
               {started && (
-                <button className="kana-button-4"
+                <button
                   onClick={clearProgress}
-
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-secondary-blue)' }}
                 >
                   <RotateCcw size={14} strokeWidth={2.5} /> Reset
                 </button>
               )}
             </div>
-            <div className="kana-panel-2" >
-              <div className="kana-panel-3" style={{ width: `${(known / all.length) * 100}%`, background: GRADIENT }} />
+            <div style={{ height: '6px', borderRadius: '999px', backgroundColor: 'var(--color-ghost-blue)', overflow: 'hidden' }}>
+              <div style={{ width: `${(known / all.length) * 100}%`, height: '100%', background: GRADIENT, borderRadius: '999px', transition: 'width 0.4s ease' }} />
             </div>
           </div>
 
           {/* Script toggle */}
-          <div className="kana-grid-2"
+          <div
             role="tablist"
             aria-label="Script"
-
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '6px', borderRadius: '18px', backgroundColor: 'var(--color-ghost-blue)', marginBottom: '10px' }}
           >
             {Object.entries(SCRIPTS).map(([key, s]) => {
               const active = key === script;
               return (
-                <button className="kana-button-5"
+                <button
                   key={key}
                   role="tab"
                   aria-selected={active}
                   onClick={() => setScript(key)}
-                  style={{ backgroundColor: active ? '#FFFFFF' : 'transparent', boxShadow: active ? '0 2px 8px rgba(3, 105, 161, 0.12)' : 'none', color: active ? 'var(--color-text-navy)' : 'var(--color-secondary-blue)' }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    padding: '12px', borderRadius: '14px', border: 'none', cursor: 'pointer',
+                    backgroundColor: active ? '#FFFFFF' : 'transparent',
+                    boxShadow: active ? '0 2px 8px rgba(3, 105, 161, 0.12)' : 'none',
+                    color: active ? 'var(--color-text-navy)' : 'var(--color-secondary-blue)',
+                    fontWeight: 800, fontSize: '0.9rem', transition: 'background-color 0.2s'
+                  }}
                 >
-                  <span className="kana-label-6" >{s.sample}</span> {s.label}
+                  <span style={{ fontSize: '1.1rem' }}>{s.sample}</span> {s.label}
                 </button>
               );
             })}
           </div>
-          <p className="kana-copy-3" >
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-secondary-blue)', fontWeight: 600, margin: '0 0 24px 4px' }}>
             {SCRIPTS[script].note}
           </p>
 
           <SectionTitle note="Tap to hear">Basic · 46</SectionTitle>
           <KanaGrid rows={BASIC} scriptIndex={scriptIndex} progress={progress} playing={playing} onPlay={play} />
 
-          <div className="kana-layout-10"  />
+          <div style={{ height: '28px' }} />
 
           <SectionTitle note="゛ and ゜ change the sound">Voiced · 25</SectionTitle>
           <KanaGrid rows={VOICED} scriptIndex={scriptIndex} progress={progress} playing={playing} onPlay={play} />

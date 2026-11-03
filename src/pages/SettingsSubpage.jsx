@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Target, Languages, Shuffle, Layers, Volume2, Gauge, Mic,
+  ArrowLeft, Target, Languages, Shuffle, Layers, Volume2, Gauge, Mic,
   Type, Bell, Flame, Trash2, Download, RotateCcw, HardDrive,
   FileText, ShieldCheck, Info, BookOpen,
   Cloud, CloudOff, RefreshCw, HelpCircle
@@ -15,8 +15,6 @@ import { useLanguage, useCourse } from '../lib/language';
 import { db } from '../lib/db';
 import { storageOwner } from '../lib/storageOwner.js';
 import { useOnlineSync } from '../lib/useOnlineSync.js';
-import { StudyHeader } from '../components/study/StudyPage';
-import './SettingsSubpage.css';
 import LanguageFlag from '../components/ui/LanguageFlag';
 import { AuthContext } from '../lib/authContext.js';
 import { trackEvent } from '../lib/analytics.js';
@@ -260,12 +258,25 @@ export default function SettingsSubpage() {
     setPref('accentByLanguage', { ...(prefs.accentByLanguage || {}), [course.id]: value });
 
   return (
-    <div className="study-page settings-page">
+    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: '100px' }}>
 
-      <StudyHeader title="Settings" subtitle={`${course.name} · Learning preferences`} backTo="/profile" backLabel="Back to profile" />
+      {/* Header */}
+      <header className="flex items-center justify-center relative" style={{ marginBottom: '0px' }}>
+        <button
+          onClick={() => navigate('/profile')}
+          style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}
+        >
+          <ArrowLeft size={24} color="var(--color-text-navy)" />
+        </button>
+        <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>Settings</h1>
+      </header>
 
       {notice && (
-        <div className="settings-notice" role="status">
+        <div style={{
+          padding: '14px 18px', borderRadius: '16px', backgroundColor: 'var(--color-ghost-blue)',
+          color: 'var(--color-text-navy)', fontWeight: 600, fontSize: '0.9rem',
+          border: '1px solid var(--color-border)'
+        }}>
           {notice}
         </div>
       )}
