@@ -43,6 +43,7 @@ export default function Layout() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%' }}>
       <main
+        id="main-content"
         ref={mainRef}
         onScroll={handleScroll}
         className="slim-scrollbar"

@@ -20,6 +20,7 @@ import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
 import DeleteAccountDialog from '../components/DeleteAccountDialog.jsx';
 import { useStudyStreak } from '../lib/studyStreak.js';
 import { useOnlineSync } from '../lib/onlineSyncContext.js';
+import { getCourseProgress } from '../lib/vocabularyProgress.js';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -53,8 +54,8 @@ export default function Profile() {
 
   const updateCounts = () => {
     try {
-      const learned = db.get('learned_words') || [];
-      setSwipedCount(learned.length);
+      const progress = getCourseProgress(db, course);
+      setSwipedCount(progress.uniqueLearned ?? 0);
     } catch {
       setSwipedCount(0);
     }
@@ -184,7 +185,7 @@ export default function Profile() {
       )}
 
       {/* Identity Card */}
-      <div className="surface-card" style={{ padding: '24px', borderRadius: '24px', boxShadow: '0 12px 24px rgba(0,0,0,0.06)', position: 'relative' }}>
+      <div className="surface-card" aria-label="Learning overview" style={{ padding: '24px', borderRadius: '24px', boxShadow: '0 12px 24px rgba(0,0,0,0.06)', position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
           {photo.url ? (
             <img
@@ -227,6 +228,11 @@ export default function Profile() {
         </div>
 
         {/* 2 Stat Cards inside */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: 0 }}>
+            Learning overview
+          </h2>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div style={{ padding: '12px 16px', borderRadius: '16px', backgroundColor: 'var(--color-page-bg)', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Flame size={20} color="#EA580C" />
@@ -259,7 +265,7 @@ export default function Profile() {
       </SettingsGroup>
 
       {/* Quick settings */}
-      <SettingsGroup title="Quick settings">
+      <SettingsGroup title="Settings & support">
         <SettingsRow
           icon={Languages}
           iconGradient="linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)"
@@ -314,7 +320,7 @@ export default function Profile() {
                 setGlobalSignOutOpen(true);
               }}
             />
-            {deletionEnabled && (
+            {deletionEnabled ? (
               <SettingsRow
                 icon={Trash2}
                 iconGradient="linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)"
@@ -322,6 +328,14 @@ export default function Profile() {
                 subtitle="Permanently erase account and data"
                 danger
                 onClick={() => setDeleteDialogOpen(true)}
+                isLast
+              />
+            ) : (
+              <SettingsRow
+                icon={Trash2}
+                iconGradient="linear-gradient(135deg, #94A3B8 0%, #64748B 100%)"
+                title={<>Delete account <span className="profile-soon" style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748B', backgroundColor: '#F1F5F9', padding: '2px 8px', borderRadius: '999px', marginLeft: '6px' }}>Soon</span></>}
+                subtitle="Available in a later update"
                 isLast
               />
             )}

@@ -11,14 +11,38 @@ import { storageOwner } from '../lib/storageOwner';
 export default function SavedWords() {
   const navigate = useNavigate();
   const course = useCourse();
-  const [savedWords, setSavedWords] = useState(() => db.get('saved_words') || []);
+  const [error, setError] = useState(() => {
+    try {
+      db.get('saved_words');
+      return null;
+    } catch {
+      return 'Unable to load saved words.';
+    }
+  });
+  const [savedWords, setSavedWords] = useState(() => {
+    try {
+      return db.get('saved_words') || [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     const unsubChange = storageOwner.subscribeChange(() => {
-      setSavedWords(db.get('saved_words') || []);
+      try {
+        setSavedWords(db.get('saved_words') || []);
+        setError(null);
+      } catch {
+        setError('Unable to load saved words.');
+      }
     });
     const unsubOwner = storageOwner.subscribe(() => {
-      setSavedWords(db.get('saved_words') || []);
+      try {
+        setSavedWords(db.get('saved_words') || []);
+        setError(null);
+      } catch {
+        setError('Unable to load saved words.');
+      }
     });
     return () => {
       unsubChange?.();
@@ -30,14 +54,84 @@ export default function SavedWords() {
 
   const handleUnsave = (id, e) => {
     e.stopPropagation();
-    db.remove('saved_words', id);
-    setSavedWords(db.get('saved_words') || []);
+    try {
+      db.remove('saved_words', id);
+      setSavedWords(db.get('saved_words') || []);
+    } catch {
+      // Safe fallback
+    }
   };
 
   const handlePlayWord = (e, word) => {
     e.stopPropagation();
     playWordAudio(word, { speakFn: speak });
   };
+
+  if (error) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
+          <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
+            <ChevronLeft size={24} color="var(--color-text-navy)" strokeWidth={2.5} />
+          </button>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Saved Words</h1>
+        </header>
+
+        <div style={{ padding: '0 24px', maxWidth: '600px', margin: '0 auto' }}>
+          <div className="collection-hero collection-hero--saved collection-hero--unavailable" style={{
+            background: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)',
+            borderRadius: '24px', padding: '24px', color: '#FFFFFF',
+            boxShadow: '0 12px 24px rgba(22, 163, 74, 0.2)', marginBottom: '32px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center'
+          }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 900, margin: '0 0 8px 0', color: '#FFFFFF' }}>Collection unavailable</h2>
+            <p style={{ fontSize: '1rem', margin: '0 0 16px 0', opacity: 0.9 }}>{error}</p>
+            <button
+              type="button"
+              className="collection-hero__action"
+              onClick={() => {
+                try {
+                  const items = db.get('saved_words') || [];
+                  setSavedWords(items);
+                  setError(null);
+                } catch {
+                  setError('Unable to load saved words.');
+                }
+              }}
+              style={{ backgroundColor: '#FFFFFF', color: '#16A34A', border: 'none', borderRadius: '100px', padding: '12px 24px', fontWeight: 800, cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          </div>
+
+          <div className="study-section-heading">
+            <div>
+              <p role="status">Status unavailable</p>
+            </div>
+          </div>
+
+          <div className="study-error" role="alert" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#EF4444', padding: '16px', borderRadius: '16px', textAlign: 'center', marginTop: '16px' }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>Unable to load saved words</p>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  const items = db.get('saved_words') || [];
+                  setSavedWords(items);
+                  setError(null);
+                } catch {
+                  setError('Unable to load saved words.');
+                }
+              }}
+              style={{ marginTop: '12px', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
@@ -53,7 +147,7 @@ export default function SavedWords() {
       <div style={{ padding: '0 24px', maxWidth: '600px', margin: '0 auto' }}>
 
         {/* Main Hero Card */}
-        <div style={{
+        <div className="collection-hero collection-hero--saved" style={{
           background: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)',
           borderRadius: '24px', padding: '24px', color: '#FFFFFF',
           boxShadow: '0 12px 24px rgba(22, 163, 74, 0.2)', marginBottom: '32px',
@@ -74,7 +168,7 @@ export default function SavedWords() {
               {savedWords.length} Word{savedWords.length === 1 ? '' : 's'}
             </h2>
             <p style={{ fontSize: '1rem', margin: '0 0 24px 0', opacity: 0.9 }}>
-              {empty ? 'Bookmark words in the dictionary to collect them here' : 'Ready for review'}
+              {empty ? 'Bookmark words in the dictionary to collect them here' : `${savedWords.length} ${savedWords.length === 1 ? 'saved word' : 'saved words'}`}
             </p>
 
             <button
@@ -126,6 +220,7 @@ export default function SavedWords() {
               return (
                 <div
                   key={word.id || phrase}
+                  className="collection-word"
                   style={{
                     backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '16px',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -143,7 +238,7 @@ export default function SavedWords() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                        <h4 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{phrase}</h4>
+                        <h4 className="collection-word__character" style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{phrase}</h4>
                         {kana && <span style={{ fontSize: '0.8rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>{kana}</span>}
                         {reading && <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'var(--font-reading)' }}>{reading}</span>}
                       </div>

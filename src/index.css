@@ -5,8 +5,8 @@
   --color-secondary-blue: #0284C7;
   --color-sky-accent: #38BDF8;
   --color-text-navy: #0C4A6E;
-  --color-text-main: #0C4A6E;
-  --color-text-sub: #0284C7;
+  --color-text-main: #1C1C1E;
+  --color-text-sub: #48484A;
   --color-text-heading: #0C4A6E;
   --color-link: #0284C7;
   --color-success-green: #22C55E;
@@ -18,7 +18,7 @@
 
   --bg-gradient: linear-gradient(145deg, #F0F9FF 0%, #EBF8FF 50%, #E0F2FE 100%);
 
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Noto Sans Myanmar', var(--font-cjk), system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* The reading line under a word: pinyin, romaji or IPA. Monospace
@@ -369,6 +369,63 @@ button {
   font-size: 0.8125rem;
   color: var(--color-danger-red);
   margin-top: 2px;
+}
+
+.auth-input-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--color-secondary-blue);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-input-toggle:focus-visible {
+  outline: 2px solid var(--color-primary-blue);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.icon-button {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+}
+
+.course-badge {
+  background: rgba(255, 255, 255, 0.25);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.course-badge--active {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.course-word-count {
+  font-size: 0.85rem;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.course-study-button:not(.course-study-button--disabled):not(.course-study-button--retry)::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background-color: currentColor;
+  clip-path: polygon(15% 0, 15% 100%, 100% 50%);
 }
 
 .auth-submit {

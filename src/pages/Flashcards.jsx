@@ -3,7 +3,7 @@ import { Layers, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCourse } from '../lib/language';
 import { phraseCards } from '../lib/phraseCards';
-import { useAuth } from '../lib/authContext';
+import { useAuth } from '../lib/useAuth.js';
 
 const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => {
   const radius = (size - strokeWidth) / 2;

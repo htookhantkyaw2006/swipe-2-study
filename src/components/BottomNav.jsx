@@ -1,7 +1,17 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Home, Layers, Library as LibraryIcon, MessageCircle, User } from 'lucide-react';
 
 export default function BottomNav() {
+  const location = useLocation();
+  const pathname = location.pathname;
+  const isLibraryChild =
+    pathname === '/saved' ||
+    pathname.startsWith('/saved/') ||
+    pathname === '/dictionary' ||
+    pathname.startsWith('/dictionary/');
+  const isLibraryActive =
+    pathname === '/library' || pathname.startsWith('/library/') || isLibraryChild;
+
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
     { path: '/learn', icon: Layers, label: 'Flashcards' },
@@ -31,47 +41,60 @@ export default function BottomNav() {
         zIndex: 50
       }}
     >
-      {navItems.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          style={{ textDecoration: 'none' }}
-          end={item.path === '/'}
-        >
-          {({ isActive }) => {
-            if (item.isProminent) {
-              return (
+      {navItems.map((item) => {
+        if (item.path === '/library') {
+          const ariaCurrent = isLibraryActive
+            ? (pathname === '/library' ? 'page' : 'true')
+            : undefined;
+
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              aria-current={ariaCurrent}
+              className={`navigation-link navigation-link--library${isLibraryActive ? ' is-active' : ''}`}
+              style={{ textDecoration: 'none' }}
+            >
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '56px',
+                height: '56px',
+                position: 'relative'
+              }}>
                 <div style={{
                   display: 'flex',
-                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: '56px',
-                  height: '56px',
-                  position: 'relative'
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)',
+                  color: '#FFFFFF',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                  transition: 'transform 0.2s',
+                  position: 'absolute',
+                  top: '-12px'
                 }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '46px',
-                    height: '46px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)',
-                    color: '#FFFFFF',
-                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
-                    transition: 'transform 0.2s',
-                    position: 'absolute',
-                    top: '-12px'
-                  }}>
-                    <item.icon size={22} strokeWidth={2.5} />
-                  </div>
-                  <span style={{ position: 'absolute', bottom: '6px', fontSize: '10px', fontWeight: 700, color: isActive ? 'var(--color-primary-blue)' : '#9CA3AF' }}>{item.label}</span>
+                  <item.icon size={22} strokeWidth={2.5} />
                 </div>
-              );
-            }
+                <span style={{ position: 'absolute', bottom: '6px', fontSize: '10px', fontWeight: 700, color: isLibraryActive ? 'var(--color-primary-blue)' : '#9CA3AF' }}>{item.label}</span>
+              </div>
+            </Link>
+          );
+        }
 
-            return (
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            style={{ textDecoration: 'none' }}
+            end={item.path === '/'}
+            className={({ isActive }) => `navigation-link${isActive ? ' is-active' : ''}`}
+          >
+            {({ isActive }) => (
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -92,10 +115,10 @@ export default function BottomNav() {
                 </div>
                 <span style={{ fontSize: '10px', fontWeight: 700, zIndex: 1, letterSpacing: '0.2px' }}>{item.label}</span>
               </div>
-            );
-          }}
-        </NavLink>
-      ))}
+            )}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }

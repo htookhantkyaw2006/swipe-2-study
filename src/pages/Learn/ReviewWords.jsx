@@ -20,14 +20,38 @@ const toListRow = (card) => ({
 export default function ReviewWords() {
   const navigate = useNavigate();
   const course = useCourse();
-  const [reviewWords, setReviewWords] = useState(() => (db.get('review_cards') || []).map(toListRow));
+  const [error, setError] = useState(() => {
+    try {
+      db.get('review_cards');
+      return null;
+    } catch {
+      return 'Unable to load review words.';
+    }
+  });
+  const [reviewWords, setReviewWords] = useState(() => {
+    try {
+      return (db.get('review_cards') || []).map(toListRow);
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     const unsubChange = storageOwner.subscribeChange(() => {
-      setReviewWords((db.get('review_cards') || []).map(toListRow));
+      try {
+        setReviewWords((db.get('review_cards') || []).map(toListRow));
+        setError(null);
+      } catch {
+        setError('Unable to load review words.');
+      }
     });
     const unsubOwner = storageOwner.subscribe(() => {
-      setReviewWords((db.get('review_cards') || []).map(toListRow));
+      try {
+        setReviewWords((db.get('review_cards') || []).map(toListRow));
+        setError(null);
+      } catch {
+        setError('Unable to load review words.');
+      }
     });
     return () => {
       unsubChange?.();
@@ -41,6 +65,72 @@ export default function ReviewWords() {
     e.stopPropagation();
     playWordAudio(word, { speakFn: speak });
   };
+
+  if (error) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
+          <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
+            <ChevronLeft size={24} color="var(--color-text-navy)" strokeWidth={2.5} />
+          </button>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Review Words</h1>
+        </header>
+
+        <div style={{ padding: '0 24px', maxWidth: '600px', margin: '0 auto' }}>
+          <div className="collection-hero collection-hero--review collection-hero--unavailable" style={{
+            background: 'linear-gradient(135deg, #F87171 0%, #EF4444 100%)',
+            borderRadius: '24px', padding: '24px', color: '#FFFFFF',
+            boxShadow: '0 12px 24px rgba(239, 68, 68, 0.2)', marginBottom: '32px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center'
+          }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 900, margin: '0 0 8px 0', color: '#FFFFFF' }}>Collection unavailable</h2>
+            <p style={{ fontSize: '1rem', margin: '0 0 16px 0', opacity: 0.9 }}>{error}</p>
+            <button
+              type="button"
+              className="collection-hero__action"
+              onClick={() => {
+                try {
+                  const items = (db.get('review_cards') || []).map(toListRow);
+                  setReviewWords(items);
+                  setError(null);
+                } catch {
+                  setError('Unable to load review words.');
+                }
+              }}
+              style={{ backgroundColor: '#FFFFFF', color: '#EF4444', border: 'none', borderRadius: '100px', padding: '12px 24px', fontWeight: 800, cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          </div>
+
+          <div className="study-section-heading">
+            <div>
+              <p role="status">Status unavailable</p>
+            </div>
+          </div>
+
+          <div className="study-error" role="alert" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#EF4444', padding: '16px', borderRadius: '16px', textAlign: 'center', marginTop: '16px' }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>Unable to load review words</p>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  const items = (db.get('review_cards') || []).map(toListRow);
+                  setReviewWords(items);
+                  setError(null);
+                } catch {
+                  setError('Unable to load review words.');
+                }
+              }}
+              style={{ marginTop: '12px', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: '8px', padding: '8px 16px', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'transparent', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
@@ -56,7 +146,7 @@ export default function ReviewWords() {
       <div style={{ padding: '0 24px', maxWidth: '600px', margin: '0 auto' }}>
 
         {/* Main Hero Card */}
-        <div style={{
+        <div className="collection-hero collection-hero--review" style={{
           background: 'linear-gradient(135deg, #F87171 0%, #EF4444 100%)',
           borderRadius: '24px', padding: '24px', color: '#FFFFFF',
           boxShadow: '0 12px 24px rgba(239, 68, 68, 0.2)', marginBottom: '32px',
@@ -77,7 +167,7 @@ export default function ReviewWords() {
               {reviewWords.length} Due
             </h2>
             <p style={{ fontSize: '1rem', margin: '0 0 24px 0', opacity: 0.9 }}>
-              {empty ? 'Swipe left on a card to send it here' : 'Ready for review'}
+              {empty ? 'Swipe left on a card to send it here' : `${reviewWords.length} ${reviewWords.length === 1 ? 'word to review' : 'words to review'}`}
             </p>
 
             <button
@@ -122,6 +212,7 @@ export default function ReviewWords() {
             {reviewWords.map((word) => (
               <div
                 key={word.id}
+                className="collection-word"
                 style={{
                   backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '16px',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -139,7 +230,7 @@ export default function ReviewWords() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      <h4 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{word.phrase}</h4>
+                      <h4 className="collection-word__character" style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{word.phrase}</h4>
                       {word.kana && <span style={{ fontSize: '0.8rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>{word.kana}</span>}
                       {word.reading && <span style={{ fontSize: '0.875rem', color: 'var(--color-primary-blue)', fontFamily: 'var(--font-reading)' }}>{word.reading}</span>}
                     </div>

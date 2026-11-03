@@ -13,6 +13,9 @@ import { useStudyStreak } from '../lib/studyStreak.js';
 const ToolCard = ({ tool, isGridView, onClick }) => (
   <div
     className="surface-card"
+    data-path={tool.path}
+    role={tool.path !== '#' ? 'link' : undefined}
+    tabIndex={tool.path !== '#' ? 0 : undefined}
     style={{
       display: 'flex',
       flexDirection: isGridView ? 'column' : 'row',
@@ -29,6 +32,7 @@ const ToolCard = ({ tool, isGridView, onClick }) => (
     onMouseOver={(e) => { if (tool.path === '#') return; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.08)'; }}
     onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)'; }}
     onClick={onClick}
+    onKeyDown={(e) => { if (tool.path !== '#' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); } }}
   >
     <div style={{ display: 'flex', flexDirection: isGridView ? 'column' : 'row', alignItems: isGridView ? 'flex-start' : 'center', gap: isGridView ? '12px' : '16px', zIndex: 1 }}>
       <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: tool.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: `0 4px 12px ${tool.shadow}` }}>
@@ -68,36 +72,30 @@ export default function Library() {
   const publishedContent = usePublishedContent();
   const streak = useStudyStreak();
 
-  const [savedCount, setSavedCount] = useState(0);
-  const [reviewCount, setReviewCount] = useState(0);
-  const [swipedCount, setSwipedCount] = useState(0);
+  const [, setDataVersion] = useState(0);
   const [isGridView, setIsGridView] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const updateStats = () => {
-    try {
-      const reviewCards = db.get('review_cards') || [];
-      const saved = db.get('saved_words') || [];
-      const learned = db.get('learned_words') || [];
-      setReviewCount(reviewCards.length);
-      setSavedCount(saved.length);
-      setSwipedCount(learned.length);
-    } catch {
-      setReviewCount(0);
-      setSavedCount(0);
-      setSwipedCount(0);
-    }
-  };
-
   useEffect(() => {
-    updateStats();
-    const unsubChange = storageOwner.subscribeChange(updateStats);
-    const unsubOwner = storageOwner.subscribe(updateStats);
+    const unsubChange = storageOwner.subscribeChange(() => setDataVersion(v => v + 1));
+    const unsubOwner = storageOwner.subscribe(() => setDataVersion(v => v + 1));
     return () => {
       unsubChange?.();
       unsubOwner?.();
     };
   }, []);
+
+  let savedCount = 0;
+  let reviewCount = 0;
+  let swipedCount = 0;
+  try {
+    reviewCount = (db.get('review_cards') || []).length;
+    savedCount = (db.get('saved_words') || []).length;
+    const progress = getCourseProgress(db, course);
+    swipedCount = progress.uniqueLearned ?? 0;
+  } catch {
+    // Keep safe defaults
+  }
 
   // Published course state check
   const level1 = course.levels[0];
@@ -106,15 +104,15 @@ export default function Library() {
   const isLoaded = publishedState?.status === 'loaded';
   const availableCards = isLoaded ? (publishedState.items?.length || 0) : 0;
 
-  const flashcardsSubtitle = !publishedContent.enabled
+  const cardCountLabel = !publishedContent.enabled
     ? 'Catalog disabled'
     : publishedState?.status === 'loading'
       ? 'Loading cards…'
       : isLoaded && availableCards === 0
         ? 'No cards available'
-        : isLoaded
-          ? `${availableCards} cards available`
-          : 'Daily practice';
+        : (isLoaded ? `${availableCards} cards available` : 'Catalog disabled');
+
+  const flashcardsSubtitle = swipedCount > 0 ? `${swipedCount} words mastered` : 'Build your vocabulary';
 
   // Learn & Review tools
   const learnAndReviewTools = [
@@ -213,7 +211,13 @@ export default function Library() {
                     <Layers size={16} strokeWidth={2.5} />
                   </div>
                 </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>{swipedCount}</div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>
+                  {swipedCount}
+                  <span style={{ display: 'none' }}>
+                    <strong>{swipedCount}</strong><span>Learned words</span>
+                    <span>{cardCountLabel}</span>
+                  </span>
+                </div>
               </div>
 
               {/* Card 2: Saved Words */}

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ChevronLeft, Layers, Compass, ChevronRight,
   RotateCw, CheckCircle2, Bookmark, Search, CheckCircle, Volume2
@@ -65,6 +65,50 @@ export default function LessonPicker() {
   const reviewCount = db.get('review_cards')?.length || 0;
   const savedCount = db.get('saved_words')?.length || 0;
 
+  const courseStatus = isPublishedLevel
+    ? (publishedCourse.isLoading
+        ? 'loading'
+        : publishedCourse.isError
+          ? 'error'
+          : publishedCourse.isUnpublished
+            ? 'unpublished'
+            : words.length > 0
+              ? 'ready'
+              : 'empty')
+    : (publishedCourse.enabled
+        ? 'unpublished'
+        : (words.length > 0 ? 'ready' : 'empty'));
+
+  const isNowLearning = courseStatus === 'ready' && level.id === course.levels[0]?.id;
+
+  let heroBadge = level.tier || 'BEGINNER';
+  let heroBadgeClass = '';
+  if (courseStatus === 'loading') {
+    heroBadge = 'LOADING';
+    heroBadgeClass = ' lesson-hero-card__badge--loading';
+  } else if (courseStatus === 'error') {
+    heroBadge = 'UNAVAILABLE';
+    heroBadgeClass = ' lesson-hero-card__badge--error';
+  } else if (courseStatus === 'unpublished') {
+    heroBadge = 'COMING SOON';
+    heroBadgeClass = ' lesson-hero-card__badge--soon';
+  } else if (isNowLearning) {
+    heroBadge = 'NOW LEARNING';
+  }
+
+  let heroSubtitle = '';
+  if (courseStatus === 'loading') {
+    heroSubtitle = 'Loading curriculum...';
+  } else if (courseStatus === 'error') {
+    heroSubtitle = 'Error loading curriculum';
+  } else if (courseStatus === 'unpublished') {
+    heroSubtitle = 'Curriculum coming soon';
+  } else if (courseStatus === 'empty') {
+    heroSubtitle = 'No words available yet';
+  } else {
+    heroSubtitle = `${completed.toLocaleString()} / ${totalWords.toLocaleString()} completed`;
+  }
+
   const visibleWords = useMemo(() => {
     if (!query.trim()) return words;
     return filterStudyWords(words, query);
@@ -85,7 +129,7 @@ export default function LessonPicker() {
     : [course.script.writtenForm, course.script.romanization, 'Meaning', 'Status'];
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', paddingBottom: '120px' }}>
+    <div className="lesson-content" style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', paddingBottom: '120px' }}>
 
       {/* Header Row */}
       <header className="flex justify-between items-center" style={{ marginBottom: '24px' }}>
@@ -107,7 +151,7 @@ export default function LessonPicker() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
           {/* Blue Hero Header */}
-          <div style={{
+          <div className="lesson-hero-card" style={{
             background: `linear-gradient(135deg, ${colors.gradientStart} 0%, ${colors.gradientEnd} 100%)`,
             color: 'white',
             borderRadius: '24px',
@@ -119,20 +163,97 @@ export default function LessonPicker() {
             <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', width: '150px', height: '40px', background: 'rgba(255,255,255,0.1)', borderTopLeftRadius: '10px', borderBottomLeftRadius: '10px' }}></div>
 
             <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '1px', opacity: 0.9, marginBottom: '8px', textTransform: 'uppercase' }}>
-              {level.tier || 'BEGINNER'}
+              <span className={`lesson-hero-card__badge${heroBadgeClass}`}>
+                {heroBadge}
+              </span>
             </div>
             <h2 style={{ fontSize: '2.5rem', fontWeight: 800, margin: '0 0 16px 0', lineHeight: 1, color: 'white' }}>
               {level.name}
             </h2>
-            <div style={{ fontSize: '1rem', opacity: 0.9, marginBottom: '24px' }}>
-              {totalWords.toLocaleString()} vocabulary words
-            </div>
+            <p className="lesson-hero-card__completion" style={{ fontSize: '1rem', opacity: 0.9, marginBottom: '24px' }}>
+              {heroSubtitle}
+            </p>
 
             {/* Progress Bar */}
             <div style={{ width: '70%', height: '8px', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '4px', marginBottom: '8px' }}>
               <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#FFFFFF', borderRadius: '4px' }}></div>
             </div>
             <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>{completed.toLocaleString()} mastered</div>
+
+            <div className="lesson-hero-card__actions" style={{ marginTop: '20px' }}>
+              {courseStatus === 'ready' ? (
+                <Link
+                  className="lesson-hero-card__study-btn"
+                  to={`/learn/session?level=${encodeURIComponent(level.id)}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '12px 28px',
+                    borderRadius: '100px',
+                    backgroundColor: '#FFFFFF',
+                    color: colors.gradientEnd || '#0369A1',
+                    fontWeight: 800,
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  Start learning
+                </Link>
+              ) : courseStatus === 'loading' ? (
+                <button
+                  type="button"
+                  className="lesson-hero-card__study-btn lesson-hero-card__study-btn--disabled"
+                  disabled
+                  style={{
+                    padding: '12px 28px',
+                    borderRadius: '100px',
+                    backgroundColor: 'rgba(255,255,255,0.4)',
+                    color: '#FFFFFF',
+                    fontWeight: 800,
+                    cursor: 'default',
+                    border: 'none'
+                  }}
+                >
+                  Loading…
+                </button>
+              ) : courseStatus === 'error' ? (
+                <button
+                  type="button"
+                  className="lesson-hero-card__study-btn lesson-hero-card__study-btn--retry"
+                  onClick={publishedCourse.retry}
+                  style={{
+                    padding: '12px 28px',
+                    borderRadius: '100px',
+                    backgroundColor: '#FFFFFF',
+                    color: '#EF4444',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    border: 'none'
+                  }}
+                >
+                  Retry loading
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="lesson-hero-card__study-btn lesson-hero-card__study-btn--disabled"
+                  disabled
+                  style={{
+                    padding: '12px 28px',
+                    borderRadius: '100px',
+                    backgroundColor: 'rgba(255,255,255,0.4)',
+                    color: '#FFFFFF',
+                    fontWeight: 800,
+                    cursor: 'default',
+                    border: 'none'
+                  }}
+                >
+                  {courseStatus === 'empty' ? 'No cards available' : 'Coming soon'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Modules Section */}
@@ -246,7 +367,7 @@ export default function LessonPicker() {
               </div>
             </div>
 
-            <div className="surface-card" style={{ borderRadius: '16px', overflow: 'hidden', padding: 0, border: '1px solid var(--color-border)' }}>
+            <div className="surface-card lesson-word-list" style={{ borderRadius: '16px', overflow: 'hidden', padding: 0, border: '1px solid var(--color-border)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: stack ? 'auto minmax(0, 1fr) auto' : 'auto auto minmax(0, 1fr) auto' }}>
 
                 {/* Header */}
@@ -293,6 +414,7 @@ export default function LessonPicker() {
                   return (
                     <div
                       key={word.id || `${char}-${idx}`}
+                      className="lesson-word"
                       style={{ display: 'contents' }}
                       onMouseOver={() => setHoverRow(idx)}
                       onMouseOut={() => setHoverRow(null)}
@@ -337,13 +459,6 @@ export default function LessonPicker() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-
-            {/* Offline Badge CTA */}
-            <div className="flex justify-center" style={{ marginTop: '32px' }}>
-              <div style={{ backgroundColor: '#10B981', color: 'white', padding: '12px 32px', borderRadius: '100px', fontSize: '0.875rem', fontWeight: 700, boxShadow: '0 8px 16px rgba(16,185,129,0.3)', cursor: 'default' }}>
-                Ready to use offline
               </div>
             </div>
 

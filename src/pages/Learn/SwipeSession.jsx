@@ -129,6 +129,8 @@ const Flashcard = ({
   // Front Content
   const frontContent = (
     <motion.div
+      className="swipe-card__front"
+      inert={flipped}
       style={{
         position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(0deg)',
@@ -146,12 +148,13 @@ const Flashcard = ({
         }}>
           {card.level || course.levels[0]?.name || 'Level 1'}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="swipe-card__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {!isPhrases && (
             <button
               type="button"
-              className={`swipe-bookmark${isBookmarked ? ' swipe-bookmark--saved' : ''}`}
+              className={`swipe-bookmark${isUnavailable ? ' swipe-bookmark--unavailable' : isBookmarked ? ' swipe-bookmark--saved' : ''}`}
               disabled={!isActive || locked || isUnavailable}
+              aria-pressed={isUnavailable ? undefined : (isBookmarked ? 'true' : 'false')}
               aria-label={isUnavailable ? `Bookmark status unavailable for ${wordLabel}` : `${isBookmarked ? 'Unsave' : 'Save'} ${wordLabel}`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -211,16 +214,72 @@ const Flashcard = ({
 
   // Back Content
   const backContent = (
-    <motion.div style={{
-      position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
-      WebkitBackfaceVisibility: 'hidden',
-      transform: 'rotateY(180deg)',
-      backgroundColor: isActive ? backgroundColor : '#FFFFFF',
-      borderRadius: '24px',
-      boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)', overflow: 'hidden'
-    }}>
+    <motion.div
+      className="swipe-card__back"
+      inert={!flipped}
+      style={{
+        position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+        transform: 'rotateY(180deg)',
+        backgroundColor: isActive ? backgroundColor : '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)', overflow: 'hidden'
+      }}
+    >
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, containerType: 'inline-size' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', padding: '24px 24px 0 24px', boxSizing: 'border-box' }}>
+          <div style={{
+            backgroundColor: '#0C4A6E', color: '#FFFFFF', padding: '4px 12px',
+            borderRadius: '100px', fontSize: '0.75rem', fontWeight: 600,
+            fontFamily: 'JetBrains Mono, monospace'
+          }}>
+            {card.level || course.levels[0]?.name || 'Level 1'}
+          </div>
+          <div className="swipe-card__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {!isPhrases && (
+              <button
+                type="button"
+                className={`swipe-bookmark${isUnavailable ? ' swipe-bookmark--unavailable' : isBookmarked ? ' swipe-bookmark--saved' : ''}`}
+                disabled={!isActive || locked || isUnavailable}
+                aria-pressed={isUnavailable ? undefined : (isBookmarked ? 'true' : 'false')}
+                aria-label={isUnavailable ? `Bookmark status unavailable for ${wordLabel}` : `${isBookmarked ? 'Unsave' : 'Save'} ${wordLabel}`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isActive || locked || isUnavailable) return;
+                  onToggleSave?.(card);
+                }}
+                style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  backgroundColor: isBookmarked ? '#D1FAE5' : '#F1F5F9',
+                  color: isBookmarked ? '#059669' : '#0C4A6E',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                  boxShadow: '0 2px 6px rgba(12, 74, 110, 0.08)'
+                }}
+              >
+                {isBookmarked ? <BookmarkMinus size={18} strokeWidth={2.5} /> : <Bookmark size={18} strokeWidth={2.5} />}
+              </button>
+            )}
+            <button
+              type="button"
+              className="swipe-audio"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={playWord}
+              aria-label={`Play pronunciation for ${wordLabel}`}
+              style={{
+                width: '36px', height: '36px', borderRadius: '50%',
+                backgroundColor: '#0C4A6E', color: '#FFFFFF',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: 'none', cursor: 'pointer', transition: 'transform 0.1s, box-shadow 0.2s',
+                boxShadow: '0 4px 12px rgba(12, 74, 110, 0.3)'
+              }}
+            >
+              <Volume2 size={20} />
+            </button>
+          </div>
+        </div>
+        <div style={{ padding: '12px 24px 24px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, containerType: 'inline-size' }}>
           <h2 style={{ fontSize: fitFontCss(char, 48), color: '#0C4A6E', fontWeight: 700, margin: 0, lineHeight: 1, whiteSpace: 'nowrap' }}>
             {char}
           </h2>
@@ -502,12 +561,27 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const dragOffset = useMotionValue(0);
 
   const [savedWords, setSavedWords] = useState(() => {
-    try { return db.get('saved_words') || []; } catch { return []; }
+    try { return db.get('saved_words'); } catch { return null; }
+  });
+
+  const [bookmarkFeedback, setBookmarkFeedback] = useState(() => {
+    try {
+      db.get('saved_words');
+      return null;
+    } catch {
+      return 'Unable to load bookmark state.';
+    }
   });
 
   useEffect(() => {
     const unsub = storageOwner.subscribeChange(() => {
-      try { setSavedWords(db.get('saved_words') || []); } catch { /* ignore */ }
+      try {
+        setSavedWords(db.get('saved_words'));
+        setBookmarkFeedback(prev => (prev === 'Unable to load bookmark state.' ? null : prev));
+      } catch {
+        setSavedWords(null);
+        setBookmarkFeedback('Unable to load bookmark state.');
+      }
     });
     return () => unsub?.();
   }, []);
@@ -532,14 +606,25 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
 
   const handleToggleSave = (card) => {
     if (!card) return;
-    const existing = findSavedWord(savedWords, card);
-    if (existing) {
-      db.remove('saved_words', existing.id);
-      setSavedWords(prev => prev.filter(w => w.id !== existing.id));
-    } else {
-      const newRec = buildSavedWordRecord(card);
-      const inserted = db.insert('saved_words', newRec);
-      setSavedWords(prev => [...prev, inserted]);
+    const isRemoving = Boolean(findSavedWord(savedWords, card));
+    try {
+      const existing = findSavedWord(savedWords, card);
+      if (existing) {
+        db.remove('saved_words', existing.id);
+      } else {
+        const newRec = buildSavedWordRecord(card);
+        db.insert('saved_words', newRec);
+      }
+      setSavedWords(db.get('saved_words'));
+      setBookmarkFeedback(null);
+    } catch {
+      const action = isRemoving ? 'unsave' : 'save';
+      setBookmarkFeedback(`Unable to ${action} word. Try again.`);
+      try {
+        setSavedWords(db.get('saved_words'));
+      } catch {
+        setSavedWords(null);
+      }
     }
   };
 
@@ -547,30 +632,39 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     if (actionLocked.current || advancing) return;
     actionLocked.current = true;
     const activeCard = swipedCard || cards[currentIndex];
-    if (!activeCard) return;
+    if (!activeCard) {
+      actionLocked.current = false;
+      return;
+    }
+
+    if (!isPhrases) {
+      try {
+        recordWordAction(db, {
+          card: activeCard,
+          direction,
+          levelId: targetLevel || activeCard.level || cards[0]?.level || course.levels[0]?.id,
+        });
+        if (direction === 'right' && isReview && activeCard) {
+          const reviewCards = db.get('review_cards') || [];
+          db.set('review_cards', reviewCards.filter(c => c.id !== activeCard.id));
+        } else if (direction === 'left' && !isReview && activeCard) {
+          const reviewCards = db.get('review_cards') || [];
+          if (!reviewCards.find(c => c.id === activeCard.id)) {
+            db.set('review_cards', [...reviewCards, activeCard]);
+          }
+        }
+      } catch {
+        actionLocked.current = false;
+        setBookmarkFeedback('Unable to save progress. Try again.');
+        return;
+      }
+    }
 
     sessionStatsRef.current.studied += 1;
-
     if (direction === 'right') {
       sessionStatsRef.current.learned += 1;
-      if (!isPhrases) {
-        recordWordAction(db, { card: activeCard, direction: 'right', levelId: targetLevel });
-      }
-      if (isReview && activeCard) {
-        const reviewCards = db.get('review_cards') || [];
-        db.set('review_cards', reviewCards.filter(c => c.id !== activeCard.id));
-      }
     } else {
       sessionStatsRef.current.review += 1;
-      if (!isPhrases) {
-        recordWordAction(db, { card: activeCard, direction: 'left', levelId: targetLevel });
-      }
-      if (!isReview && activeCard) {
-        const reviewCards = db.get('review_cards') || [];
-        if (!reviewCards.find(c => c.id === activeCard.id)) {
-          db.set('review_cards', [...reviewCards, activeCard]);
-        }
-      }
     }
 
     setAdvancing(true);
@@ -685,7 +779,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     const { studied, learned, review } = sessionSummary;
     return (
       <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <div className="surface-card" style={{ padding: '32px 24px', borderRadius: '24px', maxWidth: '400px', width: '100%', boxShadow: '0 12px 32px rgba(12, 74, 110, 0.08)' }}>
+        <div className="surface-card session-results-card" style={{ padding: '32px 24px', borderRadius: '24px', maxWidth: '400px', width: '100%', boxShadow: '0 12px 32px rgba(12, 74, 110, 0.08)' }}>
           <div style={{ width: '56px', height: '56px', borderRadius: '16px', backgroundColor: '#ECFDF5', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
             <Check size={28} strokeWidth={3} />
           </div>
@@ -697,18 +791,24 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
             <div style={{ padding: '12px', borderRadius: '16px', backgroundColor: 'var(--color-page-bg)' }}>
-              <span style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>{studied}</span>
+              <span className="session-stat-card__value" style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>{studied}</span>
               <span style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>Studied</span>
             </div>
             <div style={{ padding: '12px', borderRadius: '16px', backgroundColor: '#ECFDF5' }}>
-              <span style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: '#10B981' }}>{learned}</span>
+              <span className="session-stat-card__value" style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: '#10B981' }}>{learned}</span>
               <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>Learned</span>
             </div>
             <div style={{ padding: '12px', borderRadius: '16px', backgroundColor: '#FEF2F2' }}>
-              <span style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: '#EF4444' }}>{review}</span>
+              <span className="session-stat-card__value" style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: '#EF4444' }}>{review}</span>
               <span style={{ fontSize: '0.75rem', color: '#DC2626', fontWeight: 600 }}>Review</span>
             </div>
           </div>
+
+          {review > 0 && (
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-secondary-blue)', margin: '0 0 16px 0' }}>
+              Words marked for review have been added to your Review queue.
+            </p>
+          )}
 
           <button onClick={() => navigate(backTo)} className="btn-primary" style={{ width: '100%', padding: '14px', borderRadius: '14px', fontWeight: 700, marginBottom: '8px' }}>
             Back to course
@@ -769,6 +869,26 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         </div>
         <div style={{ width: '40px' }}></div>
       </header>
+
+      {bookmarkFeedback && (
+        <div
+          role="alert"
+          className="swipe-session__notice"
+          style={{
+            backgroundColor: '#FEF2F2',
+            color: '#EF4444',
+            padding: '8px 16px',
+            borderRadius: '12px',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            marginBottom: '16px',
+            textAlign: 'center',
+            zIndex: 10
+          }}
+        >
+          {bookmarkFeedback}
+        </div>
+      )}
 
       {/* Main Flashcard Stage */}
       <div style={{ flex: 1, position: 'relative', width: '100%', marginBottom: '24px' }}>

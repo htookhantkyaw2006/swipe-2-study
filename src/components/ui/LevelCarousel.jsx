@@ -54,6 +54,10 @@ export default function LevelCarousel() {
       ? (isLoaded && availableCount > 0)
       : (publishedContent.enabled ? false : (availableCount > 0 || level.words > 0));
 
+    const isLoadedEmpty = isInScope
+      ? (isLoaded && availableCount === 0)
+      : (!publishedContent.enabled && availableCount === 0 && !level.words);
+
     const wordCountText = publishedState?.status === 'loading'
       ? 'Loading curriculum...'
       : isInScope
@@ -61,7 +65,9 @@ export default function LevelCarousel() {
             ? 'Error loading curriculum'
             : publishedState?.status === 'unpublished'
               ? 'Curriculum coming soon'
-              : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
+              : isLoadedEmpty
+                ? 'No words available yet'
+                : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
         : publishedContent.enabled
           ? 'Curriculum coming soon'
           : course.id === 'zh'
@@ -75,8 +81,10 @@ export default function LevelCarousel() {
       availableCount,
       percent,
       isLevelAvailable,
+      isLoadedEmpty,
       wordCountText,
       publishedCourseId,
+      publishedState,
     };
   });
 
@@ -121,16 +129,16 @@ export default function LevelCarousel() {
           >
             {/* Top Heading */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{
-                background: 'rgba(255,255,255,0.25)',
-                padding: '4px 10px',
-                borderRadius: '8px',
-                fontSize: '0.65rem',
-                fontWeight: 800,
-                textTransform: 'uppercase',
-                letterSpacing: '1px'
-              }}>
-                {index === 0 && level.isLevelAvailable ? 'NOW LEARNING' : (level.tier || 'ALL LEVELS')}
+              <span className={`course-badge${index === 0 && level.isLevelAvailable ? ' course-badge--active' : ''}`}>
+                {level.publishedState?.status === 'loading'
+                  ? 'LOADING'
+                  : level.publishedState?.status === 'error'
+                    ? 'UNAVAILABLE'
+                    : level.publishedState?.status === 'unpublished'
+                      ? 'COMING SOON'
+                      : index === 0 && level.isLevelAvailable
+                        ? 'NOW LEARNING'
+                        : (level.tier || 'ALL LEVELS')}
               </span>
               <button
                 onClick={() => navigate('/learn')}
@@ -158,7 +166,7 @@ export default function LevelCarousel() {
                 <h3 style={{ fontSize: '2rem', fontWeight: 800, margin: '0 0 8px 0', color: '#FFFFFF', lineHeight: 1 }}>
                   {level.name}
                 </h3>
-                <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.9 }}>
+                <p className="course-word-count">
                   {level.wordCountText}
                 </p>
                 {/* Progress bar */}
@@ -192,32 +200,121 @@ export default function LevelCarousel() {
 
             {/* Bottom Actions */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <button
-                onClick={() => {
-                  if (level.isLevelAvailable) {
-                    navigate(`/learn/session?level=${encodeURIComponent(level.id)}`);
-                  }
-                }}
-                disabled={!level.isLevelAvailable}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  color: level.btnColor || level.gradientEnd || '#0369A1',
-                  border: 'none',
-                  borderRadius: '14px',
-                  padding: '10px 16px',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  fontSize: '0.875rem',
-                  cursor: level.isLevelAvailable ? 'pointer' : 'default',
-                  opacity: level.isLevelAvailable ? 1 : 0.6,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                }}
-              >
-                <Play size={16} fill="currentColor" /> {level.isLevelAvailable ? (level.completed === 0 ? (course.copy.startSwiping || 'Start swiping') : 'Continue') : 'Coming soon'}
-              </button>
+              {level.isLevelAvailable ? (
+                <button
+                  type="button"
+                  className="course-study-button"
+                  onClick={() => navigate(`/learn/session?level=${encodeURIComponent(level.id)}`)}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    color: level.btnColor || level.gradientEnd || '#0369A1',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '10px 16px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '0.875rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  {level.completed === 0 ? (course.copy.startSwiping || 'Start swiping') : 'Continue'}
+                </button>
+              ) : level.publishedState?.status === 'loading' ? (
+                <button
+                  type="button"
+                  className="course-study-button course-study-button--disabled"
+                  disabled
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    color: level.btnColor || level.gradientEnd || '#0369A1',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '10px 16px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '0.875rem',
+                    opacity: 0.6,
+                    cursor: 'default'
+                  }}
+                >
+                  Loading…
+                </button>
+              ) : level.publishedState?.status === 'error' ? (
+                <button
+                  type="button"
+                  className="course-study-button course-study-button--retry"
+                  onClick={() => level.publishedCourseId && publishedContent.retry(level.publishedCourseId)}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    color: level.btnColor || level.gradientEnd || '#0369A1',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '10px 16px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '0.875rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Retry
+                </button>
+              ) : level.isLoadedEmpty ? (
+                <button
+                  type="button"
+                  className="course-study-button course-study-button--disabled"
+                  disabled
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    color: level.btnColor || level.gradientEnd || '#0369A1',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '10px 16px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '0.875rem',
+                    opacity: 0.6,
+                    cursor: 'default'
+                  }}
+                >
+                  No cards available
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="course-study-button course-study-button--disabled"
+                  disabled
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    color: level.btnColor || level.gradientEnd || '#0369A1',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '10px 16px',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '0.875rem',
+                    opacity: 0.6,
+                    cursor: 'default'
+                  }}
+                >
+                  Coming soon
+                </button>
+              )}
               <button
                 onClick={() => navigate(`/learn/level/${level.id}`)}
                 style={{
