@@ -88,11 +88,13 @@ export default function Library() {
   let savedCount = 0;
   let reviewCount = 0;
   let swipedCount = 0;
+  let learnedCount = 0;
   try {
     reviewCount = (db.get('review_cards') || []).length;
     savedCount = (db.get('saved_words') || []).length;
     const progress = getCourseProgress(db, course);
-    swipedCount = progress.uniqueLearned ?? 0;
+    learnedCount = progress.uniqueLearned ?? 0;
+    swipedCount = progress.studiedCount ?? progress.uniqueSeen ?? progress.uniqueLearned ?? 0;
   } catch {
     // Keep safe defaults
   }
@@ -112,7 +114,7 @@ export default function Library() {
         ? 'No cards available'
         : (isLoaded ? `${availableCards} cards available` : 'Catalog disabled');
 
-  const flashcardsSubtitle = swipedCount > 0 ? `${swipedCount} words mastered` : 'Build your vocabulary';
+  const flashcardsSubtitle = learnedCount > 0 ? `${learnedCount} ${learnedCount === 1 ? 'word' : 'words'} learned` : 'Build your vocabulary';
 
   // Learn & Review tools
   const learnAndReviewTools = [
@@ -145,7 +147,7 @@ export default function Library() {
       <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '280px', background: 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)', zIndex: 0 }}></div>
 
       {/* Header Container */}
-      <div style={{ maxWidth: '500px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
         <div style={{ padding: '40px 24px 32px 24px' }}>
           <header className="flex justify-between items-start">
             <div>
@@ -178,7 +180,7 @@ export default function Library() {
         zIndex: 1,
         marginTop: '-8px'
       }}>
-        <div style={{ maxWidth: '500px', margin: '0 auto', padding: '24px 24px 100px 24px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 24px 100px 24px' }}>
 
           {/* Progress Tracking Section */}
           <div style={{ marginBottom: '32px' }}>
@@ -214,7 +216,7 @@ export default function Library() {
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-navy)', lineHeight: 1 }}>
                   {swipedCount}
                   <span style={{ display: 'none' }}>
-                    <strong>{swipedCount}</strong><span>Learned words</span>
+                    <strong>{learnedCount}</strong><span>Learned words</span>
                     <span>{cardCountLabel}</span>
                   </span>
                 </div>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCourse } from '../lib/language';
 import { phraseCards } from '../lib/phraseCards';
 import { useAuth } from '../lib/useAuth.js';
+import { displayName } from '../lib/profile.js';
 
 const ProgressRing = ({ progress, size, strokeWidth, gradientId, children }) => {
   const radius = (size - strokeWidth) / 2;
@@ -49,8 +50,8 @@ export default function Flashcards() {
   const navigate = useNavigate();
   const course = useCourse();
   const { profile, user } = useAuth();
-  const name = profile?.name || user?.user_metadata?.full_name || 'Htoo';
-  const firstName = name.split(' ')[0];
+  const name = user ? displayName(profile, user) : 'Learner';
+  const firstName = name.split(' ')[0] || 'Learner';
 
   const levels = course.levels.map((l) => {
     const phrases = phraseCards(course, l.id);
@@ -58,7 +59,7 @@ export default function Flashcards() {
     return {
       ...l,
       phrasesCount: count,
-      progress: l.demo?.phraseProgress || (count > 0 ? 0 : 0)
+      progress: 0
     };
   });
 

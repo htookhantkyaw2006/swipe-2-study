@@ -147,7 +147,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="home-page" style={{ padding: '24px 20px', maxWidth: '500px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '100px' }}>
+    <div className="home-page" style={{ padding: '24px', maxWidth: '800px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '100px' }}>
 
       {/* Header */}
       <header className="home-greeting" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px', paddingBottom: '16px', borderBottom: '1px solid var(--color-border)' }}>
@@ -165,7 +165,7 @@ export default function Home() {
       </header>
 
       {/* Top Section: Carousel */}
-      <div style={{ margin: '0 -20px' }}>
+      <div style={{ margin: '0 -24px' }}>
         <LevelCarousel />
       </div>
 

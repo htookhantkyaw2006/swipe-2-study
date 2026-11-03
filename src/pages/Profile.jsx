@@ -15,7 +15,9 @@ import { useAvatarUrl } from '../lib/useAvatarUrl.js';
 import { db } from '../lib/db';
 import { useGuestImport } from '../lib/useGuestImport.js';
 import { storageOwner } from '../lib/storageOwner.js';
+import { getSupabaseClient } from '../lib/supabase.js';
 import { isAccountDeletionEnabled } from '../lib/accountDeletionGate.js';
+import { sendDeletionRequest, removeOwnerLocalData, UNCONFIRMED_DELETION_GUIDANCE } from '../lib/accountDeletionClient.js';
 import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
 import DeleteAccountDialog from '../components/DeleteAccountDialog.jsx';
 import { useStudyStreak } from '../lib/studyStreak.js';
@@ -29,20 +31,35 @@ export default function Profile() {
   const [languageSheet, setLanguageSheet] = useState(false);
   const [goalSheet, setGoalSheet] = useState(false);
 
-  const { user, isGuest, loading: authLoading, signOut, signOutGlobal } = useAuth();
+  const {
+    user,
+    isGuest,
+    loading: authLoading,
+    isTransitioning,
+    error: authError,
+    retryVerification,
+    signOut,
+    signOutGlobal,
+    captureGeneration,
+    isCurrent
+  } = useAuth();
   const { profile, loading: profileLoading, error: profileError, retry: retryProfile } = useProfile();
   const photo = useAvatarUrl(profile?.avatar_path);
   const guestImport = useGuestImport();
   const streak = useStudyStreak();
 
   const [swipedCount, setSwipedCount] = useState(0);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deletionError, setDeletionError] = useState(null);
   const [localCleanupError, setLocalCleanupError] = useState(false);
+  const [deletionNotice, setDeletionNotice] = useState('');
   const [globalSignOutOpen, setGlobalSignOutOpen] = useState(false);
   const [globalSigningOut, setGlobalSigningOut] = useState(false);
   const [globalSignOutError, setGlobalSignOutError] = useState(null);
+  const [targetAccountLabel, setTargetAccountLabel] = useState('');
 
   const authProviders = user?.app_metadata?.providers || (user?.app_metadata?.provider ? [user?.app_metadata.provider] : []);
   const authIdentities = Array.isArray(user?.identities) ? user.identities : [];
@@ -50,10 +67,12 @@ export default function Profile() {
   const isOAuthOnly = Boolean(user && authProviders.length > 0 && !hasEmailAuth);
   const deletionEnabled = isAccountDeletionEnabled();
 
+  const busy = authLoading || isTransitioning;
+
   const updateCounts = () => {
     try {
       const progress = getCourseProgress(db, course);
-      setSwipedCount(progress.uniqueLearned ?? 0);
+      setSwipedCount(progress.studiedCount ?? progress.uniqueSeen ?? progress.uniqueLearned ?? 0);
     } catch {
       setSwipedCount(0);
     }
@@ -80,68 +99,147 @@ export default function Profile() {
     : 'Saved words and review lists under your account are stored on this device.';
 
   const handleLogout = async () => {
+    if (loggingOut || globalSigningOut || busy) return;
+    setLoggingOut(true);
+    setLogoutError('');
     try {
-      await signOut();
+      const res = await signOut();
+      if (res?.error) {
+        setLogoutError(res.error?.message || 'Could not sign out. Please try again.');
+      }
     } catch (err) {
-      window.alert('Error signing out. Please try again.');
+      setLogoutError(err?.message || 'Could not sign out. Please try again.');
+    } finally {
+      setLoggingOut(false);
     }
   };
 
+  const openGlobalSignOut = () => {
+    if (loggingOut || globalSigningOut || busy) return;
+    setTargetAccountLabel(user?.email || name || '');
+    setGlobalSignOutError(null);
+    setGlobalSignOutOpen(true);
+  };
+
   const handleGlobalSignOut = async () => {
+    if (globalSigningOut || loggingOut || busy) return;
     setGlobalSigningOut(true);
     setGlobalSignOutError(null);
     try {
       const result = await signOutGlobal();
-      if (!result?.success) {
-        setGlobalSignOutError(result?.error || 'Failed to sign out of all devices.');
+      if (result?.error) {
+        setGlobalSignOutError(result.error?.message || result.error?.guidance || 'Could not sign out on all devices. You have been signed out on this device.');
       } else {
         setGlobalSignOutOpen(false);
       }
     } catch (err) {
-      setGlobalSignOutError(err.message || 'Failed to sign out of all devices.');
+      setGlobalSignOutError(err?.message || 'Could not sign out on all devices.');
     } finally {
       setGlobalSigningOut(false);
     }
   };
 
-  const handleDeleteAccount = async (password) => {
+  const openDeleteAccount = () => {
+    if (loggingOut || globalSigningOut || deletingAccount || busy) return;
+    setDeletionError(null);
+    setLocalCleanupError(false);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteAccount = async ({ password }) => {
+    if (deletingAccount || loggingOut || globalSigningOut || busy) return;
+    const initiatingUserId = user?.id;
+    const initiatingGen = captureGeneration ? captureGeneration() : 0;
+    const isOperationCurrent = () => {
+      const genOk = isCurrent ? isCurrent(initiatingGen) : true;
+      return genOk && user?.id === initiatingUserId;
+    };
     setDeletingAccount(true);
     setDeletionError(null);
+    setLocalCleanupError(false);
+
     try {
-      const { sendDeletionRequest, removeOwnerLocalData } = await import('../lib/accountDeletionClient.js');
-      const res = await sendDeletionRequest({ user, password });
-      if (res?.success) {
-        try {
-          removeOwnerLocalData(user.id);
-        } catch {
-          setLocalCleanupError(true);
+      const client = getSupabaseClient();
+      const result = await sendDeletionRequest({
+        client,
+        password,
+        initiatingUserId,
+        isCurrent: isOperationCurrent,
+      });
+
+      // Guard against account switch during in-flight request
+      const isCurrentSession = isCurrent ? isCurrent(initiatingGen) : true;
+      if (!isCurrentSession || user?.id !== initiatingUserId) {
+        setDeletingAccount(false);
+        if (result.status === 'confirmed_deleted') {
+          try { removeOwnerLocalData(initiatingUserId); } catch {}
         }
-        setDeleteDialogOpen(false);
-        navigate('/');
-      } else {
-        setDeletionError(res?.error || 'Failed to delete account.');
+        return;
       }
-    } catch (err) {
-      setDeletionError(err.message || 'Failed to delete account.');
-    } finally {
+
+      if (result.status === 'confirmed_deleted') {
+        let cleanupSucceeded = false;
+        try {
+          removeOwnerLocalData(initiatingUserId);
+          cleanupSucceeded = true;
+        } catch {
+          cleanupSucceeded = false;
+        }
+
+        if (!cleanupSucceeded) {
+          setDeletingAccount(false);
+          setLocalCleanupError(true);
+          setDeletionError('Your account was deleted on the server, but local cached data could not be completely cleared.');
+          return;
+        }
+
+        setDeletingAccount(false);
+        setDeleteDialogOpen(false);
+        setDeletionNotice('Your account has been deleted. You are now in guest mode.');
+        storageOwner.setOwner(null);
+        await signOut();
+        navigate('/');
+        return;
+      }
+
       setDeletingAccount(false);
+      setDeletionError(result.message || 'Account deletion failed.');
+    } catch {
+      setDeletingAccount(false);
+      setDeletionError(UNCONFIRMED_DELETION_GUIDANCE);
     }
   };
 
   const handleRetryLocalCleanup = async () => {
+    if (deletingAccount || !localCleanupError) return;
+    const initiatingUserId = user?.id;
+    if (!initiatingUserId) return;
+    setDeletingAccount(true);
+    setDeletionError(null);
+
+    let cleanupSucceeded = false;
     try {
-      const { removeOwnerLocalData } = await import('../lib/accountDeletionClient.js');
-      removeOwnerLocalData(user.id);
+      removeOwnerLocalData(initiatingUserId);
+      cleanupSucceeded = true;
+    } catch {
+      cleanupSucceeded = false;
+    }
+
+    setDeletingAccount(false);
+    if (cleanupSucceeded) {
       setLocalCleanupError(false);
       setDeleteDialogOpen(false);
+      setDeletionNotice('Your account has been deleted. You are now in guest mode.');
+      storageOwner.setOwner(null);
+      await signOut();
       navigate('/');
-    } catch {
-      setLocalCleanupError(true);
+    } else {
+      setDeletionError('Could not clear device storage. Please try again.');
     }
   };
 
   return (
-    <div style={{ padding: '24px 20px', maxWidth: '500px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '120px' }}>
+    <div style={{ padding: '24px', maxWidth: '800px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '120px' }}>
 
       {/* Header */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -169,6 +267,31 @@ export default function Profile() {
           <SettingsIcon size={20} />
         </button>
       </header>
+
+      {deletionNotice && (
+        <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', padding: '12px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }} role="status">
+          <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{deletionNotice}</span>
+          <button type="button" onClick={() => setDeletionNotice('')} style={{ background: 'transparent', color: '#16A34A', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Dismiss</button>
+        </div>
+      )}
+
+      {logoutError && (
+        <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#EF4444', padding: '12px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }} role="alert">
+          <span style={{ fontSize: '0.875rem' }}>{logoutError}</span>
+          <button type="button" onClick={() => setLogoutError('')} style={{ background: 'transparent', color: '#EF4444', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Dismiss</button>
+        </div>
+      )}
+
+      {authError && (
+        <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#EF4444', padding: '12px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }} role="alert">
+          <span style={{ fontSize: '0.875rem' }}>{authError}</span>
+          {retryVerification && (
+            <button type="button" onClick={retryVerification} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', color: '#EF4444', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>
+              <RefreshCw size={14} /> Retry
+            </button>
+          )}
+        </div>
+      )}
 
       {profileError && (
         <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#EF4444', padding: '12px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
@@ -233,7 +356,7 @@ export default function Profile() {
               <span style={{ fontSize: '0.7rem', color: 'var(--color-secondary-blue)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Streak</span>
             </div>
             <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-              {streak?.streakDays || 0} <span style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>days</span>
+              {streak?.currentStreak ?? 0} <span style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>days</span>
             </div>
           </div>
 
@@ -318,10 +441,7 @@ export default function Profile() {
               iconGradient="linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)"
               title="Sign out on all devices"
               subtitle="Revoke all active sessions"
-              onClick={() => {
-                setTargetAccountLabel(user?.email || name);
-                setGlobalSignOutOpen(true);
-              }}
+              onClick={openGlobalSignOut}
             />
             {deletionEnabled ? (
               <SettingsRow
@@ -330,7 +450,7 @@ export default function Profile() {
                 title="Delete account"
                 subtitle="Permanently erase account and data"
                 danger
-                onClick={() => setDeleteDialogOpen(true)}
+                onClick={openDeleteAccount}
                 isLast
               />
             ) : (
@@ -387,7 +507,7 @@ export default function Profile() {
         open={globalSignOutOpen}
         pending={globalSigningOut}
         error={globalSignOutError}
-        accountLabel={user?.email || name || ''}
+        accountLabel={targetAccountLabel || user?.email || name || ''}
         onConfirm={handleGlobalSignOut}
         onClose={() => {
           if (!globalSigningOut) {

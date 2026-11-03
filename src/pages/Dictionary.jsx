@@ -7,6 +7,8 @@ import { playWordAudio } from '../lib/wordAudio';
 import { useCourse } from '../lib/language';
 import { readingOf, kanaOf, matchesQuery, wordOf } from '../lib/entry';
 import { storageOwner } from '../lib/storageOwner';
+import { buildSavedWordRecord, findSavedWord } from '../lib/studyWords.js';
+import { safeNavigateBack } from '../lib/navigation.js';
 
 export default function Dictionary() {
   const navigate = useNavigate();
@@ -15,29 +17,23 @@ export default function Dictionary() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [history, setHistory] = useState(() => db.get('search_history') || []);
-  const [savedWordsMap, setSavedWordsMap] = useState({});
+  const [savedWords, setSavedWords] = useState(() => db.get('saved_words') || []);
 
-  const refreshSavedMap = () => {
-    const saved = db.get('saved_words') || [];
-    const map = {};
-    saved.forEach(word => {
-      const phrase = word.phrase || word.character || wordOf(word);
-      if (phrase) map[phrase] = word;
-    });
-    setSavedWordsMap(map);
+  const refreshSavedWords = () => {
+    setSavedWords(db.get('saved_words') || []);
   };
 
   useEffect(() => {
     setHistory(db.get('search_history') || []);
-    refreshSavedMap();
+    refreshSavedWords();
 
     const unsubChange = storageOwner.subscribeChange(() => {
       setHistory(db.get('search_history') || []);
-      refreshSavedMap();
+      refreshSavedWords();
     });
     const unsubOwner = storageOwner.subscribe(() => {
       setHistory(db.get('search_history') || []);
-      refreshSavedMap();
+      refreshSavedWords();
     });
     return () => {
       unsubChange?.();
@@ -76,25 +72,16 @@ export default function Dictionary() {
   };
 
   const toggleSave = (word, e) => {
-    e.stopPropagation();
-    const phrase = word.phrase || word.character || wordOf(word);
-    if (!phrase) return;
-
-    if (savedWordsMap[phrase]) {
-      const savedId = savedWordsMap[phrase].id;
-      db.remove('saved_words', savedId);
-      refreshSavedMap();
+    e?.stopPropagation();
+    const currentSaved = db.get('saved_words') || [];
+    const existing = findSavedWord(currentSaved, word);
+    if (existing) {
+      db.remove('saved_words', existing.id);
     } else {
-      const savedWord = db.insert('saved_words', {
-        phrase,
-        ...(word.kana ? { kana: word.kana } : {}),
-        reading: readingOf(word) || word.pronunciation,
-        english: word.english || word.definition,
-        burmese: word.burmese || word.burmese_definition,
-        ...(word.audio_path ? { audio_path: word.audio_path } : {})
-      });
-      refreshSavedMap();
+      const record = buildSavedWordRecord(word);
+      db.insert('saved_words', record);
     }
+    refreshSavedWords();
   };
 
   const handlePlayWord = (e, word) => {
@@ -107,7 +94,7 @@ export default function Dictionary() {
 
       {/* Header */}
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
-        <button onClick={() => navigate(-1)} style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
+        <button onClick={() => safeNavigateBack(navigate, '/library')} aria-label="Back" style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
           <ChevronLeft size={24} color="var(--color-text-navy)" strokeWidth={2.5} />
         </button>
         <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Dictionary</h1>
@@ -190,7 +177,7 @@ export default function Dictionary() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {results.map((word) => {
                   const phrase = word.phrase || word.character || wordOf(word) || '';
-                  const isSaved = !!savedWordsMap[phrase];
+                  const isSaved = Boolean(findSavedWord(savedWords, word));
                   const reading = readingOf(word) || word.pronunciation || '';
                   const english = word.english || word.definition || word.meaning_english || '';
                   const burmese = word.burmese || word.burmese_definition || word.meaning_burmese || '';

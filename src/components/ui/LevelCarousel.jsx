@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RotateCw } from 'lucide-react';
+import { Play, RotateCw } from 'lucide-react';
 import { useCourse } from '../../lib/language';
 import { db } from '../../lib/db';
 import { getLevelProgress } from '../../lib/vocabularyProgress';
@@ -36,7 +36,7 @@ export default function LevelCarousel() {
     }
   };
 
-  const levels = course.levels.map((level, idx) => {
+  const levels = course.levels.map((level) => {
     const publishedCourseId = resolvePublishedCourseId(course.id, level.id);
     const isInScope = publishedContent.enabled && Boolean(publishedCourseId);
     const publishedState = publishedCourseId ? publishedContent.getCourseState(publishedCourseId) : null;
@@ -95,17 +95,17 @@ export default function LevelCarousel() {
         ref={scrollRef}
         onScroll={handleScroll}
         style={{
+          width: '100%',
           display: 'flex',
           overflowX: 'auto',
           scrollSnapType: 'x mandatory',
-          width: '100%',
-          gap: '16px',
-          padding: '0 24px',
           scrollbarWidth: 'none',
-          msOverflowStyle: 'none'
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
         }}
         className="no-scrollbar"
       >
+        <style>{`.no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
         {levels.map((level, index) => (
           <div
             key={level.id || index}
@@ -228,7 +228,7 @@ export default function LevelCarousel() {
               </div>
 
               {/* Bottom Actions */}
-              <div style={{ display: 'flex', gap: '8px', position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', gap: '10px', position: 'relative', zIndex: 1 }}>
                 {level.isLevelAvailable ? (
                   <button
                     type="button"
@@ -240,19 +240,19 @@ export default function LevelCarousel() {
                       color: level.btnColor || level.gradientEnd || '#0369A1',
                       border: 'none',
                       borderRadius: '12px',
-                      padding: '10px 8px',
+                      padding: '10px',
                       fontWeight: 'bold',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '4px',
-                      fontSize: '0.85rem',
+                      gap: '6px',
+                      fontSize: '0.875rem',
                       cursor: 'pointer',
                       minWidth: 0,
                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                     }}
                   >
-                    {level.completed === 0 ? (course.copy.startSwiping || 'Start swiping') : 'Continue'}
+                    <Play size={16} /> {level.completed === 0 ? (course.copy.startSwiping || 'Start swiping') : 'Continue'}
                   </button>
                 ) : level.publishedState?.status === 'loading' ? (
                   <button

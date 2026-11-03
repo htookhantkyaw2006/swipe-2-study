@@ -330,7 +330,7 @@ test('Course-state presentation: LOADED-READY state', () => {
   const carouselHtml = renderWithState({ Component: LevelCarousel, route: '/', initialCache });
   assert.match(carouselHtml, /course-badge--active[^>]*>NOW LEARNING<\/span>/);
   assert.match(carouselHtml, /0 \/ 1 completed/);
-  assert.match(carouselHtml, /course-study-button[^>]*>(?:Start swiping|Start learning)<\/button>/);
+  assert.match(carouselHtml, /course-study-button[\s\S]*?(?:Start swiping|Start learning)<\/button>/);
 });
 
 test('Landmark semantics: single main landmark across Layout and LessonPicker', () => {

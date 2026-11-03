@@ -492,6 +492,19 @@
           identities: [{ provider: 'email' }],
         };
         storageOwner.setOwner(mockUser.id);
+        try {
+          const streakData = {
+            currentStreak: 7,
+            streakDays: 7,
+            longestStreak: 7,
+            updatedAt: new Date().toISOString(),
+          };
+          localStorage.setItem(`s2s_user_${mockUser.id.toLowerCase()}_study_streak_v1`, JSON.stringify(streakData));
+          db.set('learned_words', [
+            { word: '爱', character: '爱', direction: 'right', timestamp: Date.now() },
+            { word: '八', character: '八', direction: 'right', timestamp: Date.now() }
+          ]);
+        } catch {}
         authValue = {
           user: mockUser,
           loading: false,

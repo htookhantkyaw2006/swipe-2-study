@@ -175,6 +175,7 @@ export function getCourseProgress(database, course, language = null) {
   }
 
   return {
+    studiedCount: seenMap.size,
     uniqueSeen: seenMap.size,
     uniqueLearned: learnedMap.size,
     levels,
