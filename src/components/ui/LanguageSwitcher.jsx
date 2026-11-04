@@ -105,14 +105,8 @@ export default function LanguageSwitcher() {
     <>
       <button
         onClick={() => setOpen(true)}
+        className="language-switcher-btn"
         aria-label={`Learning ${language.name}. Change language`}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          height: '44px', padding: '0 14px', borderRadius: '22px',
-          backgroundColor: '#FFFFFF', border: 'none', cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-          transition: 'transform 0.2s, box-shadow 0.2s'
-        }}
         onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.08)'; }}
         onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)'; }}
       >

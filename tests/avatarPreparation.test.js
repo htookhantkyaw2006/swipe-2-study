@@ -382,18 +382,20 @@ test('save flow integration: owner switching before upload halts and preserves A
 // ---------------------------------------------------------------------------
 // 7. Real Browser Canvas & Decode Verification
 // ---------------------------------------------------------------------------
-test('real browser verification: executes canvas, resize, orientation, and compression in real browser', async () => {
+test('real browser verification: executes canvas, resize, orientation, and compression in real browser', async (t) => {
   const { runBrowserAvatarVerification } = await import('./runBrowserAvatarCheck.mjs');
   const outcome = await runBrowserAvatarVerification();
   if (outcome.skipped) {
-    // Honestly report skipped if host does not have Chrome/Edge
-    assert.ok(outcome.reason);
-  } else {
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${outcome.reason}`);
+    }
+    t.skip(`Browser check skipped: ${outcome.reason}`);
+    return;
+  }
     assert.equal(outcome.passed, true);
     assert.ok(Array.isArray(outcome.results));
     assert.ok(outcome.results.some((r) => r.test === 'non-square-800x400-to-512x256'));
     assert.ok(outcome.results.some((r) => r.test === 'no-upscaling-240x160'));
     assert.ok(outcome.results.some((r) => r.test === 'browser-exif-orientation-support'));
     assert.ok(outcome.results.some((r) => r.test === 'reject-svg'));
-  }
 });

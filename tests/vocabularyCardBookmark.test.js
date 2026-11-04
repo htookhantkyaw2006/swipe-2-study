@@ -564,6 +564,9 @@ test('SwipeSession: unreadable bookmark state displays accessible alert and does
 test('Real Browser: mounted SwipeSession interaction checks (save/unsave, front/back sync, persistence, safety, failure feedback)', async (t) => {
   const result = await runBrowserBookmarkVerification();
   if (result.skipped) {
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${result.reason}`);
+    }
     t.skip(`Interactive acceptance unverified: ${result.reason}`);
     return;
   }

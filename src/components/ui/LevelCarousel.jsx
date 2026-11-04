@@ -109,26 +109,17 @@ export default function LevelCarousel() {
         {levels.map((level, index) => (
           <div
             key={level.id || index}
-            style={{
-              flex: '0 0 100%',
-              scrollSnapAlign: 'center',
-              padding: '0 24px',
-              boxSizing: 'border-box'
-            }}
+            className="level-carousel__slide"
           >
             <div
+              className="level-carousel__card"
               style={{
-                borderRadius: '24px',
-                padding: '24px 24px 20px',
                 background: level.gradient,
-                color: '#FFFFFF',
                 boxShadow: level.shadow ? `0 14px 34px ${level.shadow}` : '0 12px 24px rgba(0,0,0,0.1)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                minHeight: '220px',
                 position: 'relative',
-                overflow: 'hidden'
               }}
             >
               {/* Lit 3D Badge Graphic */}
@@ -228,7 +219,7 @@ export default function LevelCarousel() {
               </div>
 
               {/* Bottom Actions */}
-              <div style={{ display: 'flex', gap: '10px', position: 'relative', zIndex: 1 }}>
+              <div className="level-carousel__actions">
                 {level.isLevelAvailable ? (
                   <button
                     type="button"

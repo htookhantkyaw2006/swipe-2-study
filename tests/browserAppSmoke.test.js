@@ -66,6 +66,9 @@ test('RouteErrorBoundary: catches errors, renders accessible alert and retry con
 test('Real Browser App Smoke: verifies guest startup, learning routes, protected routing, and auth callback in real browser', async (t) => {
   const browserRes = await runBrowserAppSmokeVerification();
   if (browserRes.skipped) {
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${browserRes.reason}`);
+    }
     t.skip(`Browser check skipped: ${browserRes.reason}`);
     return;
   }

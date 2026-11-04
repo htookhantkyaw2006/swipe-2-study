@@ -168,17 +168,20 @@ test('Lifecycle Guard: active account transition halts navigation', async () => 
 // ---------------------------------------------------------------------------
 // 3. Real Browser React 19 Effect Execution & Navigation Verification
 // ---------------------------------------------------------------------------
-test('Real Browser: mounted AuthCallback effect lifecycle survives same-owner refresh and fails closed on switch/logout', async () => {
+test('Real Browser: mounted AuthCallback effect lifecycle survives same-owner refresh and fails closed on switch/logout', async (t) => {
   const { runBrowserAccountSafetyVerification } = await import('./runBrowserAccountSafety.mjs');
   const outcome = await runBrowserAccountSafetyVerification();
 
   if (outcome.skipped) {
-    // Honestly report skipped if host does not have Chrome/Edge
-    assert.ok(outcome.reason, 'Skipped reason must be documented');
-    console.warn('[REAL BROWSER CHECK SKIPPED]:', outcome.reason);
-  } else {
-    assert.equal(outcome.passed, true);
-    assert.ok(Array.isArray(outcome.results));
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${outcome.reason}`);
+    }
+    t.skip(`Browser check skipped: ${outcome.reason}`);
+    return;
+  }
+
+  assert.equal(outcome.passed, true);
+  assert.ok(Array.isArray(outcome.results));
 
     // 1. Control (no refresh) reaches destination
     const control = outcome.results.find((r) => r.test === 'successful-control-no-refresh');
@@ -223,5 +226,4 @@ test('Real Browser: mounted AuthCallback effect lifecycle survives same-owner re
     assert.ok(freshCallback, 'fresh-callback-not-blocked-by-stale-session-storage must be tested');
     assert.equal(freshCallback.passed, true);
     assert.equal(freshCallback.path, '/library');
-  }
 });

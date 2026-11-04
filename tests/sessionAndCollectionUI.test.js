@@ -394,6 +394,9 @@ test('StudyPage.css: verifies Saved eyebrow and CTA hover contrast colors', () =
 test('Real Browser: mounted SwipeSession, ReviewWords, and SavedWords interaction checks', async (t) => {
   const result = await runBrowserSessionVerification();
   if (result.skipped) {
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${result.reason}`);
+    }
     t.skip(`Interactive acceptance unverified: ${result.reason}`);
     return;
   }

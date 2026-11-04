@@ -5,6 +5,9 @@ import { runVisualBatch1Verification } from './runVisualBatch1Check.mjs';
 test('UI/UX Batch 1: visual foundation, Home, and vocabulary course entry verification', async (t) => {
   const result = await runVisualBatch1Verification();
   if (result.skipped) {
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${result.reason}`);
+    }
     t.skip(`Interactive visual acceptance unverified: ${result.reason}`);
     return;
   }

@@ -192,10 +192,13 @@ test('Profile Study Streak: persists and reads currentStreak accurately in stora
   assert.equal(read.todayStudied, true);
 });
 
-test('Profile Real Browser: mounted component interaction, retry ownership safety, global sign out, and nonzero streak', async () => {
+test('Profile Real Browser: mounted component interaction, retry ownership safety, global sign out, and nonzero streak', async (t) => {
   const outcome = await runBrowserProfileAccountVerification();
   if (outcome.skipped) {
-    console.warn('[REAL BROWSER PROFILE CHECK SKIPPED]:', outcome.reason);
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${outcome.reason}`);
+    }
+    t.skip(`Browser check skipped: ${outcome.reason}`);
     return;
   }
 

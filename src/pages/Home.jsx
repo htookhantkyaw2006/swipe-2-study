@@ -147,17 +147,17 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="home-page" style={{ padding: '24px', maxWidth: '800px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '100px' }}>
+    <div className="home-page">
 
       {/* Header */}
-      <header className="home-greeting" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px', paddingBottom: '16px', borderBottom: '1px solid var(--color-border)' }}>
-        <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }} aria-label="Go to profile">
+      <header className="home-greeting">
+        <Link to="/profile" className="home-greeting__profile-link" aria-label="Go to profile">
           <Avatar src={photo.url} size={48} alt="Your profile" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
             <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: 0, fontWeight: 500 }}>{user ? greeting : 'Welcome'}</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <h1 style={{ fontSize: '1.125rem', color: 'var(--color-text-navy)', margin: 0, fontWeight: 700 }}>{name}</h1>
-              {isGuest && <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '6px', background: 'var(--color-ghost-blue)', color: 'var(--color-primary-blue)' }}>Guest</span>}
+            <div className="home-greeting__name-row">
+              <h1 className="home-greeting__name">{name}</h1>
+              {isGuest && <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '6px', background: 'var(--color-ghost-blue)', color: 'var(--color-primary-blue)', flexShrink: 0 }}>Guest</span>}
             </div>
           </div>
         </Link>
@@ -165,7 +165,7 @@ export default function Home() {
       </header>
 
       {/* Top Section: Carousel */}
-      <div style={{ margin: '0 -24px' }}>
+      <div className="home-carousel-wrapper">
         <LevelCarousel />
       </div>
 

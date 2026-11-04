@@ -697,7 +697,14 @@ test('9. Stale response guard and course-switch race protection', async () => {
   assert.equal(isStale, true, 'Request 1 response must be identified as stale and discarded');
 });
 
-test('10. Headless browser verification: gate, DOM rendering, and card contract', async () => {
+test('10. Headless browser verification: gate, DOM rendering, and card contract', async (t) => {
   const result = await runBrowserPublishedContentVerification();
-  assert.equal(result.passed || result.skipped, true);
+  if (result.skipped) {
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${result.reason}`);
+    }
+    t.skip(`Browser check skipped: ${result.reason}`);
+    return;
+  }
+  assert.equal(result.passed, true, 'Published content browser check passed');
 });

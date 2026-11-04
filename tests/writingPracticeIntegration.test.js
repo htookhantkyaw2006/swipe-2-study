@@ -99,10 +99,13 @@ test('WritingPractice SSR: legacy mastery normalization supports string and obje
   assert.ok(masteredSet.has('三'));
 });
 
-test('WritingPractice Real Browser: mounted component interaction, canvas, quiz evaluation, and legacy records', async () => {
+test('WritingPractice Real Browser: mounted component interaction, canvas, quiz evaluation, and legacy records', async (t) => {
   const outcome = await runBrowserWritingPracticeVerification();
   if (outcome.skipped) {
-    console.warn('[REAL BROWSER WRITING PRACTICE SKIPPED]:', outcome.reason);
+    if (process.env.REQUIRE_BROWSER_VERIFICATION === 'true' || process.env.NODE_ENV === 'production') {
+      assert.fail(`Required release browser verification failed: ${outcome.reason}`);
+    }
+    t.skip(`Browser check skipped: ${outcome.reason}`);
     return;
   }
 
