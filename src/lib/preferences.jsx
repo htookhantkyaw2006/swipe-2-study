@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useSyncExt
 import { storageOwner } from './storageOwner.js';
 import { AuthContext } from './authContext.js';
 import { getActiveLanguageId, setActiveLanguageId, subscribeActiveLanguage } from './activeLanguage.js';
+import { isActiveCourse, DEFAULT_COURSE_ID } from '../courses/index.js';
 import { preferencesSyncService } from './preferencesSyncService.js';
 import { createPreferencesSyncController } from './preferencesSyncController.js';
 import { isPreferencesSyncEnabled } from './preferencesSyncGate.js';
@@ -54,7 +55,8 @@ export function PreferencesProvider({
           setPrefs({ ...DEFAULTS, ...settings });
         }
         if (activeLanguage) {
-          setActiveLanguageId(activeLanguage);
+          const safeLang = isActiveCourse(activeLanguage) ? activeLanguage : DEFAULT_COURSE_ID;
+          setActiveLanguageId(safeLang);
         }
       },
     });

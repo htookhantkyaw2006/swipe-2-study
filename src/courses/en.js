@@ -126,7 +126,7 @@ export default {
   name: 'English',
   nativeName: 'English',
   flag: '🇬🇧',
-  status: 'active',
+  status: 'coming-soon',
 
   levelSystem: 'CEFR',
   levels,

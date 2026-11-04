@@ -37,6 +37,15 @@ let current = readStored();
 let currentOwner = storageOwner.getOwner();
 reflect(current);
 
+storageOwner.subscribe((newOwner) => {
+  if (currentOwner !== newOwner) {
+    currentOwner = newOwner;
+    current = readStored();
+    reflect(current);
+    notifyActiveLanguage(current);
+  }
+});
+
 const listeners = new Set();
 
 export function subscribeActiveLanguage(fn) {

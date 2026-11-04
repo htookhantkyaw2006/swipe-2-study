@@ -50,29 +50,30 @@ export default function LevelCarousel() {
     const availableCount = progress.words;
     const percent = progress.percent;
 
-    const isLevelAvailable = isInScope
-      ? (isLoaded && availableCount > 0)
-      : (publishedContent.enabled ? false : (availableCount > 0 || level.words > 0));
+    const isCurriculumInScope = Boolean(publishedCourseId);
+    const isLevelAvailable = isCurriculumInScope && (
+      isInScope
+        ? (isLoaded && availableCount > 0)
+        : (availableCount > 0 || level.words > 0)
+    );
 
-    const isLoadedEmpty = isInScope
-      ? (isLoaded && availableCount === 0)
-      : (!publishedContent.enabled && availableCount === 0 && !level.words);
+    const isLoadedEmpty = isCurriculumInScope && (
+      isInScope ? (isLoaded && availableCount === 0) : false
+    );
 
-    const wordCountText = publishedState?.status === 'loading'
-      ? 'Loading curriculum...'
-      : isInScope
-        ? (publishedState?.status === 'error'
-            ? 'Error loading curriculum'
-            : publishedState?.status === 'unpublished'
-              ? 'Curriculum coming soon'
-              : isLoadedEmpty
-                ? 'No words available yet'
-                : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
-        : publishedContent.enabled
-          ? 'Curriculum coming soon'
-          : course.id === 'zh'
-            ? `${completed.toLocaleString()} / ${(availableCount || level.words).toLocaleString()} completed`
-            : `${(availableCount || level.words).toLocaleString()} words to explore`;
+    const wordCountText = !isCurriculumInScope
+      ? 'Curriculum coming soon'
+      : publishedState?.status === 'loading'
+        ? 'Loading curriculum...'
+        : isInScope
+          ? (publishedState?.status === 'error'
+              ? 'Error loading curriculum'
+              : publishedState?.status === 'unpublished'
+                ? 'Curriculum coming soon'
+                : isLoadedEmpty
+                  ? 'No words available yet'
+                  : `${completed.toLocaleString()} / ${availableCount.toLocaleString()} completed`)
+          : `${completed.toLocaleString()} / ${(availableCount || level.words).toLocaleString()} completed`;
 
     return {
       ...level,
@@ -345,7 +346,13 @@ export default function LevelCarousel() {
                   </button>
                 )}
                 <button
-                  onClick={() => navigate(`/learn/level/${level.id}`)}
+                  type="button"
+                  disabled={!level.isLevelAvailable}
+                  aria-disabled={!level.isLevelAvailable}
+                  onClick={() => {
+                    if (!level.isLevelAvailable) return;
+                    navigate(`/learn/level/${level.id}`);
+                  }}
                   style={{
                     flex: 1,
                     backgroundColor: 'transparent',
@@ -359,7 +366,9 @@ export default function LevelCarousel() {
                     justifyContent: 'center',
                     gap: '4px',
                     fontSize: '0.85rem',
-                    cursor: 'pointer',
+                    cursor: level.isLevelAvailable ? 'pointer' : 'default',
+                    opacity: level.isLevelAvailable ? 1 : 0.5,
+                    pointerEvents: level.isLevelAvailable ? 'auto' : 'none',
                     minWidth: 0
                   }}
                 >

@@ -8,6 +8,7 @@ import { speak } from '../../lib/speech';
 import { playWordAudio } from '../../lib/wordAudio';
 import { usePreferences } from '../../lib/preferences';
 import { useCourse } from '../../lib/language';
+import { getCourse } from '../../courses';
 import { readingOf, textOf, kanaOf, fitFontCss, wordOf } from '../../lib/entry';
 import { readSessionCards, buildNormalSessionCards, buildStudiedKeySet, findSavedWord, buildSavedWordRecord } from '../../lib/studyWords';
 import { phraseCards } from '../../lib/phraseCards';
@@ -464,18 +465,30 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const levelId = searchParams.get('level');
-  const course = useCourse();
+  const activeCourse = useCourse();
   const { prefs } = usePreferences();
   const reducedMotion = useReducedMotion();
 
-  const targetLevel = levelId || course.levels[0]?.id;
+  const targetLevel = levelId || activeCourse.levels[0]?.id;
+  const resolvedCourseId = resolvePublishedCourseId(activeCourse.id, targetLevel);
+  const course = (resolvedCourseId === 'ja-n5' && activeCourse.id !== 'ja')
+    ? getCourse('ja')
+    : ((resolvedCourseId === 'zh-hsk1' && activeCourse.id !== 'zh') ? getCourse('zh') : activeCourse);
   const publishedCourse = usePublishedCourse(targetLevel);
   const isPublishedSession = !isReview && !isSaved && !isPhrases && publishedCourse.enabled && publishedCourse.isInScope;
   const isNormalLearn = !isReview && !isSaved && !isPhrases;
 
-  const resolvedCourseId = resolvePublishedCourseId(course.id, targetLevel);
+  // resolvedCourseId already computed above
   const isHsk1 = resolvedCourseId === 'zh-hsk1';
-  const isTrialApplicable = isNormalLearn && isHsk1;
+  const isJaN5 = resolvedCourseId === 'ja-n5';
+  const isAvailableCurriculum = isHsk1 || isJaN5;
+  const isTrialApplicable = isNormalLearn && isAvailableCurriculum;
+
+  const isLevelSpecified = Boolean(levelId);
+  const isUnavailableLevel = (isNormalLearn || isPhrases) && (
+    (isLevelSpecified && !resolvePublishedCourseId(course.id, levelId)) ||
+    (isPhrases && isLevelSpecified && phraseCards(course, levelId).length === 0)
+  );
 
   const auth = useContext(AuthContext);
   const isConfirmedGuest = auth
@@ -484,6 +497,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const isTrialGuest = isTrialApplicable && isConfirmedGuest;
 
   const [cards, setCards] = useState(() => {
+    if (isUnavailableLevel) return [];
     if (isPublishedSession) {
       if (publishedCourse.isLoaded) {
         const result = snapshotLearnSession(publishedCourse.items, {
@@ -496,7 +510,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       return [];
     }
     if (isNormalLearn) {
-      const allCards = readSessionCards(db, { mode: 'learn', levelId: isHsk1 ? (course.levels[0]?.id || levelId) : levelId });
+      const allCards = readSessionCards(db, { mode: 'learn', levelId: isAvailableCurriculum ? (course.levels[0]?.id || levelId) : levelId });
       const result = snapshotLearnSession(allCards, {
         isTrialGuest,
         cardOrder: prefs.cardOrder,
@@ -510,6 +524,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   });
 
   const [completionState, setCompletionState] = useState(() => {
+    if (isUnavailableLevel) return { kind: 'none', trialSize: 0 };
     if (isPublishedSession && publishedCourse.isLoaded) {
       const result = snapshotLearnSession(publishedCourse.items, {
         isTrialGuest,
@@ -523,7 +538,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         };
       }
     } else if (isNormalLearn && !isPublishedSession) {
-      const allCards = readSessionCards(db, { mode: 'learn', levelId: isHsk1 ? (course.levels[0]?.id || levelId) : levelId });
+      const allCards = readSessionCards(db, { mode: 'learn', levelId: isAvailableCurriculum ? (course.levels[0]?.id || levelId) : levelId });
       if (allCards.length > 0) {
         const result = snapshotLearnSession(allCards, {
           isTrialGuest,
@@ -543,7 +558,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
 
   const initializedRef = useRef(isPublishedSession && publishedCourse.isLoaded);
   useEffect(() => {
-    if (!isPublishedSession) return;
+    if (!isPublishedSession || isUnavailableLevel) return;
     if (publishedCourse.isLoaded && !initializedRef.current) {
       initializedRef.current = true;
       const result = snapshotLearnSession(publishedCourse.items, {
@@ -559,7 +574,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         });
       }
     }
-  }, [isPublishedSession, publishedCourse.isLoaded, publishedCourse.items, isTrialGuest, prefs.cardOrder, prefs.cardsPerSession]);
+  }, [isPublishedSession, isUnavailableLevel, publishedCourse.isLoaded, publishedCourse.items, isTrialGuest, prefs.cardOrder, prefs.cardsPerSession]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -722,6 +737,48 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     }, reducedMotion ? 0 : 450);
   };
 
+  if (isUnavailableLevel) {
+    const matchedLevel =
+      course.levels.find((l) => l.id === levelId) ||
+      course.levels.find((l) => String(l.num) === String(levelId).replace(/\D/g, ''));
+    const levelName = matchedLevel?.name || (levelId ? String(levelId).toUpperCase() : 'Level');
+    const returnTarget = isPhrases ? '/flashcards' : '/learn';
+    const returnLabel = isPhrases ? 'Back to phrases' : 'Back to courses';
+
+    return (
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', alignItems: 'center', justifyContent: 'center', textAlign: 'center', backgroundColor: 'var(--color-page-bg)' }}>
+        <div style={{
+          display: 'inline-block',
+          padding: '6px 16px',
+          borderRadius: '999px',
+          backgroundColor: 'var(--color-ghost-blue)',
+          color: 'var(--color-primary-blue)',
+          fontSize: '0.8125rem',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          marginBottom: '16px'
+        }}>
+          Coming soon
+        </div>
+        <h2 style={{ color: 'var(--color-text-navy)', marginBottom: '8px', fontSize: '1.75rem', fontWeight: 800 }}>
+          {levelName}
+        </h2>
+        <p style={{ color: 'var(--color-secondary-blue)', maxWidth: '360px', marginBottom: '24px', fontSize: '0.9375rem', lineHeight: 1.5 }}>
+          Curriculum coming soon. This level is in preparation and will be available in an upcoming release.
+        </p>
+        <button
+          type="button"
+          onClick={() => safeNavigateBack(navigate, returnTarget)}
+          className="btn-primary"
+          style={{ padding: '14px 28px', border: 'none', cursor: 'pointer', borderRadius: '16px', fontWeight: 700 }}
+        >
+          {returnLabel}
+        </button>
+      </div>
+    );
+  }
+
   if (isPublishedSession && publishedCourse.isLoading) {
     return (
       <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
@@ -745,7 +802,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   }
 
   if (isNormalLearn && completionState.kind === 'trial-done') {
-    const returnTo = encodeURIComponent(`/learn/level/${encodeURIComponent(isHsk1 ? 'HSK1' : targetLevel)}`);
+    const returnTo = encodeURIComponent(`/learn/level/${encodeURIComponent(isHsk1 ? 'HSK1' : (isJaN5 ? 'N5' : targetLevel))}`);
     return (
       <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
         <div style={{ width: '56px', height: '56px', borderRadius: '16px', backgroundColor: '#ECFDF5', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>

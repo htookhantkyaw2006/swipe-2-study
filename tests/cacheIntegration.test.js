@@ -42,7 +42,8 @@ test('actual db, language, preferences and seeding modules follow an owner switc
   seedCourse('zh');
   assert.ok(db.get('flashcards').length > 0);
   db.insert('saved_words', { id: 'A-card', phrase: 'A-only' });
-  assert.equal(language.setActiveLanguageId('en'), true);
+  assert.equal(language.setActiveLanguageId('en'), false, 'English is coming soon and cannot be activated');
+  assert.equal(language.setActiveLanguageId('ja'), true);
   assert.equal(language.setActiveLanguageId('not-a-course'), false);
 
   storageOwner.setOwner(B);
@@ -51,7 +52,11 @@ test('actual db, language, preferences and seeding modules follow an owner switc
   assert.deepEqual(db.get('saved_words'), []);
 
   storageOwner.setOwner(A);
-  assert.equal(language.getActiveLanguageId(), 'en');
+  assert.equal(language.getActiveLanguageId(), 'ja');
+  storageOwner.scope().setItem('language', 'en');
+  storageOwner.setOwner(B);
+  storageOwner.setOwner(A);
+  assert.equal(language.getActiveLanguageId(), 'zh', 'Stored English preference falls back to zh');
   assert.equal(db.getFor('zh', 'saved_words')[0].phrase, 'A-only');
 
   storageOwner.setOwner(null);

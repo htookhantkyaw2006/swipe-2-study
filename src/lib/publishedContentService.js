@@ -10,14 +10,20 @@ export const SUPPORTED_PUBLISHED_COURSES = Object.freeze({
  * Returns null if the level is not an in-scope published course.
  */
 export function resolvePublishedCourseId(languageId, levelId) {
-  if (!languageId || !levelId) return null;
-  const lang = String(languageId).toLowerCase();
+  if (!levelId) return null;
+  const lang = languageId ? String(languageId).toLowerCase() : null;
   const lvl = String(levelId).trim().toUpperCase();
 
-  if (lang === 'zh' && (lvl === 'HSK1' || lvl === '1' || lvl === 'HSK 1')) {
+  if (lvl === 'N5' || lvl === 'JLPT N5' || lvl === 'JLPTN5') {
+    return 'ja-n5';
+  }
+  if (lvl === 'HSK1' || lvl === 'HSK 1') {
     return 'zh-hsk1';
   }
-  if (lang === 'ja' && (lvl === 'N5' || lvl === '5' || lvl === 'JLPT N5' || lvl === 'JLPTN5')) {
+  if (lang === 'zh' && lvl === '1') {
+    return 'zh-hsk1';
+  }
+  if (lang === 'ja' && lvl === '5') {
     return 'ja-n5';
   }
   return null;
@@ -29,6 +35,8 @@ export function resolvePublishedCourseId(languageId, levelId) {
 export function isPublishedCourseLevel(languageId, levelId) {
   return Boolean(resolvePublishedCourseId(languageId, levelId));
 }
+
+export const isLevelAvailable = isPublishedCourseLevel;
 
 /**
  * Maps a public.vocabulary database record into the client's flashcard card contract.

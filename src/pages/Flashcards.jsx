@@ -3,6 +3,7 @@ import { Layers, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCourse } from '../lib/language';
 import { phraseCards } from '../lib/phraseCards';
+import { resolvePublishedCourseId } from '../lib/publishedContentService';
 import { useAuth } from '../lib/useAuth.js';
 import { displayName } from '../lib/profile.js';
 
@@ -56,8 +57,10 @@ export default function Flashcards() {
   const levels = course.levels.map((l) => {
     const phrases = phraseCards(course, l.id);
     const count = phrases.length;
+    const isAvailable = Boolean(resolvePublishedCourseId(course.id, l.id)) && count > 0;
     return {
       ...l,
+      isAvailable,
       phrasesCount: count,
       progress: 0
     };
@@ -107,18 +110,37 @@ export default function Flashcards() {
             return (
               <div
                 key={index}
-                className="surface-card"
-                onClick={() => navigate(`/flashcards/level/${level.id}`)}
+                className={`surface-card${!level.isAvailable ? ' level-card--disabled' : ''}`}
+                role={level.isAvailable ? 'button' : undefined}
+                tabIndex={level.isAvailable ? 0 : -1}
+                aria-disabled={!level.isAvailable}
+                onClick={() => {
+                  if (!level.isAvailable) return;
+                  navigate(`/flashcards/level/${level.id}`);
+                }}
+                onKeyDown={(e) => {
+                  if (!level.isAvailable) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/flashcards/level/${level.id}`);
+                  }
+                }}
                 style={{
-                  padding: '16px', borderRadius: '20px', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                  padding: '16px', borderRadius: '20px', position: 'relative', overflow: 'hidden',
+                  cursor: level.isAvailable ? 'pointer' : 'default',
+                  opacity: level.isAvailable ? 1 : 0.65,
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                   '--gradient-start': level.gradientStart,
                   '--gradient-end': level.gradientEnd
                 }}
                 onMouseOver={(e) => {
+                  if (!level.isAvailable) return;
                   e.currentTarget.style.transform = 'translateY(-2px)';
                   e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06)';
                 }}
                 onMouseOut={(e) => {
+                  if (!level.isAvailable) return;
                   e.currentTarget.style.transform = 'translateY(0)';
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)';
                 }}
@@ -151,7 +173,7 @@ export default function Flashcards() {
                   {level.name}
                 </h3>
                 <p style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', margin: 0, fontWeight: 500, position: 'relative', zIndex: 1 }}>
-                  {level.progress}% completed
+                  {level.isAvailable ? `${level.progress}% completed` : 'Coming soon'}
                 </p>
 
                 {/* Faint character */}

@@ -285,7 +285,8 @@
       // Second tile is HSK 2: 0% completed
       const hsk2Tile = levelTiles[1];
       assert(hsk2Tile.textContent.includes('HSK 2'), 'Second tile is HSK 2');
-      assert(hsk2Tile.textContent.includes('0% completed'), 'HSK 2 shows 0% completed');
+      assert(hsk2Tile.textContent.includes('Coming soon'), 'HSK 2 shows Coming soon');
+      assert(hsk2Tile.getAttribute('aria-disabled') === 'true', 'HSK 2 is aria-disabled');
 
       results.push({ test: 'level-selection-3x3-and-availability', passed: true });
       unmountTree();

@@ -1,17 +1,88 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, Layers, Compass, RotateCw, CheckCircle, Bookmark, ChevronRight } from 'lucide-react';
 import { useCourse } from '../lib/language';
 import { phraseCards } from '../lib/phraseCards';
+import { resolvePublishedCourseId } from '../lib/publishedContentService';
+import { safeNavigateBack } from '../lib/navigation';
 
 /* Levels come from the active course (src/courses). */
 
 export default function PhrasesLevel() {
-  const { levelId } = useParams();
+  const { levelId: paramLevelId } = useParams();
+  const location = useLocation();
+  const pathMatch = location.pathname ? location.pathname.match(/\/level\/([^/?#]+)/i) : null;
+  const levelId = paramLevelId || (pathMatch ? decodeURIComponent(pathMatch[1]) : undefined);
   const navigate = useNavigate();
   const course = useCourse();
 
   // Consistent phrase progress and count matching the Phrases list
+  const matchedLevel =
+    course.levels.find((l) => l.id === levelId) ||
+    course.levels.find((l) => String(l.num) === String(levelId).replace(/\D/g, ''));
+  const isAvailable = Boolean(resolvePublishedCourseId(course.id, levelId)) && phraseCards(course, matchedLevel?.id || levelId).length > 0;
+
+  if (!isAvailable) {
+    const levelName = matchedLevel?.name || (levelId ? String(levelId).toUpperCase() : 'Level');
+    const colors = matchedLevel || course.levels[0];
+
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-page-bg)', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '24px' }}>
+          <button onClick={() => safeNavigateBack(navigate, '/flashcards')} aria-label="Back to phrases" style={{ position: 'absolute', left: '24px', background: 'transparent', padding: 0, border: 'none', cursor: 'pointer' }}>
+            <ChevronLeft size={24} color="var(--color-text-navy)" strokeWidth={2.5} />
+          </button>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>{levelName}</h1>
+        </header>
+
+        <div style={{ padding: '0 24px', maxWidth: '1000px', margin: '0 auto' }}>
+          <div style={{
+            background: `linear-gradient(135deg, ${colors.gradientStart} 0%, ${colors.gradientEnd} 100%)`,
+            borderRadius: '24px', padding: '40px 24px', color: '#FFFFFF',
+            boxShadow: '0 12px 24px rgba(0,0,0,0.1)', marginBottom: '32px', textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px', textTransform: 'uppercase' }}>
+              <span style={{
+                display: 'inline-block',
+                padding: '4px 14px',
+                borderRadius: '999px',
+                backgroundColor: 'rgba(255,255,255,0.25)',
+                color: '#FFFFFF'
+              }}>
+                COMING SOON
+              </span>
+            </div>
+            <h2 style={{ fontSize: '2.5rem', fontWeight: 800, margin: '0 0 16px 0', lineHeight: 1, color: '#FFFFFF' }}>
+              {levelName}
+            </h2>
+            <p style={{ fontSize: '1rem', opacity: 0.9, maxWidth: '420px', margin: '0 auto 28px auto', lineHeight: 1.5 }}>
+              Curriculum coming soon. Phrases for this level are in preparation and will be available in an upcoming release.
+            </p>
+            <button
+              type="button"
+              onClick={() => safeNavigateBack(navigate, '/flashcards')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 28px',
+                borderRadius: '100px',
+                backgroundColor: '#FFFFFF',
+                color: colors.gradientEnd || '#0369A1',
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}
+            >
+              Back to phrases
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const base =
     course.levels.find((l) => l.id === levelId) ||
     course.levels.find((l) => String(l.num) === String(levelId).replace(/\D/g, '')) ||

@@ -47,6 +47,7 @@ const { PublishedContentProvider } = await server.ssrLoadModule('/src/lib/publis
 const { AuthContext } = await server.ssrLoadModule('/src/lib/authContext.js');
 const { default: SwipeSession } = await server.ssrLoadModule('/src/pages/Learn/SwipeSession.jsx');
 const { storageOwner } = await server.ssrLoadModule('/src/lib/storageOwner.js');
+const { setActiveLanguageId } = await server.ssrLoadModule('/src/lib/activeLanguage.js');
 
 function createPublishedItems(count, { courseId = 'zh-hsk1', level = 'HSK1' } = {}) {
   return Array.from({ length: count }, (_, i) => ({
@@ -116,6 +117,7 @@ function normalizeHtmlText(html) {
 beforeEach(() => {
   storageMap.clear();
   storageOwner.setOwner(null);
+  setActiveLanguageId('zh');
 });
 
 // ---------------------------------------------------------------------------
@@ -165,7 +167,7 @@ test('SwipeSession SSR: canonical HSK1 aliases (level=HSK1, level=1, level=HSK%2
 // Negative Control: Japanese N5 does NOT apply HSK1 guest trial policy
 // ---------------------------------------------------------------------------
 
-test('SwipeSession SSR: Japanese N5 does not apply HSK1 guest trial policy', () => {
+test('SwipeSession SSR: Japanese N5 applies guest trial policy', () => {
   const items = createPublishedItems(300, { courseId: 'ja-n5', level: 'N5' });
 
   // Mark 30 words studied in JA learned_words
@@ -179,14 +181,18 @@ test('SwipeSession SSR: Japanese N5 does not apply HSK1 guest trial policy', () 
   storageMap.set('s2s_ja_learned_words', JSON.stringify(studiedRows));
 
   // Switch active language to ja
-  storageMap.set('s2s_language', JSON.stringify('ja'));
+  setActiveLanguageId('ja');
 
   const html = renderSession('/learn/session?level=N5', { items });
   const text = normalizeHtmlText(html);
 
   assert.ok(
-    !text.includes('Free trial complete'),
-    'Japanese N5 must NOT render Free trial complete screen'
+    text.includes('Free trial complete'),
+    'Japanese N5 must render Free trial complete screen for guest with 30 words studied'
+  );
+  assert.ok(
+    text.includes("You've studied all 30 free trial words."),
+    'Japanese N5 must report "You\'ve studied all 30 free trial words."'
   );
 });
 

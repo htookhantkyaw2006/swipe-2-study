@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
+import { getCourse } from '../../courses';
 import {
   ChevronLeft, Layers, Compass, ChevronRight,
   RotateCw, CheckCircle2, Bookmark, Search, CheckCircle, Volume2
@@ -12,13 +13,17 @@ import { playWordAudio } from '../../lib/wordAudio';
 import { getLevelProgress } from '../../lib/vocabularyProgress';
 import { filterStudyWords } from '../../lib/studyWords';
 import { usePublishedCourse } from '../../lib/publishedContentContext';
+import { resolvePublishedCourseId } from '../../lib/publishedContentService';
 import { storageOwner } from '../../lib/storageOwner';
 import { safeNavigateBack } from '../../lib/navigation';
 
 export default function LessonPicker() {
   const navigate = useNavigate();
-  const { levelId } = useParams();
-  const course = useCourse();
+  const { levelId: paramLevelId } = useParams();
+  const location = useLocation();
+  const pathMatch = location.pathname ? location.pathname.match(/\/level\/([^/?#]+)/i) : null;
+  const levelId = paramLevelId || (pathMatch ? decodeURIComponent(pathMatch[1]) : undefined);
+  const activeCourse = useCourse();
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -30,11 +35,21 @@ export default function LessonPicker() {
     };
   }, []);
 
+  // Check whether the requested level is available in the active curriculum
+  const resolvedCourseId = resolvePublishedCourseId(activeCourse.id, levelId);
+  const isAvailable = Boolean(resolvedCourseId);
+  const course = (resolvedCourseId === 'ja-n5' && activeCourse.id !== 'ja')
+    ? getCourse('ja')
+    : ((resolvedCourseId === 'zh-hsk1' && activeCourse.id !== 'zh') ? getCourse('zh') : activeCourse);
+  const matchedLevel =
+    course.levels.find((l) => l.id === levelId) ||
+    course.levels.find((l) => String(l.num) === String(levelId).replace(/\D/g, ''));
+
   // Accept both URL shapes in use: /learn/level/HSK1 and /learn/level/1
   const level =
     course.levels.find((l) => l.id === levelId) ||
     course.levels.find((l) => String(l.num) === String(levelId).replace(/\D/g, '')) ||
-    course.levels[0];
+    (matchedLevel || course.levels[0]);
 
   const colors = level;
   const publishedCourse = usePublishedCourse(level.id);
@@ -128,6 +143,76 @@ export default function LessonPicker() {
   const headers = stack
     ? [course.script.writtenForm, 'Meaning', 'Status']
     : [course.script.writtenForm, course.script.romanization, 'Meaning', 'Status'];
+
+  if (!isAvailable) {
+    const levelName = matchedLevel?.name || (levelId ? String(levelId).toUpperCase() : 'Level');
+    const colors = matchedLevel || course.levels[0];
+
+    return (
+      <div className="lesson-content" style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto', paddingBottom: '120px' }}>
+        <header className="flex justify-between items-center" style={{ marginBottom: '24px' }}>
+          <button
+            onClick={() => safeNavigateBack(navigate, '/learn')}
+            aria-label="Back to courses"
+            style={{ background: 'transparent', padding: '8px', marginLeft: '-8px', border: 'none', cursor: 'pointer' }}
+          >
+            <ChevronLeft size={24} color="var(--color-text-navy)" />
+          </button>
+          <h1 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-text-navy)', fontWeight: 800 }}>{levelName}</h1>
+          <div style={{ width: '40px' }}></div>
+        </header>
+
+        <div style={{
+          background: `linear-gradient(135deg, ${colors.gradientStart} 0%, ${colors.gradientEnd} 100%)`,
+          color: 'white',
+          borderRadius: '24px',
+          padding: '40px 24px',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: colors.shadow ? `0 12px 24px ${colors.shadow}` : '0 12px 24px rgba(0,0,0,0.1)',
+          marginBottom: '32px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '1px', marginBottom: '12px', textTransform: 'uppercase' }}>
+            <span style={{
+              display: 'inline-block',
+              padding: '4px 14px',
+              borderRadius: '999px',
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              color: '#FFFFFF'
+            }}>
+              COMING SOON
+            </span>
+          </div>
+          <h2 style={{ fontSize: '2.5rem', fontWeight: 800, margin: '0 0 16px 0', lineHeight: 1, color: 'white' }}>
+            {levelName}
+          </h2>
+          <p style={{ fontSize: '1rem', opacity: 0.9, maxWidth: '420px', margin: '0 auto 28px auto', lineHeight: 1.5 }}>
+            Curriculum coming soon. This level is in preparation and will be available in an upcoming release.
+          </p>
+          <button
+            type="button"
+            onClick={() => safeNavigateBack(navigate, '/learn')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '12px 28px',
+              borderRadius: '100px',
+              backgroundColor: '#FFFFFF',
+              color: colors.gradientEnd || '#0369A1',
+              fontWeight: 800,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}
+          >
+            Back to courses
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lesson-content" style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', paddingBottom: '120px' }}>

@@ -110,8 +110,14 @@ export default function LevelOverview({ phrases = false }) {
                 '--level-accent': level.gradientEnd,
                 '--level-tint': level.gradientStart,
                 '--level-shadow': level.shadow || 'rgba(3, 105, 161, 0.3)',
+                cursor: isUnavailable ? 'default' : 'pointer',
+                pointerEvents: isUnavailable ? 'none' : 'auto',
               }}
               to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}
+              role={isUnavailable ? 'link' : undefined}
+              aria-disabled={isUnavailable ? 'true' : undefined}
+              tabIndex={isUnavailable ? -1 : undefined}
+              onClick={isUnavailable ? (e) => e.preventDefault() : undefined}
             >
               <div className="level-tile__top">
                 {isNowLearning ? (
