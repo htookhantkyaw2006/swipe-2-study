@@ -72,7 +72,16 @@ const Flashcard = ({
 }) => {
   const { prefs } = usePreferences();
   const course = useCourse();
-  const [isPresent] = usePresence();
+  const [isPresent, safeToRemove] = usePresence();
+
+  useEffect(() => {
+    if (!isPresent) {
+      const timer = setTimeout(() => {
+        safeToRemove?.();
+      }, reducedMotion ? 10 : 450);
+      return () => clearTimeout(timer);
+    }
+  }, [isPresent, safeToRemove, reducedMotion]);
 
   const wantEnglish = prefs.translationLanguage !== 'burmese';
   const wantBurmese = prefs.translationLanguage !== 'english' && prefs.showBurmese;
@@ -80,6 +89,11 @@ const Flashcard = ({
   const showBurmese = wantBurmese;
 
   const cardRef = useRef(null);
+  const pointerStartRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const dragEndTimeRef = useRef(0);
+  const lastFlipTimeRef = useRef(0);
+
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], reducedMotion ? [0, 0] : [-15, 15]);
   const backgroundColor = useTransform(x, [-100, 0, 100], ['#FEE2E2', '#FFFFFF', '#DCFCE7']);
@@ -102,11 +116,27 @@ const Flashcard = ({
   const nextOpacity = useTransform(dragOffset, [0, 100], [0.5, 1]);
 
   const handleDragEnd = (_event, info) => {
+    dragEndTimeRef.current = performance.now();
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 150);
+
+    if (!isActive || locked) return;
+
     const width = cardRef.current?.offsetWidth ?? 320;
-    const threshold = Math.min(100, Math.max(36, width * 0.22));
-    if (info.offset.x > threshold || info.velocity.x > 800) {
+    const threshold = Math.min(100, Math.max(48, width * 0.25));
+    const offset = info.offset.x;
+    const velocity = info.velocity.x;
+
+    // Displacement and velocity must agree; velocity alone with opposing displacement must not swipe.
+    const isDragRight = offset > threshold && velocity > -250;
+    const isFlickRight = offset > 18 && velocity > 500;
+    const isDragLeft = offset < -threshold && velocity < 250;
+    const isFlickLeft = offset < -18 && velocity < -500;
+
+    if (isFlickRight || isDragRight) {
       onSwipe('right', card);
-    } else if (info.offset.x < -threshold || info.velocity.x < -800) {
+    } else if (isFlickLeft || isDragLeft) {
       onSwipe('left', card);
     }
   };
@@ -228,7 +258,7 @@ const Flashcard = ({
         boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)', overflow: 'hidden'
       }}
     >
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+      <div className="swipe-card__answer" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', padding: '24px 24px 0 24px', boxSizing: 'border-box' }}>
           <div style={{
             backgroundColor: '#0C4A6E', color: '#FFFFFF', padding: '4px 12px',
@@ -358,6 +388,7 @@ const Flashcard = ({
             x: reducedMotion ? 0 : (direction === 'right' ? window.innerWidth + 100 : -window.innerWidth - 100),
             opacity: 1,
             scale: 1,
+            zIndex: 20,
             transition: { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" }
           })
         },
@@ -371,7 +402,13 @@ const Flashcard = ({
         },
         drag: !locked ? "x" : false,
         dragConstraints: { left: 0, right: 0 },
-        dragElastic: 0.7,
+        dragElastic: 1,
+        onDragStart: () => {
+          isDraggingRef.current = true;
+        },
+        onDrag: () => {
+          isDraggingRef.current = true;
+        },
         onDragEnd: handleDragEnd,
         whileTap: { cursor: 'grabbing' }
       };
@@ -387,6 +424,37 @@ const Flashcard = ({
       }
     };
   }
+
+  const handleCardClick = (e) => {
+    const now = performance.now();
+    const wasRecentDrag = isDraggingRef.current || (now - dragEndTimeRef.current < 150);
+    let movedDistance = 0;
+    if (pointerStartRef.current && e.clientX != null && e.clientX !== 0 && pointerStartRef.current.x != null) {
+      movedDistance = Math.hypot(e.clientX - pointerStartRef.current.x, e.clientY - pointerStartRef.current.y);
+    }
+    if (wasRecentDrag || movedDistance > 6) {
+      return;
+    }
+    if (now - lastFlipTimeRef.current < 100) {
+      return;
+    }
+    if (isActive && !locked) {
+      lastFlipTimeRef.current = now;
+      setFlipped(!flipped);
+      if (!hasFlippedOnce) setHasFlippedOnce(true);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && isActive && !locked) {
+      e.preventDefault();
+      const now = performance.now();
+      if (now - lastFlipTimeRef.current < 100) return;
+      lastFlipTimeRef.current = now;
+      setFlipped(!flipped);
+      if (!hasFlippedOnce) setHasFlippedOnce(true);
+    }
+  };
 
   return (
     <motion.div
@@ -404,17 +472,20 @@ const Flashcard = ({
         perspective: '1000px',
         ...motionProps.style
       }}
-      onClick={() => {
-        if (isActive && !locked) {
-          setFlipped(!flipped);
-          if (!hasFlippedOnce) setHasFlippedOnce(true);
-        }
+      onPointerDown={(e) => {
+        pointerStartRef.current = { x: e.clientX, y: e.clientY, time: performance.now() };
+        isDraggingRef.current = false;
       }}
-      onKeyDown={(e) => {
-        if ((e.key === 'Enter' || e.key === ' ') && isActive && !locked) {
-          e.preventDefault();
-          setFlipped(!flipped);
-          if (!hasFlippedOnce) setHasFlippedOnce(true);
+      onPointerCancel={() => {
+        pointerStartRef.current = null;
+        isDraggingRef.current = false;
+        dragEndTimeRef.current = performance.now();
+      }}
+      onClick={handleCardClick}
+      onKeyDown={handleKeyDown}
+      onAnimationComplete={(definition) => {
+        if (!isPresent && definition === 'exit') {
+          safeToRemove?.();
         }
       }}
       tabIndex={isActive ? 0 : -1}

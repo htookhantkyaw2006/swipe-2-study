@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Swipe Gesture Real Pointer Test Runner</title>
+  <style>
+    :root {
+      --color-ghost-blue: #EFF6FF;
+      --color-primary-blue: #0369A1;
+      --color-border: #BAE6FD;
+      --color-text-navy: #0C4A6E;
+      --color-page-bg: #F0F9FF;
+      --shadow-soft: 0 4px 12px rgba(0,0,0,0.06);
+      --shadow-raised: 0 8px 24px rgba(0,0,0,0.1);
+      --font-reading: system-ui, -apple-system, sans-serif;
+      --font-mono: monospace;
+    }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+    #root { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React, { createElement } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter, Routes, Route } from 'react-router-dom';
+    import { LanguageProvider } from '/src/lib/language.jsx';
+    import { PreferencesProvider } from '/src/lib/preferences.jsx';
+    import { PublishedContentProvider } from '/src/lib/publishedContentContext.jsx';
+    import { AuthContext } from '/src/lib/authContext.js';
+    import SwipeSession from '/src/pages/Learn/SwipeSession.jsx';
+    import { db } from '/src/lib/db.js';
+
+    const rootElement = document.getElementById('root');
+    let reactRoot = null;
+
+    export const testCardsZh = [
+      {
+        id: 'card-1',
+        card_id: 'zh-hsk1-001',
+        course_id: 'zh-hsk1',
+        written_form: '爱',
+        character: '爱',
+        reading: 'ài',
+        pronunciation: 'ài',
+        meaning_english: 'to love',
+        definition: 'to love',
+        meaning_burmese: 'ချစ်သည်',
+        burmese_definition: 'ချစ်သည်',
+        level: 'HSK1',
+        sort_order: 1,
+        is_active: true,
+        examples: [{ text: '我爱你。', reading: 'Wǒ ài nǐ.', english: 'I love you.', burmese: 'ကျွန်တော် မင်းကို ချစ်တယ်။' }],
+        audio_path: 'audio/zh/hsk1/ai.mp3',
+      },
+      {
+        id: 'card-2',
+        card_id: 'zh-hsk1-002',
+        course_id: 'zh-hsk1',
+        written_form: '八',
+        character: '八',
+        reading: 'bā',
+        pronunciation: 'bā',
+        meaning_english: 'eight',
+        definition: 'eight',
+        meaning_burmese: 'ရှစ်',
+        burmese_definition: 'ရှစ်',
+        level: 'HSK1',
+        sort_order: 2,
+        is_active: true,
+        examples: [{ text: '八个人。', reading: 'Bā gè rén.', english: 'Eight people.', burmese: 'ရှစ်ယောက်။' }],
+        audio_path: 'audio/zh/hsk1/ba.mp3',
+      },
+    ];
+
+    export const testCardsJa = [
+      {
+        id: 'card-ja-1',
+        card_id: 'ja-n5-001',
+        course_id: 'ja-n5',
+        written_form: 'あそこ',
+        character: 'あそこ',
+        reading: 'asoko',
+        pronunciation: 'asoko',
+        meaning_english: 'over there',
+        definition: 'over there',
+        meaning_burmese: 'ဟိုမှာ',
+        burmese_definition: 'ဟိုမှာ',
+        level: 'N5',
+        sort_order: 1,
+        is_active: true,
+        examples: [{ text: 'あそこです。', reading: 'Asoko desu.', english: 'It is over there.', burmese: 'ဟိုမှာပါ။' }],
+        audio_path: 'audio/ja/n5/asoko.mp3',
+      },
+      {
+        id: 'card-ja-2',
+        card_id: 'ja-n5-002',
+        course_id: 'ja-n5',
+        written_form: 'あちら',
+        character: 'あちら',
+        reading: 'achira',
+        pronunciation: 'achira',
+        meaning_english: 'that way',
+        definition: 'that way',
+        meaning_burmese: 'ဟိုဘက်',
+        burmese_definition: 'ဟိုဘက်',
+        level: 'N5',
+        sort_order: 2,
+        is_active: true,
+        examples: [{ text: 'あちらへどうぞ。', reading: 'Achira e douzo.', english: 'This way please.', burmese: 'ဟိုဘက်ကို ကြွပါ။' }],
+        audio_path: 'audio/ja/n5/achira.mp3',
+      },
+    ];
+
+    window.mountSession = function(props = {}) {
+      if (reactRoot) {
+        reactRoot.unmount();
+        reactRoot = null;
+        rootElement.innerHTML = '';
+      }
+
+      db.set('saved_words', props.savedWords || []);
+      db.set('learned_words', props.learnedWords || []);
+      db.set('review_cards', props.reviewCards || []);
+
+      const courseId = props.courseId || (props.initialEntry?.includes('N5') ? 'ja-n5' : 'zh-hsk1');
+      const cards = props.cards || (courseId === 'ja-n5' ? testCardsJa : testCardsZh);
+
+      const initialCache = {
+        [courseId]: {
+          status: 'loaded',
+          items: cards,
+          version: 1,
+          error: null,
+          isPublished: true,
+        },
+      };
+
+      reactRoot = createRoot(rootElement);
+      reactRoot.render(
+        createElement(
+          AuthContext.Provider,
+          { value: { user: null, isGuest: true, loading: false, isTransitioning: false } },
+          createElement(
+            PreferencesProvider,
+            null,
+            createElement(
+              LanguageProvider,
+              null,
+              createElement(
+                PublishedContentProvider,
+                { enabledOverride: true, initialCache },
+                createElement(
+                  MemoryRouter,
+                  { initialEntries: [props.initialEntry || (courseId === 'ja-n5' ? '/learn/session?level=N5' : '/learn/session?level=HSK1')] },
+                  createElement(
+                    Routes,
+                    null,
+                    createElement(Route, { path: "/learn/level/:levelId", element: createElement("div", { id: "course-level-screen" }, "Course Level Screen") }),
+                    createElement(Route, { path: "/learn", element: createElement("div", { id: "course-level-screen" }, "Course Level Screen") }),
+                    createElement(Route, { path: "/saved", element: createElement("div", { id: "saved-screen" }, "Saved Screen") }),
+                    createElement(Route, { path: "/learn/review", element: createElement("div", { id: "review-screen" }, "Review Screen") }),
+                    createElement(Route, { path: "*", element: createElement(SwipeSession, props.sessionProps || {}) })
+                  )
+                )
+              )
+            )
+          )
+        )
+      );
+    };
+
+    window.__ready = true;
+    window.db = db;
+    window.testCardsZh = testCardsZh;
+    window.testCardsJa = testCardsJa;
+  </script>
+</body>
+</html>
