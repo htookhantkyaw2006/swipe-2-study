@@ -308,3 +308,119 @@ test('vocabularyProgress: getLevelProgress and resetVocabularyProgress operate c
   resetVocabularyProgress(db);
   assert.equal(getLearnedWords(db).length, 0);
 });
+
+test('vocabularyProgress: left-swipe partial failure (review_cards throws) and recovery preserves seen count and completes queue addition', () => {
+  const storage = createMemoryStorage();
+  let failReviewQueue = true;
+
+  const origSetItem = storage.setItem;
+  storage.setItem = (k, v) => {
+    if (k && k.includes('review_cards') && failReviewQueue) {
+      const err = new Error('QuotaExceededError: review_cards write failed');
+      err.name = 'QuotaExceededError';
+      throw err;
+    }
+    return origSetItem(k, v);
+  };
+
+  const owner = createStorageOwner({ storage: () => storage });
+  const db = createLocalDatabase({
+    getScope: () => owner.scope(),
+    getLanguage: () => 'zh',
+  });
+
+  const card = { character: '爱', pronunciation: 'ài', level: 'HSK1' };
+
+  // Attempt 1: Left swipe into review fails on review_cards write
+  assert.throws(() => {
+    recordWordAction(db, { card, direction: 'left', levelId: 'HSK1' });
+  }, /CacheStorageError|Device storage write failed/);
+
+  // learned_words was inserted with seen: 1, last_action: 'review', status: 'learning'
+  const wordsAfterFail = getLearnedWords(db);
+  assert.equal(wordsAfterFail.length, 1);
+  assert.equal(wordsAfterFail[0].seen, 1);
+  assert.equal(wordsAfterFail[0].last_action, 'review');
+  assert.equal(wordsAfterFail[0].status, 'learning');
+
+  // review_cards queue remains empty because the write failed
+  assert.equal(db.get('review_cards').length, 0);
+
+  // Recover storage
+  failReviewQueue = false;
+
+  // Attempt 2: Retry left swipe completes outstanding review queue write without double-counting seen
+  const result = recordWordAction(db, { card, direction: 'left', levelId: 'HSK1', isRetry: true });
+  assert.equal(result.status, 'learning');
+  assert.equal(result.isLearned, false);
+
+  const wordsAfterRetry = getLearnedWords(db);
+  assert.equal(wordsAfterRetry.length, 1);
+  assert.equal(wordsAfterRetry[0].seen, 1, 'Seen counter remains exactly 1 on retry after partial failure');
+  assert.equal(wordsAfterRetry[0].last_action, 'review');
+
+  const reviewAfterRetry = db.get('review_cards');
+  assert.equal(reviewAfterRetry.length, 1, 'Review queue now contains card');
+  assert.equal(reviewAfterRetry[0].character, '爱');
+});
+
+test('vocabularyProgress: right-swipe out of Review partial failure (review_cards removal throws) and recovery preserves seen count and completes queue removal', () => {
+  const storage = createMemoryStorage();
+  let failReviewQueue = false;
+
+  const origSetItem = storage.setItem;
+  storage.setItem = (k, v) => {
+    if (k && k.includes('review_cards') && failReviewQueue) {
+      const err = new Error('QuotaExceededError: review_cards write failed');
+      err.name = 'QuotaExceededError';
+      throw err;
+    }
+    return origSetItem(k, v);
+  };
+
+  const owner = createStorageOwner({ storage: () => storage });
+  const db = createLocalDatabase({
+    getScope: () => owner.scope(),
+    getLanguage: () => 'zh',
+  });
+
+  const card = { character: '爱', pronunciation: 'ài', level: 'HSK1' };
+
+  // Pre-seed card in review queue and learned_words (seen: 1, learning)
+  db.set('review_cards', [card]);
+  recordWordAction(db, { card, direction: 'left', levelId: 'HSK1' });
+  assert.equal(db.get('review_cards').length, 1);
+  assert.equal(getLearnedWords(db)[0].seen, 1);
+
+  // Enable review queue write failure
+  failReviewQueue = true;
+
+  // Attempt 1: Right swipe out of review fails on review_cards removal
+  assert.throws(() => {
+    recordWordAction(db, { card, direction: 'right', levelId: 'HSK1' });
+  }, /CacheStorageError|Device storage write failed/);
+
+  // learned_words was updated with seen: 2, last_action: 'learned', status: 'known'
+  const wordsAfterFail = getLearnedWords(db);
+  assert.equal(wordsAfterFail[0].seen, 2);
+  assert.equal(wordsAfterFail[0].last_action, 'learned');
+  assert.equal(wordsAfterFail[0].status, 'known');
+
+  // review_cards queue still has the card because removal failed
+  assert.equal(db.get('review_cards').length, 1);
+
+  // Recover storage
+  failReviewQueue = false;
+
+  // Attempt 2: Retry right swipe completes outstanding review queue removal without double-counting seen
+  const result = recordWordAction(db, { card, direction: 'right', levelId: 'HSK1', isRetry: true });
+  assert.equal(result.status, 'known');
+  assert.equal(result.isLearned, true);
+
+  const wordsAfterRetry = getLearnedWords(db);
+  assert.equal(wordsAfterRetry[0].seen, 2, 'Seen counter remains exactly 2 on retry after partial failure');
+  assert.equal(wordsAfterRetry[0].last_action, 'learned');
+
+  const reviewAfterRetry = db.get('review_cards');
+  assert.equal(reviewAfterRetry.length, 0, 'Review queue is now cleanly emptied');
+});

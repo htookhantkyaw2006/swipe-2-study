@@ -709,6 +709,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const [shuffleState, setShuffleState] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const actionLocked = useRef(false);
+  const partialFailureCardRef = useRef(null);
   const dragOffset = useMotionValue(0);
 
   const [savedWords, setSavedWords] = useState(() => {
@@ -789,22 +790,24 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     }
 
     if (!isPhrases) {
+      const isRetry = Boolean(
+        partialFailureCardRef.current &&
+        partialFailureCardRef.current.cardId === (activeCard.id || wordOf(activeCard)) &&
+        partialFailureCardRef.current.direction === direction
+      );
       try {
         recordWordAction(db, {
           card: activeCard,
           direction,
           levelId: targetLevel || activeCard.level || cards[0]?.level || course.levels[0]?.id,
+          isRetry,
         });
-        if (direction === 'right' && isReview && activeCard) {
-          const reviewCards = db.get('review_cards') || [];
-          db.set('review_cards', reviewCards.filter(c => c.id !== activeCard.id));
-        } else if (direction === 'left' && !isReview && activeCard) {
-          const reviewCards = db.get('review_cards') || [];
-          if (!reviewCards.find(c => c.id === activeCard.id)) {
-            db.set('review_cards', [...reviewCards, activeCard]);
-          }
-        }
+        partialFailureCardRef.current = null;
       } catch {
+        partialFailureCardRef.current = {
+          cardId: activeCard.id || wordOf(activeCard),
+          direction,
+        };
         actionLocked.current = false;
         setBookmarkFeedback('Unable to save progress. Try again.');
         return false;
@@ -850,6 +853,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
 
   const handleShuffle = () => {
     if (actionLocked.current || cards.length - currentIndex <= 1) return;
+    partialFailureCardRef.current = null;
     actionLocked.current = true;
     setShuffleState(true);
     if (!reducedMotion && navigator.vibrate) navigator.vibrate(50);

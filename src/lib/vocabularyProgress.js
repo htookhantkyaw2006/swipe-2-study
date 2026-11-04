@@ -29,6 +29,7 @@ export function recordWordAction(database, {
   direction,
   levelId = null,
   now = () => new Date().toISOString(),
+  isRetry = false,
 }) {
   if (!database || !card) return null;
 
@@ -43,14 +44,29 @@ export function recordWordAction(database, {
   const status = direction === 'right' ? 'known' : 'learning';
   const nowIso = now();
 
-  const words = database.get('learned_words');
+  const words = database.get('learned_words') || [];
   const existing = words.find(w => sameStudyWord(w, card));
+
+  const currentReviews = database.get('review_cards') || [];
+  const inReviews = currentReviews.some(c => sameStudyWord(c, card));
+
+  // Determine whether this call represents an idempotent recovery/retry
+  // of a partially committed swipe (e.g. learned_words was written but review_cards failed).
+  const isPartialRetry = Boolean(
+    existing &&
+    existing.last_action === action &&
+    (
+      isRetry ||
+      (direction === 'left' && !inReviews) ||
+      (direction === 'right' && inReviews)
+    )
+  );
 
   let resultRow;
   if (existing) {
     resultRow = database.update('learned_words', existing.id, {
       level: card.level || existing.level || level,
-      seen: (existing.seen || 0) + 1,
+      seen: isPartialRetry ? (existing.seen || 1) : ((existing.seen || 0) + 1),
       last_action: action,
       status,
       last_reviewed_at: nowIso,
@@ -76,22 +92,17 @@ export function recordWordAction(database, {
     });
   }
 
-  // Manage manual review queue
-  try {
-    const currentReviews = database.get('review_cards');
-    if (direction === 'right') {
-      // Swiping right clears card from review queue if present
-      if (currentReviews.some(c => sameStudyWord(c, card))) {
-        database.set('review_cards', currentReviews.filter(c => !sameStudyWord(c, card)));
-      }
-    } else if (direction === 'left') {
-      // Swiping left adds card to review queue if not already present
-      if (!currentReviews.some(c => sameStudyWord(c, card))) {
-        database.set('review_cards', [...currentReviews, card]);
-      }
+  // Manage manual review queue synchronously without swallowing errors
+  if (direction === 'right') {
+    // Swiping right clears card from review queue if present
+    if (inReviews) {
+      database.set('review_cards', currentReviews.filter(c => !sameStudyWord(c, card)));
     }
-  } catch {
-    // Review queue updates are best effort alongside progress record
+  } else if (direction === 'left') {
+    // Swiping left adds card to review queue if not already present
+    if (!inReviews) {
+      database.set('review_cards', [...currentReviews, card]);
+    }
   }
 
   return {

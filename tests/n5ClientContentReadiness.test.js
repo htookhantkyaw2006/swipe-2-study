@@ -436,6 +436,25 @@ test('6. Conversion Reproducibility: Re-running conversion produces identical fi
   const hashFile = (p) => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
   const normalizeText = (s) => s.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
 
+  const TRACKED_CRLF_SOURCE_SHA256 = '851e0536dd7acffa5fe55130e4524972631585e793bd2e9ffa2d216fcbcec476';
+  const CANONICAL_LF_SOURCE_SHA256 = 'd9fd48c31ea115bc96e88ef3134f8cf532d9d57dbbb7ddcf40920a36cfae22d6';
+
+  function verifySourceProvenance(actualHash, sourcePathOrText) {
+    const text = typeof sourcePathOrText === 'string' && sourcePathOrText.includes('\n')
+      ? sourcePathOrText
+      : fs.readFileSync(sourcePathOrText, 'utf8');
+
+    const crlfSha = crypto.createHash('sha256').update(Buffer.from(text.replace(/\r?\n/g, '\r\n'), 'utf8')).digest('hex');
+    const lfSha = crypto.createHash('sha256').update(Buffer.from(text.replace(/\r?\n/g, '\n'), 'utf8')).digest('hex');
+
+    assert.ok(
+      actualHash === TRACKED_CRLF_SOURCE_SHA256 || actualHash === CANONICAL_LF_SOURCE_SHA256,
+      `source_sha256 (${actualHash}) must match authoritative provenance (CRLF ${TRACKED_CRLF_SOURCE_SHA256} or LF ${CANONICAL_LF_SOURCE_SHA256})`
+    );
+    assert.equal(crlfSha, TRACKED_CRLF_SOURCE_SHA256, 'Converting source bytes from LF to CRLF produces the tracked hash exactly');
+    assert.equal(lfSha, CANONICAL_LF_SOURCE_SHA256, 'Converting source bytes to LF produces canonical LF hash');
+  }
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 's2s-n5-convert-'));
   try {
     const tmpCsv1 = path.join(tmpDir, 'import_run1.csv');
@@ -473,10 +492,15 @@ test('6. Conversion Reproducibility: Re-running conversion produces identical fi
     assert.equal(parsedTracked.rows.length, 706);
     assert.deepEqual(parsedTmp.rows, parsedTracked.rows, 'All 706 rows and IDs match tracked repository artifact');
 
-    // JSON semantic structure match
+    // Cross-platform provenance comparison: validates source integrity against authoritative CRLF/LF provenance
     const jsonTmp = JSON.parse(fs.readFileSync(tmpJson1, 'utf8'));
     const jsonTracked = JSON.parse(fs.readFileSync(MAPPING_JSON_PATH, 'utf8'));
-    assert.deepEqual(jsonTmp, jsonTracked, 'Mapping JSON semantic structure matches tracked repository artifact');
+    verifySourceProvenance(jsonTmp.source_sha256, SOURCE_CSV_PATH);
+
+    // JSON semantic structure match (excluding platform checkout line-ending variance in source_sha256)
+    const { source_sha256: _tmpSha, ...jsonTmpRest } = jsonTmp;
+    const { source_sha256: _trackedSha, ...jsonTrackedRest } = jsonTracked;
+    assert.deepEqual(jsonTmpRest, jsonTrackedRest, 'Mapping JSON semantic structure matches tracked repository artifact');
 
     // 3. Line-ending normalized serialization verification (cross-platform Linux/Windows safety)
     assert.equal(
@@ -484,9 +508,18 @@ test('6. Conversion Reproducibility: Re-running conversion produces identical fi
       normalizeText(fs.readFileSync(IMPORT_CSV_PATH, 'utf8')),
       'CSV content matches tracked artifact across Linux LF and Windows CRLF checkouts'
     );
+
+    // Cross-platform mapping JSON normalization: normalize source_sha256 to tracked hash for text comparison
+    const normalizeMappingJsonText = (str) => {
+      const obj = JSON.parse(str);
+      if (obj.source_sha256 === CANONICAL_LF_SOURCE_SHA256) {
+        obj.source_sha256 = TRACKED_CRLF_SOURCE_SHA256;
+      }
+      return normalizeText(JSON.stringify(obj, null, 2));
+    };
     assert.equal(
-      normalizeText(fs.readFileSync(tmpJson1, 'utf8')),
-      normalizeText(fs.readFileSync(MAPPING_JSON_PATH, 'utf8')),
+      normalizeMappingJsonText(fs.readFileSync(tmpJson1, 'utf8')),
+      normalizeMappingJsonText(fs.readFileSync(MAPPING_JSON_PATH, 'utf8')),
       'Mapping JSON content matches tracked artifact across Linux LF and Windows CRLF checkouts'
     );
 
@@ -501,6 +534,58 @@ test('6. Conversion Reproducibility: Re-running conversion produces identical fi
     });
     const parsedLf = parseCsv(fs.readFileSync(tmpCsvLf, 'utf8'));
     assert.deepEqual(parsedLf.rows, parsedTracked.rows, 'Explicit LF serialization preserves 100% of data rows');
+
+    // 5. Cross-platform equivalent inputs: LF and CRLF sources produce identical semantic outputs with expected provenance
+    const sourceRaw = fs.readFileSync(SOURCE_CSV_PATH, 'utf8');
+    const tmpSourceLf = path.join(tmpDir, 'source_equiv_lf.csv');
+    const tmpSourceCrlf = path.join(tmpDir, 'source_equiv_crlf.csv');
+    fs.writeFileSync(tmpSourceLf, sourceRaw.replace(/\r?\n/g, '\n'), 'utf8');
+    fs.writeFileSync(tmpSourceCrlf, sourceRaw.replace(/\r?\n/g, '\r\n'), 'utf8');
+
+    const tmpJsonLfIn = path.join(tmpDir, 'mapping_from_lf.json');
+    const tmpCsvLfIn = path.join(tmpDir, 'import_from_lf.csv');
+    convertN5Dataset({
+      sourcePath: tmpSourceLf,
+      importCsvPath: tmpCsvLfIn,
+      mappingJsonPath: tmpJsonLfIn,
+    });
+    const jsonFromLf = JSON.parse(fs.readFileSync(tmpJsonLfIn, 'utf8'));
+    assert.equal(jsonFromLf.source_sha256, CANONICAL_LF_SOURCE_SHA256, 'LF source produces canonical LF provenance hash');
+    assert.equal(jsonFromLf.total_records, 706);
+    assert.deepEqual(parseCsv(fs.readFileSync(tmpCsvLfIn, 'utf8')).rows, parsedTracked.rows, 'LF source yields identical rows and IDs');
+
+    const tmpJsonCrlfIn = path.join(tmpDir, 'mapping_from_crlf.json');
+    const tmpCsvCrlfIn = path.join(tmpDir, 'import_from_crlf.csv');
+    convertN5Dataset({
+      sourcePath: tmpSourceCrlf,
+      importCsvPath: tmpCsvCrlfIn,
+      mappingJsonPath: tmpJsonCrlfIn,
+    });
+    const jsonFromCrlf = JSON.parse(fs.readFileSync(tmpJsonCrlfIn, 'utf8'));
+    assert.equal(jsonFromCrlf.source_sha256, TRACKED_CRLF_SOURCE_SHA256, 'CRLF source produces tracked CRLF provenance hash');
+    assert.equal(jsonFromCrlf.total_records, 706);
+    assert.deepEqual(parseCsv(fs.readFileSync(tmpCsvCrlfIn, 'utf8')).rows, parsedTracked.rows, 'CRLF source yields identical rows and IDs');
+
+    // 6. Genuine content change detection: genuine content modification fails provenance verification
+    const modifiedSource = sourceRaw.replace('N5,会う,あう', 'N5,会う,あう_ALTERED');
+    const tmpSourceMod = path.join(tmpDir, 'source_modified.csv');
+    const tmpJsonMod = path.join(tmpDir, 'mapping_modified.json');
+    const tmpCsvMod = path.join(tmpDir, 'import_modified.csv');
+    fs.writeFileSync(tmpSourceMod, modifiedSource, 'utf8');
+
+    convertN5Dataset({
+      sourcePath: tmpSourceMod,
+      importCsvPath: tmpCsvMod,
+      mappingJsonPath: tmpJsonMod,
+    });
+    const jsonMod = JSON.parse(fs.readFileSync(tmpJsonMod, 'utf8'));
+    assert.notEqual(jsonMod.source_sha256, TRACKED_CRLF_SOURCE_SHA256, 'Altered content does not match tracked CRLF hash');
+    assert.notEqual(jsonMod.source_sha256, CANONICAL_LF_SOURCE_SHA256, 'Altered content does not match canonical LF hash');
+    assert.throws(
+      () => verifySourceProvenance(jsonMod.source_sha256, tmpSourceMod),
+      /must match authoritative provenance/,
+      'Genuine content modification is strictly rejected by provenance verification'
+    );
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

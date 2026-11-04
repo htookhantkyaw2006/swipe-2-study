@@ -1031,4 +1031,225 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     assert.strictEqual(finalLearned[0].character, '爱', 'Saved word is 爱');
     assert.strictEqual(finalLearned[0].status, 'known', 'Status is known');
   });
+
+  it('15. Left-swipe partial persistence failure (review_cards throws) halts exit, preserves card/face at rest; retry after storage recovery records exactly once and updates review queue', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    // Mount fresh session on HSK1
+    await cdp.eval('window.mountSession({ courseId: "zh-hsk1" })');
+    const init = await getCardCenter();
+    assert.strictEqual(init.char, '爱', 'Starts on card 1 (爱)');
+    assert.ok(init.hasBackInert, 'Starts on front face');
+
+    const restingLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+
+    // Intercept localStorage.setItem to throw QuotaExceededError ONLY for review_cards
+    await cdp.eval(`(() => {
+      window.__origSetItem = localStorage.setItem;
+      localStorage.setItem = function(key, val) {
+        if (key && key.includes('review_cards')) {
+          const err = new Error('QuotaExceededError: review_cards write quota exceeded.');
+          err.name = 'QuotaExceededError';
+          throw err;
+        }
+        return window.__origSetItem.apply(this, arguments);
+      };
+    })()`);
+
+    try {
+      // Commit a LEFT swipe using actual mouse input drag (-120px)
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: init.cx, y: init.cy, button: 'left', buttons: 1, clickCount: 1 });
+      for (let i = 1; i <= 4; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: init.cx - i * 35, y: init.cy, button: 'left', buttons: 1 });
+      }
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: init.cx - 140, y: init.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+      // Wait for spring back to rest and notice display
+      await waitForCondition(`document.querySelector('.swipe-session__notice') !== null`);
+      await new Promise((r) => setTimeout(r, 500));
+
+      // 1. Error notice displayed
+      const noticeText = await cdp.eval(`document.querySelector('.swipe-session__notice')?.textContent`);
+      assert.ok(noticeText.includes('Unable to save progress. Try again.'), 'Notice displays save failure message');
+
+      // 2. Active card returned to rest, face preserved
+      const failedState = await getCardCenter();
+      assert.strictEqual(failedState.char, '爱', 'Active card character remains 爱');
+      assert.ok(failedState.hasBackInert, 'Card face preserved on front face');
+      const failedLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+      assert.ok(Math.abs(failedLeft - restingLeft) < 15, `Card returned to rest position (left=${failedLeft}, restingLeft=${restingLeft})`);
+
+      // 3. Partial persistence state: learned_words has 爱 with seen: 1, last_action: review; review_cards is empty
+      const learnedPartial = await cdp.eval(`window.db.get('learned_words') || []`);
+      assert.strictEqual(learnedPartial.length, 1, 'learned_words has partial entry');
+      assert.strictEqual(learnedPartial[0].character, '爱');
+      assert.strictEqual(learnedPartial[0].seen, 1, 'seen is 1 on partial entry');
+      assert.strictEqual(learnedPartial[0].last_action, 'review');
+      assert.strictEqual(learnedPartial[0].status, 'learning');
+
+      const reviewPartial = await cdp.eval(`window.db.get('review_cards') || []`);
+      assert.strictEqual(reviewPartial.length, 0, 'review_cards remains empty because its write failed');
+    } finally {
+      // Restore storage
+      await cdp.eval(`(() => {
+        if (window.__origSetItem) {
+          localStorage.setItem = window.__origSetItem;
+          delete window.__origSetItem;
+        }
+      })()`);
+    }
+
+    // 4. Retry left swipe with storage restored
+    const retryInit = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: retryInit.cx, y: retryInit.cy, button: 'left', buttons: 1, clickCount: 1 });
+    for (let i = 1; i <= 4; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: retryInit.cx - i * 35, y: retryInit.cy, button: 'left', buttons: 1 });
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: retryInit.cx - 140, y: retryInit.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+    // Wait for deck to advance to card 2 (八)
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const finalState = await getCardCenter();
+    assert.strictEqual(finalState.char, '八', 'Retry successfully advances to card 2 (八)');
+
+    // 5. Assert idempotent progress: seen remains 1 (not 2!), and review_cards contains card 爱
+    const finalLearned = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(finalLearned.length, 1, 'One record in learned_words');
+    assert.strictEqual(finalLearned[0].seen, 1, 'Seen counter remains exactly 1, no double-counting on retry');
+    assert.strictEqual(finalLearned[0].last_action, 'review');
+    assert.strictEqual(finalLearned[0].status, 'learning');
+
+    const finalReview = await cdp.eval(`window.db.get('review_cards') || []`);
+    assert.strictEqual(finalReview.length, 1, 'Review queue now contains card 爱');
+    assert.strictEqual(finalReview[0].character, '爱');
+  });
+
+  it('16. Right-swipe out of Review partial persistence failure (review_cards removal throws) halts exit, preserves card/face at rest; retry after storage recovery records exactly once and clears review queue', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    // Mount session in Review mode with cards in review queue and learned_words
+    await cdp.eval(`window.mountSession({
+      initialEntry: '/learn/review/session',
+      sessionProps: { isReview: true },
+      reviewCards: [{
+        id: 'zh-hsk1-ai',
+        character: '爱',
+        pronunciation: 'ài',
+        level: 'HSK1'
+      }, {
+        id: 'zh-hsk1-ba',
+        character: '八',
+        pronunciation: 'bā',
+        level: 'HSK1'
+      }],
+      learnedWords: [{
+        id: 'pw_zh-hsk1-ai',
+        character: '爱',
+        pronunciation: 'ài',
+        level: 'HSK1',
+        seen: 1,
+        last_action: 'review',
+        status: 'learning'
+      }]
+    })`);
+    const init = await getCardCenter();
+    assert.strictEqual(init.char, '爱', 'Starts on card 1 (爱)');
+    assert.ok(init.hasBackInert, 'Starts on front face');
+
+    const restingLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+
+    // Intercept localStorage.setItem to throw QuotaExceededError ONLY for review_cards
+    await cdp.eval(`(() => {
+      window.__origSetItem = localStorage.setItem;
+      localStorage.setItem = function(key, val) {
+        if (key && key.includes('review_cards')) {
+          const err = new Error('QuotaExceededError: review_cards write quota exceeded.');
+          err.name = 'QuotaExceededError';
+          throw err;
+        }
+        return window.__origSetItem.apply(this, arguments);
+      };
+    })()`);
+
+    try {
+      // Commit a RIGHT swipe (+120px)
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: init.cx, y: init.cy, button: 'left', buttons: 1, clickCount: 1 });
+      for (let i = 1; i <= 4; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: init.cx + i * 35, y: init.cy, button: 'left', buttons: 1 });
+      }
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: init.cx + 140, y: init.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+      // Wait for spring back to rest and notice display
+      await waitForCondition(`document.querySelector('.swipe-session__notice') !== null`);
+      await new Promise((r) => setTimeout(r, 500));
+
+      // 1. Error notice displayed
+      const noticeText = await cdp.eval(`document.querySelector('.swipe-session__notice')?.textContent`);
+      assert.ok(noticeText.includes('Unable to save progress. Try again.'), 'Notice displays save failure message');
+
+      // 2. Active card returned to rest, face preserved
+      const failedState = await getCardCenter();
+      assert.strictEqual(failedState.char, '爱', 'Active card character remains 爱');
+      assert.ok(failedState.hasBackInert, 'Card face preserved on front face');
+      const failedLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+      assert.ok(Math.abs(failedLeft - restingLeft) < 15, `Card returned to rest position (left=${failedLeft}, restingLeft=${restingLeft})`);
+
+      // 3. Partial persistence state: learned_words was updated with seen: 2, last_action: learned; review_cards still has card because removal failed
+      const learnedPartial = await cdp.eval(`window.db.get('learned_words') || []`);
+      assert.strictEqual(learnedPartial[0].seen, 2, 'seen updated to 2 during attempt');
+      assert.strictEqual(learnedPartial[0].last_action, 'learned');
+      assert.strictEqual(learnedPartial[0].status, 'known');
+
+      const reviewPartial = await cdp.eval(`window.db.get('review_cards') || []`);
+      assert.strictEqual(reviewPartial.length, 2, 'review_cards still contains both cards because removal failed');
+      assert.ok(reviewPartial.some(c => c.character === '爱'), 'Card 爱 is still in review_cards');
+    } finally {
+      // Restore storage
+      await cdp.eval(`(() => {
+        if (window.__origSetItem) {
+          localStorage.setItem = window.__origSetItem;
+          delete window.__origSetItem;
+        }
+      })()`);
+    }
+
+    // 4. Retry right swipe with storage restored
+    const retryInit = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: retryInit.cx, y: retryInit.cy, button: 'left', buttons: 1, clickCount: 1 });
+    for (let i = 1; i <= 4; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: retryInit.cx + i * 35, y: retryInit.cy, button: 'left', buttons: 1 });
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: retryInit.cx + 140, y: retryInit.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+    // Wait for deck to advance to card 2 (八)
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const finalState = await getCardCenter();
+    assert.strictEqual(finalState.char, '八', 'Retry successfully advances to card 2 (八)');
+
+    // 5. Assert idempotent progress: seen remains 2 (NOT 3!), and review_cards has been cleared
+    const finalLearned = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(finalLearned[0].seen, 2, 'Seen counter remains exactly 2, no double-counting on retry');
+    assert.strictEqual(finalLearned[0].last_action, 'learned');
+    assert.strictEqual(finalLearned[0].status, 'known');
+
+    const finalReview = await cdp.eval(`window.db.get('review_cards') || []`);
+    assert.strictEqual(finalReview.length, 1, 'Card 爱 was cleanly removed from review queue');
+    assert.strictEqual(finalReview[0].character, '八', 'Card 八 remains in review queue');
+  });
 });
