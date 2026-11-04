@@ -506,3 +506,106 @@ test('vocabularyProgress: failure before progress write preserves seen count, re
   assert.equal(resultSubsequent.status, 'known');
   assert.equal(getLearnedWords(db)[0].seen, 7, 'subsequent deliberate swipe increments seen from 6 to 7');
 });
+
+test('vocabularyProgress: confirmed persistence survives intermediate failure on learned_words across retries for left and right swipe', () => {
+  const storage = createMemoryStorage();
+  let failReviewQueue = false;
+  let failLearnedWords = false;
+
+  const origSetItem = storage.setItem;
+  storage.setItem = (k, v) => {
+    if (k && k.includes('review_cards') && failReviewQueue) {
+      const err = new Error('QuotaExceededError: review_cards write failed');
+      err.name = 'QuotaExceededError';
+      throw err;
+    }
+    if (k && k.includes('learned_words') && failLearnedWords) {
+      const err = new Error('QuotaExceededError: learned_words write failed');
+      err.name = 'QuotaExceededError';
+      throw err;
+    }
+    return origSetItem(k, v);
+  };
+
+  const owner = createStorageOwner({ storage: () => storage });
+  const db = createLocalDatabase({
+    getScope: () => owner.scope(),
+    getLanguage: () => 'zh',
+  });
+
+  const card = { character: '爱', pronunciation: 'ài', level: 'HSK1' };
+
+  // --- Part 1: Left swipe ---
+  // 1. Left swipe: learned_words succeeds, review_cards fails. seen is 1.
+  failReviewQueue = true;
+  failLearnedWords = false;
+  let progressAlreadyPersisted = false;
+
+  try {
+    recordWordAction(db, { card, direction: 'left', levelId: 'HSK1', progressAlreadyPersisted: false });
+  } catch (err) {
+    progressAlreadyPersisted = Boolean(err && err.progressPersisted === true);
+  }
+  assert.strictEqual(progressAlreadyPersisted, true, 'Left swipe attempt 1 tags progressPersisted = true');
+  assert.strictEqual(getLearnedWords(db)[0].seen, 1, 'seen is 1 after attempt 1');
+  assert.strictEqual(db.get('review_cards').length, 0, 'review queue remains empty');
+
+  // 2. Retry: learned_words now fails. Confirm progressPersisted is preserved and seen stays 1.
+  failReviewQueue = false;
+  failLearnedWords = true;
+
+  try {
+    recordWordAction(db, { card, direction: 'left', levelId: 'HSK1', progressAlreadyPersisted });
+  } catch (err) {
+    // SwipeSession logic: progressPersisted = progressAlreadyPersisted || Boolean(err && err.progressPersisted === true)
+    progressAlreadyPersisted = progressAlreadyPersisted || Boolean(err && err.progressPersisted === true);
+  }
+  assert.strictEqual(progressAlreadyPersisted, true, 'progressPersisted preserved across failed learned_words retry');
+  assert.strictEqual(getLearnedWords(db)[0].seen, 1, 'seen remains 1 after failed retry');
+
+  // 3. Restore storage and retry: review queue completes, seen remains 1.
+  failLearnedWords = false;
+  failReviewQueue = false;
+
+  const leftResult = recordWordAction(db, { card, direction: 'left', levelId: 'HSK1', progressAlreadyPersisted });
+  assert.strictEqual(leftResult.status, 'learning');
+  assert.strictEqual(getLearnedWords(db)[0].seen, 1, 'seen remains 1 after final recovery');
+  assert.strictEqual(db.get('review_cards').length, 1, 'review queue now contains card');
+  assert.strictEqual(db.get('review_cards')[0].character, '爱');
+
+  // --- Part 2: Equivalent Right swipe out of review ---
+  // 1. Right swipe: learned_words succeeds (seen: 2), review_cards removal fails.
+  failReviewQueue = true;
+  failLearnedWords = false;
+  let rightProgressPersisted = false;
+
+  try {
+    recordWordAction(db, { card, direction: 'right', levelId: 'HSK1', progressAlreadyPersisted: false });
+  } catch (err) {
+    rightProgressPersisted = Boolean(err && err.progressPersisted === true);
+  }
+  assert.strictEqual(rightProgressPersisted, true, 'Right swipe attempt 1 tags progressPersisted = true');
+  assert.strictEqual(getLearnedWords(db)[0].seen, 2, 'seen updated to 2');
+  assert.strictEqual(db.get('review_cards').length, 1, 'card still in review queue because removal failed');
+
+  // 2. Retry: learned_words now fails. Confirm rightProgressPersisted is preserved and seen stays 2.
+  failReviewQueue = false;
+  failLearnedWords = true;
+
+  try {
+    recordWordAction(db, { card, direction: 'right', levelId: 'HSK1', progressAlreadyPersisted: rightProgressPersisted });
+  } catch (err) {
+    rightProgressPersisted = rightProgressPersisted || Boolean(err && err.progressPersisted === true);
+  }
+  assert.strictEqual(rightProgressPersisted, true, 'rightProgressPersisted preserved across failed learned_words retry');
+  assert.strictEqual(getLearnedWords(db)[0].seen, 2, 'seen remains 2 after failed retry');
+
+  // 3. Restore storage and retry: review queue completes removal, seen remains 2.
+  failLearnedWords = false;
+  failReviewQueue = false;
+
+  const rightResult = recordWordAction(db, { card, direction: 'right', levelId: 'HSK1', progressAlreadyPersisted: rightProgressPersisted });
+  assert.strictEqual(rightResult.status, 'known');
+  assert.strictEqual(getLearnedWords(db)[0].seen, 2, 'seen remains 2 after recovery');
+  assert.strictEqual(db.get('review_cards').length, 0, 'review queue cleanly emptied');
+});

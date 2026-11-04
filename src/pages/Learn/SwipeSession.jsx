@@ -809,7 +809,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         partialFailureCardRef.current = {
           cardId: activeCardKey,
           direction,
-          progressPersisted: Boolean(err && err.progressPersisted === true),
+          progressPersisted: progressAlreadyPersisted || Boolean(err && err.progressPersisted === true),
         };
         actionLocked.current = false;
         setBookmarkFeedback('Unable to save progress. Try again.');
