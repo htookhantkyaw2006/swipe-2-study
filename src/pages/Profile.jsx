@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings as SettingsIcon, Flame, BookOpen,
@@ -17,6 +17,7 @@ import { useGuestImport } from '../lib/useGuestImport.js';
 import { storageOwner } from '../lib/storageOwner.js';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { isAccountDeletionEnabled } from '../lib/accountDeletionGate.js';
+import { usePublishedCourse } from '../lib/publishedContentContext.jsx';
 import { sendDeletionRequest, removeOwnerLocalData, UNCONFIRMED_DELETION_GUIDANCE } from '../lib/accountDeletionClient.js';
 import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
 import DeleteAccountDialog from '../components/DeleteAccountDialog.jsx';
@@ -55,6 +56,7 @@ export default function Profile() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deletionError, setDeletionError] = useState(null);
   const [localCleanupError, setLocalCleanupError] = useState(false);
+  const [pendingCleanupOwnerId, setPendingCleanupOwnerId] = useState(null);
   const [deletionNotice, setDeletionNotice] = useState('');
   const [globalSignOutOpen, setGlobalSignOutOpen] = useState(false);
   const [globalSigningOut, setGlobalSigningOut] = useState(false);
@@ -69,14 +71,16 @@ export default function Profile() {
 
   const busy = authLoading || isTransitioning;
 
-  const updateCounts = () => {
+  const publishedCourse = usePublishedCourse(course.levels[0]?.id);
+
+  const updateCounts = useCallback(() => {
     try {
       const progress = getCourseProgress(db, course);
       setSwipedCount(progress.studiedCount ?? progress.uniqueSeen ?? progress.uniqueLearned ?? 0);
     } catch {
       setSwipedCount(0);
     }
-  };
+  }, [course]);
 
   useEffect(() => {
     updateCounts();
@@ -86,7 +90,7 @@ export default function Profile() {
       unsubChange?.();
       unsubOwner?.();
     };
-  }, []);
+  }, [updateCounts, publishedCourse?.status, publishedCourse?.items]);
 
   const name = authLoading ? 'Loading…' : user
     ? displayName(profileLoading ? null : profile, user)
@@ -143,6 +147,7 @@ export default function Profile() {
     if (loggingOut || globalSigningOut || deletingAccount || busy) return;
     setDeletionError(null);
     setLocalCleanupError(false);
+            setPendingCleanupOwnerId(null);
     setDeleteDialogOpen(true);
   };
 
@@ -178,6 +183,7 @@ export default function Profile() {
       }
 
       if (result.status === 'confirmed_deleted') {
+        setPendingCleanupOwnerId(initiatingUserId);
         let cleanupSucceeded = false;
         try {
           removeOwnerLocalData(initiatingUserId);
@@ -195,10 +201,14 @@ export default function Profile() {
 
         setDeletingAccount(false);
         setDeleteDialogOpen(false);
+        setLocalCleanupError(false);
+        setPendingCleanupOwnerId(null);
         setDeletionNotice('Your account has been deleted. You are now in guest mode.');
-        storageOwner.setOwner(null);
-        await signOut();
-        navigate('/');
+        if (user?.id === initiatingUserId) {
+          storageOwner.setOwner(null);
+          await signOut();
+          navigate('/');
+        }
         return;
       }
 
@@ -212,14 +222,14 @@ export default function Profile() {
 
   const handleRetryLocalCleanup = async () => {
     if (deletingAccount || !localCleanupError) return;
-    const initiatingUserId = user?.id;
-    if (!initiatingUserId) return;
+    const targetOwnerId = pendingCleanupOwnerId;
+    if (!targetOwnerId) return;
     setDeletingAccount(true);
     setDeletionError(null);
 
     let cleanupSucceeded = false;
     try {
-      removeOwnerLocalData(initiatingUserId);
+      removeOwnerLocalData(targetOwnerId);
       cleanupSucceeded = true;
     } catch {
       cleanupSucceeded = false;
@@ -228,13 +238,17 @@ export default function Profile() {
     setDeletingAccount(false);
     if (cleanupSucceeded) {
       setLocalCleanupError(false);
+      setPendingCleanupOwnerId(null);
       setDeleteDialogOpen(false);
-      setDeletionNotice('Your account has been deleted. You are now in guest mode.');
-      storageOwner.setOwner(null);
-      await signOut();
-      navigate('/');
+      setDeletionNotice('Cached data for the deleted account was cleared.');
+      if (user?.id === targetOwnerId) {
+        setDeletionNotice('Your account has been deleted. You are now in guest mode.');
+        storageOwner.setOwner(null);
+        await signOut();
+        navigate('/');
+      }
     } else {
-      setDeletionError('Could not clear device storage. Please try again.');
+      setDeletionError('Could not clear device storage for the deleted account. Please try again.');
     }
   };
 

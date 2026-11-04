@@ -1,16 +1,113 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
+import React from 'react';
+import { renderToString } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
+import { createServer } from 'vite';
+import { fileURLToPath } from 'node:url';
 import { sendDeletionRequest, removeOwnerLocalData } from '../src/lib/accountDeletionClient.js';
 import { readStreakState, writeStreakState } from '../src/lib/studyStreak.js';
+import { runBrowserProfileAccountVerification } from './runBrowserProfileAccount.mjs';
 
-test('Profile account deletion: sendDeletionRequest validates parameters and contract', async () => {
-  const userId = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
+const oldStorage = globalThis.localStorage;
+const storageMap = new Map();
+globalThis.localStorage = {
+  getItem: (key) => storageMap.get(key) ?? null,
+  setItem: (key, val) => storageMap.set(key, String(val)),
+  removeItem: (key) => storageMap.delete(key),
+  clear: () => storageMap.clear(),
+  get length() { return storageMap.size; },
+  key: (i) => Array.from(storageMap.keys())[i] ?? null,
+};
 
+const projectRoot = fileURLToPath(new URL('..', import.meta.url));
+
+const server = await createServer({
+  root: projectRoot,
+  server: { middlewareMode: true, hmr: false, ws: false, host: '127.0.0.1', watch: null },
+});
+
+after(async () => {
+  await server.close();
+  if (oldStorage === undefined) delete globalThis.localStorage;
+  else globalThis.localStorage = oldStorage;
+});
+
+const { default: Profile } = await server.ssrLoadModule('/src/pages/Profile.jsx');
+const { LanguageProvider } = await server.ssrLoadModule('/src/lib/language.jsx');
+const { PreferencesProvider } = await server.ssrLoadModule('/src/lib/preferences.jsx');
+const { PublishedContentProvider } = await server.ssrLoadModule('/src/lib/publishedContentContext.jsx');
+const { GuestImportContext } = await server.ssrLoadModule('/src/lib/guestImportContext.js');
+const { AuthContext } = await server.ssrLoadModule('/src/lib/authContext.js');
+const { setActiveLanguageId } = await server.ssrLoadModule('/src/lib/activeLanguage.js');
+
+setActiveLanguageId('zh');
+
+const USER_A = '11111111-1111-4111-8111-111111111111';
+const USER_B = '22222222-2222-4222-8222-222222222222';
+
+test('Profile SSR: renders destructive session and danger controls safely', () => {
+  const authValue = {
+    user: { id: USER_A, email: 'learner@example.com' },
+    profile: { display_name: 'Alex Rivera' },
+    loading: false,
+    isTransitioning: false,
+    error: null,
+    isGuest: false,
+    isConfigured: true,
+    captureGeneration: () => 1,
+    isCurrent: () => true,
+    signOut: async () => ({ error: null }),
+    signOutGlobal: async () => ({ confirmedLocal: true, remoteConfirmed: true, error: null }),
+  };
+
+  const guestImportValue = {
+    status: 'idle',
+    count: 0,
+    isEligible: false,
+    run: () => {},
+    dismiss: () => {},
+  };
+
+  const html = renderToString(
+    React.createElement(
+      AuthContext.Provider,
+      { value: authValue },
+      React.createElement(
+        GuestImportContext.Provider,
+        { value: guestImportValue },
+        React.createElement(
+          LanguageProvider,
+          null,
+          React.createElement(
+            PreferencesProvider,
+            null,
+            React.createElement(
+              PublishedContentProvider,
+              null,
+              React.createElement(
+                MemoryRouter,
+                { initialEntries: ['/profile'] },
+                React.createElement(Profile)
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+
+  assert.ok(html.includes('Sign out on all devices'), 'Global sign out option present');
+  assert.ok(html.includes('Delete account'), 'Delete account option present');
+  assert.ok(html.includes('Session &amp; account') || html.includes('profile-group--danger'), 'Destructive actions grouped in danger section');
+});
+
+test('Profile Deletion Client: validates parameters and contract', async () => {
   // 1. Missing password rejects with PASSWORD_REQUIRED
   const res1 = await sendDeletionRequest({
     client: { auth: { getSession: async () => ({}) } },
     password: '',
-    initiatingUserId: userId,
+    initiatingUserId: USER_A,
   });
   assert.equal(res1.status, 'error');
   assert.equal(res1.code, 'PASSWORD_REQUIRED');
@@ -19,7 +116,7 @@ test('Profile account deletion: sendDeletionRequest validates parameters and con
   const res2 = await sendDeletionRequest({
     client: null,
     password: 'securePassword123',
-    initiatingUserId: userId,
+    initiatingUserId: USER_A,
   });
   assert.equal(res2.status, 'error');
   assert.equal(res2.code, 'CLIENT_UNAVAILABLE');
@@ -34,15 +131,11 @@ test('Profile account deletion: sendDeletionRequest validates parameters and con
   assert.equal(res3.code, 'INVALID_OWNER');
 });
 
-test('Profile account deletion: in-flight account switch protects Account B', async () => {
-  const accountA = '11111111-1111-4111-8111-111111111111';
-  const accountB = '22222222-2222-4222-8222-222222222222';
-
-  // Seed storage for both accounts
+test('Profile Deletion Client: in-flight account switch protects Account B', async () => {
   const mockStorage = {
     data: new Map([
-      [`s2s_user_${accountA}_progress`, 'A_data'],
-      [`s2s_user_${accountB}_progress`, 'B_data'],
+      [`s2s_user_${USER_A}_progress`, 'A_data'],
+      [`s2s_user_${USER_B}_progress`, 'B_data'],
       ['s2s_guest_progress', 'guest_data'],
     ]),
     key(i) {
@@ -59,26 +152,25 @@ test('Profile account deletion: in-flight account switch protects Account B', as
     },
   };
 
-  let currentUser = accountA;
+  let currentUser = USER_A;
   let currentGen = 1;
-  const isCurrent = (gen) => gen === currentGen && currentUser === accountA;
+  const isCurrent = (gen) => gen === currentGen && currentUser === USER_A;
 
   // Account switch happens during request
-  currentUser = accountB;
+  currentUser = USER_B;
   currentGen = 2;
 
   // Verify guard detects account switch
   assert.equal(isCurrent(1), false, 'Operation from Gen 1 on Account A must be flagged non-current');
 
   // If server confirmed deletion of Account A, removeOwnerLocalData clears ONLY Account A
-  removeOwnerLocalData(accountA, mockStorage);
-  assert.equal(mockStorage.getItem(`s2s_user_${accountA}_progress`), null, 'Account A data removed');
-  assert.equal(mockStorage.getItem(`s2s_user_${accountB}_progress`), 'B_data', 'Account B data strictly preserved');
+  removeOwnerLocalData(USER_A, mockStorage);
+  assert.equal(mockStorage.getItem(`s2s_user_${USER_A}_progress`), null, 'Account A data removed');
+  assert.equal(mockStorage.getItem(`s2s_user_${USER_B}_progress`), 'B_data', 'Account B data strictly preserved');
   assert.equal(mockStorage.getItem('s2s_guest_progress'), 'guest_data', 'Guest data strictly preserved');
 });
 
-test('Profile study streak: persists and reads currentStreak accurately', () => {
-  const ownerId = '33333333-3333-4333-8333-333333333333';
+test('Profile Study Streak: persists and reads currentStreak accurately in storage', () => {
   const mockStorage = {
     items: {},
     setItem(k, v) { this.items[k] = v; },
@@ -92,10 +184,33 @@ test('Profile study streak: persists and reads currentStreak accurately', () => 
     timezone: 'Asia/Yangon',
   };
 
-  writeStreakState(mockStorage, ownerId, streak);
-  const read = readStreakState(mockStorage, ownerId);
+  writeStreakState(mockStorage, USER_A, streak);
+  const read = readStreakState(mockStorage, USER_A);
 
   assert.equal(read.currentStreak, 12, 'currentStreak read matches written streak');
   assert.equal(read.longestStreak, 25);
   assert.equal(read.todayStudied, true);
+});
+
+test('Profile Real Browser: mounted component interaction, retry ownership safety, global sign out, and nonzero streak', async () => {
+  const outcome = await runBrowserProfileAccountVerification();
+  if (outcome.skipped) {
+    console.warn('[REAL BROWSER PROFILE CHECK SKIPPED]:', outcome.reason);
+    return;
+  }
+
+  assert.equal(outcome.passed, true);
+  assert.ok(Array.isArray(outcome.results));
+
+  // 1. Mounted Profile: A deletion confirmed -> local cleanup fails -> switch to B -> retry
+  const retryTest = outcome.results.find((r) => r.test === 'profile-account-deletion-retry-ownership-safe');
+  assert.ok(retryTest && retryTest.passed, 'profile-account-deletion-retry-ownership-safe must pass');
+
+  // 2. Global sign out flow
+  const globalSignOutTest = outcome.results.find((r) => r.test === 'profile-global-sign-out-flow');
+  assert.ok(globalSignOutTest && globalSignOutTest.passed, 'profile-global-sign-out-flow must pass');
+
+  // 3. Nonzero streak in Library and Profile
+  const streakTest = outcome.results.find((r) => r.test === 'nonzero-streak-library-and-profile');
+  assert.ok(streakTest && streakTest.passed, 'nonzero-streak-library-and-profile must pass');
 });

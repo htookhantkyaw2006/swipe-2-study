@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Profile Account Actions Browser Verification</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React, { createElement, useState } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter, Routes, Route } from 'react-router-dom';
+    import Profile from '/src/pages/Profile.jsx';
+    import Library from '/src/pages/Library.jsx';
+    import { LanguageProvider } from '/src/lib/language.jsx';
+    import { PreferencesProvider } from '/src/lib/preferences.jsx';
+    import { PublishedContentProvider } from '/src/lib/publishedContentContext.jsx';
+    import { GuestImportContext } from '/src/lib/guestImportContext.js';
+    import { AuthContext } from '/src/lib/authContext.js';
+    import { storageOwner } from '/src/lib/storageOwner.js';
+    import { setSupabaseClient } from '/src/lib/supabase.js';
+    import { writeStreakState } from '/src/lib/studyStreak.js';
+
+    const USER_A = '11111111-1111-4111-8111-111111111111';
+    const USER_B = '22222222-2222-4222-8222-222222222222';
+
+    const rootElement = document.getElementById('root');
+    let reactRoot = null;
+    const testLogs = [];
+    const origLog = console.log;
+    console.log = (...args) => { testLogs.push(args.join(' ')); origLog(...args); };
+    const origError = console.error;
+    console.error = (...args) => { testLogs.push('ERROR: ' + args.join(' ')); origError(...args); };
+    window.addEventListener('error', (e) => testLogs.push('UNCAUGHT: ' + (e.error?.message || e.message)));
+
+    function renderComponent(ui) {
+      if (!reactRoot) {
+        reactRoot = createRoot(rootElement);
+      }
+      reactRoot.render(ui);
+    }
+
+    function unmountComponent() {
+      if (reactRoot) {
+        reactRoot.unmount();
+        reactRoot = null;
+        rootElement.innerHTML = '';
+      }
+      try { localStorage.clear(); } catch {}
+    }
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // Dynamic Auth wrapper to allow in-flight account switching
+    let currentAuthContextValue = null;
+    let authContextListeners = new Set();
+
+    function DynamicAuthProvider({ children }) {
+      const [val, setVal] = useState(currentAuthContextValue);
+      React.useEffect(() => {
+        const listener = (newVal) => setVal(newVal);
+        authContextListeners.add(listener);
+        return () => authContextListeners.delete(listener);
+      }, []);
+      return createElement(AuthContext.Provider, { value: val }, children);
+    }
+
+    function updateActiveAuth(newVal) {
+      currentAuthContextValue = { ...currentAuthContextValue, ...newVal };
+      for (const listener of authContextListeners) {
+        listener(currentAuthContextValue);
+      }
+    }
+
+    const mockGuestImportValue = {
+      status: 'idle',
+      count: 0,
+      isEligible: false,
+      run: () => {},
+      dismiss: () => {},
+    };
+
+    // Setup window.fetch mock for delete-account edge function
+    const origFetch = window.fetch.bind(window);
+    window.fetch = async (url, opts) => {
+      const urlStr = String(url || '');
+      if (urlStr.includes('delete-account')) {
+        return new Response(JSON.stringify({
+          success: true,
+          status: 'deleted',
+          userId: USER_A,
+          deletedAt: new Date().toISOString(),
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return origFetch(url, opts);
+    };
+
+    async function runAllTests() {
+      const results = [];
+      function assert(cond, msg) { if (!cond) throw new Error(msg); }
+
+      // -------------------------------------------------------------
+      // Test 1: Mounted Profile: A deletion confirmed -> local cleanup fails -> switch to B -> retry
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        storageOwner.setOwner(USER_A);
+
+        // Seed storage for A, B, and guest
+        localStorage.setItem(`s2s_user_${USER_A}_progress`, 'progress_A');
+        localStorage.setItem(`s2s_user_${USER_A}_preferences`, 'prefs_A');
+        localStorage.setItem(`s2s_user_${USER_B}_progress`, 'progress_B');
+        localStorage.setItem(`s2s_guest_progress`, 'guest_data');
+
+        let signOutCallCount = 0;
+        let lastSignedOutUser = null;
+
+        currentAuthContextValue = {
+          user: {
+            id: USER_A,
+            email: 'user_a@example.com',
+            app_metadata: { provider: 'email', providers: ['email'] },
+            identities: [{ provider: 'email' }],
+          },
+          profile: { display_name: 'User A' },
+          loading: false,
+          isTransitioning: false,
+          error: null,
+          isGuest: false,
+          isConfigured: true,
+          captureGeneration: () => 1,
+          isCurrent: () => true,
+          signOut: async () => {
+            signOutCallCount++;
+            lastSignedOutUser = currentAuthContextValue.user?.id;
+            return { error: null };
+          },
+          signOutGlobal: async () => ({ confirmedLocal: true, remoteConfirmed: true, error: null }),
+        };
+
+        // Setup mock Supabase client for deletion and profiles
+        const mockClient = {
+          functions: {
+            invoke: async (fn, opts) => {
+              if (fn === 'delete-account') {
+                return { data: { success: true, status: 'confirmed_deleted' }, error: null };
+              }
+              return { data: null, error: new Error('Unknown function') };
+            },
+          },
+          from: () => ({
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { id: USER_A, display_name: 'User A' }, error: null }),
+                single: async () => ({ data: { id: USER_A, display_name: 'User A' }, error: null }),
+              }),
+            }),
+          }),
+          auth: {
+            getSession: async () => ({
+              data: {
+                session: {
+                  access_token: 'token-a',
+                  user: { id: USER_A },
+                },
+              },
+              error: null,
+            }),
+            getUser: async () => ({
+              data: { user: { id: USER_A } },
+              error: null,
+            }),
+          },
+        };
+        setSupabaseClient(mockClient);
+
+        // Hook localStorage.removeItem to fail only on USER_A during first attempt
+        let failUserACleanup = true;
+        const origRemoveItem = localStorage.removeItem.bind(localStorage);
+        localStorage.removeItem = (key) => {
+          if (failUserACleanup && key.includes(USER_A)) {
+            throw new Error('Device storage quota exceeded');
+          }
+          return origRemoveItem(key);
+        };
+
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { initialEntries: ['/profile'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/profile', element: createElement(Profile) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+
+        // Find interactive SettingsRow button for Delete account
+        const interactiveButtons = Array.from(document.querySelectorAll('[role="button"]'));
+        const deleteRow = interactiveButtons.find((r) => r.textContent?.includes('Delete account') && !r.textContent?.includes('Soon'));
+        assert(deleteRow, 'Delete account interactive row must exist and be enabled');
+        deleteRow.click();
+
+        await sleep(100);
+
+        // Verify DeleteAccountDialog is open
+        const passwordInput = document.querySelector('#delete-account-password');
+        assert(passwordInput, 'Password input must be present in open DeleteAccountDialog');
+
+        const confirmInput = document.querySelector('#delete-account-confirm');
+        assert(confirmInput, 'Confirm input must be present in open DeleteAccountDialog');
+
+        // Enter password and confirm DELETE using native value setter for React
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+
+        nativeInputValueSetter.call(passwordInput, 'SecretPassword123');
+        passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        nativeInputValueSetter.call(confirmInput, 'DELETE');
+        confirmInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        await sleep(50);
+
+        // Submit deletion form
+        const deleteBtn = document.querySelector('.delete-account-dialog__btn--danger');
+        assert(deleteBtn, 'Delete account danger submit button must exist');
+        deleteBtn.click();
+
+        // Wait for deletion request and failed local cleanup
+        await sleep(400);
+
+        // Verify local cleanup failure state is displayed
+        const retryBtn = document.querySelector('.delete-account-dialog__btn--retry');
+        assert(retryBtn, 'Retry local cleanup button must be displayed after local cleanup error');
+
+        const cleanupErrorMsg = document.querySelector('.delete-account-dialog__cleanup-message');
+        assert(cleanupErrorMsg && cleanupErrorMsg.textContent.includes('could not be completely cleared'),
+          'Cleanup error guidance must explain server deletion succeeded but local cleanup failed');
+
+        // Now, simulate account switch in background to User B
+        storageOwner.setOwner(USER_B);
+        updateActiveAuth({
+          user: {
+            id: USER_B,
+            email: 'user_b@example.com',
+            app_metadata: { provider: 'email', providers: ['email'] },
+            identities: [{ provider: 'email' }],
+          },
+          profile: { display_name: 'User B' },
+        });
+
+        await sleep(100);
+
+        // Allow cleanup of User A to succeed on retry
+        failUserACleanup = false;
+
+        // Click "Retry local cleanup" button
+        retryBtn.click();
+
+        await sleep(350);
+
+        // Verify:
+        // 1. User A local data was cleared
+        assert(localStorage.getItem(`s2s_user_${USER_A}_progress`) === null, 'User A progress must be cleared on retry');
+        assert(localStorage.getItem(`s2s_user_${USER_A}_preferences`) === null, 'User A preferences must be cleared on retry');
+
+        // 2. User B data was strictly preserved
+        assert(localStorage.getItem(`s2s_user_${USER_B}_progress`) === 'progress_B', 'User B progress must be strictly preserved');
+
+        // 3. Guest data was strictly preserved
+        assert(localStorage.getItem('s2s_guest_progress') === 'guest_data', 'Guest data must be strictly preserved');
+
+        // 4. User B storage owner was NOT reset to null
+        assert(storageOwner.getOwner() === USER_B, 'Active storage owner must remain User B, not reset to null');
+
+        // 5. User B was NOT signed out
+        assert(signOutCallCount === 0 || lastSignedOutUser !== USER_B, 'User B must NOT be signed out by User A retry');
+
+        // Restore localStorage.removeItem
+        localStorage.removeItem = origRemoveItem;
+
+        results.push({ test: 'profile-account-deletion-retry-ownership-safe', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 2: Global sign out flow opens dialog and dispatches signOutGlobal safely
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        storageOwner.setOwner(USER_A);
+
+        let globalSignOutCalled = false;
+
+        currentAuthContextValue = {
+          user: {
+            id: USER_A,
+            email: 'user_a@example.com',
+            app_metadata: { provider: 'email', providers: ['email'] },
+            identities: [{ provider: 'email' }],
+          },
+          profile: { display_name: 'User A' },
+          loading: false,
+          isTransitioning: false,
+          error: null,
+          isGuest: false,
+          isConfigured: true,
+          captureGeneration: () => 1,
+          isCurrent: () => true,
+          signOut: async () => ({ error: null }),
+          signOutGlobal: async () => {
+            globalSignOutCalled = true;
+            return { confirmedLocal: true, remoteConfirmed: true, error: null };
+          },
+        };
+
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { initialEntries: ['/profile'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/profile', element: createElement(Profile) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+
+        // Click "Sign out on all devices"
+        const interactiveButtons = Array.from(document.querySelectorAll('[role="button"]'));
+        const globalRow = interactiveButtons.find((r) => r.textContent?.includes('Sign out on all devices'));
+        assert(globalRow, 'Sign out on all devices row must exist');
+        globalRow.click();
+
+        await sleep(100);
+
+        // Confirm in GlobalSignOutDialog
+        const confirmBtn = document.querySelector('.global-signout-dialog__btn--confirm');
+        assert(confirmBtn, 'Global sign out confirm button must exist in dialog');
+        confirmBtn.click();
+
+        await sleep(100);
+        assert(globalSignOutCalled, 'signOutGlobal must be dispatched on confirm');
+
+        results.push({ test: 'profile-global-sign-out-flow', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 3: Nonzero streak verified in both Library and Profile
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        storageOwner.setOwner(USER_A);
+        updateActiveAuth({
+          user: {
+            id: USER_A,
+            email: 'user_a@example.com',
+            app_metadata: { provider: 'email', providers: ['email'] },
+            identities: [{ provider: 'email' }],
+          },
+          profile: { display_name: 'User A' },
+        });
+
+        // Seed streak
+        writeStreakState(localStorage, USER_A, {
+          currentStreak: 7,
+          longestStreak: 14,
+          todayStudied: true,
+          timezone: 'Asia/Yangon',
+        });
+
+        // 1. Check Profile
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { initialEntries: ['/profile'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/profile', element: createElement(Profile) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        assert(document.body.textContent.includes('7 days'), 'Profile must render "7 days" for streak');
+
+        // 2. Check Library
+        writeStreakState(localStorage, USER_A, {
+          currentStreak: 7,
+          longestStreak: 14,
+          todayStudied: true,
+          timezone: 'Asia/Yangon',
+        });
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { key: 'library-route', initialEntries: ['/library'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/library', element: createElement(Library) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        assert(document.body.textContent.includes('7'), 'Library must render currentStreak of 7');
+
+        results.push({ test: 'nonzero-streak-library-and-profile', passed: true });
+      }
+
+      return results;
+    }
+
+    try {
+      const results = await runAllTests();
+      await fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, results }),
+      });
+    } catch (err) {
+      await fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: err.message, stack: err.stack, logs: testLogs }),
+      });
+    }
+  </script>
+</body>
+</html>

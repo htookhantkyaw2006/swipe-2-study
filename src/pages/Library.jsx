@@ -197,7 +197,7 @@ export default function Library() {
                 border: '1px solid rgba(255, 255, 255, 0.9)'
               }}>
                 <span role="img" aria-label="streak fire">🔥</span>
-                <span>{streak?.streakDays || 0}</span>
+                <span>{streak?.currentStreak ?? streak?.streakDays ?? 0}</span>
               </div>
             </div>
 

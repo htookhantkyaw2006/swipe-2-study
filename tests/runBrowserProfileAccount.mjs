@@ -1,0 +1,134 @@
+import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createServer as createViteServer } from 'vite';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const CHROME_PATHS = [
+  process.env.CHROME_BIN,
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+].filter(Boolean);
+
+export async function runBrowserProfileAccountVerification() {
+  const browserPath = CHROME_PATHS.find((p) => fs.existsSync(p));
+  if (!browserPath) {
+    console.warn('[BROWSER_CHECK_SKIPPED] No real browser executable (Chrome/Edge) found on host.');
+    return { skipped: true, reason: 'No real browser executable (Chrome/Edge) found on host' };
+  }
+
+  const viteServer = await createViteServer({
+    server: { port: 0, hmr: false, ws: false, host: '127.0.0.1' },
+    appType: 'custom',
+    root: path.resolve(__dirname, '..'),
+    define: {
+      'import.meta.env.VITE_ACCOUNT_DELETION_ENABLED': JSON.stringify('true'),
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('https://example.supabase.co'),
+      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify('sb_publishable_12345678901234567890'),
+    },
+  });
+
+  return new Promise((resolve, reject) => {
+    let chromeProc = null;
+    let serverClosed = false;
+
+    const cleanup = async () => {
+      if (serverClosed) return;
+      serverClosed = true;
+      if (chromeProc) {
+        try { chromeProc.kill(); } catch {}
+      }
+      try { await viteServer.close(); } catch {}
+    };
+
+    const timeout = setTimeout(async () => {
+      await cleanup();
+      reject(new Error('Browser Profile account verification timed out after 15 seconds.'));
+    }, 15000);
+
+    viteServer.middlewares.use((req, res) => {
+      if (req.url === '/report' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => { body += chunk; });
+        req.on('end', async () => {
+          clearTimeout(timeout);
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end('ok');
+          await cleanup();
+
+          try {
+            const report = JSON.parse(body);
+            if (report.success) {
+              console.log('✓ Real Browser Mounted Profile Verification Passed:');
+              for (const r of report.results) {
+                console.log(`    - ${r.test}: ${JSON.stringify(r)}`);
+              }
+              resolve({ passed: true, results: report.results });
+            } else {
+              console.error('✗ Real Browser Mounted Profile Verification Failed:', report.error);
+              if (report.logs) {
+                console.error('--- BROWSER LOGS ---');
+                for (const l of report.logs) console.error(l);
+                console.error('--------------------');
+              }
+              reject(new Error(report.error));
+            }
+          } catch (e) {
+            reject(new Error(`Failed to parse browser report: ${e.message}`));
+          }
+        });
+        return;
+      }
+
+      if (req.url === '/tests/helpers/profileAccount/browserRunner.html' || req.url === '/') {
+        const filePath = path.resolve(__dirname, 'helpers/profileAccount/browserRunner.html');
+        fs.readFile(filePath, 'utf8', async (err, content) => {
+          if (err) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end(err.message);
+            return;
+          }
+          try {
+            const transformed = await viteServer.transformIndexHtml(req.url, content);
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(transformed);
+          } catch (transformErr) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end(transformErr.message);
+          }
+        });
+        return;
+      }
+    });
+
+    viteServer.listen().then(() => {
+      const address = viteServer.httpServer.address();
+      const port = typeof address === 'object' && address ? address.port : 5173;
+      const targetUrl = `http://127.0.0.1:${port}/tests/helpers/profileAccount/browserRunner.html`;
+
+      chromeProc = execFile(
+        browserPath,
+        [
+          '--headless=new',
+          '--disable-gpu',
+          '--no-sandbox',
+          '--disable-dev-shm-usage',
+          '--window-size=1280,800',
+          targetUrl,
+        ],
+        (err) => {
+          if (err && !serverClosed) {
+            cleanup().then(() => reject(err));
+          }
+        }
+      );
+    }).catch(reject);
+  });
+}

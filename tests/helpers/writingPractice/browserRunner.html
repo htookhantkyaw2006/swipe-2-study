@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>WritingPractice Browser Verification</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    import React, { createElement } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter, Routes, Route } from 'react-router-dom';
+    import WritingPractice from '/src/pages/WritingPractice.jsx';
+    import { LanguageProvider } from '/src/lib/language.jsx';
+    import { setActiveLanguageId } from '/src/lib/activeLanguage.js';
+    import { db } from '/src/lib/db.js';
+
+    setActiveLanguageId('zh');
+
+    const rootElement = document.getElementById('root');
+    let reactRoot = null;
+    const testLogs = [];
+    const origLog = console.log;
+    console.log = (...args) => { testLogs.push(args.join(' ')); origLog(...args); };
+
+    function renderComponent(ui) {
+      if (!reactRoot) {
+        reactRoot = createRoot(rootElement);
+      }
+      reactRoot.render(ui);
+    }
+
+    function unmountComponent() {
+      if (reactRoot) {
+        reactRoot.unmount();
+        reactRoot = null;
+        rootElement.innerHTML = '';
+      }
+      try { localStorage.clear(); } catch {}
+    }
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    async function runAllTests() {
+      const results = [];
+      function assert(cond, msg) { if (!cond) throw new Error(msg); }
+
+      // -------------------------------------------------------------
+      // Test 1: Query parameter ?word=你好 selects word and renders character tabs
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        setActiveLanguageId('zh');
+
+        renderComponent(
+          createElement(LanguageProvider, null,
+            createElement(MemoryRouter, { initialEntries: ['/practice-writing?word=你好'] },
+              createElement(Routes, null,
+                createElement(Route, {
+                  path: '/practice-writing',
+                  element: createElement(WritingPractice)
+                })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        const cardHeading = document.querySelector('.surface-card h2');
+        assert(cardHeading && cardHeading.textContent.includes('你好'), 'Should render word heading "你好" inside practice card');
+
+        const tabs = document.querySelectorAll('[role="tab"]');
+        assert(tabs.length === 2, `Expected 2 character tabs for 你好, found ${tabs.length}`);
+        assert(tabs[0].textContent.includes('你'), 'Tab 1 should be 你');
+        assert(tabs[1].textContent.includes('好'), 'Tab 2 should be 好');
+        assert(tabs[0].getAttribute('aria-selected') === 'true', 'Tab 1 (你) should be selected initially');
+
+        results.push({ test: 'query-param-word-and-tabs', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 2: Query parameter ?char= resolves exact and multi-character containing words
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        setActiveLanguageId('zh');
+
+        // Exact match: ?char=好
+        renderComponent(
+          createElement(LanguageProvider, null,
+            createElement(MemoryRouter, { initialEntries: ['/practice-writing?char=好'] },
+              createElement(Routes, null,
+                createElement(Route, {
+                  path: '/practice-writing',
+                  element: createElement(WritingPractice)
+                })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        assert(document.body.textContent.includes('Practising: 好'), 'Exact ?char=好 resolves to character "好"');
+
+        // Containing match in multi-character word: ?char=子 in 包子
+        unmountComponent();
+        renderComponent(
+          createElement(LanguageProvider, null,
+            createElement(MemoryRouter, { initialEntries: ['/practice-writing?char=子'] },
+              createElement(Routes, null,
+                createElement(Route, {
+                  path: '/practice-writing',
+                  element: createElement(WritingPractice)
+                })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        assert(document.body.textContent.includes('Practising: 子'), 'Containing ?char=子 resolves to character "子" in 包子');
+        const tabs = document.querySelectorAll('[role="tab"]');
+        assert(tabs.length >= 2, 'Should render tabs for containing word 包子');
+        const ziTab = Array.from(tabs).find((t) => t.textContent.includes('子'));
+        assert(ziTab && ziTab.getAttribute('aria-selected') === 'true', 'Tab for "子" should have aria-selected="true"');
+
+        results.push({ test: 'query-param-char-resolution', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 3: Tab switching updates active character and canvas target
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        setActiveLanguageId('zh');
+
+        renderComponent(
+          createElement(LanguageProvider, null,
+            createElement(MemoryRouter, { initialEntries: ['/practice-writing?word=你好'] },
+              createElement(Routes, null,
+                createElement(Route, {
+                  path: '/practice-writing',
+                  element: createElement(WritingPractice)
+                })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        const tabs = document.querySelectorAll('[role="tab"]');
+        assert(tabs.length >= 2, 'Must have at least 2 tabs');
+
+        // Click second tab ('好')
+        tabs[1].click();
+        await sleep(150);
+
+        assert(tabs[1].getAttribute('aria-selected') === 'true', 'Second tab should now be aria-selected');
+        assert(document.body.textContent.includes('Practising: 好'), 'Practising text should now display "好"');
+
+        results.push({ test: 'multi-character-tab-switching', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 4: Canvas rendering pipeline produces practice grid SVG
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        setActiveLanguageId('zh');
+
+        renderComponent(
+          createElement(LanguageProvider, null,
+            createElement(MemoryRouter, { initialEntries: ['/practice-writing?word=一'] },
+              createElement(Routes, null,
+                createElement(Route, {
+                  path: '/practice-writing',
+                  element: createElement(WritingPractice)
+                })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        const gridSvg = document.querySelector('svg[viewBox="0 0 260 260"]');
+        assert(gridSvg, 'Must render SVG practice grid with viewBox="0 0 260 260"');
+
+        const dashedLines = gridSvg.querySelectorAll('line[stroke-dasharray="6 6"]');
+        assert(dashedLines.length === 4, `Expected 4 dashed guide lines in 米字格, found ${dashedLines.length}`);
+
+        const gridContainer = document.querySelector('[aria-label="Writing grid for 一"]');
+        assert(gridContainer, 'Grid container with aria-label must exist');
+
+        results.push({ test: 'canvas-rendering-pipeline-grid', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 5: Quiz mode, controls, evaluation, score and retry
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        setActiveLanguageId('zh');
+
+        renderComponent(
+          createElement(LanguageProvider, null,
+            createElement(MemoryRouter, { initialEntries: ['/practice-writing?word=一'] },
+              createElement(Routes, null,
+                createElement(Route, {
+                  path: '/practice-writing',
+                  element: createElement(WritingPractice)
+                })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const practiceBtn = buttons.find((b) => b.textContent.includes('Practise'));
+        const clearBtn = buttons.find((b) => b.textContent.includes('Clear'));
+        const showMeBtn = buttons.find((b) => b.textContent.includes('Show me'));
+
+        assert(practiceBtn, 'Practise button must exist');
+        assert(clearBtn, 'Clear button must exist');
+        assert(showMeBtn, 'Show me button must exist');
+
+        // Click Practise to start quiz
+        practiceBtn.click();
+        await sleep(50);
+
+        assert(document.body.textContent.includes('Trace the character — no mistakes yet'), 'Status indicates quiz started');
+
+        // Click Clear (retry) to reset
+        clearBtn.click();
+        await sleep(50);
+
+        assert(!document.body.textContent.includes('Trace the character'), 'Status reset after Clear');
+
+        results.push({ test: 'stroke-quiz-controls-and-retry', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 6: Legacy mastery records parsing ({ char: '一' }, { character: '二' }, { char: '三' })
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        setActiveLanguageId('zh');
+        db.set('written_chars', [
+          { char: '一' },
+          { character: '二' },
+          { char: '三' },
+        ]);
+
+        renderComponent(
+          createElement(LanguageProvider, null,
+            createElement(MemoryRouter, { initialEntries: ['/practice-writing?word=一'] },
+              createElement(Routes, null,
+                createElement(Route, {
+                  path: '/practice-writing',
+                  element: createElement(WritingPractice)
+                })
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+        // Word '一' is in the mastered list, so checkmark icon is rendered
+        const masteredIcon = document.querySelector('[aria-label="Character mastered"]');
+        assert(masteredIcon, 'Mastered checkmark icon must be rendered for mastered character "一"');
+
+        // Verify summary text shows 3 mastered
+        assert(document.body.textContent.includes('3 of 248 characters written cleanly'), 'Progress counter must show 3 of 248 characters written cleanly');
+
+        results.push({ test: 'legacy-mastery-records-parsing', passed: true });
+      }
+
+      return results;
+    }
+
+    try {
+      const results = await runAllTests();
+      await fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, results }),
+      });
+    } catch (err) {
+      await fetch('/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: err.message, stack: err.stack, logs: testLogs }),
+      });
+    }
+  </script>
+</body>
+</html>

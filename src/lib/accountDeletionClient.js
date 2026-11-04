@@ -331,6 +331,7 @@ export function createAccountDeletionController({
   let localCleanupError = false;
   let notice = null;
   let dialogOpen = false;
+  let confirmedDeletedOwnerId = null;
   const listeners = new Set();
 
   function notify() {
@@ -439,6 +440,7 @@ export function createAccountDeletionController({
 
     // Handle response on still-current account
     if (result.status === 'confirmed_deleted') {
+      confirmedDeletedOwnerId = initiatingUserId;
       const targetStorage = typeof storage === 'function' ? storage() : storage;
       let cleanupSucceeded = false;
       try {
@@ -482,9 +484,8 @@ export function createAccountDeletionController({
 
   async function retryLocalCleanup() {
     if (pending || !localCleanupError) return;
-    const user = authCoordinator?.getUser?.() ?? authCoordinator?.getState?.()?.user ?? null;
-    const initiatingUserId = user?.id;
-    if (!initiatingUserId) return;
+    const targetOwnerId = confirmedDeletedOwnerId;
+    if (!targetOwnerId) return;
 
     pending = true;
     error = null;
@@ -493,7 +494,7 @@ export function createAccountDeletionController({
     let cleanupSucceeded = false;
     try {
       const targetStorage = typeof storage === 'function' ? storage() : storage;
-      removeOwnerLocalData(initiatingUserId, targetStorage);
+      removeOwnerLocalData(targetOwnerId, targetStorage);
       cleanupSucceeded = true;
     } catch {
       cleanupSucceeded = false;
@@ -503,14 +504,18 @@ export function createAccountDeletionController({
     if (cleanupSucceeded) {
       localCleanupError = false;
       dialogOpen = false;
+      confirmedDeletedOwnerId = null;
       notice = 'Your account has been deleted. You are now in guest mode.';
-      if (storageOwner?.setOwner) {
-        storageOwner.setOwner(null);
-      }
-      if (authCoordinator?.signOut) {
-        try {
-          await authCoordinator.signOut();
-        } catch {}
+      const currentUser = authCoordinator?.getUser?.() ?? authCoordinator?.getState?.()?.user ?? null;
+      if (currentUser?.id === targetOwnerId) {
+        if (storageOwner?.setOwner) {
+          storageOwner.setOwner(null);
+        }
+        if (authCoordinator?.signOut) {
+          try {
+            await authCoordinator.signOut();
+          } catch {}
+        }
       }
     } else {
       error = 'Could not clear device storage. Please try again.';

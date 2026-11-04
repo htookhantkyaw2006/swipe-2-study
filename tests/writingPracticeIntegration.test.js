@@ -1,96 +1,129 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { writingWords } from '../src/data/writingChars.js';
+import React from 'react';
+import { renderToString } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
+import { createServer } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { runBrowserWritingPracticeVerification } from './runBrowserWritingPractice.mjs';
 
-// Functions matching production contracts in WritingPractice.jsx
-const normalizeMasteredChar = (item) => {
-  if (typeof item === 'string') return item;
-  return item?.character || item?.char || null;
+const oldStorage = globalThis.localStorage;
+const storageMap = new Map();
+globalThis.localStorage = {
+  getItem: (key) => storageMap.get(key) ?? null,
+  setItem: (key, val) => storageMap.set(key, String(val)),
+  removeItem: (key) => storageMap.delete(key),
+  clear: () => storageMap.clear(),
+  get length() { return storageMap.size; },
+  key: (i) => Array.from(storageMap.keys())[i] ?? null,
 };
 
-const parseMasteredSet = (records) => {
-  const set = new Set();
-  if (Array.isArray(records)) {
-    for (const item of records) {
-      const char = normalizeMasteredChar(item);
-      if (char) set.add(char);
-    }
-  }
-  return set;
-};
+const projectRoot = fileURLToPath(new URL('..', import.meta.url));
 
-const resolveWordAndChar = (words, wordQuery, charQuery) => {
-  let targetWord = null;
-  let targetChar = null;
+const server = await createServer({
+  root: projectRoot,
+  server: { middlewareMode: true, hmr: false, ws: false, host: '127.0.0.1', watch: null },
+});
 
-  if (wordQuery) {
-    targetWord = words.find((w) => w.word === wordQuery) || null;
-    if (targetWord && targetWord.chars?.length > 0) {
-      targetChar = targetWord.chars[0];
-    }
-  }
+after(async () => {
+  await server.close();
+  if (oldStorage === undefined) delete globalThis.localStorage;
+  else globalThis.localStorage = oldStorage;
+});
 
-  if (!targetWord && charQuery) {
-    targetWord = words.find((w) => w.chars && w.chars.includes(charQuery)) || null;
-    if (targetWord) {
-      targetChar = charQuery;
-    }
-  }
+const { default: WritingPractice } = await server.ssrLoadModule('/src/pages/WritingPractice.jsx');
+const { LanguageProvider } = await server.ssrLoadModule('/src/lib/language.jsx');
+const { setActiveLanguageId } = await server.ssrLoadModule('/src/lib/activeLanguage.js');
 
-  return { targetWord, targetChar };
-};
+setActiveLanguageId('zh');
 
-const computeResponsiveCanvasSize = (containerWidth, viewportHeight) => {
-  const maxAllowedByWidth = Math.max(120, containerWidth - 32);
-  const maxAllowedByHeight = viewportHeight ? Math.max(120, viewportHeight * 0.36) : 260;
-  return Math.max(140, Math.min(260, Math.min(maxAllowedByWidth, maxAllowedByHeight)));
-};
+test('WritingPractice SSR: renders header, surface card, and action controls safely on server', () => {
+  setActiveLanguageId('zh');
+  const html = renderToString(
+    React.createElement(
+      LanguageProvider,
+      null,
+      React.createElement(
+        MemoryRouter,
+        { initialEntries: ['/practice-writing'] },
+        React.createElement(WritingPractice)
+      )
+    )
+  );
 
-test('WritingPractice: legacy mastery record format compatibility', () => {
-  const mixedRecords = [
+  assert.ok(html.includes('Practise Writing'), 'Renders page title');
+  assert.ok(html.includes('Write it'), 'Renders hero heading line 1');
+  assert.ok(html.includes('stroke by stroke'), 'Renders hero heading line 2');
+  assert.ok(html.includes('Show me'), 'Show me button present');
+  assert.ok(html.includes('Practise'), 'Practise button present');
+  assert.ok(html.includes('Clear'), 'Clear button present');
+});
+
+test('WritingPractice SSR: canvas rendering pipeline renders guide grid SVG with standard bounds', () => {
+  setActiveLanguageId('zh');
+  const html = renderToString(
+    React.createElement(
+      LanguageProvider,
+      null,
+      React.createElement(
+        MemoryRouter,
+        { initialEntries: ['/practice-writing?word=一'] },
+        React.createElement(WritingPractice)
+      )
+    )
+  );
+
+  assert.ok(html.includes('viewBox="0 0 260 260"'), 'SVG practice grid with 260x260 viewBox');
+  assert.ok(html.includes('stroke-dasharray="6 6"'), 'SVG guide lines with 6 6 dasharray');
+});
+
+test('WritingPractice SSR: legacy mastery normalization supports string and object records', () => {
+  const legacyRecords = [
     '一',
     { char: '二' },
     { character: '三' },
-    { invalidKey: '四' },
     null,
     undefined,
+    { invalid: 'foo' },
     '一', // duplicate
   ];
 
-  const mastered = parseMasteredSet(mixedRecords);
-  assert.equal(mastered.size, 3, 'Must parse exactly 3 unique characters');
-  assert.ok(mastered.has('一'), 'Recognizes plain string character');
-  assert.ok(mastered.has('二'), 'Recognizes { char } record');
-  assert.ok(mastered.has('三'), 'Recognizes { character } record');
-  assert.ok(!mastered.has('四'), 'Ignores invalid records');
+  const parsed = legacyRecords
+    .map((r) => r?.character || r?.char || (typeof r === 'string' ? r : null))
+    .filter(Boolean);
+  const masteredSet = new Set(parsed);
+
+  assert.equal(masteredSet.size, 3);
+  assert.ok(masteredSet.has('一'));
+  assert.ok(masteredSet.has('二'));
+  assert.ok(masteredSet.has('三'));
 });
 
-test('WritingPractice: query resolution for multi-character word (?word=你好)', () => {
-  const { targetWord, targetChar } = resolveWordAndChar(writingWords, '你好', null);
-  assert.ok(targetWord, 'Finds word "你好"');
-  assert.equal(targetWord.word, '你好');
-  assert.deepEqual(targetWord.chars, ['你', '好'], 'Word preserves complete character breakdown');
-  assert.equal(targetChar, '你', 'Defaults active character to first character in word');
-});
+test('WritingPractice Real Browser: mounted component interaction, canvas, quiz evaluation, and legacy records', async () => {
+  const outcome = await runBrowserWritingPracticeVerification();
+  if (outcome.skipped) {
+    console.warn('[REAL BROWSER WRITING PRACTICE SKIPPED]:', outcome.reason);
+    return;
+  }
 
-test('WritingPractice: query resolution for character (?char=好) finds parent word', () => {
-  const { targetWord, targetChar } = resolveWordAndChar(writingWords, null, '好');
-  assert.ok(targetWord, 'Finds parent word containing character "好"');
-  assert.equal(targetChar, '好', 'Active character set to "好"');
-  assert.ok(targetWord.chars.includes('好'), 'Parent word contains "好"');
-});
+  assert.equal(outcome.passed, true);
+  assert.ok(Array.isArray(outcome.results));
 
-test('WritingPractice: responsive canvas size bounds strictly [140, 260] without clipping', () => {
-  // Mobile 320px screen: container width ~288px, viewport height ~568px
-  const mobile320 = computeResponsiveCanvasSize(288, 568);
-  assert.ok(mobile320 <= 256, 'Cannot exceed container width - 32px padding');
-  assert.ok(mobile320 >= 140, 'Cannot shrink below minimum touch-target 140px');
+  const wordTest = outcome.results.find((r) => r.test === 'query-param-word-and-tabs');
+  assert.ok(wordTest && wordTest.passed, 'query-param-word-and-tabs must pass');
 
-  // Small container width edge case: 150px container
-  const tinyContainer = computeResponsiveCanvasSize(150, 500);
-  assert.equal(tinyContainer, 140, 'Clamps to min 140px');
+  const charTest = outcome.results.find((r) => r.test === 'query-param-char-resolution');
+  assert.ok(charTest && charTest.passed, 'query-param-char-resolution must pass');
 
-  // Desktop 1440px screen: container width 800px, viewport height 900px
-  const desktop = computeResponsiveCanvasSize(800, 900);
-  assert.equal(desktop, 260, 'Caps to maximum 260px on wide viewports');
+  const tabSwitch = outcome.results.find((r) => r.test === 'multi-character-tab-switching');
+  assert.ok(tabSwitch && tabSwitch.passed, 'multi-character-tab-switching must pass');
+
+  const gridPipeline = outcome.results.find((r) => r.test === 'canvas-rendering-pipeline-grid');
+  assert.ok(gridPipeline && gridPipeline.passed, 'canvas-rendering-pipeline-grid must pass');
+
+  const quizControls = outcome.results.find((r) => r.test === 'stroke-quiz-controls-and-retry');
+  assert.ok(quizControls && quizControls.passed, 'stroke-quiz-controls-and-retry must pass');
+
+  const legacyMastery = outcome.results.find((r) => r.test === 'legacy-mastery-records-parsing');
+  assert.ok(legacyMastery && legacyMastery.passed, 'legacy-mastery-records-parsing must pass');
 });

@@ -50,7 +50,7 @@
     import ResetPassword from '/src/pages/ResetPassword.jsx';
     import { AuthContext } from '/src/lib/authContext.js';
     import { storageOwner } from '/src/lib/storageOwner.js';
-    import { getSupabaseClient } from '/src/lib/supabase.js';
+    import { getSupabaseClient, setSupabaseClient } from '/src/lib/supabase.js';
     import { db } from '/src/lib/db.js';
     import { setActiveLanguageId } from '/src/lib/activeLanguage.js';
 
@@ -501,8 +501,8 @@
           };
           localStorage.setItem(`s2s_user_${mockUser.id.toLowerCase()}_study_streak_v1`, JSON.stringify(streakData));
           db.set('learned_words', [
-            { word: '爱', character: '爱', direction: 'right', timestamp: Date.now() },
-            { word: '八', character: '八', direction: 'right', timestamp: Date.now() }
+            { word: '爱', character: '爱', reading: 'ài', seen: 1, status: 'known', level: 'HSK1', timestamp: Date.now() },
+            { word: '八', character: '八', reading: 'bā', seen: 1, status: 'known', level: 'HSK1', timestamp: Date.now() }
           ]);
         } catch {}
         authValue = {
@@ -524,31 +524,36 @@
           generation: 1,
         };
 
-        const client = getSupabaseClient();
-        client.auth.getUser = async () => ({ data: { user: mockUser }, error: null });
-        client.auth.getSession = async () => ({ data: { session: { user: mockUser } }, error: null });
-        const origFrom = client.from.bind(client);
-        client.from = (table) => {
-          if (table === 'profiles') {
-            return {
-              select: () => ({
-                eq: () => ({
-                  maybeSingle: async () => ({
-                    data: {
-                      id: mockUser.id,
-                      display_name: 'Alex Rivera',
-                      avatar_path: null,
-                      created_at: '2026-01-01T00:00:00Z',
-                      updated_at: '2026-01-01T00:00:00Z',
-                    },
-                    error: null,
+        const mockClient = {
+          auth: {
+            getUser: async () => ({ data: { user: mockUser }, error: null }),
+            getSession: async () => ({ data: { session: { user: mockUser } }, error: null }),
+          },
+          from: (table) => {
+            if (table === 'profiles') {
+              return {
+                select: () => ({
+                  eq: () => ({
+                    maybeSingle: async () => ({
+                      data: {
+                        id: mockUser.id,
+                        display_name: 'Alex Rivera',
+                        avatar_path: null,
+                        created_at: '2026-01-01T00:00:00Z',
+                        updated_at: '2026-01-01T00:00:00Z',
+                      },
+                      error: null,
+                    }),
                   }),
                 }),
-              }),
+              };
+            }
+            return {
+              select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
             };
-          }
-          return origFrom(table);
+          },
         };
+        setSupabaseClient(mockClient);
       } else {
         storageOwner.setOwner(null);
       }
@@ -571,7 +576,7 @@
       if (pageName === 'home' || targetRoute === '/') {
         await waitFor(() => document.querySelector('.home-page') !== null && document.querySelector('.course-badge') !== null, 4000, 'capture-home-mounted');
       } else if (pageName === 'levels' || targetRoute === '/learn' || pageName === 'levels-scrolled-hsk4') {
-        await waitFor(() => document.querySelector('.level-picker__grid') !== null && document.querySelectorAll('.surface-card').length >= 6, 4000, 'capture-levels-mounted');
+        await waitFor(() => document.querySelector('.level-picker__grid') !== null && document.querySelectorAll('.surface-card').length >= (langParam === 'ja' ? 5 : 6), 4000, 'capture-levels-mounted');
         if (pageName === 'levels-scrolled-hsk4') {
           const hsk4 = Array.from(document.querySelectorAll('.surface-card')).find(c => c.textContent.includes('HSK 4'));
           if (hsk4) {

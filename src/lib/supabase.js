@@ -3,6 +3,10 @@ import { assertSafeFrontendEnv, readSupabaseConfig } from './supabaseConfig.js';
 
 let client;
 
+export function setSupabaseClient(customClient) {
+  client = customClient;
+}
+
 // Lazy until the account flows are wired. The existing guest app can still run
 // without a configured backend; it must never claim its local data is synced.
 export function getSupabaseClient() {

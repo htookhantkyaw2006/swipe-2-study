@@ -248,7 +248,7 @@ export default function LevelCarousel() {
                       gap: '6px',
                       fontSize: '0.875rem',
                       cursor: 'pointer',
-                      minWidth: 0,
+                      whiteSpace: 'nowrap',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                     }}
                   >
