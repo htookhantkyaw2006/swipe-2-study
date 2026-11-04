@@ -24,7 +24,7 @@
   <script type="module">
     import React, { createElement } from 'react';
     import { createRoot } from 'react-dom/client';
-    import { MemoryRouter } from 'react-router-dom';
+    import { MemoryRouter, Routes, Route } from 'react-router-dom';
     import { LanguageProvider } from '/src/lib/language.jsx';
     import { PreferencesProvider } from '/src/lib/preferences.jsx';
     import { PublishedContentProvider } from '/src/lib/publishedContentContext.jsx';
@@ -123,7 +123,7 @@
       }
     }
 
-    function mountSwipeSession(initialEntry = '/learn/level/HSK1', items = testCards) {
+    function mountSwipeSession(initialEntry = '/learn/session?level=HSK1', items = testCards) {
       const initialCache = {
         'zh-hsk1': {
           status: 'loaded',
@@ -150,7 +150,13 @@
                 createElement(
                   MemoryRouter,
                   { initialEntries: [initialEntry] },
-                  createElement(SwipeSession, null)
+                  createElement(
+                    Routes,
+                    null,
+                    createElement(Route, { path: "/learn/level/:levelId", element: createElement("div", { id: "course-level-screen" }, "Course Level Screen") }),
+                    createElement(Route, { path: "/learn", element: createElement("div", { id: "course-level-screen" }, "Course Level Screen") }),
+                    createElement(Route, { path: "*", element: createElement(SwipeSession, null) })
+                  )
                 )
               )
             )
@@ -213,11 +219,11 @@
       db.set('learned_words', []);
       db.set('review_cards', []);
 
-      mountSwipeSession('/learn/level/HSK1', testCards);
+      mountSwipeSession('/learn/session?level=HSK1', testCards);
       await waitFor(() => document.querySelector('.swipe-card--active') !== null, 4000, 't1-first-card');
 
       // Card 1: Review action (swipe left)
-      assert(document.querySelector('.session-results-card') === null, 'Completion must not appear before final action');
+      assert(document.getElementById('course-level-screen') === null, 'Completion must not occur before final action');
       const revBtn1 = document.querySelector('.swipe-action--review');
       assert(revBtn1 !== null, 'Review button present');
       revBtn1.click();
@@ -232,8 +238,8 @@
         return b && !b.disabled;
       }, 4000, 't1-card2-unlocked');
 
-      // Card 2: Still in session, completion not shown
-      assert(document.querySelector('.session-results-card') === null, 'Completion must not appear on card 2 of 3');
+      // Card 2: Still in session, completion not triggered
+      assert(document.getElementById('course-level-screen') === null, 'Completion must not occur on card 2 of 3');
       const learnBtn2 = document.querySelector('.swipe-action--learned');
       learnBtn2.click();
 
@@ -247,26 +253,14 @@
         return b && !b.disabled;
       }, 4000, 't1-card3-unlocked');
 
-      // Card 3: Final card. Results card still absent before final action
-      assert(document.querySelector('.session-results-card') === null, 'Completion must not appear before final card action');
+      // Card 3: Final card. Session still active before final action
+      assert(document.getElementById('course-level-screen') === null, 'Session remains active before final card action');
       const learnBtn3 = document.querySelector('.swipe-action--learned');
       learnBtn3.click();
 
-      // Final accepted action produces session completion summary
-      await waitFor(() => document.querySelector('.session-results-card') !== null, 4000, 't1-results-card');
-
-      const resultsCard = document.querySelector('.session-results-card');
-      assert(resultsCard !== null, 'Results card is mounted');
-      assert(resultsCard.textContent.includes('SESSION COMPLETE'), 'Shows SESSION COMPLETE');
-      assert(resultsCard.textContent.includes('Great work!'), 'Shows Great work!');
-      assert(resultsCard.textContent.includes('all 3 cards'), 'Mentions all 3 cards completed');
-
-      // Exact stats: 3 studied, 2 learned, 1 review
-      const statValues = Array.from(resultsCard.querySelectorAll('.session-stat-card__value')).map(el => el.textContent.trim());
-      assert(statValues.includes('3'), 'Words studied count is 3');
-      assert(statValues.includes('2'), 'Marked learned count is 2');
-      assert(statValues.includes('1'), 'Sent to review count is 1');
-      assert(resultsCard.textContent.includes('Words marked for review have been added to your Review queue.'), 'Review queue note shown');
+      // Final accepted action completes session and navigates back to course
+      await waitFor(() => document.getElementById('course-level-screen') !== null, 4000, 't1-return-to-course');
+      assert(document.getElementById('course-level-screen') !== null, 'Returned to course after completion');
 
       // Verify DB persistence of the exact actions
       const learnedDb = db.get('learned_words');
@@ -285,7 +279,7 @@
       db.set('learned_words', []);
       db.set('review_cards', []);
 
-      mountSwipeSession('/learn/level/HSK1', testCards);
+      mountSwipeSession('/learn/session?level=HSK1', testCards);
       await waitFor(() => document.querySelector('.swipe-card--active') !== null, 4000, 't2-card-mounted');
 
       // Rapid successive clicks on Learned button
@@ -314,7 +308,7 @@
       db.set('learned_words', []);
       db.set('review_cards', []);
 
-      mountSwipeSession('/learn/level/HSK1', testCards);
+      mountSwipeSession('/learn/session?level=HSK1', testCards);
       await waitFor(() => document.querySelector('.swipe-card--active') !== null, 4000, 't3-session1-mounted');
 
       // Swipe only Card 1 (爱)
@@ -328,7 +322,7 @@
       unmountTree();
 
       // Mount a new session with the same pool
-      mountSwipeSession('/learn/level/HSK1', testCards);
+      mountSwipeSession('/learn/session?level=HSK1', testCards);
       await waitFor(() => document.querySelector('.swipe-card--active') !== null, 4000, 't3-session2-mounted');
 
       // First card of new session must be Card 2 (八), because Card 1 (爱) is already studied
@@ -345,7 +339,7 @@
       db.set('learned_words', []);
       db.set('review_cards', []);
 
-      mountSwipeSession('/learn/level/HSK1', testCards);
+      mountSwipeSession('/learn/session?level=HSK1', testCards);
       await waitFor(() => document.querySelector('.swipe-card--active') !== null, 4000, 't4-mounted');
 
       // Intercept localStorage.setItem for learned_words writes

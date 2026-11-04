@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePresence, useReducedMotion } from 'framer-motion';
-import { ChevronLeft, Check, X, Hand, Shuffle, Volume2, RotateCw, Bookmark, BookmarkMinus } from 'lucide-react';
+import { ChevronLeft, Check, X, Hand, Shuffle, Volume2, Bookmark, BookmarkMinus } from 'lucide-react';
 import ProgressBar from '../../components/ui/ProgressBar';
 import { db } from '../../lib/db';
 import { speak } from '../../lib/speech';
@@ -409,6 +409,16 @@ const Flashcard = ({
           if (!hasFlippedOnce) setHasFlippedOnce(true);
         }
       }}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && isActive && !locked) {
+          e.preventDefault();
+          setFlipped(!flipped);
+          if (!hasFlippedOnce) setHasFlippedOnce(true);
+        }
+      }}
+      tabIndex={isActive ? 0 : -1}
+      role="button"
+      aria-label={flipped ? 'Flashcard, showing back face. Tap to flip to front.' : 'Flashcard, showing front face. Tap to reveal answer.'}
     >
       <motion.div
         initial={false}
@@ -556,7 +566,6 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const [hasFlippedOnce, setHasFlippedOnce] = useState(false);
   const [exitData, setExitData] = useState({ direction: 'right' });
   const [shuffleState, setShuffleState] = useState(false);
-  const [sessionSummary, setSessionSummary] = useState(null);
   const [advancing, setAdvancing] = useState(false);
   const actionLocked = useRef(false);
   const dragOffset = useMotionValue(0);
@@ -603,7 +612,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       ? '/saved'
       : isReview
         ? '/learn/review'
-        : (levelId ? `/learn/level/${encodeURIComponent(levelId)}` : '/learn');
+        : (targetLevel ? `/learn/level/${encodeURIComponent(targetLevel)}` : '/learn');
 
   const handleToggleSave = (card) => {
     if (!card) return;
@@ -688,20 +697,12 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
           mode: isReview ? 'review' : isSaved ? 'saved' : 'learn',
           cardCount: cards.length,
         });
-        setTimeout(() => {
-          setSessionSummary({
-            studied: sessionStatsRef.current.studied,
-            learned: sessionStatsRef.current.learned,
-            review: sessionStatsRef.current.review,
-            totalCards: cards.length,
-            mode: isReview ? 'review' : isSaved ? 'saved' : 'learn',
-          });
-          actionLocked.current = false;
-          setAdvancing(false);
-        }, reducedMotion ? 0 : 350);
-      } else {
-        setTimeout(() => navigate(backTo), reducedMotion ? 0 : 350);
       }
+      setTimeout(() => {
+        actionLocked.current = false;
+        setAdvancing(false);
+        navigate(backTo);
+      }, reducedMotion ? 0 : 350);
     }
   };
 
@@ -772,54 +773,6 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         </p>
         <button onClick={() => navigate('/learn/review')} className="btn-primary" style={{ padding: '14px 28px', marginBottom: '12px' }}>Go to Review</button>
         <button onClick={() => navigate(backTo)} className="btn-secondary" style={{ padding: '12px 24px' }}>Back to course</button>
-      </div>
-    );
-  }
-
-  if (sessionSummary !== null) {
-    const { studied, learned, review } = sessionSummary;
-    return (
-      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <div className="surface-card session-results-card" style={{ padding: '32px 24px', borderRadius: '24px', maxWidth: '400px', width: '100%', boxShadow: '0 12px 32px rgba(12, 74, 110, 0.08)' }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '16px', backgroundColor: '#ECFDF5', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <Check size={28} strokeWidth={3} />
-          </div>
-          <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-primary-blue)', letterSpacing: '1px', textTransform: 'uppercase', margin: '0 0 4px 0' }}>SESSION COMPLETE</p>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--color-text-navy)', margin: '0 0 8px 0' }}>Great work!</h2>
-          <p style={{ fontSize: '0.95rem', color: 'var(--color-secondary-blue)', margin: '0 0 24px 0' }}>
-            You've completed all {studied} {studied === 1 ? 'card' : 'cards'} in this session.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
-            <div style={{ padding: '12px', borderRadius: '16px', backgroundColor: 'var(--color-page-bg)' }}>
-              <span className="session-stat-card__value" style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-navy)' }}>{studied}</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-secondary-blue)', fontWeight: 600 }}>Studied</span>
-            </div>
-            <div style={{ padding: '12px', borderRadius: '16px', backgroundColor: '#ECFDF5' }}>
-              <span className="session-stat-card__value" style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: '#10B981' }}>{learned}</span>
-              <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>Learned</span>
-            </div>
-            <div style={{ padding: '12px', borderRadius: '16px', backgroundColor: '#FEF2F2' }}>
-              <span className="session-stat-card__value" style={{ display: 'block', fontSize: '1.5rem', fontWeight: 800, color: '#EF4444' }}>{review}</span>
-              <span style={{ fontSize: '0.75rem', color: '#DC2626', fontWeight: 600 }}>Review</span>
-            </div>
-          </div>
-
-          {review > 0 && (
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-secondary-blue)', margin: '0 0 16px 0' }}>
-              Words marked for review have been added to your Review queue.
-            </p>
-          )}
-
-          <button onClick={() => navigate(backTo)} className="btn-primary" style={{ width: '100%', padding: '14px', borderRadius: '14px', fontWeight: 700, marginBottom: '8px' }}>
-            Back to course
-          </button>
-          {review > 0 && (
-            <button onClick={() => navigate('/learn/review')} className="btn-secondary" style={{ width: '100%', padding: '14px', borderRadius: '14px', fontWeight: 700 }}>
-              Go to Review
-            </button>
-          )}
-        </div>
       </div>
     );
   }
@@ -896,7 +849,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         {shuffleState && <ShuffleDeck />}
 
         <AnimatePresence custom={exitData}>
-          {!shuffleState && visibleCards.map((card, idx) => {
+          {!shuffleState && visibleCards.map((card) => {
             const isTop = card.id === cards[currentIndex]?.id;
             const isRight = card.id === cards[currentIndex + 1]?.id;
 
@@ -952,43 +905,34 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
           <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-navy)' }}>Review</span>
         </div>
 
-        {/* Center Buttons (Shuffle & Reveal) */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '8px' }}>
-          <button
+        {/* Center Button (Shuffle) */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+          <motion.button
             type="button"
-            className="swipe-action--flip"
-            onClick={() => {
-              if (!locked) {
-                setFlipped(!flipped);
-                setHasFlippedOnce(true);
-              }
-            }}
-            disabled={locked}
-            aria-label={flipped ? 'Show front face' : 'Reveal answer'}
+            className="swipe-action--shuffle"
+            onClick={handleShuffle}
+            disabled={locked || cards.length - currentIndex <= 1}
+            animate={shuffleState ? { backgroundColor: ['#FFFFFF', '#E0F2FE', '#FFFFFF'] } : {}}
+            transition={{ duration: 0.15, times: [0, 0.5, 1] }}
+            aria-label="Shuffle remaining cards"
             style={{
-              padding: '12px 20px', borderRadius: '16px',
+              padding: '12px 24px', borderRadius: '16px',
               backgroundColor: '#FFFFFF', color: '#0C4A6E',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-              border: '0.5px solid #BAE6FD', cursor: locked ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              border: '0.5px solid #BAE6FD',
+              cursor: (locked || cards.length - currentIndex <= 1) ? 'default' : 'pointer',
+              opacity: (locked || cards.length - currentIndex <= 1) ? 0.8 : 1,
               boxShadow: '0 2px 8px rgba(12, 74, 110, 0.05)'
             }}
           >
-            <RotateCw size={16} strokeWidth={2.5} color="#0369A1" />
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>{flipped ? 'Front' : 'Reveal'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleShuffle}
-            disabled={locked || cards.length - currentIndex <= 1}
-            style={{
-              background: 'none', border: 'none', color: '#0369A1', fontSize: '12px', fontWeight: 600,
-              cursor: (locked || cards.length - currentIndex <= 1) ? 'default' : 'pointer',
-              display: 'flex', alignItems: 'center', gap: '4px', opacity: (cards.length - currentIndex <= 1) ? 0.5 : 1
-            }}
-          >
-            <Shuffle size={12} strokeWidth={2.5} />
-            Shuffle
-          </button>
+            <motion.div
+              animate={shuffleState ? { rotate: 180 } : { rotate: 0 }}
+              transition={{ duration: 0.4, ease: "easeInOut" }}
+            >
+              <Shuffle size={18} strokeWidth={2.5} color="#0369A1" />
+            </motion.div>
+            <span style={{ fontSize: '14px', fontWeight: 600 }}>Shuffle</span>
+          </motion.button>
         </div>
 
         {/* Right Button (Learned) */}

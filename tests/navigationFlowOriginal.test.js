@@ -40,7 +40,8 @@ const server = await createServer({
           norm.includes('PhrasesLevel.jsx') ||
           norm.includes('StudyByInterest.jsx') ||
           norm.includes('SavedWords.jsx') ||
-          norm.includes('LevelCarousel.jsx')
+          norm.includes('LevelCarousel.jsx') ||
+          norm.includes('SwipeSession.jsx')
         ) {
           return code.replace(/useNavigate\(\)/g, '((...args) => globalThis.__testNavigateSpy(...args))');
         }
@@ -74,6 +75,7 @@ const { default: LessonPicker } = await server.ssrLoadModule('/src/pages/Learn/L
 const { default: PhrasesLevel } = await server.ssrLoadModule('/src/pages/PhrasesLevel.jsx');
 const { default: StudyByInterest } = await server.ssrLoadModule('/src/pages/StudyByInterest.jsx');
 const { default: LevelCarousel } = await server.ssrLoadModule('/src/components/ui/LevelCarousel.jsx');
+const { default: SwipeSession } = await server.ssrLoadModule('/src/pages/Learn/SwipeSession.jsx');
 
 const mockAuthValue = {
   user: null,
@@ -351,6 +353,95 @@ test('PhrasesLevel: actual button clicks route through real router', () => {
   assert.ok(lastNavigatedTarget, 'Phrases card must trigger navigation');
   const phraseRes = verifyRouteDestination(lastNavigatedTarget);
   assert.equal(phraseRes.pathname, '/flashcards/session', 'Phrases card must route to /flashcards/session');
+});
+
+test('PhrasesLevel: uses actual available phrase dataset and consistent 0 progress semantics without demo values', () => {
+  const html = renderToString(
+    createElement(
+      MemoryRouter,
+      { initialEntries: ['/flashcards/level/HSK1'] },
+      createElement(
+        AuthContext.Provider,
+        { value: mockAuthValue },
+        createElement(
+          GuestImportContext.Provider,
+          { value: mockGuestImportValue },
+          createElement(
+            LanguageProvider,
+            null,
+            createElement(
+              PreferencesProvider,
+              null,
+              createElement(PhrasesLevel)
+            )
+          )
+        )
+      )
+    )
+  );
+  const text = html.replace(/<!--.*?-->/g, '');
+
+  // HSK1 has 5 phrases in course.phrases
+  assert.ok(text.includes('5 phrases'), 'Must report actual available phrase count (5 phrases)');
+  assert.ok(text.includes('0 mastered'), 'Must report 0 mastered');
+  assert.ok(text.includes('0 of 5 phrases mastered'), 'Must report 0 of 5 phrases mastered');
+  assert.ok(!text.includes('300 phrases'), 'Must not report demo 300 phrases');
+  assert.ok(!text.includes('300 mastered'), 'Must not report demo 300 mastered');
+  assert.ok(text.includes('0%'), 'Must report 0% progress');
+  assert.ok(!text.includes('>100%<') && !text.includes('100% completed'), 'Must not report demo 100% progress');
+});
+
+test('SwipeSession: bottom action controls render Review, central Shuffle, and Learned without redundant Reveal button', () => {
+  const html = renderToString(
+    createElement(
+      MemoryRouter,
+      { initialEntries: ['/learn/session?level=HSK1'] },
+      createElement(
+        AuthContext.Provider,
+        { value: mockAuthValue },
+        createElement(
+          GuestImportContext.Provider,
+          { value: mockGuestImportValue },
+          createElement(
+            LanguageProvider,
+            null,
+            createElement(
+              PreferencesProvider,
+              null,
+              createElement(
+                PublishedContentProvider,
+                { enabledOverride: false },
+                createElement(SwipeSession)
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+
+  assert.ok(html.includes('swipe-action--review'), 'Review action rendered');
+  assert.ok(html.includes('swipe-action--shuffle'), 'Central shuffle action rendered');
+  assert.ok(html.includes('swipe-action--learned'), 'Learned action rendered');
+  assert.ok(!html.includes('swipe-action--flip'), 'Must not render separate Reveal/Flip button in bottom controls');
+  assert.ok(!html.includes('Reveal answer'), 'Must not have Reveal answer aria-label in bottom controls');
+});
+
+test('SwipeSession: Leave session / Back button navigates to course level context (HSK1 and N5) without hardcoded level/1', () => {
+  // Test Chinese HSK1
+  const { clickables: hsk1Clickables } = renderAndInspect(SwipeSession, {}, ['/learn/session?level=HSK1']);
+  lastNavigatedTarget = null;
+  // Clickable 0 is the header Leave session / Back button
+  hsk1Clickables[0].props.onClick();
+  assert.equal(lastNavigatedTarget, '/learn/level/HSK1', 'HSK1 session back must return to /learn/level/HSK1');
+  assert.notEqual(lastNavigatedTarget, '/learn/level/1', 'Must not hardcode /learn/level/1');
+
+  // Test Japanese N5
+  const { clickables: n5Clickables } = renderAndInspect(SwipeSession, {}, ['/learn/session?level=N5']);
+  lastNavigatedTarget = null;
+  n5Clickables[0].props.onClick();
+  assert.equal(lastNavigatedTarget, '/learn/level/N5', 'Japanese N5 session back must return to /learn/level/N5');
+  assert.notEqual(lastNavigatedTarget, '/learn/level/1', 'Must not hardcode /learn/level/1');
 });
 
 // -----------------------------------------------------------------------------

@@ -164,14 +164,14 @@ test('SwipeSession: renders all 3 supplied examples with Chinese text, audio, re
   assert.ok(html.includes('swipe-example__burmese'), 'Burmese example class applied');
 });
 
-test('SwipeSession: bottom action controls render Review, Reveal, and Learned with accessible labels', () => {
+test('SwipeSession: bottom action controls render Review, Shuffle, and Learned with accessible labels', () => {
   const items = createSampleItems(1);
   const html = renderSession('/learn/level/HSK1', { items });
 
   assert.ok(html.includes('swipe-action--review'), 'Review action is rendered');
   assert.ok(html.includes('Review this word later'), 'Review action has aria-label');
-  assert.ok(html.includes('swipe-action--flip'), 'Flip/reveal action is rendered');
-  assert.ok(html.includes('Reveal'), 'Reveal label is rendered');
+  assert.ok(html.includes('swipe-action--shuffle'), 'Central shuffle action is rendered');
+  assert.ok(html.includes('Shuffle'), 'Shuffle label is rendered');
   assert.ok(html.includes('swipe-action--learned'), 'Learned action is rendered');
   assert.ok(html.includes('Mark this word learned'), 'Learned action has aria-label');
 });

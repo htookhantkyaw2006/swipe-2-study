@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Layers, Compass, RotateCw, CheckCircle, Bookmark, ChevronRight } from 'lucide-react';
 import { useCourse } from '../lib/language';
+import { phraseCards } from '../lib/phraseCards';
 
 /* Levels come from the active course (src/courses). */
 
@@ -10,15 +11,16 @@ export default function PhrasesLevel() {
   const navigate = useNavigate();
   const course = useCourse();
 
-  // The Phrases tab list and this page used to carry separate progress
-  // numbers (HSK 2: 85% there, 31% here). One source now.
+  // Consistent phrase progress and count matching the Phrases list
   const base =
     course.levels.find((l) => l.id === levelId) ||
     course.levels.find((l) => String(l.num) === String(levelId).replace(/\D/g, '')) ||
     course.levels[0];
-  const progress = base?.demo?.phraseProgress ?? 0;
-  const totalPhrases = base?.phrases ?? 0;
-  const level = { ...base, progress, mastered: Math.round((totalPhrases * progress) / 100) };
+  const phrases = phraseCards(course, base?.id);
+  const totalPhrases = phrases.length;
+  const mastered = 0;
+  const progress = 0;
+  const level = { ...base, progress, mastered, phrases: totalPhrases };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-page-bg)', paddingBottom: '100px', fontFamily: 'Inter, sans-serif' }}>
