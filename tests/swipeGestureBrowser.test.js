@@ -138,6 +138,7 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     await cdp.connect();
     await cdp.send('Page.enable');
     await cdp.send('Runtime.enable');
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await cdp.send('Page.navigate', { url: `http://127.0.0.1:${serverPort}/test-gesture` });
 
     // Wait for window.__ready
@@ -275,6 +276,8 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     });
 
     await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    // Wait for 3D flip transition to finish so back face is fully upright
+    await new Promise((r) => setTimeout(r, 500));
     const flippedState = await getCardCenter();
     assert.strictEqual(flippedState.hasBackInert, false, 'Back face is active after tap');
     assert.ok(flippedState.ariaLabel.includes('showing back face'), 'Aria label reports back face');
@@ -498,10 +501,40 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     assert.strictEqual(card2.char, '八', 'Flick advanced to card 2');
   });
 
-  it('7. Vertical scroll gesture in examples on back face does not flip card or commit horizontal swipe', async (t) => {
+  it('7. Touch scrolling through overflowing examples container on back face scrolls vertically without flipping card or committing horizontal swipe', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
-    await cdp.eval('window.mountSession()');
+    // Mount card with multiple examples so that content vertically overflows the card
+    await cdp.eval(`(() => {
+      const cardWithManyExamples = {
+        id: 'card-overflow',
+        card_id: 'zh-hsk1-overflow',
+        course_id: 'zh-hsk1',
+        written_form: '爱',
+        character: '爱',
+        reading: 'ài',
+        pronunciation: 'ài',
+        meaning_english: 'to love',
+        definition: 'to love',
+        meaning_burmese: 'ချစ်သည်',
+        burmese_definition: 'ချစ်သည်',
+        level: 'HSK1',
+        sort_order: 1,
+        is_active: true,
+        examples: [
+          { text: '我爱我的家人。', reading: 'Wǒ ài wǒ de jiārén.', english: 'I love my family.', burmese: 'ကျွန်တော် ကျွန်တော့် မိသားစုကို ချစ်တယ်။' },
+          { text: '她非常喜欢学中文。', reading: 'Tā fēicháng xǐhuan xué zhōngwén.', english: 'She really loves learning Chinese.', burmese: 'သူမ တရုတ်စာ လေ့လာရတာ အရမ်းကြိုက်တယ်။' },
+          { text: '我们大家都爱和平。', reading: 'Wǒmen dàjiā dōu ài hépíng.', english: 'We all love peace.', burmese: 'ကျွန်တော်တို့အားလုံး ငြိမ်းချမ်းရေးကို ချစ်ကြတယ်။' },
+          { text: '猫很可爱，我想要一只。', reading: 'Māo hěn kě\\'ài, wǒ xiǎng yào yī zhī.', english: 'Cats are lovely, I want one.', burmese: 'ကြောင်လေးတွေ အရမ်းချစ်စရာကောင်းတယ်၊ ကျွန်တော် တစ်ကောင် လိုချင်တယ်။' },
+        ],
+        audio_path: 'audio/zh/hsk1/ai.mp3'
+      };
+      window.mountSession({
+        courseId: 'zh-hsk1',
+        cards: [cardWithManyExamples]
+      });
+    })()`);
+
     const card = await getCardCenter();
 
     // Deliberate click to flip to back face
@@ -522,79 +555,133 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
       clickCount: 1,
     });
     await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    // Wait for 3D flip transition to finish so back face is fully upright
+    await new Promise((r) => setTimeout(r, 500));
 
-    // Vertical drag in example area (+40px Y movement, 0px X movement)
-    await cdp.send('Input.dispatchMouseEvent', {
-      type: 'mousePressed',
-      x: card.cx,
-      y: card.cy + 50,
-      button: 'left',
-      buttons: 1,
-      clickCount: 1,
+    // Verify container is overflowing
+    const scrollMetricsBefore = await cdp.eval(`(() => {
+      const scrollEl = document.querySelector('.swipe-card--active .swipe-card__answer');
+      return {
+        scrollHeight: scrollEl.scrollHeight,
+        clientHeight: scrollEl.clientHeight,
+        scrollTop: scrollEl.scrollTop,
+        isOverflowing: scrollEl.scrollHeight > scrollEl.clientHeight
+      };
+    })()`);
+    assert.ok(scrollMetricsBefore.isOverflowing, 'Examples container overflows vertically (scrollHeight > clientHeight)');
+    assert.strictEqual(scrollMetricsBefore.scrollTop, 0, 'Initial scrollTop is 0');
+
+    const answerCenter = await cdp.eval(`(() => {
+      const el = document.querySelector('.swipe-card--active .swipe-card__answer');
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, left: r.left };
+    })()`);
+
+    // Dispatch actual touch scrolling events: touchStart inside answer container, vertical drag up, touchEnd
+    const touchStartY = Math.round(answerCenter.y + 100);
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(answerCenter.x), y: touchStartY, id: 0 }]
     });
-    for (let step = 1; step <= 3; step++) {
-      await cdp.send('Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x: card.cx,
-        y: card.cy + 50 + step * 15,
-        button: 'left',
-        buttons: 1,
-      });
+
+    for (let step = 1; step <= 6; step++) {
       await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: Math.round(answerCenter.x), y: touchStartY - step * 30, id: 0 }]
+      });
     }
-    await cdp.send('Input.dispatchMouseEvent', {
-      type: 'mouseReleased',
-      x: card.cx,
-      y: card.cy + 95,
-      button: 'left',
-      buttons: 0,
-      clickCount: 1,
-    });
-    await new Promise((r) => setTimeout(r, 200));
 
-    // Card must remain on back face, no accidental swipe
-    const state = await getCardCenter();
-    assert.strictEqual(state.hasBackInert, false, 'Card remains on back face');
-    assert.strictEqual(state.char, '爱', 'Card is still 爱, did not advance');
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: []
+    });
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Verify: scrolled vertically, card remained on back face, no horizontal swipe committed
+    const scrollMetricsAfter = await cdp.eval(`(() => {
+      const scrollEl = document.querySelector('.swipe-card--active .swipe-card__answer');
+      const cardEl = document.querySelector('.swipe-card--active');
+      const r = cardEl.getBoundingClientRect();
+      return {
+        scrollTop: scrollEl.scrollTop,
+        cardLeft: r.left,
+        ariaLabel: cardEl.getAttribute('aria-label'),
+        learned: window.db.get('learned_words') || []
+      };
+    })()`);
+
+    assert.ok(scrollMetricsAfter.scrollTop > 0, `Container scrolled vertically (scrollTop=${scrollMetricsAfter.scrollTop})`);
+    assert.strictEqual(scrollMetricsAfter.cardLeft, answerCenter.left, 'Card horizontal position remained at rest');
+    assert.ok(scrollMetricsAfter.ariaLabel.includes('showing back face'), 'Card face preserved on back face');
+    assert.strictEqual(scrollMetricsAfter.learned.length, 0, 'No progress writes committed during vertical scroll');
   });
 
-  it('8. Audio and bookmark buttons do not trigger drag, flip, or progress writes', async (t) => {
+  it('8. Keyboard activation on child controls (bookmark and audio with Enter and Space) toggles state safely without flipping card or recording progress', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
     await cdp.eval('window.mountSession()');
     await getCardCenter();
 
-    // Click bookmark button
-    await cdp.eval(`(() => {
-      const btn = document.querySelector('.swipe-card__front .swipe-bookmark');
-      btn.click();
-    })()`);
+    // 1. Focus front-face bookmark button and activate via Enter key
+    await cdp.eval(`document.querySelector('.swipe-card--active .swipe-bookmark').focus()`);
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', unmodifiedText: '\r' });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     await waitForCondition(`(window.db.get('saved_words') || []).length === 1`);
 
-    // Verify word is saved
-    const saved = await cdp.eval(`window.db.get('saved_words') || []`);
-    assert.strictEqual(saved.length, 1, 'Word saved in saved_words');
+    let saved = await cdp.eval(`window.db.get('saved_words') || []`);
+    assert.strictEqual(saved.length, 1, 'Bookmark Enter saved word to saved_words');
     assert.strictEqual(saved[0].character || saved[0].phrase, '爱', 'Saved word is 爱');
 
-    // Card must still be on front face and not advanced
-    const state = await getCardCenter();
-    assert.ok(state.hasBackInert, 'Card remains on front face');
-    assert.strictEqual(state.char, '爱', 'Card did not advance');
+    let state = await getCardCenter();
+    assert.ok(state.hasBackInert, 'Card remains on front face after bookmark Enter');
+    assert.ok(state.ariaLabel.includes('showing front face'), 'Aria label remains showing front face');
+    let learned = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learned.length, 0, 'No progress recorded in learned_words');
 
-    const learned = await cdp.eval(`window.db.get('learned_words') || []`);
+    // 2. Activate front-face bookmark button via Space key (unsaves the word)
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, text: ' ' });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+    await waitForCondition(`(window.db.get('saved_words') || []).length === 0`);
+
+    saved = await cdp.eval(`window.db.get('saved_words') || []`);
+    assert.strictEqual(saved.length, 0, 'Bookmark Space unsaved word');
+    state = await getCardCenter();
+    assert.ok(state.hasBackInert, 'Card remains on front face after bookmark Space');
+
+    // 3. Focus audio button and activate via Enter and Space
+    await cdp.eval(`document.querySelector('.swipe-card--active .swipe-audio').focus()`);
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', unmodifiedText: '\r' });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    await new Promise((r) => setTimeout(r, 150));
+
+    state = await getCardCenter();
+    assert.ok(state.hasBackInert, 'Card remains on front face after audio Enter');
+
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, text: ' ' });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+    await new Promise((r) => setTimeout(r, 150));
+
+    state = await getCardCenter();
+    assert.ok(state.hasBackInert, 'Card remains on front face after audio Space');
+    learned = await cdp.eval(`window.db.get('learned_words') || []`);
     assert.strictEqual(learned.length, 0, 'No progress recorded in learned_words');
   });
 
-  it('9. Keyboard Enter and Space flip card without double-triggering', async (t) => {
+  it('9. Keyboard Enter and Space on card container flips card without double-triggering', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
     await cdp.eval('window.mountSession()');
     await cdp.eval(`document.querySelector('.swipe-card--active').focus()`);
 
-    // Dispatch Enter key
-    await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    // Dispatch Enter key targeted at card container
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', unmodifiedText: '\r' });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    // Wait for 3D flip transition to finish so back face is fully upright
+    await new Promise((r) => setTimeout(r, 500));
 
     let state = await getCardCenter();
     assert.strictEqual(state.hasBackInert, false, 'Enter key flipped card to back face');
@@ -602,16 +689,154 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     // Wait for flip animation to settle
     await new Promise((r) => setTimeout(r, 500));
 
-    // Dispatch Space key
-    await cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+    // Dispatch Space key targeted at card container
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, text: ' ' });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
     await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing front face')`);
 
     state = await getCardCenter();
     assert.strictEqual(state.hasBackInert, true, 'Space key flipped card back to front face');
+
+    const learned = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learned.length, 0, 'No progress written during card flipping');
   });
 
-  it('10. Japanese JLPT N5 curriculum functions identically', async (t) => {
+  it('10. Touch cancellation (+120px drag -> touchCancel) returns card to rest with zero progress writes and keeps session usable afterwards', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    await cdp.eval('window.mountSession({ courseId: "zh-hsk1" })');
+    const init = await getCardCenter();
+    assert.strictEqual(init.char, '爱', 'Starts with card 1 (爱)');
+    assert.ok(init.hasBackInert, 'Starts on front face');
+
+    // touchStart
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(init.cx), y: Math.round(init.cy), id: 0 }]
+    });
+
+    // 6 horizontal touchMove events totalling +120px
+    for (let i = 1; i <= 6; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: Math.round(init.cx + i * 20), y: Math.round(init.cy), id: 0 }]
+      });
+    }
+
+    // touchCancel
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchCancel',
+      touchPoints: []
+    });
+
+    await new Promise((r) => setTimeout(r, 600));
+
+    // Expected: card returns to rest, front face preserved, zero progress writes
+    const afterCancel = await getCardCenter();
+    assert.strictEqual(afterCancel.char, '爱', 'Active card remains 爱, not advanced');
+    assert.ok(afterCancel.hasBackInert, 'Front face preserved (back face inert)');
+    assert.ok(afterCancel.ariaLabel.includes('showing front face'), 'Aria label confirms front face');
+
+    const learned = await cdp.eval(`window.db.get('learned_words') || []`);
+    const review = await cdp.eval(`window.db.get('review_cards') || []`);
+    assert.strictEqual(learned.length, 0, 'Zero progress writes in learned_words');
+    assert.strictEqual(review.length, 0, 'Zero entries in review_cards');
+
+    // Verify session remains fully usable: a subsequent committed swipe right advances card and writes progress
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(afterCancel.cx), y: Math.round(afterCancel.cy), id: 0 }]
+    });
+    for (let i = 1; i <= 6; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: Math.round(afterCancel.cx + i * 20), y: Math.round(afterCancel.cy), id: 0 }]
+      });
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: []
+    });
+
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const card2 = await getCardCenter();
+    assert.strictEqual(card2.char, '八', 'Session advanced to card 2 (八)');
+    const learnedAfter = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learnedAfter.length, 1, 'Card 1 recorded as learned');
+    assert.strictEqual(learnedAfter[0].status, 'known', 'Status is known');
+  });
+
+  it('11. Release continuity: committed swipes do not snap toward center before exit animation', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    await cdp.eval('window.mountSession({ courseId: "zh-hsk1" })');
+    const card = await getCardCenter();
+
+    // Install frame position recorder on the active card element
+    await cdp.eval(`(() => {
+      window.__positions = [];
+      window.__recording = false;
+      window.__targetCard = document.querySelector('.swipe-card--active');
+      function track() {
+        const el = window.__targetCard;
+        if (el && window.__recording && document.body.contains(el)) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0) {
+            window.__positions.push({ time: performance.now(), left: r.left });
+          }
+        }
+        requestAnimationFrame(track);
+      }
+      requestAnimationFrame(track);
+    })()`);
+
+    // Drag right +100px with touch
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(card.cx), y: Math.round(card.cy), id: 0 }]
+    });
+    for (let i = 1; i <= 5; i++) {
+      await new Promise((r) => setTimeout(r, 16));
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: Math.round(card.cx + i * 20), y: Math.round(card.cy), id: 0 }]
+      });
+    }
+
+    // Start recording positions across release and exit
+    await cdp.eval('window.__recording = true');
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: []
+    });
+
+    await new Promise((r) => setTimeout(r, 450));
+    await cdp.eval('window.__recording = false');
+
+    const positions = await cdp.eval('window.__positions');
+    assert.ok(positions.length >= 5, `Recorded ${positions.length} animation frames during exit`);
+
+    // Verify left position moved outward without dipping backward toward resting center
+    const releaseLeft = positions[0].left;
+    let didSnapTowardCenter = false;
+    for (let i = 1; i < positions.length; i++) {
+      if (positions[i].left < releaseLeft - 5) {
+        didSnapTowardCenter = true;
+        break;
+      }
+    }
+    assert.strictEqual(didSnapTowardCenter, false, 'Committed swipe continues outward and does not snap toward center');
+  });
+
+  it('12. Japanese JLPT N5 curriculum functions identically', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
     await cdp.eval(`window.mountSession({
@@ -637,6 +862,8 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
     await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    // Wait for 3D flip transition to finish so back face is fully upright
+    await new Promise((r) => setTimeout(r, 500));
 
     state = await getCardCenter();
     assert.strictEqual(state.hasBackInert, false, 'Japanese card flips to reveal back face');
@@ -662,7 +889,7 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     assert.strictEqual(learned[0].character || learned[0].phrase, 'あそこ', 'Recorded card is あそこ');
   });
 
-  it('11. Review and Saved session modes navigate back to their respective screens on completion', async (t) => {
+  it('13. Review and Saved session modes navigate back to their respective screens on completion', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
     // Mount in Saved session mode with cards

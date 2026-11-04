@@ -91,6 +91,7 @@ const Flashcard = ({
   const cardRef = useRef(null);
   const pointerStartRef = useRef(null);
   const isDraggingRef = useRef(false);
+  const isCancelledRef = useRef(false);
   const dragEndTimeRef = useRef(0);
   const lastFlipTimeRef = useRef(0);
 
@@ -115,13 +116,21 @@ const Flashcard = ({
   const nextScale = useTransform(dragOffset, [0, 100], [0.95, 1]);
   const nextOpacity = useTransform(dragOffset, [0, 100], [0.5, 1]);
 
-  const handleDragEnd = (_event, info) => {
+  const handleDragEnd = (event, info) => {
     dragEndTimeRef.current = performance.now();
     setTimeout(() => {
       isDraggingRef.current = false;
     }, 150);
 
-    if (!isActive || locked) return;
+    const isCancelled =
+      event?.type === 'pointercancel' ||
+      event?.type === 'touchcancel' ||
+      (typeof event?.type === 'string' && event.type.toLowerCase().includes('cancel')) ||
+      isCancelledRef.current;
+
+    isCancelledRef.current = false;
+
+    if (isCancelled || !isActive || locked) return;
 
     const width = cardRef.current?.offsetWidth ?? 320;
     const threshold = Math.min(100, Math.max(48, width * 0.25));
@@ -135,8 +144,12 @@ const Flashcard = ({
     const isFlickLeft = offset < -18 && velocity < -500;
 
     if (isFlickRight || isDragRight) {
+      x.stop();
+      animate(x, window.innerWidth + 100, { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" });
       onSwipe('right', card);
     } else if (isFlickLeft || isDragLeft) {
+      x.stop();
+      animate(x, -window.innerWidth - 100, { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" });
       onSwipe('left', card);
     }
   };
@@ -189,6 +202,9 @@ const Flashcard = ({
               aria-pressed={isUnavailable ? undefined : (isBookmarked ? 'true' : 'false')}
               aria-label={isUnavailable ? `Bookmark status unavailable for ${wordLabel}` : `${isBookmarked ? 'Unsave' : 'Save'} ${wordLabel}`}
               onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 if (!isActive || locked || isUnavailable) return;
@@ -210,6 +226,9 @@ const Flashcard = ({
             type="button"
             className="swipe-audio"
             onPointerDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+            }}
             onClick={playWord}
             aria-label={`Play pronunciation for ${wordLabel}`}
             style={{
@@ -276,6 +295,9 @@ const Flashcard = ({
                 aria-pressed={isUnavailable ? undefined : (isBookmarked ? 'true' : 'false')}
                 aria-label={isUnavailable ? `Bookmark status unavailable for ${wordLabel}` : `${isBookmarked ? 'Unsave' : 'Save'} ${wordLabel}`}
                 onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!isActive || locked || isUnavailable) return;
@@ -297,6 +319,9 @@ const Flashcard = ({
               type="button"
               className="swipe-audio"
               onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+              }}
               onClick={playWord}
               aria-label={`Play pronunciation for ${wordLabel}`}
               style={{
@@ -342,6 +367,9 @@ const Flashcard = ({
                     type="button"
                     className="swipe-audio swipe-audio--example"
                     onPointerDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+                    }}
                     onClick={(e) => { e.stopPropagation(); playWordAudio(ex, { speakFn: speak }); }}
                     title="Play sentence"
                     aria-label={`Play sentence: ${textOf(ex)}`}
@@ -446,6 +474,11 @@ const Flashcard = ({
   };
 
   const handleKeyDown = (e) => {
+    // Only handle activation targeted directly at the card container itself,
+    // not events bubbling from interactive child controls (e.g. bookmark, audio buttons).
+    if (e.target !== e.currentTarget) {
+      return;
+    }
     if ((e.key === 'Enter' || e.key === ' ') && isActive && !locked) {
       e.preventDefault();
       const now = performance.now();
@@ -475,8 +508,16 @@ const Flashcard = ({
       onPointerDown={(e) => {
         pointerStartRef.current = { x: e.clientX, y: e.clientY, time: performance.now() };
         isDraggingRef.current = false;
+        isCancelledRef.current = false;
       }}
       onPointerCancel={() => {
+        isCancelledRef.current = true;
+        pointerStartRef.current = null;
+        isDraggingRef.current = false;
+        dragEndTimeRef.current = performance.now();
+      }}
+      onTouchCancel={() => {
+        isCancelledRef.current = true;
         pointerStartRef.current = null;
         isDraggingRef.current = false;
         dragEndTimeRef.current = performance.now();
