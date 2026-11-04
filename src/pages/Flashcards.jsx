@@ -67,7 +67,6 @@ export default function Flashcards() {
     <div style={{
       minHeight: '100vh',
       background: 'transparent',
-      padding: '60px 24px 120px 24px',
       fontFamily: 'Inter, sans-serif',
       position: 'relative',
       overflow: 'hidden'
@@ -77,7 +76,7 @@ export default function Flashcards() {
       <div style={{ position: 'absolute', top: '-5%', left: '-10%', width: '60vw', height: '60vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(125, 211, 252, 0.4) 0%, rgba(255,255,255,0) 70%)', filter: 'blur(50px)', zIndex: 0, pointerEvents: 'none' }}></div>
       <div style={{ position: 'absolute', top: '5%', right: '-20%', width: '70vw', height: '70vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, rgba(255,255,255,0) 70%)', filter: 'blur(60px)', zIndex: 0, pointerEvents: 'none' }}></div>
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '1000px', width: '100%', margin: '0 auto', padding: '60px 24px 120px 24px', boxSizing: 'border-box' }}>
 
         {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '48px' }}>

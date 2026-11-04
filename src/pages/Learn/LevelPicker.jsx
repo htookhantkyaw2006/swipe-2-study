@@ -57,7 +57,7 @@ export default function LevelPicker() {
   });
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto', paddingBottom: '100px' }}>
+    <div style={{ padding: '24px', maxWidth: '1000px', width: '100%', margin: '0 auto', paddingBottom: '100px', boxSizing: 'border-box' }}>
       <header className="flex items-center justify-center relative" style={{ marginBottom: '24px' }}>
         <button onClick={() => safeNavigateBack(navigate, '/')} style={{ position: 'absolute', left: 0, background: 'transparent', padding: '8px', border: 'none', cursor: 'pointer', zIndex: 10 }}>
           <ChevronLeft size={24} color="var(--color-text-navy)" />

@@ -560,6 +560,26 @@
           },
         };
         setSupabaseClient(mockClient);
+      } else if (pageName.startsWith('login') || targetRoute === '/login' || targetRoute === '/signup') {
+        storageOwner.setOwner(null);
+        authValue = {
+          user: null,
+          loading: false,
+          isTransitioning: false,
+          error: null,
+          clearError: () => {},
+          retryVerification: () => {},
+          signOut: async () => ({}),
+          signOutGlobal: async () => ({}),
+          canResetPassword: () => false,
+          completePasswordRecovery: () => {},
+          passwordRecoveryUserId: null,
+          captureGeneration: () => 1,
+          isCurrent: () => true,
+          isGuest: true,
+          isConfigured: true,
+          generation: 1,
+        };
       } else {
         storageOwner.setOwner(null);
       }
@@ -691,6 +711,8 @@
         await waitFor(() => document.querySelector('.dictionary-page') !== null || document.body.textContent.includes('Dictionary') || document.body.textContent.includes('Search'), 4000, 'capture-dictionary-mounted');
       } else if (pageName === 'interest' || targetRoute === '/interest') {
         await waitFor(() => document.body.textContent.includes('Study by Interest'), 4000, 'capture-interest-mounted');
+      } else if (pageName === 'flashcards' || targetRoute === '/flashcards') {
+        await waitFor(() => document.body.textContent.includes('Flashcards') || document.body.textContent.includes('Levels'), 4000, 'capture-flashcards-mounted');
       } else if (pageName === 'phrases-level' || targetRoute.startsWith('/flashcards/level/')) {
         await waitFor(() => document.body.textContent.includes('phrases mastered') || document.body.textContent.includes('course modules'), 4000, 'capture-phrases-level-mounted');
       } else if (pageName === 'premium' || targetRoute === '/premium') {

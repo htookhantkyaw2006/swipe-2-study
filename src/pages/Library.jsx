@@ -147,7 +147,7 @@ export default function Library() {
       <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '280px', background: 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)', zIndex: 0 }}></div>
 
       {/* Header Container */}
-      <div style={{ maxWidth: '1000px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '1000px', width: '100%', margin: '0 auto', position: 'relative', zIndex: 1, boxSizing: 'border-box' }}>
         <div style={{ padding: '40px 24px 32px 24px' }}>
           <header className="flex justify-between items-start">
             <div>

@@ -41,6 +41,17 @@
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+    async function waitFor(cond, timeoutMs = 4000, intervalMs = 30) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        try {
+          if (cond()) return;
+        } catch {}
+        await sleep(intervalMs);
+      }
+      throw new Error('waitFor timed out');
+    }
+
     async function runAllTests() {
       const results = [];
       function assert(cond, msg) { if (!cond) throw new Error(msg); }
@@ -65,7 +76,7 @@
           )
         );
 
-        await sleep(150);
+        await waitFor(() => document.querySelector('.surface-card h2')?.textContent?.includes('你好'));
         const cardHeading = document.querySelector('.surface-card h2');
         assert(cardHeading && cardHeading.textContent.includes('你好'), 'Should render word heading "你好" inside practice card');
 
@@ -99,7 +110,7 @@
           )
         );
 
-        await sleep(150);
+        await waitFor(() => document.body.textContent.includes('Practising: 好'));
         assert(document.body.textContent.includes('Practising: 好'), 'Exact ?char=好 resolves to character "好"');
 
         // Containing match in multi-character word: ?char=子 in 包子
@@ -117,7 +128,7 @@
           )
         );
 
-        await sleep(150);
+        await waitFor(() => document.body.textContent.includes('Practising: 子'));
         assert(document.body.textContent.includes('Practising: 子'), 'Containing ?char=子 resolves to character "子" in 包子');
         const tabs = document.querySelectorAll('[role="tab"]');
         assert(tabs.length >= 2, 'Should render tabs for containing word 包子');
