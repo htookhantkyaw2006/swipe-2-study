@@ -1252,4 +1252,246 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     assert.strictEqual(finalReview.length, 1, 'Card 爱 was cleanly removed from review queue');
     assert.strictEqual(finalReview[0].character, '八', 'Card 八 remains in review queue');
   });
+
+  it('17. Real-browser reproduction: failure before progress write on existing card (seen: 5) keeps card at rest; retry after recovery increments seen to 6', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    // Mount session in Review mode with card 爱 having seen: 5, last_action: 'learned'
+    await cdp.eval(`window.mountSession({
+      initialEntry: '/learn/review/session',
+      sessionProps: { isReview: true },
+      reviewCards: [{
+        id: 'zh-hsk1-ai',
+        character: '爱',
+        pronunciation: 'ài',
+        level: 'HSK1'
+      }, {
+        id: 'zh-hsk1-ba',
+        character: '八',
+        pronunciation: 'bā',
+        level: 'HSK1'
+      }, {
+        id: 'zh-hsk1-baba',
+        character: '爸爸',
+        pronunciation: 'bàba',
+        level: 'HSK1'
+      }],
+      learnedWords: [{
+        id: 'pw_zh-hsk1-ai',
+        character: '爱',
+        pronunciation: 'ài',
+        level: 'HSK1',
+        seen: 5,
+        last_action: 'learned',
+        status: 'known'
+      }]
+    })`);
+
+    const init = await getCardCenter();
+    assert.strictEqual(init.char, '爱', 'Starts on card 1 (爱)');
+    const restingLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+
+    // Intercept localStorage.setItem to throw QuotaExceededError ONLY for learned_words
+    await cdp.eval(`(() => {
+      window.__origSetItem = localStorage.setItem;
+      localStorage.setItem = function(key, val) {
+        if (key && key.includes('learned_words')) {
+          const err = new Error('QuotaExceededError: learned_words write quota exceeded.');
+          err.name = 'QuotaExceededError';
+          throw err;
+        }
+        return window.__origSetItem.apply(this, arguments);
+      };
+    })()`);
+
+    try {
+      // 1. Commit a right swipe (+120px)
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: init.cx, y: init.cy, button: 'left', buttons: 1, clickCount: 1 });
+      for (let i = 1; i <= 4; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: init.cx + i * 35, y: init.cy, button: 'left', buttons: 1 });
+      }
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: init.cx + 140, y: init.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+      // Wait for spring back to rest and notice display
+      await waitForCondition(`document.querySelector('.swipe-session__notice') !== null`);
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Error notice displayed, card returns to rest, seen remains 5
+      const noticeText = await cdp.eval(`document.querySelector('.swipe-session__notice')?.textContent`);
+      assert.ok(noticeText.includes('Unable to save progress. Try again.'), 'Notice displays save failure message');
+
+      const failedState = await getCardCenter();
+      assert.strictEqual(failedState.char, '爱', 'Card remains 爱');
+      const failedLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+      assert.ok(Math.abs(failedLeft - restingLeft) < 15, 'Card returned to rest position');
+
+      const learnedAfterFail = await cdp.eval(`window.db.get('learned_words') || []`);
+      assert.strictEqual(learnedAfterFail[0].seen, 5, 'seen remains 5 after failed write');
+
+      // 2. Repeated failed retry while storage is still failing
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: init.cx, y: init.cy, button: 'left', buttons: 1, clickCount: 1 });
+      for (let i = 1; i <= 4; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: init.cx + i * 35, y: init.cy, button: 'left', buttons: 1 });
+      }
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: init.cx + 140, y: init.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+      await new Promise((r) => setTimeout(r, 500));
+      const learnedAfterRepeatFail = await cdp.eval(`window.db.get('learned_words') || []`);
+      assert.strictEqual(learnedAfterRepeatFail[0].seen, 5, 'seen still remains 5 after repeated failed retry');
+    } finally {
+      // Restore storage
+      await cdp.eval(`(() => {
+        if (window.__origSetItem) {
+          localStorage.setItem = window.__origSetItem;
+          delete window.__origSetItem;
+        }
+      })()`);
+    }
+
+    // 3. Retry right swipe after storage restored
+    const retryInit = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: retryInit.cx, y: retryInit.cy, button: 'left', buttons: 1, clickCount: 1 });
+    for (let i = 1; i <= 4; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: retryInit.cx + i * 35, y: retryInit.cy, button: 'left', buttons: 1 });
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: retryInit.cx + 140, y: retryInit.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+    // Wait for deck to advance to card 2 (八)
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const finalState = await getCardCenter();
+    assert.strictEqual(finalState.char, '八', 'Advances to card 2 (八)');
+
+    // 4. Assert seen increments to 6!
+    const finalLearned = await cdp.eval(`window.db.get('learned_words') || []`);
+    const aiEntry = finalLearned.find(w => w.character === '爱');
+    assert.strictEqual(aiEntry.seen, 6, 'seen successfully increments from 5 to 6 on retry');
+    assert.strictEqual(aiEntry.last_action, 'learned');
+    assert.strictEqual(aiEntry.status, 'known');
+
+    // 5. Subsequent deliberate swipe on card 2 (八) succeeds as a new action
+    const c2 = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c2.cx, y: c2.cy, button: 'left', buttons: 1, clickCount: 1 });
+    for (let i = 1; i <= 4; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c2.cx + i * 35, y: c2.cy, button: 'left', buttons: 1 });
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c2.cx + 140, y: c2.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '爸爸';
+    })()`);
+
+    const afterC2Learned = await cdp.eval(`window.db.get('learned_words') || []`);
+    const baEntry = afterC2Learned.find(w => w.character === '八');
+    assert.ok(baEntry, 'Card 2 (八) recorded as new action');
+    assert.strictEqual(baEntry.seen, 1, 'Card 2 has seen: 1');
+  });
+
+  it('18. Left-swipe failure before progress write on existing card (seen: 3, last_action: review) keeps card at rest; retry after recovery increments seen to 4', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    // Pre-seed card with seen: 3, last_action: 'review', status: 'learning'
+    await cdp.eval(`window.mountSession({
+      initialEntry: '/learn/review/session',
+      sessionProps: { isReview: true },
+      reviewCards: [{
+        id: 'zh-hsk1-ai',
+        character: '爱',
+        pronunciation: 'ài',
+        level: 'HSK1'
+      }, {
+        id: 'zh-hsk1-ba',
+        character: '八',
+        pronunciation: 'bā',
+        level: 'HSK1'
+      }],
+      learnedWords: [{
+        id: 'pw_zh-hsk1-ai',
+        character: '爱',
+        pronunciation: 'ài',
+        level: 'HSK1',
+        seen: 3,
+        last_action: 'review',
+        status: 'learning'
+      }]
+    })`);
+
+    const init = await getCardCenter();
+    assert.strictEqual(init.char, '爱', 'Starts on card 1 (爱)');
+
+    // Intercept localStorage.setItem to throw QuotaExceededError ONLY for learned_words
+    await cdp.eval(`(() => {
+      window.__origSetItem = localStorage.setItem;
+      localStorage.setItem = function(key, val) {
+        if (key && key.includes('learned_words')) {
+          const err = new Error('QuotaExceededError: learned_words write quota exceeded.');
+          err.name = 'QuotaExceededError';
+          throw err;
+        }
+        return window.__origSetItem.apply(this, arguments);
+      };
+    })()`);
+
+    try {
+      // Commit left swipe (-120px)
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: init.cx, y: init.cy, button: 'left', buttons: 1, clickCount: 1 });
+      for (let i = 1; i <= 4; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: init.cx - i * 35, y: init.cy, button: 'left', buttons: 1 });
+      }
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: init.cx - 140, y: init.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+      await waitForCondition(`document.querySelector('.swipe-session__notice') !== null`);
+      await new Promise((r) => setTimeout(r, 500));
+
+      const failedState = await getCardCenter();
+      assert.strictEqual(failedState.char, '爱', 'Card remains 爱 at rest');
+
+      const learnedAfterFail = await cdp.eval(`window.db.get('learned_words') || []`);
+      assert.strictEqual(learnedAfterFail[0].seen, 3, 'seen remains 3 after failed write');
+    } finally {
+      await cdp.eval(`(() => {
+        if (window.__origSetItem) {
+          localStorage.setItem = window.__origSetItem;
+          delete window.__origSetItem;
+        }
+      })()`);
+    }
+
+    // Retry left swipe after storage restored
+    const retryInit = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: retryInit.cx, y: retryInit.cy, button: 'left', buttons: 1, clickCount: 1 });
+    for (let i = 1; i <= 4; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: retryInit.cx - i * 35, y: retryInit.cy, button: 'left', buttons: 1 });
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: retryInit.cx - 140, y: retryInit.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const finalLearned = await cdp.eval(`window.db.get('learned_words') || []`);
+    const aiEntry = finalLearned.find(w => w.character === '爱');
+    assert.strictEqual(aiEntry.seen, 4, 'seen increments from 3 to 4 on retry');
+    assert.strictEqual(aiEntry.last_action, 'review');
+
+    const finalReview = await cdp.eval(`window.db.get('review_cards') || []`);
+    assert.ok(finalReview.some(c => c.character === '爱'), 'Card 爱 is in review queue');
+  });
 });

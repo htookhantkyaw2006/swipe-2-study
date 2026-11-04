@@ -790,23 +790,26 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     }
 
     if (!isPhrases) {
-      const isRetry = Boolean(
+      const activeCardKey = activeCard.id || wordOf(activeCard);
+      const progressAlreadyPersisted = Boolean(
         partialFailureCardRef.current &&
-        partialFailureCardRef.current.cardId === (activeCard.id || wordOf(activeCard)) &&
-        partialFailureCardRef.current.direction === direction
+        partialFailureCardRef.current.cardId === activeCardKey &&
+        partialFailureCardRef.current.direction === direction &&
+        partialFailureCardRef.current.progressPersisted === true
       );
       try {
         recordWordAction(db, {
           card: activeCard,
           direction,
           levelId: targetLevel || activeCard.level || cards[0]?.level || course.levels[0]?.id,
-          isRetry,
+          progressAlreadyPersisted,
         });
         partialFailureCardRef.current = null;
-      } catch {
+      } catch (err) {
         partialFailureCardRef.current = {
-          cardId: activeCard.id || wordOf(activeCard),
+          cardId: activeCardKey,
           direction,
+          progressPersisted: Boolean(err && err.progressPersisted === true),
         };
         actionLocked.current = false;
         setBookmarkFeedback('Unable to save progress. Try again.');

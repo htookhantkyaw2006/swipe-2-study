@@ -350,7 +350,7 @@ test('vocabularyProgress: left-swipe partial failure (review_cards throws) and r
   failReviewQueue = false;
 
   // Attempt 2: Retry left swipe completes outstanding review queue write without double-counting seen
-  const result = recordWordAction(db, { card, direction: 'left', levelId: 'HSK1', isRetry: true });
+  const result = recordWordAction(db, { card, direction: 'left', levelId: 'HSK1', progressAlreadyPersisted: true });
   assert.equal(result.status, 'learning');
   assert.equal(result.isLearned, false);
 
@@ -413,7 +413,7 @@ test('vocabularyProgress: right-swipe out of Review partial failure (review_card
   failReviewQueue = false;
 
   // Attempt 2: Retry right swipe completes outstanding review queue removal without double-counting seen
-  const result = recordWordAction(db, { card, direction: 'right', levelId: 'HSK1', isRetry: true });
+  const result = recordWordAction(db, { card, direction: 'right', levelId: 'HSK1', progressAlreadyPersisted: true });
   assert.equal(result.status, 'known');
   assert.equal(result.isLearned, true);
 
@@ -423,4 +423,86 @@ test('vocabularyProgress: right-swipe out of Review partial failure (review_card
 
   const reviewAfterRetry = db.get('review_cards');
   assert.equal(reviewAfterRetry.length, 0, 'Review queue is now cleanly emptied');
+});
+
+test('vocabularyProgress: failure before progress write preserves seen count, retry increments exactly once, and deliberate swipe increments again', () => {
+  const storage = createMemoryStorage();
+  let failLearnedWords = false;
+
+  const origSetItem = storage.setItem;
+  storage.setItem = (k, v) => {
+    if (k && k.includes('learned_words') && failLearnedWords) {
+      const err = new Error('QuotaExceededError: learned_words write failed');
+      err.name = 'QuotaExceededError';
+      throw err;
+    }
+    return origSetItem(k, v);
+  };
+
+  const owner = createStorageOwner({ storage: () => storage });
+  const db = createLocalDatabase({
+    getScope: () => owner.scope(),
+    getLanguage: () => 'zh',
+  });
+
+  const card = { character: '爱', pronunciation: 'ài', level: 'HSK1' };
+
+  // Pre-seed card with seen: 5, last_action: 'learned', status: 'known'
+  db.insert('learned_words', {
+    id: 'pw_zh-hsk1-ai',
+    character: '爱',
+    pronunciation: 'ài',
+    level: 'HSK1',
+    seen: 5,
+    last_action: 'learned',
+    status: 'known',
+  });
+
+  // Enable learned_words storage write failure
+  failLearnedWords = true;
+
+  // Attempt 1: Right swipe fails BEFORE progress write
+  let err1;
+  try {
+    recordWordAction(db, { card, direction: 'right', levelId: 'HSK1' });
+  } catch (e) {
+    err1 = e;
+  }
+  assert.ok(err1, 'Attempt 1 throws');
+  assert.equal(err1.progressPersisted, undefined, 'Error does not have progressPersisted: true');
+  assert.equal(getLearnedWords(db)[0].seen, 5, 'seen remains 5 after failed write');
+
+  // Attempt 2: Repeated failed retry while storage is still failing
+  let err2;
+  try {
+    recordWordAction(db, { card, direction: 'right', levelId: 'HSK1', progressAlreadyPersisted: false });
+  } catch (e) {
+    err2 = e;
+  }
+  assert.ok(err2, 'Attempt 2 throws again');
+  assert.equal(err2.progressPersisted, undefined);
+  assert.equal(getLearnedWords(db)[0].seen, 5, 'seen still remains 5 after repeated failure');
+
+  // Recover storage
+  failLearnedWords = false;
+
+  // Attempt 3: Successful retry increments seen exactly once (5 -> 6)
+  const resultRetry = recordWordAction(db, {
+    card,
+    direction: 'right',
+    levelId: 'HSK1',
+    progressAlreadyPersisted: false,
+  });
+  assert.equal(resultRetry.status, 'known');
+  assert.equal(getLearnedWords(db)[0].seen, 6, 'seen increments from 5 to 6 on retry');
+
+  // Deliberate subsequent swipe: counts as a new action and increments seen (6 -> 7)
+  const resultSubsequent = recordWordAction(db, {
+    card,
+    direction: 'right',
+    levelId: 'HSK1',
+    progressAlreadyPersisted: false,
+  });
+  assert.equal(resultSubsequent.status, 'known');
+  assert.equal(getLearnedWords(db)[0].seen, 7, 'subsequent deliberate swipe increments seen from 6 to 7');
 });

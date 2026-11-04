@@ -29,7 +29,7 @@ export function recordWordAction(database, {
   direction,
   levelId = null,
   now = () => new Date().toISOString(),
-  isRetry = false,
+  progressAlreadyPersisted = false,
 }) {
   if (!database || !card) return null;
 
@@ -50,23 +50,16 @@ export function recordWordAction(database, {
   const currentReviews = database.get('review_cards') || [];
   const inReviews = currentReviews.some(c => sameStudyWord(c, card));
 
-  // Determine whether this call represents an idempotent recovery/retry
-  // of a partially committed swipe (e.g. learned_words was written but review_cards failed).
-  const isPartialRetry = Boolean(
-    existing &&
-    existing.last_action === action &&
-    (
-      isRetry ||
-      (direction === 'left' && !inReviews) ||
-      (direction === 'right' && inReviews)
-    )
-  );
+  // Determine whether progress in learned_words has ALREADY been persisted
+  // for this specific swipe action (e.g. previous attempt wrote learned_words but review_cards failed).
+  // Do NOT infer successful persistence solely from matching last_action or a generic retry flag.
+  const hasProgressPersisted = Boolean(progressAlreadyPersisted);
 
   let resultRow;
   if (existing) {
     resultRow = database.update('learned_words', existing.id, {
       level: card.level || existing.level || level,
-      seen: isPartialRetry ? (existing.seen || 1) : ((existing.seen || 0) + 1),
+      seen: hasProgressPersisted ? (existing.seen || 1) : ((existing.seen || 0) + 1),
       last_action: action,
       status,
       last_reviewed_at: nowIso,
@@ -92,17 +85,28 @@ export function recordWordAction(database, {
     });
   }
 
-  // Manage manual review queue synchronously without swallowing errors
-  if (direction === 'right') {
-    // Swiping right clears card from review queue if present
-    if (inReviews) {
-      database.set('review_cards', currentReviews.filter(c => !sameStudyWord(c, card)));
+  // Manage manual review queue synchronously; if queue update fails, tag error with progressPersisted: true
+  // so callers know that progress was already committed and should not be double-counted on retry.
+  try {
+    if (direction === 'right') {
+      // Swiping right clears card from review queue if present
+      if (inReviews) {
+        database.set('review_cards', currentReviews.filter(c => !sameStudyWord(c, card)));
+      }
+    } else if (direction === 'left') {
+      // Swiping left adds card to review queue if not already present
+      if (!inReviews) {
+        database.set('review_cards', [...currentReviews, card]);
+      }
     }
-  } else if (direction === 'left') {
-    // Swiping left adds card to review queue if not already present
-    if (!inReviews) {
-      database.set('review_cards', [...currentReviews, card]);
-    }
+  } catch (queueErr) {
+    const err = new Error(queueErr?.message || 'Review queue persistence failed');
+    err.name = queueErr?.name || 'QueuePersistenceError';
+    err.cause = queueErr;
+    err.progressPersisted = true;
+    err.stage = 'review_queue';
+    err.committedRow = resultRow;
+    throw err;
   }
 
   return {
