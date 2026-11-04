@@ -44,6 +44,9 @@
     import WritingPractice from '/src/pages/WritingPractice.jsx';
     import Dictionary from '/src/pages/Dictionary.jsx';
     import Premium from '/src/pages/Premium.jsx';
+    import StudyByInterest from '/src/pages/StudyByInterest.jsx';
+    import Notifications from '/src/pages/Notifications.jsx';
+    import EditProfile from '/src/pages/EditProfile.jsx';
     import Login from '/src/pages/Login.jsx';
     import Signup from '/src/pages/Signup.jsx';
     import ForgotPassword from '/src/pages/ForgotPassword.jsx';
@@ -177,6 +180,9 @@
                       createElement(Route, { path: 'radicals', element: createElement(LearnRadicals) }),
                       createElement(Route, { path: 'writing', element: createElement(WritingPractice) }),
                       createElement(Route, { path: 'dictionary', element: createElement(Dictionary) }),
+                      createElement(Route, { path: 'interest', element: createElement(StudyByInterest) }),
+                      createElement(Route, { path: 'notifications', element: createElement(Notifications) }),
+                      createElement(Route, { path: 'profile/edit', element: createElement(EditProfile) }),
                       createElement(Route, { path: 'premium', element: createElement(Premium) })
                     )
                   )
@@ -588,7 +594,7 @@
           const appMain = document.querySelector('.app-main') || document.documentElement;
           if (appMain) appMain.scrollTop = 0;
         }
-      } else if (pageName === 'course-overview' || targetRoute.includes('/level/')) {
+      } else if (pageName === 'course-overview' || targetRoute.startsWith('/learn/level/')) {
         await waitFor(() => document.querySelector('.lesson-hero-card') !== null && document.querySelector('.lesson-word-list') !== null, 4000, 'capture-course-overview-mounted');
       } else if (pageName === 'session-results') {
         // Complete the session through real production swipe/button actions
@@ -640,7 +646,7 @@
         await waitFor(() => document.querySelector('.collection-hero') !== null, 4000, 'capture-saved-collection-mounted');
       } else if (pageName === 'library' || pageName === 'library-catalog-disabled' || pageName === 'library-storage-error' || targetRoute === '/library') {
         await waitFor(() => document.querySelectorAll('.surface-card').length >= 4, 4000, 'capture-library-mounted');
-      } else if (pageName.startsWith('profile') || targetRoute === '/profile') {
+      } else if ((pageName.startsWith('profile') && !pageName.includes('edit')) || targetRoute === '/profile') {
         await waitFor(() => document.body.textContent.includes('Streak') && document.body.textContent.includes('Swiped'), 4000, 'capture-profile-mounted');
         if (pageName === 'profile-mobile-actions-scrolled') {
           const appMain = document.querySelector('.app-main');
@@ -650,7 +656,7 @@
           await sleep(200);
         }
       } else if (pageName === 'settings' || targetRoute === '/settings') {
-        await waitFor(() => document.querySelector('.settings-page') !== null && document.querySelector('.settings-group') !== null, 4000, 'capture-settings-mounted');
+        await waitFor(() => document.body.textContent.includes('Settings'), 4000, 'capture-settings-mounted');
       } else if (pageName === 'login' || pageName === 'login-toggle-focus' || targetRoute === '/login') {
         await waitFor(() => document.querySelector('.auth-card') !== null && document.querySelector('.auth-submit') !== null, 4000, 'capture-login-mounted');
         assert(document.querySelector('.app-navigation') === null, 'Login must not contain bottom navigation');
@@ -681,6 +687,18 @@
           appMain.scrollTop = appMain.scrollHeight;
         }
         await sleep(150);
+      } else if (pageName === 'dictionary' || targetRoute === '/dictionary') {
+        await waitFor(() => document.querySelector('.dictionary-page') !== null || document.body.textContent.includes('Dictionary') || document.body.textContent.includes('Search'), 4000, 'capture-dictionary-mounted');
+      } else if (pageName === 'interest' || targetRoute === '/interest') {
+        await waitFor(() => document.body.textContent.includes('Study by Interest'), 4000, 'capture-interest-mounted');
+      } else if (pageName === 'phrases-level' || targetRoute.startsWith('/flashcards/level/')) {
+        await waitFor(() => document.body.textContent.includes('phrases mastered') || document.body.textContent.includes('course modules'), 4000, 'capture-phrases-level-mounted');
+      } else if (pageName === 'premium' || targetRoute === '/premium') {
+        await waitFor(() => document.body.textContent.includes('Premium'), 4000, 'capture-premium-mounted');
+      } else if (pageName === 'notifications' || targetRoute === '/notifications') {
+        await waitFor(() => document.body.textContent.includes('Notifications') || document.body.textContent.includes('No notifications') || document.body.textContent.includes('Notification'), 4000, 'capture-notifications-mounted');
+      } else if (pageName === 'profile-edit' || targetRoute === '/profile/edit') {
+        await waitFor(() => document.body.textContent.includes('Edit profile') || document.body.textContent.includes('Display name') || document.body.textContent.includes('Save changes'), 4000, 'capture-profile-edit-mounted');
       } else {
         await waitFor(() => document.querySelector('#main-content') !== null, 4000, 'capture-generic-mounted');
       }

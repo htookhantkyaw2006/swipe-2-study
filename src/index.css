@@ -459,6 +459,7 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
@@ -467,9 +468,8 @@ button {
   color: var(--color-text-navy);
   margin: 0;
   font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .home-carousel-wrapper {

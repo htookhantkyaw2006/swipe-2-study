@@ -177,6 +177,29 @@
         results.push({ test: 'public-page-privacy-direct', passed: true });
         unmountComponent();
 
+        // -------------------------------------------------------------
+        // Test 7: Interactive button navigation through real router
+        // -------------------------------------------------------------
+        renderComponent(createTestTree('/learn/level/HSK1'));
+        await waitFor(() => document.body.textContent.includes('Flashcards') || document.body.textContent.includes('HSK 1'));
+        const flashcardsModule = Array.from(document.querySelectorAll('.surface-card, div')).find(
+          el => el.textContent.includes('Flashcards') && el.textContent.includes('mastered')
+        );
+        assert(Boolean(flashcardsModule), 'Flashcards module element must exist in LessonPicker');
+        flashcardsModule.click();
+        await waitFor(() => document.body.textContent.includes('card') || document.querySelector('.swipe-session') || document.body.textContent.includes('Leave session') || document.body.textContent.includes('Start'));
+        results.push({ test: 'lesson-picker-flashcards-click', passed: true });
+        unmountComponent();
+
+        renderComponent(createTestTree('/interest'));
+        await waitFor(() => document.body.textContent.includes('Study by Interest'));
+        const backBtn = document.querySelector('button[aria-label="Back"]');
+        assert(Boolean(backBtn), 'Back button must exist in StudyByInterest');
+        backBtn.click();
+        await sleep(50);
+        results.push({ test: 'study-by-interest-back-click', passed: true });
+        unmountComponent();
+
         // Report results
         fetch('/report', {
           method: 'POST',

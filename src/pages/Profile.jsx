@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Settings as SettingsIcon, Flame, BookOpen,
-  LogOut, Trash2, Languages, Volume2, Crown, Sliders,
-  FolderInput, AlertCircle, RefreshCw, KeyRound
+  LogOut, Trash2, Languages, Volume2, Crown,
+  FolderInput, AlertCircle, RefreshCw, KeyRound, Target, MessageSquare
 } from 'lucide-react';
 import { SettingsGroup, SettingsRow, ToggleSwitch, OptionSheet } from '../components/ui/SettingsControls';
 import { LanguageSheet } from '../components/ui/LanguageSwitcher';
@@ -405,7 +405,7 @@ export default function Profile() {
       </SettingsGroup>
 
       {/* Quick settings */}
-      <SettingsGroup title="Settings & support">
+      <SettingsGroup title="Quick settings">
         <SettingsRow
           icon={Languages}
           iconGradient="linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)"
@@ -415,11 +415,12 @@ export default function Profile() {
           onClick={() => setLanguageSheet(true)}
         />
         <SettingsRow
-          icon={Sliders}
+          icon={Target}
           iconGradient="linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)"
-          title="Learning settings"
-          subtitle="Course language, audio, and display"
-          onClick={() => navigate('/settings')}
+          title="Daily goal"
+          subtitle="Cards to aim for each day"
+          value={OPTIONS.dailyGoal.find((o) => o.value === prefs.dailyGoal)?.label}
+          onClick={() => setGoalSheet(true)}
         />
         <SettingsRow
           icon={Volume2}
@@ -428,6 +429,14 @@ export default function Profile() {
           subtitle="Speak each card as it is revealed"
           control={<ToggleSwitch checked={prefs.autoPlayAudio} onChange={(v) => setPref('autoPlayAudio', v)} label="Auto-play pronunciation" />}
         />
+        <SettingsRow
+          icon={SettingsIcon}
+          iconGradient="linear-gradient(135deg, #94A3B8 0%, #334155 100%)"
+          title="All settings"
+          subtitle="Display, audio, data and more"
+          onClick={() => navigate('/settings')}
+          isLast={!guestImport?.available}
+        />
         {guestImport?.available && (
           <SettingsRow
             icon={FolderInput}
@@ -435,12 +444,20 @@ export default function Profile() {
             title="Import guest learning"
             subtitle="Merge earlier guest words on this device"
             onClick={guestImport.openGuestImport}
+            isLast
           />
         )}
       </SettingsGroup>
 
-      {/* Session & account danger section */}
-      <SettingsGroup title="Session & account" className="profile-group--danger">
+      {/* Support & Actions */}
+      <SettingsGroup title="Support & Actions" className="profile-group--danger">
+        <SettingsRow
+          icon={MessageSquare}
+          iconGradient="linear-gradient(135deg, #67E8F9 0%, #0E7490 100%)"
+          title="Send feedback"
+          subtitle="Report an issue or suggest a feature"
+          onClick={() => navigate('/settings')}
+        />
         {user ? (
           <>
             <SettingsRow

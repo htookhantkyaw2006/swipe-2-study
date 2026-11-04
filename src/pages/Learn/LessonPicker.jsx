@@ -265,7 +265,7 @@ export default function LessonPicker() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Flashcards Module */}
-              <div className="surface-card flex items-center justify-between" style={{ padding: '20px', borderRadius: '24px', cursor: 'pointer', position: 'relative', overflow: 'hidden' }} onClick={() => navigate(`/learn/level/${level.id}/session`)}>
+              <div className="surface-card flex items-center justify-between" style={{ padding: '20px', borderRadius: '24px', cursor: 'pointer', position: 'relative', overflow: 'hidden' }} onClick={() => navigate(`/learn/session?level=${encodeURIComponent(level.id)}`)}>
                 <div style={{ position: 'absolute', right: '-10px', bottom: '-20px', fontSize: '6rem', color: 'var(--color-ghost-blue)', fontWeight: 800, opacity: 0.5, zIndex: 0 }}>{course.copy.flashcardsWatermark}</div>
                 <div className="flex items-center" style={{ gap: '16px', position: 'relative', zIndex: 1 }}>
                   <div style={{ width: '56px', height: '56px', borderRadius: '16px', backgroundColor: '#EFF6FF', color: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

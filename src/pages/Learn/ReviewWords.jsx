@@ -172,7 +172,7 @@ export default function ReviewWords() {
             </p>
 
             <button
-              onClick={() => navigate(empty ? '/learn/level/1/session' : '/learn/review/session')}
+              onClick={() => navigate(empty ? '/learn/session' : '/learn/review/session')}
               style={{
                 backgroundColor: '#FFFFFF',
                 color: '#EF4444',

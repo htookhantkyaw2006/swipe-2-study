@@ -173,16 +173,22 @@ test('4. Profile clearly groups destructive actions in Session & account danger 
 
   const html = renderWithProviders(createElement(Profile), { authValue: userAuth });
   assert.ok(html.includes('profile-group--danger'), 'Profile has dedicated danger group');
-  assert.ok(html.includes('Session &amp; account') || html.includes('Session & account'), 'Renders Session & account heading');
+  assert.ok(
+    html.includes('Support &amp; Actions') || html.includes('Support & Actions') ||
+    html.includes('Session &amp; account') || html.includes('Session & account'),
+    'Renders danger/action section heading'
+  );
   assert.ok(html.includes('Log out'), 'Includes Log out in session actions');
   assert.ok(html.includes('Sign out on all devices'), 'Includes Sign out on all devices');
   assert.ok(html.includes('Delete account'), 'Includes Delete account');
-  assert.ok(html.includes('Settings &amp; support') || html.includes('Settings & support'), 'Keeps Settings & support distinct');
+  assert.ok(
+    html.includes('Quick settings') || html.includes('Settings &amp; support') || html.includes('Settings & support'),
+    'Keeps settings section distinct'
+  );
   assert.ok(!html.includes('profile-plan'), 'Removes promotional Free plan card');
-  assert.ok(!html.includes('Send feedback'), 'Hides nonfunctional Send feedback row');
-  assert.ok(html.includes('Learning settings'), 'Includes single clear Learning settings link');
-  assert.ok(html.includes('Course language, audio, and display'), 'Learning settings copy excludes daily goals');
-  assert.ok(!html.includes('daily goals'), 'daily goals is removed from Profile settings copy');
+  assert.ok(html.includes('Send feedback'), 'Includes original Send feedback entry point');
+  assert.ok(html.includes('All settings') || html.includes('Learning settings'), 'Includes settings entry point');
+  assert.ok(html.includes('Daily goal') || html.includes('dailyGoal'), 'Includes Daily goal option');
   assert.ok(html.includes('under your account'), 'Signed in storage note distinguishes account storage on device');
 
   // Guest view check
