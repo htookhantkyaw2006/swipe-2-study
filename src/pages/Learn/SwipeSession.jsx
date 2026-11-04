@@ -130,7 +130,11 @@ const Flashcard = ({
 
     isCancelledRef.current = false;
 
-    if (isCancelled || !isActive || locked) return;
+    if (isCancelled || !isActive || locked) {
+      x.stop();
+      animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
+      return;
+    }
 
     const width = cardRef.current?.offsetWidth ?? 320;
     const threshold = Math.min(100, Math.max(48, width * 0.25));
@@ -144,13 +148,23 @@ const Flashcard = ({
     const isFlickLeft = offset < -18 && velocity < -500;
 
     if (isFlickRight || isDragRight) {
-      x.stop();
-      animate(x, window.innerWidth + 100, { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" });
-      onSwipe('right', card);
+      const accepted = onSwipe ? onSwipe('right', card) : false;
+      if (accepted) {
+        x.stop();
+        animate(x, window.innerWidth + 100, { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" });
+      } else {
+        x.stop();
+        animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
+      }
     } else if (isFlickLeft || isDragLeft) {
-      x.stop();
-      animate(x, -window.innerWidth - 100, { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" });
-      onSwipe('left', card);
+      const accepted = onSwipe ? onSwipe('left', card) : false;
+      if (accepted) {
+        x.stop();
+        animate(x, -window.innerWidth - 100, { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" });
+      } else {
+        x.stop();
+        animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
+      }
     }
   };
 
@@ -766,12 +780,12 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   };
 
   const triggerSwipe = (direction, swipedCard = null) => {
-    if (actionLocked.current || advancing) return;
+    if (actionLocked.current || advancing) return false;
     actionLocked.current = true;
     const activeCard = swipedCard || cards[currentIndex];
     if (!activeCard) {
       actionLocked.current = false;
-      return;
+      return false;
     }
 
     if (!isPhrases) {
@@ -793,7 +807,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       } catch {
         actionLocked.current = false;
         setBookmarkFeedback('Unable to save progress. Try again.');
-        return;
+        return false;
       }
     }
 
@@ -831,6 +845,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         navigate(backTo);
       }, reducedMotion ? 0 : 350);
     }
+    return true;
   };
 
   const handleShuffle = () => {

@@ -925,4 +925,110 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     // Must navigate to /saved screen
     await waitForCondition(`document.getElementById('saved-screen') !== null`);
   });
+
+  it('14. Storage write failure on committed drag halts outward exit, springs card back to rest, preserves face and shows error; retry after recovery succeeds', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    await cdp.eval('window.mountSession({ courseId: "zh-hsk1" })');
+    const init = await getCardCenter();
+    assert.strictEqual(init.char, '爱', 'Starts on card 1 (爱)');
+    assert.ok(init.hasBackInert, 'Starts on front face');
+
+    const restingLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+
+    // Intercept localStorage.setItem to throw QuotaExceededError when writing learned_words
+    await cdp.eval(`(() => {
+      window.__origSetItem = localStorage.setItem;
+      localStorage.setItem = function(key, val) {
+        if (key && key.includes('learned_words')) {
+          const err = new Error('QuotaExceededError: The quota has been exceeded.');
+          err.name = 'QuotaExceededError';
+          throw err;
+        }
+        return window.__origSetItem.apply(this, arguments);
+      };
+    })()`);
+
+    try {
+      // Perform committed drag right (+120px)
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [{ x: Math.round(init.cx), y: Math.round(init.cy), id: 0 }]
+      });
+      for (let i = 1; i <= 6; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x: Math.round(init.cx + i * 20), y: Math.round(init.cy), id: 0 }]
+        });
+      }
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchEnd',
+        touchPoints: []
+      });
+
+      // Wait for spring back to rest and notice display
+      await waitForCondition(`document.querySelector('.swipe-session__notice') !== null`);
+      await new Promise((r) => setTimeout(r, 500));
+
+      // 1. Error notice must be displayed with accurate message
+      const noticeText = await cdp.eval(`document.querySelector('.swipe-session__notice')?.textContent`);
+      assert.ok(noticeText.includes('Unable to save progress. Try again.'), 'Notice displays save failure message');
+
+      // 2. Active card must still be in viewport and spring back to rest
+      const failedState = await getCardCenter();
+      assert.strictEqual(failedState.char, '爱', 'Active card character remains 爱, did not advance');
+      assert.ok(failedState.hasBackInert, 'Card face preserved on front face');
+      assert.ok(failedState.ariaLabel.includes('showing front face'), 'Aria label confirms front face');
+
+      const failedLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+      assert.ok(Math.abs(failedLeft - restingLeft) < 15, `Card returned to rest position (left=${failedLeft}, restingLeft=${restingLeft})`);
+
+      // 3. Zero progress writes
+      const learnedFailed = await cdp.eval(`window.db.get('learned_words') || []`);
+      assert.strictEqual(learnedFailed.length, 0, 'No progress saved to learned_words during failure');
+    } finally {
+      // Restore storage
+      await cdp.eval(`(() => {
+        if (window.__origSetItem) {
+          localStorage.setItem = window.__origSetItem;
+          delete window.__origSetItem;
+        }
+      })()`);
+    }
+
+    // 4. Retry committed drag right after storage restored
+    const retryInit = await getCardCenter();
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(retryInit.cx), y: Math.round(retryInit.cy), id: 0 }]
+    });
+    for (let i = 1; i <= 6; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: Math.round(retryInit.cx + i * 20), y: Math.round(retryInit.cy), id: 0 }]
+      });
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: []
+    });
+
+    // Wait for deck to advance to card 2 (八)
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const finalState = await getCardCenter();
+    assert.strictEqual(finalState.char, '八', 'Retry successfully advances to card 2 (八)');
+
+    const finalLearned = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(finalLearned.length, 1, 'Progress saved exactly once after retry');
+    assert.strictEqual(finalLearned[0].character, '爱', 'Saved word is 爱');
+    assert.strictEqual(finalLearned[0].status, 'known', 'Status is known');
+  });
 });
