@@ -102,8 +102,13 @@ export default function LevelOverview({ phrases = false }) {
           else if (status === 'error') tileModifier = ' level-tile--error';
           else if (status === 'empty') tileModifier = ' level-tile--empty';
 
+          const TileTag = isUnavailable ? 'div' : Link;
+          const tileProps = isUnavailable
+            ? { role: 'group', 'aria-disabled': 'true' }
+            : { to: `${phrases ? '/flashcards' : '/learn'}/level/${level.id}` };
+
           return (
-            <Link
+            <TileTag
               key={level.id}
               className={`level-tile${tileModifier}${isLight ? ' level-tile--light' : ''}`}
               style={{
@@ -113,9 +118,7 @@ export default function LevelOverview({ phrases = false }) {
                 cursor: isUnavailable ? 'default' : 'pointer',
                 pointerEvents: isUnavailable ? 'none' : 'auto',
               }}
-              to={`${phrases ? '/flashcards' : '/learn'}/level/${level.id}`}
-              role={isUnavailable ? 'link' : undefined}
-              aria-disabled={isUnavailable ? 'true' : undefined}
+              {...tileProps}
               tabIndex={isUnavailable ? -1 : undefined}
               onClick={isUnavailable ? (e) => e.preventDefault() : undefined}
             >
@@ -149,7 +152,7 @@ export default function LevelOverview({ phrases = false }) {
                 )}
               </span>
               <span className="level-tile__watermark" aria-hidden="true">{level.numeral || level.badge}</span>
-            </Link>
+            </TileTag>
           );
         })}
       </div>
