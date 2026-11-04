@@ -253,27 +253,28 @@ export default function Profile() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '120px' }}>
+    <div style={{ padding: '24px', maxWidth: '800px', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: '120px' }}>
 
       {/* Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-primary-blue)', letterSpacing: '1px', textTransform: 'uppercase' }}>
-            YOUR IDENTITY
-          </span>
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '4px 0 0 0' }}>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-secondary-blue)', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+            Your Identity
+          </p>
+          <h1 style={{ fontSize: '2rem', color: 'var(--color-text-navy)', margin: 0, fontWeight: 800 }}>
             Profile
           </h1>
         </div>
         <button
+          type="button"
           onClick={() => navigate('/settings')}
           aria-label="Settings"
           style={{
             width: '44px', height: '44px', borderRadius: '50%',
-            backgroundColor: 'var(--color-sky-accent)', color: '#FFFFFF',
+            background: 'linear-gradient(135deg, #7DD3FC 0%, #0369A1 100%)', color: '#FFFFFF',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(56, 189, 248, 0.3)',
-            cursor: 'pointer', transition: 'transform 0.1s'
+            boxShadow: '0 4px 12px rgba(3, 105, 161, 0.3)',
+            border: 'none', cursor: 'pointer', transition: 'transform 0.1s'
           }}
           onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
           onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}

@@ -405,23 +405,27 @@ button {
 }
 
 .course-badge {
-  background: rgba(255, 255, 255, 0.25);
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 0.65rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #FFFFFF;
+  display: inline-block;
+  line-height: 1.4;
 }
 
 .course-badge--active {
-  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: #FFFFFF;
 }
 
 .course-word-count {
-  font-size: 0.85rem;
-  margin: 0;
-  opacity: 0.9;
+  font-size: 13px;
+  margin: 0 0 10px 0;
+  opacity: 0.85;
 }
 
 .home-page {
@@ -680,7 +684,20 @@ button {
   margin-top: 8px;
 }
 
+.app-bottom-nav {
+  bottom: max(24px, calc(16px + env(safe-area-inset-bottom, 0px)));
+  width: calc(100% - 48px);
+  max-width: 400px;
+  padding: 8px 16px;
+}
+
 @media (max-width: 360px) {
+  .app-bottom-nav {
+    width: calc(100% - 20px) !important;
+    padding: 8px 10px !important;
+    bottom: max(16px, calc(10px + env(safe-area-inset-bottom, 0px))) !important;
+  }
+
   #root {
     padding-left: 0;
     padding-right: 0;

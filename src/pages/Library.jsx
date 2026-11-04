@@ -196,8 +196,30 @@ export default function Library() {
                 boxShadow: '0 8px 24px rgba(2, 132, 199, 0.15), inset 0 2px 4px rgba(255, 255, 255, 1)',
                 border: '1px solid rgba(255, 255, 255, 0.9)'
               }}>
-                <span role="img" aria-label="streak fire">🔥</span>
-                <span>{streak?.currentStreak ?? streak?.streakDays ?? 0}</span>
+                <style>
+                  {`
+                    @keyframes iceFire {
+                      0% { filter: drop-shadow(0 0 2px rgba(2, 132, 199, 0.3)); transform: scale(1) translateY(0); }
+                      50% { filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.7)); transform: scale(1.08) translateY(-1px); }
+                      100% { filter: drop-shadow(0 0 2px rgba(2, 132, 199, 0.3)); transform: scale(1) translateY(0); }
+                    }
+                  `}
+                </style>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="url(#glacier-fire)" stroke="url(#glacier-fire-stroke)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'iceFire 2.5s ease-in-out infinite' }}>
+                  <defs>
+                    <linearGradient id="glacier-fire" x1="0%" y1="100%" x2="0%" y2="0%">
+                      <stop offset="0%" stopColor="#7DD3FC" />
+                      <stop offset="50%" stopColor="#0EA5E9" />
+                      <stop offset="100%" stopColor="#0369A1" />
+                    </linearGradient>
+                    <linearGradient id="glacier-fire-stroke" x1="0%" y1="100%" x2="0%" y2="0%">
+                      <stop offset="0%" stopColor="#0284C7" />
+                      <stop offset="100%" stopColor="#082F49" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+                </svg>
+                <span style={{ textShadow: '0 2px 4px rgba(2, 132, 199, 0.1)' }}>{streak?.currentStreak ?? streak?.streakDays ?? 0}</span>
               </div>
             </div>
 

@@ -796,7 +796,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: 'var(--color-page-bg)', maxWidth: '500px', margin: '0 auto', position: 'relative' }}>
 
       {/* Top Header */}
-      <header className="flex items-center justify-between" style={{ marginBottom: '24px', zIndex: 10 }}>
+      <header className="flex items-center justify-between" style={{ marginBottom: '32px', zIndex: 10 }}>
         <button
           onClick={() => safeNavigateBack(navigate, backTo)}
           style={{
@@ -811,7 +811,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
           <ChevronLeft size={24} strokeWidth={2.5} />
         </button>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 16px' }}>
-          <h2 style={{ fontSize: '1.25rem', margin: '0 0 10px 0', textAlign: 'center', color: 'var(--color-text-navy)', fontWeight: 800 }}>
+          <h2 style={{ fontSize: '1.25rem', margin: '0 0 12px 0', textAlign: 'center', color: 'var(--color-text-navy)', fontWeight: 800 }}>
             {isReview ? 'Review Session' : isSaved ? 'Saved Words' : (cards[0]?.lesson_name ?? course.copy?.lessonName ?? 'Vocabulary')}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '200px' }}>

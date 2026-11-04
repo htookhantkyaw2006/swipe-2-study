@@ -182,38 +182,37 @@ export default function LevelCarousel() {
                           ? 'NOW LEARNING'
                           : (level.tier || 'ALL LEVELS')}
                 </span>
-                <button
+                <span
                   onClick={() => navigate('/learn')}
                   style={{
-                    background: 'rgba(255,255,255,0.25)',
-                    border: 'none',
-                    color: '#FFFFFF',
-                    padding: '4px 12px',
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    padding: '3px 12px',
                     borderRadius: '12px',
                     fontSize: '0.75rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    color: '#FFFFFF'
                   }}
                 >
                   All levels
-                </button>
+                </span>
               </div>
 
               {/* Middle Content */}
-              <div style={{ flex: 1, marginBottom: '20px', position: 'relative', zIndex: 1 }}>
+              <div style={{ flex: 1, marginBottom: '24px', position: 'relative', zIndex: 1 }}>
                 <div style={{ maxWidth: '55%' }}>
-                  <p style={{ fontSize: '12px', fontWeight: 700, margin: '0 0 4px 0', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <p style={{ fontSize: '12px', opacity: 0.8, margin: '0 0 4px 0', color: '#FFFFFF' }}>
                     {level.kicker || `LEVEL ${level.num || (index + 1)}`}
                   </p>
-                  <h3 style={{ fontSize: '2rem', fontWeight: 800, margin: '0 0 8px 0', color: '#FFFFFF', lineHeight: 1 }}>
+                  <h3 style={{ fontSize: '36px', fontWeight: 700, margin: '0 0 8px 0', color: '#FFFFFF', lineHeight: 1 }}>
                     {level.name}
                   </h3>
                   <p className="course-word-count">
                     {level.wordCountText}
                   </p>
                   {/* Progress bar */}
-                  <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.3)', borderRadius: '3px', marginTop: '10px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, level.percent)}%`, height: '100%', background: '#FFFFFF', borderRadius: '3px' }}></div>
+                  <div style={{ width: '100%', height: '5px', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min(100, level.percent)}%`, height: '100%', backgroundColor: '#FFFFFF', borderRadius: '3px' }}></div>
                   </div>
                 </div>
               </div>

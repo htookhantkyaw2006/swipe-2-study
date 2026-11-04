@@ -23,6 +23,7 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Main navigation"
+      className="app-bottom-nav"
       style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -33,10 +34,10 @@ export default function BottomNav() {
         borderRadius: '100px',
         padding: '8px 16px',
         position: 'fixed',
-        bottom: 'max(20px, calc(12px + env(safe-area-inset-bottom, 0px)))',
+        bottom: 'max(24px, calc(16px + env(safe-area-inset-bottom, 0px)))',
         left: '50%',
         transform: 'translateX(-50%)',
-        width: 'calc(100% - 32px)',
+        width: 'calc(100% - 48px)',
         maxWidth: '400px',
         zIndex: 50
       }}
