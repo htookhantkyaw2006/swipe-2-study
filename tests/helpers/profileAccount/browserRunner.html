@@ -12,6 +12,7 @@
     import { MemoryRouter, Routes, Route } from 'react-router-dom';
     import Profile from '/src/pages/Profile.jsx';
     import Library from '/src/pages/Library.jsx';
+    import Home from '/src/pages/Home.jsx';
     import { LanguageProvider } from '/src/lib/language.jsx';
     import { PreferencesProvider } from '/src/lib/preferences.jsx';
     import { PublishedContentProvider } from '/src/lib/publishedContentContext.jsx';
@@ -439,6 +440,291 @@
         assert(document.body.textContent.includes('7'), 'Library must render currentStreak of 7');
 
         results.push({ test: 'nonzero-streak-library-and-profile', passed: true });
+      }
+
+            // -------------------------------------------------------------
+      // Test 4: Mounted Google Account deletion dialog presentation and cancellation
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        storageOwner.setOwner(USER_A);
+
+        currentAuthContextValue = {
+          user: {
+            id: USER_A,
+            email: 'google-learner@gmail.com',
+            app_metadata: { provider: 'google', providers: ['google'] },
+            identities: [{ provider: 'google', id: 'gid-1' }],
+          },
+          profile: { display_name: 'Google Learner' },
+          loading: false,
+          isTransitioning: false,
+          error: null,
+          isGuest: false,
+          isConfigured: true,
+          captureGeneration: () => 1,
+          isCurrent: () => true,
+          signOut: async () => ({ error: null }),
+          signOutGlobal: async () => ({ confirmedLocal: true, remoteConfirmed: true, error: null }),
+        };
+
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { initialEntries: ['/profile'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/profile', element: createElement(Profile) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+
+        // Click Delete account row
+        const interactiveButtons = Array.from(document.querySelectorAll('[role="button"]'));
+        const deleteRow = interactiveButtons.find((r) => r.textContent?.includes('Delete account') && !r.textContent?.includes('Soon'));
+        assert(deleteRow, 'Delete account row must exist for Google account');
+        deleteRow.click();
+
+        await sleep(100);
+
+        // Verify Google-only dialog presentation:
+        // No password input, has Google note, has confirm input
+        const passwordInput = document.querySelector('#delete-account-password');
+        assert(!passwordInput, 'Google-only dialog must NOT render a password field');
+
+        const oauthNote = document.querySelector('.delete-account-dialog__oauth-note');
+        assert(oauthNote && oauthNote.textContent.includes('Signed in with Google. No password is required.'),
+          'OAuth note explaining no password is required must be displayed');
+
+        const confirmInput = document.querySelector('#delete-account-confirm');
+        assert(confirmInput, 'Confirm input must be present');
+
+        // Cancel dialog
+        const cancelBtn = document.querySelector('.delete-account-dialog__btn--cancel');
+        assert(cancelBtn, 'Cancel button must be present in dialog');
+        cancelBtn.click();
+
+        await sleep(100);
+        assert(!document.querySelector('.delete-account-dialog'), 'Dialog must close cleanly after Cancel');
+
+        results.push({ test: 'profile-google-deletion-dialog-and-cancel', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 5: Wrong-account return cancels pending deletion and alerts user
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        storageOwner.setOwner(USER_B);
+
+        // Stored intent binds to USER_A
+        sessionStorage.setItem('s2s_pending_deletion_intent', JSON.stringify({
+          initiatingUserId: USER_A,
+          email: 'user-a@gmail.com',
+          timestamp: Date.now(),
+        }));
+
+        // Active user is USER_B
+        currentAuthContextValue = {
+          user: {
+            id: USER_B,
+            email: 'user-b@gmail.com',
+            app_metadata: { provider: 'google', providers: ['google'] },
+            identities: [{ provider: 'google', id: 'gid-2' }],
+          },
+          profile: { display_name: 'User B' },
+          loading: false,
+          isTransitioning: false,
+          error: null,
+          isGuest: false,
+          isConfigured: true,
+          captureGeneration: () => 1,
+          isCurrent: () => true,
+          signOut: async () => ({ error: null }),
+          signOutGlobal: async () => ({ confirmedLocal: true, remoteConfirmed: true, error: null }),
+        };
+
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { initialEntries: ['/profile?verifyDeletion=true'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/profile', element: createElement(Profile) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+
+        // Intent must be immediately cleared
+        assert(sessionStorage.getItem('s2s_pending_deletion_intent') === null,
+          'Pending deletion intent must be cleared immediately upon evaluation');
+
+        // Error banner must explain account mismatch
+        const errorAlert = document.querySelector('[role="alert"]');
+        assert(errorAlert && errorAlert.textContent.includes('Verification account did not match'),
+          'Error alert must notify that returning account did not match initiating owner');
+
+        results.push({ test: 'profile-google-deletion-wrong-account-return', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 6: No callback-triggered deletion on direct navigation or reload
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        storageOwner.setOwner(USER_A);
+        sessionStorage.removeItem('s2s_pending_deletion_intent');
+
+        let deletionAttempted = false;
+        const testFetch = window.fetch;
+        window.fetch = async (url, opts) => {
+          if (String(url || '').includes('delete-account')) {
+            deletionAttempted = true;
+          }
+          return testFetch(url, opts);
+        };
+
+        currentAuthContextValue = {
+          user: {
+            id: USER_A,
+            email: 'user-a@gmail.com',
+            app_metadata: { provider: 'google', providers: ['google'] },
+            identities: [{ provider: 'google', id: 'gid-1' }],
+          },
+          profile: { display_name: 'User A' },
+          loading: false,
+          isTransitioning: false,
+          error: null,
+          isGuest: false,
+          isConfigured: true,
+          captureGeneration: () => 1,
+          isCurrent: () => true,
+          signOut: async () => ({ error: null }),
+          signOutGlobal: async () => ({ confirmedLocal: true, remoteConfirmed: true, error: null }),
+        };
+
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { initialEntries: ['/profile?verifyDeletion=true'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/profile', element: createElement(Profile) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+
+        assert(!deletionAttempted, 'Must never automatically trigger deletion on callback or reload');
+        assert(!document.querySelector('.delete-account-dialog'), 'Dialog must not open without valid intent');
+
+        results.push({ test: 'profile-google-deletion-no-callback-triggered-deletion', passed: true });
+      }
+
+      // -------------------------------------------------------------
+      // Test 7: One-time Home deletion success notice survives navigation and clears
+      // -------------------------------------------------------------
+      {
+        unmountComponent();
+        storageOwner.setOwner(null);
+
+        sessionStorage.setItem('s2s_home_notice', 'Your account has been deleted. You are now in guest mode.');
+
+        const guestAuthValue = {
+          user: null,
+          profile: null,
+          loading: false,
+          isTransitioning: false,
+          error: null,
+          isGuest: true,
+          isConfigured: true,
+          captureGeneration: () => 1,
+          isCurrent: () => true,
+          signOut: async () => ({ error: null }),
+          signOutGlobal: async () => ({ confirmedLocal: true, remoteConfirmed: true, error: null }),
+        };
+
+        // Mount 1: Home renders banner and clears sessionStorage
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { initialEntries: ['/'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/', element: createElement(Home) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+
+        const banner = document.querySelector('.home-deletion-banner');
+        assert(banner && banner.textContent.includes('Your account has been deleted'),
+          'Home must render one-time deletion notice banner');
+
+        // Verify storage was cleared on mount
+        assert(sessionStorage.getItem('s2s_home_notice') === null,
+          's2s_home_notice must be removed from sessionStorage on initial view');
+
+        // Mount 2: Remount / navigate back - banner is gone
+        unmountComponent();
+        renderComponent(
+          createElement(DynamicAuthProvider, null,
+            createElement(GuestImportContext.Provider, { value: mockGuestImportValue },
+              createElement(LanguageProvider, null,
+                createElement(PreferencesProvider, null,
+                  createElement(PublishedContentProvider, null,
+                    createElement(MemoryRouter, { initialEntries: ['/'] },
+                      createElement(Routes, null,
+                        createElement(Route, { path: '/', element: createElement(Home) })
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        );
+
+        await sleep(150);
+
+        const remountBanner = document.querySelector('.home-deletion-banner');
+        assert(!remountBanner, 'Home notice banner must NOT appear on subsequent visits or reloads');
+
+        results.push({ test: 'home-one-time-deletion-success-banner', passed: true });
       }
 
       return results;

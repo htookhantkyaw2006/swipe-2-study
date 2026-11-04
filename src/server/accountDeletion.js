@@ -1,4 +1,5 @@
 import { createClient as defaultCreateClient } from '@supabase/supabase-js';
+import crypto from 'node:crypto';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_REQUEST_BODY_BYTES = 4096;
@@ -9,23 +10,51 @@ const DEFAULT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 /**
  * Short freshness window (10 minutes) for interactive Google OAuth authentication.
  *
- * Why JWT `iat` alone or routine token refresh is insufficient:
- * In Supabase / GoTrue Auth, routine client-side token refresh (via the refresh_token)
- * issues a new access token with a renewed `iat` (issued-at) and `exp` timestamp
- * without requiring any interactive credential entry or Google consent. Therefore,
- * a long-lived or stolen refresh token could continue generating "fresh" access tokens
- * indefinitely.
+ * Interactive Authentication Freshness for Google OAuth Reauthentication:
  *
- * In contrast, `last_sign_in_at` on the user and linked GoTrue identity records
- * (auth.identities.last_sign_in_at) is updated exclusively when an interactive
- * authentication round-trip completes (such as initial Google OAuth login or an
- * explicit interactive OAuth re-authentication redirect).
+ * Routine token refreshes issue new JWT access tokens with updated `iat` and `exp`
+ * timestamps without requiring interactive user authentication. Therefore, `iat`
+ * alone cannot verify that an account owner actively authenticated.
  *
- * Evaluating `last_sign_in_at` against the server clock with a bounded freshness window
- * guarantees that account deletion can only proceed if the account owner has interactively
- * verified their Google identity recently.
+ * Furthermore, account-wide evidence like `user.last_sign_in_at` or `identity.last_sign_in_at`
+ * is shared across all devices and sessions. If a user recently signed in on Device B,
+ * checking `user.last_sign_in_at` alone would inappropriately authorize an ancient,
+ * stale session on Device A to delete the account without fresh interactive verification.
+ *
+ * To guarantee true session-specific interactive authentication:
+ * 1. The caller's JWT token signature is verified against Supabase Auth (and optionally
+ *    HMAC-SHA256 verified if SUPABASE_JWT_SECRET is configured).
+ * 2. Token subject claim `sub` is strictly bound to the verified caller UUID.
+ * 3. The token's session ID (`session_id`) is validated as non-empty.
+ * 4. The session's RFC 8176 Authentication Method Reference (`amr`) claims are inspected
+ *    specifically for interactive OAuth authentication (`method === 'oauth'` or `provider === 'google'`).
+ *    Routine token refreshes (`method === 'token_refresh'`) are strictly excluded.
+ * 5. The interactive authentication timestamp is verified against the server clock
+ *    within the bounded freshness window (default: 600 seconds / 10 minutes).
  */
-export const GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS = 10 * 60; // 10 minutes (600 seconds)
+export const DEFAULT_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS = 10 * 60; // 600 seconds
+export const GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS = DEFAULT_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS;
+export const MIN_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS = 60; // 1 minute
+export const MAX_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS = 3600; // 1 hour
+
+/**
+ * Validates and resolves the Google auth freshness window setting.
+ * Strict finite, positive, and bounded between 60s and 3600s.
+ */
+export function resolveFreshnessWindowSeconds(rawVal) {
+  if (rawVal === undefined || rawVal === null || rawVal === '') {
+    return DEFAULT_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS;
+  }
+  const parsed = Number(rawVal);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < MIN_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS || parsed > MAX_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS) {
+    throw new AccountDeletionError(
+      `Invalid GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS: must be an integer between ${MIN_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS} and ${MAX_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS} seconds.`,
+      'SERVER_CONFIGURATION_ERROR',
+      500
+    );
+  }
+  return parsed;
+}
 
 export class AccountDeletionError extends Error {
   constructor(message, code, status = 400) {
@@ -332,15 +361,111 @@ export function inspectUserAuthProviders(user) {
   };
 }
 
+function base64UrlDecode(str) {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(padded, 'base64').toString('utf8');
+  }
+  return decodeURIComponent(
+    atob(padded)
+      .split('')
+      .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+      .join('')
+  );
+}
+
+export function parseJwtToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.trim().split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const header = JSON.parse(base64UrlDecode(parts[0]));
+    const payload = JSON.parse(base64UrlDecode(parts[1]));
+    if (!header || typeof header !== 'object' || !payload || typeof payload !== 'object') {
+      return null;
+    }
+    return { header, payload, rawSignature: parts[2], parts };
+  } catch {
+    return null;
+  }
+}
+
+export function verifyJwtSignature(token, secret) {
+  if (!secret) return true; // Signature was verified by GoTrue getUser()
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.trim().split('.');
+  if (parts.length !== 3) return false;
+  try {
+    const signatureInput = `${parts[0]}.${parts[1]}`;
+    const expectedSig = crypto
+      .createHmac('sha256', secret)
+      .update(signatureInput)
+      .digest('base64url');
+    const sigBuf = Buffer.from(parts[2]);
+    const expBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expBuf.length) return false;
+    return crypto.timingSafeEqual(sigBuf, expBuf);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Verifies that a Google-authenticated user completed interactive authentication
- * within the allowable freshness window using trusted server-side GoTrue evidence.
+ * Helper to construct signed or test JWT tokens with specific claims for testing.
+ */
+export function createTestJwt({
+  userId,
+  sessionId = 'test-session-uuid',
+  email = 'google-learner@gmail.com',
+  amr = [{ method: 'oauth', timestamp: Math.floor(Date.now() / 1000), provider: 'google' }],
+  authTime = null,
+  iat = Math.floor(Date.now() / 1000),
+  exp = Math.floor(Date.now() / 1000) + 3600,
+  secret = null,
+} = {}) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const payload = {
+    sub: userId,
+    aud: 'authenticated',
+    role: 'authenticated',
+    email,
+    session_id: sessionId,
+    amr,
+    iat,
+    exp,
+    ...(authTime !== null ? { auth_time: authTime } : {}),
+  };
+  const b64 = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+  const headerB64 = b64(header);
+  const payloadB64 = b64(payload);
+  const sigInput = `${headerB64}.${payloadB64}`;
+  const signature = secret
+    ? crypto.createHmac('sha256', secret).update(sigInput).digest('base64url')
+    : 'test-signature';
+  return `${sigInput}.${signature}`;
+}
+
+/**
+ * Verifies that a Google-authenticated session completed interactive authentication
+ * within the allowable freshness window using trusted, session-specific evidence.
  *
- * Checks identity.last_sign_in_at (or user.last_sign_in_at) against the server clock.
+ * Requirements:
+ * 1. Binds evidence to the authenticated requesting session via server-verified token claims.
+ * 2. Token subject claim `sub` must match the verified user UUID.
+ * 3. Token must contain a valid session identifier (`session_id`).
+ * 4. Token signature is verified (by GoTrue getUser and HMAC if secret present).
+ * 5. Session AMR (Authentication Method Reference) claims are inspected for interactive
+ *    OAuth authentication (`method === 'oauth'` or `provider === 'google'`).
+ *    Routine token refresh (`method === 'token_refresh'`) or JWT `iat` renewals are EXCLUDED.
+ * 6. Interactive authentication timestamp must be within the freshness window.
+ * 7. Missing, malformed, future, or expired evidence fails closed with REAUTH_REQUIRED (401).
  */
 export function verifyGoogleAuthFreshness({
+  token,
   user,
-  freshnessWindowSeconds = GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+  freshnessWindowSeconds = DEFAULT_GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+  env = {},
   now = () => Date.now(),
 } = {}) {
   if (!user) {
@@ -353,13 +478,7 @@ export function verifyGoogleAuthFreshness({
     throw error;
   }
 
-  const identities = Array.isArray(user.identities) ? user.identities : [];
-  const googleIdentity = identities.find(i => i.provider === 'google');
-
-  // GoTrue stores last_sign_in_at on the identity and on the user record.
-  // Evaluate the specific Google identity last_sign_in_at if available; fallback to user.last_sign_in_at.
-  const lastSignInStr = googleIdentity?.last_sign_in_at || user.last_sign_in_at;
-  if (!lastSignInStr || typeof lastSignInStr !== 'string') {
+  if (!token || typeof token !== 'string') {
     const error = new AccountDeletionError(
       'Recent Google authentication is required to delete this account. Please verify with Google.',
       'REAUTH_REQUIRED',
@@ -369,10 +488,42 @@ export function verifyGoogleAuthFreshness({
     throw error;
   }
 
-  const lastSignInMs = Date.parse(lastSignInStr);
-  if (Number.isNaN(lastSignInMs)) {
+  const parsed = parseJwtToken(token);
+  if (!parsed || !parsed.payload) {
     const error = new AccountDeletionError(
-      'Invalid authentication timestamp. Re-authentication is required.',
+      'Malformed or unverified authentication token. Re-authentication is required.',
+      'REAUTH_REQUIRED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  const payload = parsed.payload;
+
+  // Validate token signature if secret is available in environment
+  const jwtSecret = env?.SUPABASE_JWT_SECRET || env?.JWT_SECRET;
+  if (jwtSecret && !verifyJwtSignature(token, jwtSecret)) {
+    throw new AccountDeletionError(
+      'Invalid token signature.',
+      'UNAUTHENTICATED',
+      401
+    );
+  }
+
+  // Token sub must strictly match verified user ID
+  if (!payload.sub || payload.sub !== user.id) {
+    throw new AccountDeletionError(
+      'Authentication token subject does not match verified user identity.',
+      'IDENTITY_MISMATCH',
+      401
+    );
+  }
+
+  // Session ID must be present in token claims
+  if (!payload.session_id || typeof payload.session_id !== 'string') {
+    const error = new AccountDeletionError(
+      'Authentication token missing session identity. Re-authentication is required.',
       'REAUTH_REQUIRED',
       401
     );
@@ -381,7 +532,84 @@ export function verifyGoogleAuthFreshness({
   }
 
   const currentMs = now();
-  const ageSeconds = Math.floor((currentMs - lastSignInMs) / 1000);
+
+  // Validate token exp is not expired
+  if (payload.exp !== undefined) {
+    const expMs = Number(payload.exp) * 1000;
+    if (!Number.isFinite(expMs) || expMs <= currentMs) {
+      throw new AccountDeletionError(
+        'Invalid or expired authentication session.',
+        'UNAUTHENTICATED',
+        401
+      );
+    }
+  }
+
+  // Ensure user has a Google identity
+  const authInfo = inspectUserAuthProviders(user);
+  if (!authInfo.hasGoogleIdentity) {
+    throw new AccountDeletionError(
+      'Provider reauthentication is not supported for this account.',
+      'UNSUPPORTED_AUTH_PROVIDER',
+      400
+    );
+  }
+
+  // Validate session AMR claims
+  if (!Array.isArray(payload.amr) || payload.amr.length === 0) {
+    const error = new AccountDeletionError(
+      'Authentication token missing method reference claims. Re-authentication is required.',
+      'REAUTH_REQUIRED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  // Strictly filter for interactive OAuth authentication methods.
+  // Exclude routine background token refresh.
+  const interactiveEntries = payload.amr.filter((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    if (entry.method === 'token_refresh') return false;
+    const isOauth = entry.method === 'oauth' || entry.method === 'google';
+    const providerMatches = !entry.provider || entry.provider === 'google';
+    return isOauth && providerMatches;
+  });
+
+  if (interactiveEntries.length === 0) {
+    const error = new AccountDeletionError(
+      'Recent Google authentication is required to delete this account. Please verify with Google.',
+      'REAUTH_REQUIRED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  // Find the latest interactive authentication timestamp among matching entries
+  let latestInteractiveTs = null;
+  for (const entry of interactiveEntries) {
+    const rawTs = entry.timestamp ?? (entry.method === 'oauth' ? payload.auth_time : null);
+    const numTs = Number(rawTs);
+    if (Number.isFinite(numTs) && numTs > 0) {
+      if (latestInteractiveTs === null || numTs > latestInteractiveTs) {
+        latestInteractiveTs = numTs;
+      }
+    }
+  }
+
+  if (latestInteractiveTs === null) {
+    const error = new AccountDeletionError(
+      'Invalid authentication timestamp in session claims. Re-authentication is required.',
+      'REAUTH_REQUIRED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  const authMs = latestInteractiveTs > 1e11 ? latestInteractiveTs : latestInteractiveTs * 1000;
+  const ageSeconds = Math.floor((currentMs - authMs) / 1000);
 
   // Reject future timestamps beyond 30s allowable clock skew
   if (ageSeconds < -30) {
@@ -394,6 +622,7 @@ export function verifyGoogleAuthFreshness({
     throw error;
   }
 
+  // Reject expired interactive authentication
   if (ageSeconds > freshnessWindowSeconds) {
     const error = new AccountDeletionError(
       'Recent Google authentication has expired. Please verify with Google before deleting your account.',
@@ -402,6 +631,23 @@ export function verifyGoogleAuthFreshness({
     );
     error.provider = 'google';
     throw error;
+  }
+
+  // Optional account-wide check: if user.last_sign_in_at is also present, it must not be older than freshness window
+  if (user.last_sign_in_at) {
+    const userLastSignInMs = Date.parse(user.last_sign_in_at);
+    if (Number.isFinite(userLastSignInMs)) {
+      const userAgeSeconds = Math.floor((currentMs - userLastSignInMs) / 1000);
+      if (userAgeSeconds > freshnessWindowSeconds) {
+        const error = new AccountDeletionError(
+          'Recent Google authentication has expired. Please verify with Google before deleting your account.',
+          'REAUTH_REQUIRED',
+          401
+        );
+        error.provider = 'google';
+        throw error;
+      }
+    }
   }
 
   return true;
@@ -727,13 +973,17 @@ export async function handleReauthenticationStep({
 
   // Google provider re-authentication freshness check
   if (!payload.password && authInfo.isGoogleOnly) {
-    const freshnessWindowSeconds = env.GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS
-      ? Number(env.GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS)
-      : GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS;
+    const freshnessWindowSeconds = resolveFreshnessWindowSeconds(
+      env.GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS
+    );
+
+    const token = typeof authHeader === 'string' ? authHeader.trim().split(/\s+/)[1] : null;
 
     verifyGoogleAuthFreshness({
+      token,
       user: verifiedUser,
       freshnessWindowSeconds,
+      env,
       now,
     });
 

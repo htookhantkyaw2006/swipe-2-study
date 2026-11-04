@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   handleReauthenticationStep,
   createAttemptLimiter,
+  createTestJwt,
 } from '../src/server/accountDeletion.js';
 
 const USER_A = '11111111-1111-4111-8111-111111111111';
@@ -73,10 +74,17 @@ setActiveLanguageId('zh');
 // ---------------------------------------------------------------------------
 test('Google deletion: recent interactive authentication allows deletion without password', async () => {
   const baseTime = Date.now();
+  const baseTimeSec = Math.floor(baseTime / 1000);
+  const freshJwt = createTestJwt({
+    userId: USER_A,
+    sessionId: 'session-flow-fresh',
+    amr: [{ method: 'oauth', timestamp: baseTimeSec - 120, provider: 'google' }],
+  });
+
   const mockUserClient = {
     auth: {
       getUser: async (token) => {
-        assert.equal(token, 'google-recent-jwt');
+        assert.equal(token, freshJwt);
         return {
           data: {
             user: {
@@ -86,7 +94,7 @@ test('Google deletion: recent interactive authentication allows deletion without
               identities: [{
                 provider: 'google',
                 id: 'google-sub-1',
-                last_sign_in_at: new Date(baseTime - 120 * 1000).toISOString(), // 2 minutes ago (fresh)
+                last_sign_in_at: new Date(baseTime - 120 * 1000).toISOString(),
               }],
             },
           },
@@ -99,7 +107,7 @@ test('Google deletion: recent interactive authentication allows deletion without
   const limiter = createAttemptLimiter({ maxAttempts: 5, windowMs: 60000 });
 
   const result = await handleReauthenticationStep({
-    authHeader: 'Bearer google-recent-jwt',
+    authHeader: `Bearer ${freshJwt}`,
     rawBody: { provider: 'google', confirmation: 'DELETE' },
     env: TEST_ENV,
     userClient: mockUserClient,
@@ -117,6 +125,13 @@ test('Google deletion: recent interactive authentication allows deletion without
 // ---------------------------------------------------------------------------
 test('Google deletion: stale authentication rejects with 401 REAUTH_REQUIRED', async () => {
   const baseTime = Date.now();
+  const baseTimeSec = Math.floor(baseTime / 1000);
+  const staleJwt = createTestJwt({
+    userId: USER_A,
+    sessionId: 'session-flow-stale',
+    amr: [{ method: 'oauth', timestamp: baseTimeSec - 700, provider: 'google' }],
+  });
+
   const mockStaleClient = {
     auth: {
       getUser: async () => ({
@@ -128,7 +143,7 @@ test('Google deletion: stale authentication rejects with 401 REAUTH_REQUIRED', a
             identities: [{
               provider: 'google',
               id: 'google-sub-1',
-              last_sign_in_at: new Date(baseTime - 700 * 1000).toISOString(), // 11m 40s ago (> 10 minutes)
+              last_sign_in_at: new Date(baseTime - 700 * 1000).toISOString(),
             }],
           },
         },
@@ -142,7 +157,7 @@ test('Google deletion: stale authentication rejects with 401 REAUTH_REQUIRED', a
   await assert.rejects(
     async () => {
       await handleReauthenticationStep({
-        authHeader: 'Bearer stale-token',
+        authHeader: `Bearer ${staleJwt}`,
         rawBody: { provider: 'google', confirmation: 'DELETE' },
         env: TEST_ENV,
         userClient: mockStaleClient,

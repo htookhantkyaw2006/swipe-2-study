@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Settings as SettingsIcon, Flame, BookOpen,
   LogOut, Trash2, Languages, Volume2, Crown,
@@ -27,6 +27,7 @@ import { getCourseProgress } from '../lib/vocabularyProgress.js';
 
 export default function Profile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { prefs, setPref } = usePreferences();
   const { language } = useLanguage();
   const course = useCourse();
@@ -182,7 +183,8 @@ export default function Profile() {
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location?.search || '');
+    const searchStr = location?.search || (typeof window !== 'undefined' ? window.location?.search : '') || '';
+    const params = new URLSearchParams(searchStr);
     if (!params.get('verifyDeletion')) return;
 
     let storedIntent = null;
@@ -211,7 +213,7 @@ export default function Profile() {
 
     if (!user || user.id !== storedIntent.initiatingUserId) {
       setDeletionError(
-        'Google re-authentication completed with a different account. Deletion was cancelled to protect your data.'
+        'Verification account did not match the account to delete. Deletion was cancelled.'
       );
       setDeleteDialogOpen(false);
       return;
@@ -220,7 +222,7 @@ export default function Profile() {
     setReauthRequired(false);
     setDeletionError(null);
     setDeleteDialogOpen(true);
-  }, [user, navigate]);
+  }, [location?.search, user, navigate]);
 
   const handleDeleteAccount = async ({ password = null, confirmation = null } = {}) => {
     if (deletingAccount || loggingOut || globalSigningOut || busy) return;

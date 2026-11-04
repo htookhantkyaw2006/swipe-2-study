@@ -4,6 +4,7 @@ import {
   createDeletionHttpHandler,
   createAttemptLimiter,
   resolveCorsHeaders,
+  createTestJwt,
 } from '../src/server/accountDeletion.js';
 import edgeFunctionHandler, { VERIFIED_STAGING_ORIGIN } from '../supabase/functions/delete-account/index.js';
 import { sendDeletionRequest } from '../src/lib/accountDeletionClient.js';
@@ -534,6 +535,12 @@ test('Edge Function entry point: index.js exports callable handler handling pref
 // Google Deletion HTTP Boundary Tests
 // ---------------------------------------------------------------------------
 test('Edge Function Handler: Google-only deletion with fresh auth returns 200 confirmed deleted', async () => {
+  const freshToken = createTestJwt({
+    userId: TEST_USER_ID,
+    sessionId: 'session-http-fresh',
+    amr: [{ method: 'oauth', timestamp: Math.floor(Date.now() / 1000) - 60, provider: 'google' }],
+  });
+
   const handler = createDeletionHttpHandler({
     adminClient: createMockAdminClient(),
     dbClient: createMockDbClient(),
@@ -541,7 +548,7 @@ test('Edge Function Handler: Google-only deletion with fresh auth returns 200 co
     createClient: () => ({
       auth: {
         getUser: async (token) => {
-          assert.equal(token, 'google-fresh-token');
+          assert.equal(token, freshToken);
           return {
             data: {
               user: {
@@ -551,7 +558,7 @@ test('Edge Function Handler: Google-only deletion with fresh auth returns 200 co
                 identities: [{
                   provider: 'google',
                   id: 'google-sub-123',
-                  last_sign_in_at: new Date(Date.now() - 60 * 1000).toISOString(), // 1 minute ago
+                  last_sign_in_at: new Date(Date.now() - 60 * 1000).toISOString(),
                 }],
               },
             },
@@ -565,7 +572,7 @@ test('Edge Function Handler: Google-only deletion with fresh auth returns 200 co
   const request = new Request('https://staging-project.supabase.co/functions/v1/delete-account', {
     method: 'POST',
     headers: {
-      Authorization: 'Bearer google-fresh-token',
+      Authorization: `Bearer ${freshToken}`,
       Origin: VERIFIED_STAGING_ORIGIN,
       'Content-Type': 'application/json',
     },
@@ -582,6 +589,12 @@ test('Edge Function Handler: Google-only deletion with fresh auth returns 200 co
 });
 
 test('Edge Function Handler: Google-only deletion with stale auth returns 401 REAUTH_REQUIRED with provider', async () => {
+  const staleToken = createTestJwt({
+    userId: TEST_USER_ID,
+    sessionId: 'session-http-stale',
+    amr: [{ method: 'oauth', timestamp: Math.floor(Date.now() / 1000) - 900, provider: 'google' }],
+  });
+
   const handler = createDeletionHttpHandler({
     adminClient: createMockAdminClient(),
     dbClient: createMockDbClient(),
@@ -589,7 +602,7 @@ test('Edge Function Handler: Google-only deletion with stale auth returns 401 RE
     createClient: () => ({
       auth: {
         getUser: async (token) => {
-          assert.equal(token, 'google-stale-token');
+          assert.equal(token, staleToken);
           return {
             data: {
               user: {
@@ -599,7 +612,7 @@ test('Edge Function Handler: Google-only deletion with stale auth returns 401 RE
                 identities: [{
                   provider: 'google',
                   id: 'google-sub-123',
-                  last_sign_in_at: new Date(Date.now() - 900 * 1000).toISOString(), // 15 minutes ago
+                  last_sign_in_at: new Date(Date.now() - 900 * 1000).toISOString(),
                 }],
               },
             },
@@ -613,7 +626,7 @@ test('Edge Function Handler: Google-only deletion with stale auth returns 401 RE
   const request = new Request('https://staging-project.supabase.co/functions/v1/delete-account', {
     method: 'POST',
     headers: {
-      Authorization: 'Bearer google-stale-token',
+      Authorization: `Bearer ${staleToken}`,
       Origin: VERIFIED_STAGING_ORIGIN,
       'Content-Type': 'application/json',
     },

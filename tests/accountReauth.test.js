@@ -7,9 +7,10 @@ import {
   checkPasswordReauthSupported,
   performPasswordReauth,
   handleReauthenticationStep,
-  GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+  resolveFreshnessWindowSeconds,
   inspectUserAuthProviders,
   verifyGoogleAuthFreshness,
+  createTestJwt,
 } from '../src/server/accountDeletion.js';
 
 const USER_A = '11111111-1111-4111-8111-111111111111';
@@ -513,152 +514,290 @@ test('inspectUserAuthProviders: accurately classifies user identity configuratio
   });
 });
 
-test('verifyGoogleAuthFreshness: allows recent Google authentication within 10-minute window', () => {
+test('resolveFreshnessWindowSeconds: enforces finite, positive, bounded integers between 60s and 3600s', () => {
+  // Defaults to 600s when missing
+  assert.equal(resolveFreshnessWindowSeconds(), 600);
+  assert.equal(resolveFreshnessWindowSeconds(undefined), 600);
+  assert.equal(resolveFreshnessWindowSeconds(null), 600);
+  assert.equal(resolveFreshnessWindowSeconds(''), 600);
+
+  // Valid values
+  assert.equal(resolveFreshnessWindowSeconds(60), 60);
+  assert.equal(resolveFreshnessWindowSeconds('300'), 300);
+  assert.equal(resolveFreshnessWindowSeconds(3600), 3600);
+
+  // Below min (60s)
+  assert.throws(
+    () => resolveFreshnessWindowSeconds(59),
+    (err) => err.code === 'SERVER_CONFIGURATION_ERROR' && err.status === 500
+  );
+  assert.throws(
+    () => resolveFreshnessWindowSeconds('0'),
+    (err) => err.code === 'SERVER_CONFIGURATION_ERROR' && err.status === 500
+  );
+  assert.throws(
+    () => resolveFreshnessWindowSeconds('-300'),
+    (err) => err.code === 'SERVER_CONFIGURATION_ERROR' && err.status === 500
+  );
+
+  // Above max (3600s)
+  assert.throws(
+    () => resolveFreshnessWindowSeconds(3601),
+    (err) => err.code === 'SERVER_CONFIGURATION_ERROR' && err.status === 500
+  );
+
+  // Malformed / NaN / non-integer
+  assert.throws(
+    () => resolveFreshnessWindowSeconds('invalid'),
+    (err) => err.code === 'SERVER_CONFIGURATION_ERROR' && err.status === 500
+  );
+  assert.throws(
+    () => resolveFreshnessWindowSeconds(120.5),
+    (err) => err.code === 'SERVER_CONFIGURATION_ERROR' && err.status === 500
+  );
+});
+
+test('verifyGoogleAuthFreshness: allows fresh interactive session and rejects stale, missing, future, or malformed claims', () => {
   const baseTime = 1700000000000;
-  const recentUser = {
+  const baseTimeSec = Math.floor(baseTime / 1000);
+
+  const googleUser = {
     id: USER_A,
-    last_sign_in_at: new Date(baseTime - 60 * 1000).toISOString(), // 1 minute ago
-    identities: [
-      {
-        provider: 'google',
-        last_sign_in_at: new Date(baseTime - 60 * 1000).toISOString(),
-      },
-    ],
+    email: 'google-learner@gmail.com',
+    identities: [{ provider: 'google', id: 'gid-1' }],
   };
+
+  // 1. Fresh session (2 minutes ago)
+  const freshToken = createTestJwt({
+    userId: USER_A,
+    sessionId: 'session-123',
+    amr: [{ method: 'oauth', timestamp: baseTimeSec - 120, provider: 'google' }],
+    exp: baseTimeSec + 3600,
+  });
 
   assert.equal(
     verifyGoogleAuthFreshness({
-      user: recentUser,
-      freshnessWindowSeconds: GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+      token: freshToken,
+      user: googleUser,
+      freshnessWindowSeconds: 600,
       now: () => baseTime,
     }),
     true
   );
+
+  // 2. Stale session (15 minutes ago)
+  const staleToken = createTestJwt({
+    userId: USER_A,
+    sessionId: 'session-123',
+    amr: [{ method: 'oauth', timestamp: baseTimeSec - 900, provider: 'google' }],
+    exp: baseTimeSec + 3600,
+  });
+
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      token: staleToken,
+      user: googleUser,
+      freshnessWindowSeconds: 600,
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
+  );
+
+  // 3. Future timestamp (> 30s clock skew)
+  const futureToken = createTestJwt({
+    userId: USER_A,
+    sessionId: 'session-123',
+    amr: [{ method: 'oauth', timestamp: baseTimeSec + 120, provider: 'google' }],
+    exp: baseTimeSec + 3600,
+  });
+
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      token: futureToken,
+      user: googleUser,
+      freshnessWindowSeconds: 600,
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
+  );
+
+  // 4. Missing session_id
+  const noSessionToken = createTestJwt({
+    userId: USER_A,
+    sessionId: '',
+    amr: [{ method: 'oauth', timestamp: baseTimeSec - 120, provider: 'google' }],
+  });
+
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      token: noSessionToken,
+      user: googleUser,
+      freshnessWindowSeconds: 600,
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401
+  );
+
+  // 5. Missing / empty amr
+  const noAmrToken = createTestJwt({
+    userId: USER_A,
+    amr: [],
+  });
+
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      token: noAmrToken,
+      user: googleUser,
+      freshnessWindowSeconds: 600,
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401
+  );
+
+  // 6. User identity mismatch (token sub !== user.id)
+  const mismatchToken = createTestJwt({
+    userId: USER_B,
+    amr: [{ method: 'oauth', timestamp: baseTimeSec - 120, provider: 'google' }],
+  });
+
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      token: mismatchToken,
+      user: googleUser,
+      freshnessWindowSeconds: 600,
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'IDENTITY_MISMATCH' && err.status === 401
+  );
+
+  // 7. Signature verification failure when secret configured
+  const forgedToken = freshToken + 'tampered';
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      token: forgedToken,
+      user: googleUser,
+      freshnessWindowSeconds: 600,
+      env: { SUPABASE_JWT_SECRET: 'test-secret' },
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'UNAUTHENTICATED' && err.status === 401
+  );
 });
 
-test('verifyGoogleAuthFreshness: throws REAUTH_REQUIRED (401) on stale, missing, or future timestamps', () => {
-  const baseTime = 1700000000000;
-
-  // Stale (> 600s / 10m)
-  const staleUser = {
-    id: USER_A,
-    last_sign_in_at: new Date(baseTime - 601 * 1000).toISOString(), // 10m 1s ago
-    identities: [
-      {
-        provider: 'google',
-        last_sign_in_at: new Date(baseTime - 601 * 1000).toISOString(),
-      },
-    ],
-  };
-  assert.throws(
-    () => verifyGoogleAuthFreshness({
-      user: staleUser,
-      freshnessWindowSeconds: GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
-      now: () => baseTime,
-    }),
-    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
-  );
-
-  // Missing last_sign_in_at
-  const noTimestampUser = {
-    id: USER_A,
-    last_sign_in_at: null,
-    identities: [{ provider: 'google', last_sign_in_at: null }],
-  };
-  assert.throws(
-    () => verifyGoogleAuthFreshness({
-      user: noTimestampUser,
-      freshnessWindowSeconds: GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
-      now: () => baseTime,
-    }),
-    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
-  );
-
-  // Future timestamp (> 30s in the future)
-  const futureUser = {
-    id: USER_A,
-    last_sign_in_at: new Date(baseTime + 120 * 1000).toISOString(),
-    identities: [{ provider: 'google', last_sign_in_at: new Date(baseTime + 120 * 1000).toISOString() }],
-  };
-  assert.throws(
-    () => verifyGoogleAuthFreshness({
-      user: futureUser,
-      freshnessWindowSeconds: GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
-      now: () => baseTime,
-    }),
-    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
-  );
-});
-
-test('handleReauthenticationStep: allows Google deletion when authentication is fresh', async () => {
+test('Regression: Session A authenticated long ago, Session B authenticated recently for same account', async () => {
   const limiter = createAttemptLimiter({ maxAttempts: 5, windowMs: 60000 });
   const baseTime = 1700000000000;
+  const baseTimeSec = Math.floor(baseTime / 1000);
 
-  const mockGoogleUserClient = {
+  // User account has recent last_sign_in_at (from Session B 1 minute ago)
+  const sharedUser = {
+    id: USER_A,
+    email: 'google-learner@gmail.com',
+    app_metadata: { provider: 'google', providers: ['google'] },
+    last_sign_in_at: new Date(baseTime - 60 * 1000).toISOString(),
+    identities: [{
+      provider: 'google',
+      id: 'google-id-123',
+      last_sign_in_at: new Date(baseTime - 60 * 1000).toISOString(),
+    }],
+  };
+
+  const mockUserClient = {
     auth: {
       getUser: async () => ({
-        data: {
-          user: {
-            id: USER_A,
-            email: 'google-learner@gmail.com',
-            app_metadata: { provider: 'google', providers: ['google'] },
-            identities: [{
-              provider: 'google',
-              id: 'google-id-123',
-              last_sign_in_at: new Date(baseTime - 120 * 1000).toISOString(), // 2 minutes ago
-            }],
-          },
-        },
+        data: { user: sharedUser },
         error: null,
       }),
     },
   };
 
-  const result = await handleReauthenticationStep({
-    authHeader: 'Bearer valid-token',
+  // Session A: authenticated 2 hours ago (7200s ago)
+  const tokenSessionA = createTestJwt({
+    userId: USER_A,
+    sessionId: 'session-a-uuid',
+    amr: [{ method: 'oauth', timestamp: baseTimeSec - 7200, provider: 'google' }],
+    exp: baseTimeSec + 3600,
+  });
+
+  // Session B: authenticated 1 minute ago (60s ago)
+  const tokenSessionB = createTestJwt({
+    userId: USER_A,
+    sessionId: 'session-b-uuid',
+    amr: [{ method: 'oauth', timestamp: baseTimeSec - 60, provider: 'google' }],
+    exp: baseTimeSec + 3600,
+  });
+
+  // 1. Session A must be rejected with REAUTH_REQUIRED despite account-wide recent sign-in
+  await assert.rejects(
+    async () => {
+      await handleReauthenticationStep({
+        authHeader: `Bearer ${tokenSessionA}`,
+        rawBody: { provider: 'google', confirmation: 'DELETE' },
+        env: TEST_ENV,
+        userClient: mockUserClient,
+        attemptLimiter: limiter,
+        now: () => baseTime,
+      });
+    },
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
+  );
+
+  // 2. Session B was freshly authenticated and must proceed
+  const resB = await handleReauthenticationStep({
+    authHeader: `Bearer ${tokenSessionB}`,
     rawBody: { provider: 'google', confirmation: 'DELETE' },
     env: TEST_ENV,
-    userClient: mockGoogleUserClient,
+    userClient: mockUserClient,
     attemptLimiter: limiter,
     now: () => baseTime,
   });
 
-  assert.equal(result.success, true);
-  assert.equal(result.verifiedUser.id, USER_A);
-  assert.equal(result.method, 'google');
+  assert.equal(resB.success, true);
+  assert.equal(resB.verifiedUser.id, USER_A);
+  assert.equal(resB.method, 'google');
 });
 
-test('handleReauthenticationStep: rejects Google deletion with REAUTH_REQUIRED (401) when stale', async () => {
+test('Regression: Refreshing Session A does not renew interactive authentication freshness', async () => {
   const limiter = createAttemptLimiter({ maxAttempts: 5, windowMs: 60000 });
   const baseTime = 1700000000000;
+  const baseTimeSec = Math.floor(baseTime / 1000);
 
-  const mockStaleGoogleClient = {
+  const googleUser = {
+    id: USER_A,
+    email: 'google-learner@gmail.com',
+    app_metadata: { provider: 'google', providers: ['google'] },
+    identities: [{ provider: 'google', id: 'google-id-123' }],
+  };
+
+  const mockUserClient = {
     auth: {
       getUser: async () => ({
-        data: {
-          user: {
-            id: USER_A,
-            email: 'google-learner@gmail.com',
-            app_metadata: { provider: 'google', providers: ['google'] },
-            identities: [{
-              provider: 'google',
-              id: 'google-id-123',
-              last_sign_in_at: new Date(baseTime - 900 * 1000).toISOString(), // 15 minutes ago (stale)
-            }],
-          },
-        },
+        data: { user: googleUser },
         error: null,
       }),
     },
   };
 
+  // Refreshed token: iat is recent (30s ago), has token_refresh amr entry,
+  // but original interactive oauth timestamp is still stale (2 hours ago)
+  const refreshedToken = createTestJwt({
+    userId: USER_A,
+    sessionId: 'session-a-uuid',
+    amr: [
+      { method: 'oauth', timestamp: baseTimeSec - 7200, provider: 'google' },
+      { method: 'token_refresh', timestamp: baseTimeSec - 30 },
+    ],
+    iat: baseTimeSec - 30,
+    exp: baseTimeSec + 3600,
+  });
+
   await assert.rejects(
     async () => {
       await handleReauthenticationStep({
-        authHeader: 'Bearer valid-token',
+        authHeader: `Bearer ${refreshedToken}`,
         rawBody: { provider: 'google', confirmation: 'DELETE' },
         env: TEST_ENV,
-        userClient: mockStaleGoogleClient,
+        userClient: mockUserClient,
         attemptLimiter: limiter,
         now: () => baseTime,
       });
