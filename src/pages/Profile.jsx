@@ -19,6 +19,7 @@ import { getSupabaseClient } from '../lib/supabase.js';
 import { isAccountDeletionEnabled } from '../lib/accountDeletionGate.js';
 import { usePublishedCourse } from '../lib/publishedContentContext.jsx';
 import { sendDeletionRequest, removeOwnerLocalData, UNCONFIRMED_DELETION_GUIDANCE } from '../lib/accountDeletionClient.js';
+import { initiateGoogleSignIn } from '../lib/googleAuth.js';
 import GlobalSignOutDialog from '../components/GlobalSignOutDialog.jsx';
 import DeleteAccountDialog from '../components/DeleteAccountDialog.jsx';
 import { useStudyStreak } from '../lib/studyStreak.js';
@@ -57,6 +58,7 @@ export default function Profile() {
   const [deletionError, setDeletionError] = useState(null);
   const [localCleanupError, setLocalCleanupError] = useState(false);
   const [pendingCleanupOwnerId, setPendingCleanupOwnerId] = useState(null);
+  const [reauthRequired, setReauthRequired] = useState(false);
   const [deletionNotice, setDeletionNotice] = useState('');
   const [globalSignOutOpen, setGlobalSignOutOpen] = useState(false);
   const [globalSigningOut, setGlobalSigningOut] = useState(false);
@@ -66,6 +68,8 @@ export default function Profile() {
   const authProviders = user?.app_metadata?.providers || (user?.app_metadata?.provider ? [user?.app_metadata.provider] : []);
   const authIdentities = Array.isArray(user?.identities) ? user.identities : [];
   const hasEmailAuth = authIdentities.some(i => i.provider === 'email') || authProviders.includes('email');
+  const hasGoogleAuth = authIdentities.some(i => i.provider === 'google') || authProviders.includes('google');
+  const isGoogleOnly = Boolean(user && hasGoogleAuth && !hasEmailAuth);
   const isOAuthOnly = Boolean(user && authProviders.length > 0 && !hasEmailAuth);
   const deletionEnabled = isAccountDeletionEnabled();
 
@@ -147,11 +151,78 @@ export default function Profile() {
     if (loggingOut || globalSigningOut || deletingAccount || busy) return;
     setDeletionError(null);
     setLocalCleanupError(false);
-            setPendingCleanupOwnerId(null);
+    setPendingCleanupOwnerId(null);
+    setReauthRequired(false);
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteAccount = async ({ password }) => {
+  const handleVerifyGoogle = async () => {
+    if (!user?.id || deletingAccount) return;
+    setDeletingAccount(true);
+    setDeletionError(null);
+    try {
+      const intentData = {
+        initiatingUserId: user.id,
+        email: user.email,
+        timestamp: Date.now(),
+      };
+      sessionStorage.setItem('s2s_pending_deletion_intent', JSON.stringify(intentData));
+      const client = getSupabaseClient();
+      const res = await initiateGoogleSignIn(client, {
+        returnTo: '/profile?verifyDeletion=true',
+      });
+      if (res?.error) {
+        setDeletingAccount(false);
+        setDeletionError(res.error.message || 'Could not connect to Google. Please try again.');
+      }
+    } catch (err) {
+      setDeletingAccount(false);
+      setDeletionError(err?.message || 'Could not connect to Google. Please try again.');
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location?.search || '');
+    if (!params.get('verifyDeletion')) return;
+
+    let storedIntent = null;
+    try {
+      const raw = sessionStorage.getItem('s2s_pending_deletion_intent');
+      if (raw) {
+        storedIntent = JSON.parse(raw);
+        sessionStorage.removeItem('s2s_pending_deletion_intent');
+      }
+    } catch {
+      storedIntent = null;
+    }
+
+    navigate('/profile', { replace: true });
+
+    if (!storedIntent || !storedIntent.initiatingUserId) {
+      return;
+    }
+
+    const ageMs = Date.now() - (storedIntent.timestamp || 0);
+    if (ageMs > 10 * 60 * 1000) {
+      setDeletionError('Google verification session expired. Please try deleting your account again.');
+      setDeleteDialogOpen(true);
+      return;
+    }
+
+    if (!user || user.id !== storedIntent.initiatingUserId) {
+      setDeletionError(
+        'Google re-authentication completed with a different account. Deletion was cancelled to protect your data.'
+      );
+      setDeleteDialogOpen(false);
+      return;
+    }
+
+    setReauthRequired(false);
+    setDeletionError(null);
+    setDeleteDialogOpen(true);
+  }, [user, navigate]);
+
+  const handleDeleteAccount = async ({ password = null, confirmation = null } = {}) => {
     if (deletingAccount || loggingOut || globalSigningOut || busy) return;
     const initiatingUserId = user?.id;
     const initiatingGen = captureGeneration ? captureGeneration() : 0;
@@ -170,6 +241,9 @@ export default function Profile() {
         password,
         initiatingUserId,
         isCurrent: isOperationCurrent,
+        isGoogleOnly,
+        provider: isGoogleOnly ? 'google' : null,
+        confirmation: confirmation || 'DELETE',
       });
 
       // Guard against account switch during in-flight request
@@ -179,6 +253,12 @@ export default function Profile() {
         if (result.status === 'confirmed_deleted') {
           try { removeOwnerLocalData(initiatingUserId); } catch {}
         }
+        return;
+      }
+
+      if (result.status === 'reauth_required') {
+        setDeletingAccount(false);
+        setReauthRequired(true);
         return;
       }
 
@@ -204,6 +284,9 @@ export default function Profile() {
         setLocalCleanupError(false);
         setPendingCleanupOwnerId(null);
         setDeletionNotice('Your account has been deleted. You are now in guest mode.');
+        try {
+          sessionStorage.setItem('s2s_home_notice', 'Your account has been deleted. You are now in guest mode.');
+        } catch {}
         if (user?.id === initiatingUserId) {
           storageOwner.setOwner(null);
           await signOut();
@@ -241,6 +324,9 @@ export default function Profile() {
       setPendingCleanupOwnerId(null);
       setDeleteDialogOpen(false);
       setDeletionNotice('Cached data for the deleted account was cleared.');
+      try {
+        sessionStorage.setItem('s2s_home_notice', 'Your account has been deleted. You are now in guest mode.');
+      } catch {}
       if (user?.id === targetOwnerId) {
         setDeletionNotice('Your account has been deleted. You are now in guest mode.');
         storageOwner.setOwner(null);
@@ -287,6 +373,13 @@ export default function Profile() {
         <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', color: '#16A34A', padding: '12px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }} role="status">
           <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{deletionNotice}</span>
           <button type="button" onClick={() => setDeletionNotice('')} style={{ background: 'transparent', color: '#16A34A', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}>Dismiss</button>
+        </div>
+      )}
+
+      {deletionError && !deleteDialogOpen && (
+        <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', padding: '12px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }} role="alert">
+          <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{deletionError}</span>
+          <button type="button" onClick={() => setDeletionError(null)} style={{ background: 'transparent', color: '#991B1B', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', border: 0 }}>Dismiss</button>
         </div>
       )}
 
@@ -523,15 +616,19 @@ export default function Profile() {
         pending={deletingAccount}
         error={deletionError}
         isOAuthOnly={isOAuthOnly}
+        isGoogleOnly={isGoogleOnly}
+        reauthRequired={reauthRequired}
         localCleanupError={localCleanupError}
         accountLabel={user?.email || name || ''}
         onConfirm={handleDeleteAccount}
+        onVerifyGoogle={handleVerifyGoogle}
         onRetryCleanup={handleRetryLocalCleanup}
         onClose={() => {
           if (!deletingAccount) {
             setDeleteDialogOpen(false);
             setDeletionError(null);
             setLocalCleanupError(false);
+            setReauthRequired(false);
           }
         }}
       />

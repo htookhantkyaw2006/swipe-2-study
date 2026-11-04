@@ -193,6 +193,27 @@
 .delete-account-dialog__btn--retry:hover:not(:disabled) {
   background-color: #B45309;
 }
+.delete-account-dialog__btn--google-verify {
+  background-color: var(--color-primary-blue, #0284C7);
+  color: #FFFFFF;
+}
+
+.delete-account-dialog__btn--google-verify:hover:not(:disabled) {
+  background-color: #0369A1;
+}
+
+.delete-account-dialog__oauth-note {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #0369A1;
+  background-color: var(--color-page-bg, #F0F9FF);
+  border: 1px solid #BAE6FD;
+  border-radius: var(--radius-btn);
+  padding: 8px 12px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 
 @media (min-width: 480px) {
   .delete-account-dialog__actions {

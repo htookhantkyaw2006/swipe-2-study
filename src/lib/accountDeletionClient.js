@@ -68,11 +68,14 @@ export function formatRateLimitMessage(retryAfter) {
  */
 export async function sendDeletionRequest({
   client,
-  password,
+  password = null,
   initiatingUserId,
   isCurrent = null,
   supabaseUrl = null,
   fetcher = globalThis.fetch,
+  isGoogleOnly = false,
+  provider = null,
+  confirmation = null,
 }) {
   if (!initiatingUserId || !UUID_REGEX.test(initiatingUserId)) {
     return {
@@ -82,7 +85,8 @@ export async function sendDeletionRequest({
     };
   }
 
-  if (!password || typeof password !== 'string' || !password.trim()) {
+  const isGoogle = isGoogleOnly || provider === 'google';
+  if (!isGoogle && (!password || typeof password !== 'string' || !password.trim())) {
     return {
       status: 'error',
       code: 'PASSWORD_REQUIRED',
@@ -227,7 +231,9 @@ export async function sendDeletionRequest({
         Authorization: `Bearer ${capturedToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ password }),
+      body: isGoogle
+        ? JSON.stringify({ provider: 'google', confirmation: confirmation || 'DELETE' })
+        : JSON.stringify({ password }),
     });
   } catch {
     // Network loss, DNS failure, dropped connection, or timeout
@@ -271,6 +277,15 @@ export async function sendDeletionRequest({
   const code = json?.code;
   const retryHeader = response.headers?.get?.('Retry-After');
   const retryAfter = json?.retryAfter ?? retryHeader;
+
+  if (response.status === 401 && code === 'REAUTH_REQUIRED') {
+    return {
+      status: 'reauth_required',
+      code: 'REAUTH_REQUIRED',
+      provider: json?.provider || 'google',
+      message: json?.error || 'Recent Google authentication is required to delete this account. Please verify with Google.',
+    };
+  }
 
   if (response.status === 400 && code === 'UNSUPPORTED_AUTH_PROVIDER') {
     return {
@@ -380,7 +395,7 @@ export function createAccountDeletionController({
     notify();
   }
 
-  async function deleteAccount({ password }) {
+  async function deleteAccount({ password = null, isGoogleOnly = false, provider = null, confirmation = null } = {}) {
     if (pending) return;
     const user = authCoordinator?.getUser?.() ?? authCoordinator?.getState?.()?.user ?? null;
     if (!user?.id) {
@@ -413,6 +428,9 @@ export function createAccountDeletionController({
         isCurrent: isOperationCurrent,
         supabaseUrl,
         fetcher,
+        isGoogleOnly,
+        provider,
+        confirmation,
       });
     } catch {
       result = {
@@ -439,6 +457,13 @@ export function createAccountDeletionController({
     }
 
     // Handle response on still-current account
+    if (result.status === 'reauth_required') {
+      pending = false;
+      error = null;
+      notify();
+      return result;
+    }
+
     if (result.status === 'confirmed_deleted') {
       confirmedDeletedOwnerId = initiatingUserId;
       const targetStorage = typeof storage === 'function' ? storage() : storage;
@@ -463,6 +488,9 @@ export function createAccountDeletionController({
       pending = false;
       dialogOpen = false;
       notice = 'Your account has been deleted. You are now in guest mode.';
+      try {
+        globalThis.sessionStorage?.setItem('s2s_home_notice', 'Your account has been deleted. You are now in guest mode.');
+      } catch {}
       if (storageOwner?.setOwner) {
         storageOwner.setOwner(null);
       }
@@ -506,6 +534,9 @@ export function createAccountDeletionController({
       dialogOpen = false;
       confirmedDeletedOwnerId = null;
       notice = 'Your account has been deleted. You are now in guest mode.';
+      try {
+        globalThis.sessionStorage?.setItem('s2s_home_notice', 'Your account has been deleted. You are now in guest mode.');
+      } catch {}
       const currentUser = authCoordinator?.getUser?.() ?? authCoordinator?.getState?.()?.user ?? null;
       if (currentUser?.id === targetOwnerId) {
         if (storageOwner?.setOwner) {

@@ -7,6 +7,9 @@ import {
   checkPasswordReauthSupported,
   performPasswordReauth,
   handleReauthenticationStep,
+  GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+  inspectUserAuthProviders,
+  verifyGoogleAuthFreshness,
 } from '../src/server/accountDeletion.js';
 
 const USER_A = '11111111-1111-4111-8111-111111111111';
@@ -442,4 +445,257 @@ test('handleReauthenticationStep: successful authentication does not wipe attemp
   assert.equal(result.verifiedUser.id, USER_A);
   // Successful response must not wipe reservations (total reservations = 2 previous + 1 admitted = 3)
   assert.equal(limiter._getAttempts(USER_A), 3, 'Successful reauth preserves attempt reservations');
+});
+
+
+// ---------------------------------------------------------------------------
+// 7. Google OAuth Freshness & Provider Deletion
+// ---------------------------------------------------------------------------
+test('validateDeletionPayload: accepts valid Google provider deletion payload and enforces DELETE confirmation', () => {
+  const valid = validateDeletionPayload({ provider: 'google', confirmation: 'DELETE' });
+  assert.equal(valid.provider, 'google');
+  assert.equal(valid.confirmation, 'DELETE');
+  assert.equal(valid.password, null);
+
+  // Missing or wrong confirmation
+  assert.throws(
+    () => validateDeletionPayload({ provider: 'google' }),
+    { name: 'AccountDeletionError', code: 'CONFIRMATION_REQUIRED', status: 400 }
+  );
+
+  assert.throws(
+    () => validateDeletionPayload({ provider: 'google', confirmation: 'yes' }),
+    { name: 'AccountDeletionError', code: 'CONFIRMATION_REQUIRED', status: 400 }
+  );
+
+  // Extra unauthorized parameter
+  assert.throws(
+    () => validateDeletionPayload({ provider: 'google', confirmation: 'DELETE', user_id: USER_B }),
+    { name: 'AccountDeletionError', code: 'UNEXPECTED_PARAMETER', status: 400 }
+  );
+});
+
+test('inspectUserAuthProviders: accurately classifies user identity configurations', () => {
+  const googleOnly = {
+    identities: [{ provider: 'google', id: 'gid-1' }],
+    app_metadata: { provider: 'google', providers: ['google'] },
+  };
+  assert.deepEqual(inspectUserAuthProviders(googleOnly), {
+    hasEmailIdentity: false,
+    hasGoogleIdentity: true,
+    isGoogleOnly: true,
+    isEmailOnly: false,
+    isHybrid: false,
+  });
+
+  const emailOnly = {
+    identities: [{ provider: 'email', id: 'eid-1' }],
+    app_metadata: { provider: 'email', providers: ['email'] },
+  };
+  assert.deepEqual(inspectUserAuthProviders(emailOnly), {
+    hasEmailIdentity: true,
+    hasGoogleIdentity: false,
+    isGoogleOnly: false,
+    isEmailOnly: true,
+    isHybrid: false,
+  });
+
+  const hybrid = {
+    identities: [{ provider: 'email', id: 'eid-1' }, { provider: 'google', id: 'gid-1' }],
+    app_metadata: { providers: ['email', 'google'] },
+  };
+  assert.deepEqual(inspectUserAuthProviders(hybrid), {
+    hasEmailIdentity: true,
+    hasGoogleIdentity: true,
+    isGoogleOnly: false,
+    isEmailOnly: false,
+    isHybrid: true,
+  });
+});
+
+test('verifyGoogleAuthFreshness: allows recent Google authentication within 10-minute window', () => {
+  const baseTime = 1700000000000;
+  const recentUser = {
+    id: USER_A,
+    last_sign_in_at: new Date(baseTime - 60 * 1000).toISOString(), // 1 minute ago
+    identities: [
+      {
+        provider: 'google',
+        last_sign_in_at: new Date(baseTime - 60 * 1000).toISOString(),
+      },
+    ],
+  };
+
+  assert.equal(
+    verifyGoogleAuthFreshness({
+      user: recentUser,
+      freshnessWindowSeconds: GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+      now: () => baseTime,
+    }),
+    true
+  );
+});
+
+test('verifyGoogleAuthFreshness: throws REAUTH_REQUIRED (401) on stale, missing, or future timestamps', () => {
+  const baseTime = 1700000000000;
+
+  // Stale (> 600s / 10m)
+  const staleUser = {
+    id: USER_A,
+    last_sign_in_at: new Date(baseTime - 601 * 1000).toISOString(), // 10m 1s ago
+    identities: [
+      {
+        provider: 'google',
+        last_sign_in_at: new Date(baseTime - 601 * 1000).toISOString(),
+      },
+    ],
+  };
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      user: staleUser,
+      freshnessWindowSeconds: GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
+  );
+
+  // Missing last_sign_in_at
+  const noTimestampUser = {
+    id: USER_A,
+    last_sign_in_at: null,
+    identities: [{ provider: 'google', last_sign_in_at: null }],
+  };
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      user: noTimestampUser,
+      freshnessWindowSeconds: GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
+  );
+
+  // Future timestamp (> 30s in the future)
+  const futureUser = {
+    id: USER_A,
+    last_sign_in_at: new Date(baseTime + 120 * 1000).toISOString(),
+    identities: [{ provider: 'google', last_sign_in_at: new Date(baseTime + 120 * 1000).toISOString() }],
+  };
+  assert.throws(
+    () => verifyGoogleAuthFreshness({
+      user: futureUser,
+      freshnessWindowSeconds: GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+      now: () => baseTime,
+    }),
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
+  );
+});
+
+test('handleReauthenticationStep: allows Google deletion when authentication is fresh', async () => {
+  const limiter = createAttemptLimiter({ maxAttempts: 5, windowMs: 60000 });
+  const baseTime = 1700000000000;
+
+  const mockGoogleUserClient = {
+    auth: {
+      getUser: async () => ({
+        data: {
+          user: {
+            id: USER_A,
+            email: 'google-learner@gmail.com',
+            app_metadata: { provider: 'google', providers: ['google'] },
+            identities: [{
+              provider: 'google',
+              id: 'google-id-123',
+              last_sign_in_at: new Date(baseTime - 120 * 1000).toISOString(), // 2 minutes ago
+            }],
+          },
+        },
+        error: null,
+      }),
+    },
+  };
+
+  const result = await handleReauthenticationStep({
+    authHeader: 'Bearer valid-token',
+    rawBody: { provider: 'google', confirmation: 'DELETE' },
+    env: TEST_ENV,
+    userClient: mockGoogleUserClient,
+    attemptLimiter: limiter,
+    now: () => baseTime,
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.verifiedUser.id, USER_A);
+  assert.equal(result.method, 'google');
+});
+
+test('handleReauthenticationStep: rejects Google deletion with REAUTH_REQUIRED (401) when stale', async () => {
+  const limiter = createAttemptLimiter({ maxAttempts: 5, windowMs: 60000 });
+  const baseTime = 1700000000000;
+
+  const mockStaleGoogleClient = {
+    auth: {
+      getUser: async () => ({
+        data: {
+          user: {
+            id: USER_A,
+            email: 'google-learner@gmail.com',
+            app_metadata: { provider: 'google', providers: ['google'] },
+            identities: [{
+              provider: 'google',
+              id: 'google-id-123',
+              last_sign_in_at: new Date(baseTime - 900 * 1000).toISOString(), // 15 minutes ago (stale)
+            }],
+          },
+        },
+        error: null,
+      }),
+    },
+  };
+
+  await assert.rejects(
+    async () => {
+      await handleReauthenticationStep({
+        authHeader: 'Bearer valid-token',
+        rawBody: { provider: 'google', confirmation: 'DELETE' },
+        env: TEST_ENV,
+        userClient: mockStaleGoogleClient,
+        attemptLimiter: limiter,
+        now: () => baseTime,
+      });
+    },
+    (err) => err.code === 'REAUTH_REQUIRED' && err.status === 401 && err.provider === 'google'
+  );
+});
+
+test('handleReauthenticationStep: rejects email account attempting Google deletion without password', async () => {
+  const limiter = createAttemptLimiter({ maxAttempts: 5, windowMs: 60000 });
+
+  const mockEmailClient = {
+    auth: {
+      getUser: async () => ({
+        data: {
+          user: {
+            id: USER_A,
+            email: 'email-user@example.com',
+            app_metadata: { provider: 'email', providers: ['email'] },
+            identities: [{ provider: 'email', id: USER_A }],
+          },
+        },
+        error: null,
+      }),
+    },
+  };
+
+  await assert.rejects(
+    async () => {
+      await handleReauthenticationStep({
+        authHeader: 'Bearer valid-token',
+        rawBody: { provider: 'google', confirmation: 'DELETE' },
+        env: TEST_ENV,
+        userClient: mockEmailClient,
+        attemptLimiter: limiter,
+      });
+    },
+    { name: 'AccountDeletionError', code: 'PASSWORD_REQUIRED', status: 400 }
+  );
 });

@@ -6,15 +6,20 @@ import './DeleteAccountDialog.css';
  * DeleteAccountDialog
  *
  * Presentational confirmation dialog for permanent account deletion.
+ * Supports email/password re-authentication and Google OAuth re-authentication.
  * Contains NO Auth, network, routing, or storage dependencies.
  *
  * Props:
  * - open: boolean (mounts dialog only when true)
  * - pending: boolean (disables buttons/inputs, suppresses dismissal, sets aria-busy)
  * - error: string | null (accessible error message)
+ * - isOAuthOnly: boolean (true for non-Google third-party OAuth accounts)
+ * - isGoogleOnly: boolean (true for Google OAuth accounts without passwords)
+ * - reauthRequired: boolean (indicates server returned 401 REAUTH_REQUIRED for Google)
  * - localCleanupError: boolean (indicates server deletion succeeded but device storage cleanup failed)
  * - accountLabel: string (optional email or display name of the account being deleted)
- * - onConfirm: ({ password }) => void (invoked with the entered password)
+ * - onConfirm: ({ password, confirmation }) => void (invoked with the entered credentials/confirmation)
+ * - onVerifyGoogle: () => void (invoked when user clicks "Continue with Google to verify")
  * - onRetryCleanup: () => void (invoked when retrying local storage cleanup)
  * - onClose: () => void (invoked on Cancel, Escape, or backdrop click)
  */
@@ -23,27 +28,35 @@ export default function DeleteAccountDialog({
   pending = false,
   error = null,
   isOAuthOnly = false,
+  isGoogleOnly = false,
+  reauthRequired = false,
   localCleanupError = false,
   accountLabel = '',
   onConfirm,
+  onVerifyGoogle,
   onRetryCleanup,
   onClose,
 }) {
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const passwordInputRef = useRef(null);
+  const confirmInputRef = useRef(null);
 
-  // Focus password input when dialog opens
+  // Focus input when dialog opens
   useEffect(() => {
-    if (open && !pending && !localCleanupError) {
+    if (open && !pending && !localCleanupError && !reauthRequired && !(isOAuthOnly && !isGoogleOnly)) {
       const timer = setTimeout(() => {
-        passwordInputRef.current?.focus();
+        if (isGoogleOnly) {
+          confirmInputRef.current?.focus();
+        } else {
+          passwordInputRef.current?.focus();
+        }
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [open, pending, localCleanupError]);
+  }, [open, pending, localCleanupError, reauthRequired, isOAuthOnly, isGoogleOnly]);
 
-  // Clear password whenever dialog closes
+  // Clear password and confirmation whenever dialog closes
   useEffect(() => {
     if (!open) {
       setPassword('');
@@ -71,14 +84,19 @@ export default function DeleteAccountDialog({
 
   const isConfirmed = confirmation === 'DELETE';
   const hasPassword = password.trim().length > 0;
-  const canSubmit = hasPassword && isConfirmed && !pending && !localCleanupError;
+  const canSubmit = isGoogleOnly
+    ? (isConfirmed && !pending && !localCleanupError)
+    : (hasPassword && isConfirmed && !pending && !localCleanupError);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!canSubmit) return;
-    const currentPassword = password;
     if (onConfirm) {
-      onConfirm({ password: currentPassword });
+      if (isGoogleOnly) {
+        onConfirm({ confirmation: 'DELETE' });
+      } else {
+        onConfirm({ password, confirmation: 'DELETE' });
+      }
     }
   };
 
@@ -110,7 +128,34 @@ export default function DeleteAccountDialog({
           </div>
         ) : null}
 
-        {isOAuthOnly ? (
+        {reauthRequired ? (
+          <div className="delete-account-dialog__cleanup-state">
+            <div className="delete-account-dialog__error" role="alert" aria-live="assertive">
+              For security, recent Google authentication is required to delete your account.
+            </div>
+            <p className="delete-account-dialog__cleanup-message">
+              Please verify your identity with Google. You will return here to confirm the deletion.
+            </p>
+            <div className="delete-account-dialog__actions">
+              <button
+                type="button"
+                className="delete-account-dialog__btn delete-account-dialog__btn--cancel"
+                onClick={handleClose}
+                disabled={pending}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="delete-account-dialog__btn delete-account-dialog__btn--google-verify"
+                onClick={onVerifyGoogle}
+                disabled={pending}
+              >
+                {pending ? 'Connecting to Google…' : 'Continue with Google to verify'}
+              </button>
+            </div>
+          </div>
+        ) : (isOAuthOnly && !isGoogleOnly) ? (
           <div className="delete-account-dialog__cleanup-state">
             <div className="delete-account-dialog__error" role="alert" aria-live="assertive">
               Password reauthentication is not supported for accounts signed in with a third-party provider (such as Google). Self-service account deletion is unavailable for this account in this version.
@@ -155,29 +200,36 @@ export default function DeleteAccountDialog({
           </div>
         ) : (
           <form className="delete-account-dialog__form" onSubmit={handleSubmit} noValidate>
-            <div className="delete-account-dialog__field">
-              <label htmlFor="delete-account-password" className="delete-account-dialog__label">
-                Account password
-              </label>
-              <input
-                ref={passwordInputRef}
-                id="delete-account-password"
-                type="password"
-                className="delete-account-dialog__input"
-                autoComplete="new-password"
-                value={password}
-                disabled={pending}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your current password"
-                required
-              />
-            </div>
+            {isGoogleOnly ? (
+              <p className="delete-account-dialog__oauth-note">
+                Signed in with Google. No password is required.
+              </p>
+            ) : (
+              <div className="delete-account-dialog__field">
+                <label htmlFor="delete-account-password" className="delete-account-dialog__label">
+                  Account password
+                </label>
+                <input
+                  ref={passwordInputRef}
+                  id="delete-account-password"
+                  type="password"
+                  className="delete-account-dialog__input"
+                  autoComplete="new-password"
+                  value={password}
+                  disabled={pending}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your current password"
+                  required
+                />
+              </div>
+            )}
 
             <div className="delete-account-dialog__field">
               <label htmlFor="delete-account-confirm" className="delete-account-dialog__label">
                 Type <strong>DELETE</strong> to confirm
               </label>
               <input
+                ref={confirmInputRef}
                 id="delete-account-confirm"
                 type="text"
                 className="delete-account-dialog__input"

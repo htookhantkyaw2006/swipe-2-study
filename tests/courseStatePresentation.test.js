@@ -171,8 +171,8 @@ test('Course-state presentation: ERROR state', () => {
   assert.match(hsk1TileMatch[1], /Explore level/);
 
   // Unpublished HSK 2 tile displays Curriculum in preparation without numeric totals
-  const hsk2TileMatch = overviewHtml.match(/<a[^>]*href="\/learn\/level\/HSK2"[^>]*>([\s\S]*?)<\/a>/);
-  assert.ok(hsk2TileMatch, 'HSK 2 tile is present');
+  const hsk2TileMatch = [null, overviewHtml.split(/<(?:a\b|div\b)[^>]*\bclass="level-tile\b/).find(chunk => chunk.includes('<h3>HSK 2</h3>'))];
+  assert.ok(hsk2TileMatch[1], 'HSK 2 tile is present');
   assert.match(hsk2TileMatch[1], /level-tile__badge--soon[^>]*>COMING SOON<\/span>/);
   assert.match(hsk2TileMatch[1], /Curriculum in preparation/);
   assert.doesNotMatch(hsk2TileMatch[1], /\d+\s+(?:words|phrases)\s+curriculum/);
@@ -214,8 +214,8 @@ test('Course-state presentation: UNPUBLISHED / COMING SOON state', () => {
   // 1. LevelOverview
   const overviewHtml = renderWithState({ Component: LevelOverview, route: '/learn', initialCache });
   // HSK 1 and HSK 2 both render COMING SOON
-  const hsk1TileMatch = overviewHtml.match(/<a[^>]*href="\/learn\/level\/HSK1"[^>]*>([\s\S]*?)<\/a>/);
-  assert.ok(hsk1TileMatch, 'HSK 1 tile is present');
+  const hsk1TileMatch = [null, overviewHtml.split(/<(?:a\b|div\b)[^>]*\bclass="level-tile\b/).find(chunk => chunk.includes('<h3>HSK 1</h3>'))];
+  assert.ok(hsk1TileMatch[1], 'HSK 1 tile is present');
   assert.match(hsk1TileMatch[1], /level-tile__badge--soon[^>]*>COMING SOON<\/span>/);
   assert.match(hsk1TileMatch[1], /Curriculum in preparation/);
   assert.doesNotMatch(hsk1TileMatch[1], /\d+\s+(?:words|phrases)\s+curriculum/);

@@ -528,3 +528,103 @@ test('Edge Function entry point: index.js exports callable handler handling pref
     else delete process.env.SUPABASE_ANON_KEY;
   }
 });
+
+
+// ---------------------------------------------------------------------------
+// Google Deletion HTTP Boundary Tests
+// ---------------------------------------------------------------------------
+test('Edge Function Handler: Google-only deletion with fresh auth returns 200 confirmed deleted', async () => {
+  const handler = createDeletionHttpHandler({
+    adminClient: createMockAdminClient(),
+    dbClient: createMockDbClient(),
+    env: TEST_ENV,
+    createClient: () => ({
+      auth: {
+        getUser: async (token) => {
+          assert.equal(token, 'google-fresh-token');
+          return {
+            data: {
+              user: {
+                id: TEST_USER_ID,
+                email: 'google-learner@gmail.com',
+                app_metadata: { provider: 'google', providers: ['google'] },
+                identities: [{
+                  provider: 'google',
+                  id: 'google-sub-123',
+                  last_sign_in_at: new Date(Date.now() - 60 * 1000).toISOString(), // 1 minute ago
+                }],
+              },
+            },
+            error: null,
+          };
+        },
+      },
+    }),
+  });
+
+  const request = new Request('https://staging-project.supabase.co/functions/v1/delete-account', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer google-fresh-token',
+      Origin: VERIFIED_STAGING_ORIGIN,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ provider: 'google', confirmation: 'DELETE' }),
+  });
+
+  const response = await handler(request);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), VERIFIED_STAGING_ORIGIN);
+  const json = await response.json();
+  assert.equal(json.success, true);
+  assert.equal(json.status, 'deleted');
+  assert.equal(json.userId, TEST_USER_ID);
+});
+
+test('Edge Function Handler: Google-only deletion with stale auth returns 401 REAUTH_REQUIRED with provider', async () => {
+  const handler = createDeletionHttpHandler({
+    adminClient: createMockAdminClient(),
+    dbClient: createMockDbClient(),
+    env: TEST_ENV,
+    createClient: () => ({
+      auth: {
+        getUser: async (token) => {
+          assert.equal(token, 'google-stale-token');
+          return {
+            data: {
+              user: {
+                id: TEST_USER_ID,
+                email: 'google-learner@gmail.com',
+                app_metadata: { provider: 'google', providers: ['google'] },
+                identities: [{
+                  provider: 'google',
+                  id: 'google-sub-123',
+                  last_sign_in_at: new Date(Date.now() - 900 * 1000).toISOString(), // 15 minutes ago
+                }],
+              },
+            },
+            error: null,
+          };
+        },
+      },
+    }),
+  });
+
+  const request = new Request('https://staging-project.supabase.co/functions/v1/delete-account', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer google-stale-token',
+      Origin: VERIFIED_STAGING_ORIGIN,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ provider: 'google', confirmation: 'DELETE' }),
+  });
+
+  const response = await handler(request);
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), VERIFIED_STAGING_ORIGIN);
+  const json = await response.json();
+  assert.equal(json.code, 'REAUTH_REQUIRED');
+  assert.equal(json.provider, 'google');
+  assert.equal(json.status, 'pending');
+});

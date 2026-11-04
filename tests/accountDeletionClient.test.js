@@ -560,3 +560,99 @@ test('DeleteAccountDialog: displays unsupported third-party provider notice and 
   assert.ok(html.includes('Close'));
   assert.ok(!html.includes('Account password'));
 });
+
+
+// ---------------------------------------------------------------------------
+// 7. Google Account Deletion Client Tests
+// ---------------------------------------------------------------------------
+
+test('sendDeletionRequest: Google-only deletion dispatches provider confirmation and handles reauth_required', async () => {
+  let capturedBody = null;
+  const mockFetcher = async (url, opts) => {
+    capturedBody = JSON.parse(opts.body);
+    return new Response(JSON.stringify({
+      error: 'Recent Google authentication is required to delete this account.',
+      code: 'REAUTH_REQUIRED',
+      provider: 'google',
+      status: 'pending',
+    }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  };
+
+  const mockClient = {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: { access_token: 'google-token', user: { id: USER_A } } }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: { id: USER_A } }, error: null }),
+    },
+  };
+
+  const res = await sendDeletionRequest({
+    client: mockClient,
+    initiatingUserId: USER_A,
+    isGoogleOnly: true,
+    provider: 'google',
+    confirmation: 'DELETE',
+    fetcher: mockFetcher,
+  });
+
+  assert.equal(capturedBody.provider, 'google');
+  assert.equal(capturedBody.confirmation, 'DELETE');
+  assert.equal(capturedBody.password, undefined);
+  assert.equal(res.status, 'reauth_required');
+  assert.equal(res.code, 'REAUTH_REQUIRED');
+  assert.equal(res.provider, 'google');
+});
+
+test('sendDeletionRequest: Google-only deletion handles confirmed_deleted success', async () => {
+  const mockFetcher = async () => new Response(JSON.stringify({
+    success: true,
+    status: 'deleted',
+    userId: USER_A,
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+  const mockClient = {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: { access_token: 'google-token', user: { id: USER_A } } }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: { id: USER_A } }, error: null }),
+    },
+  };
+
+  const res = await sendDeletionRequest({
+    client: mockClient,
+    initiatingUserId: USER_A,
+    isGoogleOnly: true,
+    provider: 'google',
+    confirmation: 'DELETE',
+    fetcher: mockFetcher,
+  });
+
+  assert.equal(res.status, 'confirmed_deleted');
+  assert.equal(res.userId, USER_A);
+});
+
+test('DeleteAccountDialog: displays Google-only mode without password field', () => {
+  const html = renderToString(React.createElement(DeleteAccountDialog, {
+    open: true,
+    isGoogleOnly: true,
+    accountLabel: 'google-learner@gmail.com',
+  }));
+
+  assert.ok(html.includes('google-learner@gmail.com'));
+  assert.ok(html.includes('Signed in with Google. No password is required.'));
+  assert.ok(html.includes('Type <strong>DELETE</strong> to confirm'));
+  assert.ok(!html.includes('Account password'), 'Must NOT ask for a password in Google mode');
+  assert.ok(html.includes('Delete my account'));
+});
+
+test('DeleteAccountDialog: displays reauthRequired state with Continue with Google action', () => {
+  const html = renderToString(React.createElement(DeleteAccountDialog, {
+    open: true,
+    isGoogleOnly: true,
+    reauthRequired: true,
+    accountLabel: 'google-learner@gmail.com',
+  }));
+
+  assert.ok(html.includes('For security, recent Google authentication is required to delete your account.'));
+  assert.ok(html.includes('Continue with Google to verify'));
+  assert.ok(!html.includes('Account password'));
+  assert.ok(!html.includes('Type <strong>DELETE</strong> to confirm'));
+});

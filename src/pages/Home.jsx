@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { RotateCw, Search, ChevronRight, Bookmark, Library as LibraryIcon, Crown, Layers, Sparkles } from 'lucide-react';
+import { RotateCw, Search, ChevronRight, Bookmark, Library as LibraryIcon, Crown, Layers, Sparkles, CheckCircle2, X } from 'lucide-react';
 import LevelCarousel from '../components/ui/LevelCarousel';
 import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import Avatar from '../components/ui/Avatar';
@@ -119,6 +119,16 @@ export default function Home() {
   const photo = useAvatarUrl(profile?.avatar_path);
   const course = useCourse();
   const [counts, setCounts] = useState({ review: 0, saved: 0 });
+  const [deletionNotice, setDeletionNotice] = useState(() => {
+    try {
+      const notice = sessionStorage.getItem('s2s_home_notice');
+      if (notice) {
+        sessionStorage.removeItem('s2s_home_notice');
+        return notice;
+      }
+    } catch {}
+    return null;
+  });
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -148,6 +158,23 @@ export default function Home() {
 
   return (
     <div className="home-page">
+
+      {deletionNotice && (
+        <div className="home-deletion-banner" role="status" aria-live="polite">
+          <div className="home-deletion-banner__content">
+            <CheckCircle2 size={18} className="home-deletion-banner__icon" aria-hidden="true" />
+            <p className="home-deletion-banner__text">{deletionNotice}</p>
+          </div>
+          <button
+            type="button"
+            className="home-deletion-banner__dismiss"
+            onClick={() => setDeletionNotice(null)}
+            aria-label="Dismiss notice"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <header className="home-greeting">

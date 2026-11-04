@@ -6,6 +6,27 @@ const MAX_PASSWORD_LENGTH = 1024;
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
+/**
+ * Short freshness window (10 minutes) for interactive Google OAuth authentication.
+ *
+ * Why JWT `iat` alone or routine token refresh is insufficient:
+ * In Supabase / GoTrue Auth, routine client-side token refresh (via the refresh_token)
+ * issues a new access token with a renewed `iat` (issued-at) and `exp` timestamp
+ * without requiring any interactive credential entry or Google consent. Therefore,
+ * a long-lived or stolen refresh token could continue generating "fresh" access tokens
+ * indefinitely.
+ *
+ * In contrast, `last_sign_in_at` on the user and linked GoTrue identity records
+ * (auth.identities.last_sign_in_at) is updated exclusively when an interactive
+ * authentication round-trip completes (such as initial Google OAuth login or an
+ * explicit interactive OAuth re-authentication redirect).
+ *
+ * Evaluating `last_sign_in_at` against the server clock with a bounded freshness window
+ * guarantees that account deletion can only proceed if the account owner has interactively
+ * verified their Google identity recently.
+ */
+export const GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS = 10 * 60; // 10 minutes (600 seconds)
+
 export class AccountDeletionError extends Error {
   constructor(message, code, status = 400) {
     super(message);
@@ -293,7 +314,102 @@ export function createDatabaseAttemptLimiter(dbClient, {
 }
 
 /**
+ * Inspects a Supabase/GoTrue user record to determine active identity providers.
+ */
+export function inspectUserAuthProviders(user) {
+  const providers = user?.app_metadata?.providers || (user?.app_metadata?.provider ? [user.app_metadata.provider] : []);
+  const identities = Array.isArray(user?.identities) ? user.identities : [];
+
+  const hasEmailIdentity = identities.some(i => i.provider === 'email') || providers.includes('email');
+  const hasGoogleIdentity = identities.some(i => i.provider === 'google') || providers.includes('google');
+
+  return {
+    hasEmailIdentity,
+    hasGoogleIdentity,
+    isGoogleOnly: hasGoogleIdentity && !hasEmailIdentity,
+    isEmailOnly: hasEmailIdentity && !hasGoogleIdentity,
+    isHybrid: hasEmailIdentity && hasGoogleIdentity,
+  };
+}
+
+/**
+ * Verifies that a Google-authenticated user completed interactive authentication
+ * within the allowable freshness window using trusted server-side GoTrue evidence.
+ *
+ * Checks identity.last_sign_in_at (or user.last_sign_in_at) against the server clock.
+ */
+export function verifyGoogleAuthFreshness({
+  user,
+  freshnessWindowSeconds = GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS,
+  now = () => Date.now(),
+} = {}) {
+  if (!user) {
+    const error = new AccountDeletionError(
+      'Authenticated user is required for Google re-authentication verification.',
+      'UNAUTHENTICATED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  const identities = Array.isArray(user.identities) ? user.identities : [];
+  const googleIdentity = identities.find(i => i.provider === 'google');
+
+  // GoTrue stores last_sign_in_at on the identity and on the user record.
+  // Evaluate the specific Google identity last_sign_in_at if available; fallback to user.last_sign_in_at.
+  const lastSignInStr = googleIdentity?.last_sign_in_at || user.last_sign_in_at;
+  if (!lastSignInStr || typeof lastSignInStr !== 'string') {
+    const error = new AccountDeletionError(
+      'Recent Google authentication is required to delete this account. Please verify with Google.',
+      'REAUTH_REQUIRED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  const lastSignInMs = Date.parse(lastSignInStr);
+  if (Number.isNaN(lastSignInMs)) {
+    const error = new AccountDeletionError(
+      'Invalid authentication timestamp. Re-authentication is required.',
+      'REAUTH_REQUIRED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  const currentMs = now();
+  const ageSeconds = Math.floor((currentMs - lastSignInMs) / 1000);
+
+  // Reject future timestamps beyond 30s allowable clock skew
+  if (ageSeconds < -30) {
+    const error = new AccountDeletionError(
+      'Invalid authentication timestamp from the future. Re-authentication is required.',
+      'REAUTH_REQUIRED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  if (ageSeconds > freshnessWindowSeconds) {
+    const error = new AccountDeletionError(
+      'Recent Google authentication has expired. Please verify with Google before deleting your account.',
+      'REAUTH_REQUIRED',
+      401
+    );
+    error.provider = 'google';
+    throw error;
+  }
+
+  return true;
+}
+
+/**
  * Validates raw request payload for account deletion.
+ * Supports password reauthentication or Google OAuth provider confirmation.
  * Enforces size limits and prevents arbitrary property injection.
  */
 export function validateDeletionPayload(rawBody) {
@@ -318,23 +434,44 @@ export function validateDeletionPayload(rawBody) {
     throw new AccountDeletionError('Request body must be a JSON object.', 'INVALID_PAYLOAD', 400);
   }
 
-  const allowedKeys = new Set(['password']);
+  const allowedKeys = new Set(['password', 'provider', 'confirmation']);
   for (const key of Object.keys(body)) {
     if (!allowedKeys.has(key)) {
       throw new AccountDeletionError(`Unexpected parameter "${key}" in request body. Target user cannot be caller-specified.`, 'UNEXPECTED_PARAMETER', 400);
     }
   }
 
+  const hasPassword = body.password !== undefined && body.password !== null;
   const password = body.password;
-  if (typeof password !== 'string' || !password) {
-    throw new AccountDeletionError('Password is required for account deletion reauthentication.', 'PASSWORD_REQUIRED', 400);
+
+  if (hasPassword) {
+    if (typeof password !== 'string' || !password) {
+      throw new AccountDeletionError('Password is required for account deletion reauthentication.', 'PASSWORD_REQUIRED', 400);
+    }
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      throw new AccountDeletionError('Password length exceeds maximum allowed limit.', 'PASSWORD_TOO_LONG', 400);
+    }
+    return {
+      password,
+      provider: body.provider || null,
+      confirmation: body.confirmation || null,
+    };
   }
 
-  if (password.length > MAX_PASSWORD_LENGTH) {
-    throw new AccountDeletionError('Password length exceeds maximum allowed limit.', 'PASSWORD_TOO_LONG', 400);
+  // Password omitted: only valid for provider re-authentication (Google)
+  if (body.provider === 'google') {
+    if (body.confirmation !== 'DELETE') {
+      throw new AccountDeletionError('Explicit confirmation ("DELETE") is required to delete this account.', 'CONFIRMATION_REQUIRED', 400);
+    }
+    return {
+      password: null,
+      provider: 'google',
+      confirmation: 'DELETE',
+    };
   }
 
-  return { password };
+  // Neither valid password nor supported provider
+  throw new AccountDeletionError('Password is required for account deletion reauthentication.', 'PASSWORD_REQUIRED', 400);
 }
 
 /**
@@ -485,6 +622,7 @@ export async function handleReauthenticationStep({
   userClient,
   attemptLimiter,
   createClient = defaultCreateClient,
+  now = () => Date.now(),
 }) {
   const supabaseUrl = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
   const supabaseAnonKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -497,13 +635,40 @@ export async function handleReauthenticationStep({
     );
   }
 
-  const { password } = validateDeletionPayload(rawBody);
+  const payload = validateDeletionPayload(rawBody);
   const verifiedUser = await verifyCallerIdentity(userClient, authHeader);
   const userId = verifiedUser.id;
+  const authInfo = inspectUserAuthProviders(verifiedUser);
 
-  checkPasswordReauthSupported(verifiedUser);
+  // If password was omitted, verify caller does not have an email/password identity
+  if (!payload.password) {
+    if (authInfo.hasEmailIdentity) {
+      throw new AccountDeletionError(
+        'Password reauthentication is required for accounts with email authentication.',
+        'PASSWORD_REQUIRED',
+        400
+      );
+    }
+    if (!authInfo.isGoogleOnly) {
+      throw new AccountDeletionError(
+        'Provider reauthentication is not supported for this account.',
+        'UNSUPPORTED_AUTH_PROVIDER',
+        400
+      );
+    }
+  } else {
+    // Password was provided: verify caller actually supports password reauthentication
+    if (authInfo.isGoogleOnly) {
+      throw new AccountDeletionError(
+        'Password reauthentication is not supported for this account. Provider reauthentication is required.',
+        'UNSUPPORTED_AUTH_PROVIDER',
+        400
+      );
+    }
+    checkPasswordReauthSupported(verifiedUser);
+  }
 
-  // Atomically reserve attempt capacity BEFORE starting password verification.
+  // Atomically reserve attempt capacity BEFORE starting password or Google freshness check.
   // Enforces capacity in one short database transaction without holding locks during Auth.
   // Fails closed if the limiter RPC or database is unavailable.
   let reservation;
@@ -560,13 +725,32 @@ export async function handleReauthenticationStep({
     throw error;
   }
 
+  // Google provider re-authentication freshness check
+  if (!payload.password && authInfo.isGoogleOnly) {
+    const freshnessWindowSeconds = env.GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS
+      ? Number(env.GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS)
+      : GOOGLE_AUTH_FRESHNESS_WINDOW_SECONDS;
+
+    verifyGoogleAuthFreshness({
+      user: verifiedUser,
+      freshnessWindowSeconds,
+      now,
+    });
+
+    return {
+      success: true,
+      verifiedUser,
+      method: 'google',
+    };
+  }
+
   // Database transaction was committed during reserve(); NO transaction is held open during this network request.
   try {
     await performPasswordReauth({
       supabaseUrl,
       supabaseAnonKey,
       verifiedEmail: verifiedUser.email,
-      password,
+      password: payload.password,
       initiatingUserId: userId,
       createClient,
     });
@@ -577,6 +761,7 @@ export async function handleReauthenticationStep({
     return {
       success: true,
       verifiedUser,
+      method: 'password',
     };
   } catch (error) {
     // If using legacy limiter without reserve(), record failure
@@ -1100,6 +1285,7 @@ export function createDeletionHttpHandler({
         code,
         status: 'pending',
         ...(err.retryAfter ? { retryAfter: err.retryAfter } : {}),
+        ...(err.provider || code === 'REAUTH_REQUIRED' ? { provider: err.provider || 'google' } : {}),
       }), {
         status,
         headers,
