@@ -1,1 +1,8 @@
 /* App specific styles, mostly handled in index.css */
+
+/* Scoped gesture policy for flashcard answer scroller:
+   enables vertical scrolling and pinch-zoom inside the revealed answer
+   while allowing horizontal touch swipe gestures to be handled by the draggable card. */
+.swipe-card__answer {
+  touch-action: pan-y pinch-zoom;
+}

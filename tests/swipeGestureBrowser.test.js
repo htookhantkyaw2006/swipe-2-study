@@ -192,6 +192,29 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     throw new Error(`Timed out waiting for condition: ${expr}`);
   }
 
+  async function dispatchTouchDrag(startX, startY, deltaX, deltaY = 0, steps = 5, stepDelay = 20) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(startX), y: Math.round(startY), id: 0 }]
+    });
+    for (let i = 1; i <= steps; i++) {
+      await new Promise((r) => setTimeout(r, stepDelay));
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{
+          x: Math.round(startX + (deltaX * i) / steps),
+          y: Math.round(startY + (deltaY * i) / steps),
+          id: 0
+        }]
+      });
+    }
+    await new Promise((r) => setTimeout(r, stepDelay));
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: []
+    });
+  }
+
   it('1. Cancelled drag below threshold returns card smoothly to resting position without flipping or writing progress', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
@@ -1728,5 +1751,386 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
         }
       })()`);
     }
+  });
+
+  it('21. Computed gesture styling: rendered .swipe-card__answer scroller computes touch-action: pan-y pinch-zoom', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    await cdp.eval('window.mountSession()');
+    const computedTouchAction = await cdp.eval(`(() => {
+      const el = document.querySelector('.swipe-card--active .swipe-card__answer');
+      return el ? window.getComputedStyle(el).touchAction : null;
+    })()`);
+
+    assert.strictEqual(computedTouchAction, 'pan-y pinch-zoom', 'Scroller computes touch-action: pan-y pinch-zoom');
+  });
+
+  it('22. Revealed back-face horizontal touch swipes succeed in both directions (Learned right and Review left) on short content', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    // Part A: Right swipe -> Learned
+    await cdp.eval('window.mountSession()');
+    const card1 = await getCardCenter();
+
+    // Tap to reveal
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card1.cx, y: card1.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card1.cx, y: card1.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    await new Promise((r) => setTimeout(r, 350));
+
+    // Get back face scroller center
+    const answerPosA = await cdp.eval(`(() => {
+      const el = document.querySelector('.swipe-card--active .swipe-card__answer');
+      const r = el.getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    })()`);
+
+    // Perform horizontal touch swipe right (+140px) starting on .swipe-card__answer
+    await dispatchTouchDrag(answerPosA.x, answerPosA.y, 140, 0, 5, 20);
+
+    // Deck advances to card 2 (八)
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const learnedA = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learnedA.length, 1);
+    assert.strictEqual(learnedA[0].character, '爱');
+    assert.strictEqual(learnedA[0].last_action, 'learned');
+    assert.strictEqual(learnedA[0].seen, 1);
+
+    // Part B: Left swipe -> Review
+    await cdp.eval('window.mountSession()');
+    const card1B = await getCardCenter();
+
+    // Tap to reveal
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card1B.cx, y: card1B.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card1B.cx, y: card1B.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    await new Promise((r) => setTimeout(r, 350));
+
+    const answerPosB = await cdp.eval(`(() => {
+      const el = document.querySelector('.swipe-card--active .swipe-card__answer');
+      const r = el.getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    })()`);
+
+    // Perform horizontal touch swipe left (-140px) starting on .swipe-card__answer
+    await dispatchTouchDrag(answerPosB.x, answerPosB.y, -140, 0, 5, 20);
+
+    // Deck advances to card 2 (八)
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const learnedB = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learnedB.length, 1);
+    assert.strictEqual(learnedB[0].character, '爱');
+    assert.strictEqual(learnedB[0].last_action, 'review');
+
+    const reviewB = await cdp.eval(`window.db.get('review_cards') || []`);
+    assert.strictEqual(reviewB.length, 1);
+    assert.strictEqual(reviewB[0].character, '爱');
+  });
+
+  it('23. Revealed back-face touch swipes succeed across various reveal timings (0ms, 120ms, 250ms, 450ms)', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    const testDelays = [0, 120, 250, 450];
+    for (const delayMs of testDelays) {
+      await cdp.eval('window.mountSession()');
+      const card = await getCardCenter();
+
+      // Tap card
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+      if (delayMs > 0) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+
+      // Touch drag right (+140px)
+      await dispatchTouchDrag(card.cx, card.cy, 140, 0, 5, 20);
+
+      // Verify deck advances to card 2 (八)
+      await waitForCondition(`(() => {
+        const c = document.querySelector('.swipe-card--active .swipe-card__character');
+        return c && c.textContent.trim() === '八';
+      })()`);
+
+      const learned = await cdp.eval(`window.db.get('learned_words') || []`);
+      assert.strictEqual(learned.length, 1, `Advances cleanly with delay ${delayMs}ms`);
+      assert.strictEqual(learned[0].character, '爱');
+    }
+  });
+
+  it('24. Revealed back-face with overflowing content: vertical touch scroll preserves face and writes zero progress, then horizontal touch swipe succeeds', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    // Mount card with overflowing content and a second card
+    await cdp.eval(`(() => {
+      const cardWithManyExamples = {
+        id: 'card-overflow-1',
+        card_id: 'zh-hsk1-overflow-1',
+        course_id: 'zh-hsk1',
+        written_form: '爱',
+        character: '爱',
+        reading: 'ài',
+        pronunciation: 'ài',
+        meaning_english: 'to love',
+        definition: 'to love',
+        meaning_burmese: 'ချစ်သည်',
+        burmese_definition: 'ချစ်သည်',
+        level: 'HSK1',
+        sort_order: 1,
+        is_active: true,
+        examples: [
+          { text: '我爱我的家人。', reading: 'Wǒ ài wǒ de jiārén.', english: 'I love my family.', burmese: 'ကျွန်တော် ကျွန်တော့် မိသားစုကို ချစ်တယ်။' },
+          { text: '她非常喜欢学中文。', reading: 'Tā fēicháng xǐhuan xué zhōngwén.', english: 'She really loves learning Chinese.', burmese: 'သူမ တရုတ်စာ လေ့လာရတာ အရမ်းကြိုက်တယ်။' },
+          { text: '我们大家都爱和平。', reading: 'Wǒmen dàjiā dōu ài hépíng.', english: 'We all love peace.', burmese: 'ကျွန်တော်တို့အားလုံး ငြိမ်းချမ်းရေးကို ချစ်ကြတယ်။' },
+          { text: '猫很可爱，我想要一只。', reading: 'Māo hěn kě\\'ài, wǒ xiǎng yào yī zhī.', english: 'Cats are lovely, I want one.', burmese: 'ကြောင်လေးတွေ အရမ်းချစ်စရာကောင်းတယ်၊ ကျွန်တော် တစ်ကောင် လိုချင်တယ်။' },
+        ],
+        audio_path: 'audio/zh/hsk1/ai.mp3'
+      };
+      window.mountSession({
+        courseId: 'zh-hsk1',
+        cards: [cardWithManyExamples, window.testCardsZh[1]]
+      });
+    })()`);
+
+    const card = await getCardCenter();
+
+    // Reveal back face
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    await new Promise((r) => setTimeout(r, 400));
+
+    const answerMetrics = await cdp.eval(`(() => {
+      const el = document.querySelector('.swipe-card--active .swipe-card__answer');
+      const r = el.getBoundingClientRect();
+      return {
+        isOverflowing: el.scrollHeight > el.clientHeight,
+        cx: Math.round(r.left + r.width / 2),
+        cy: Math.round(r.top + r.height / 2),
+        left: r.left
+      };
+    })()`);
+    assert.ok(answerMetrics.isOverflowing, 'Answer scroller has overflowing content');
+
+    // 1. Dispatch vertical touch scroll (drag up 120px)
+    await dispatchTouchDrag(answerMetrics.cx, answerMetrics.cy + 60, 0, -120, 6, 20);
+    await new Promise((r) => setTimeout(r, 400));
+
+    const scrollState = await cdp.eval(`(() => {
+      const el = document.querySelector('.swipe-card--active .swipe-card__answer');
+      const cardEl = document.querySelector('.swipe-card--active');
+      return {
+        scrollTop: el.scrollTop,
+        ariaLabel: cardEl.getAttribute('aria-label'),
+        learned: window.db.get('learned_words') || []
+      };
+    })()`);
+    assert.ok(scrollState.scrollTop > 0, `Scrolled vertically (scrollTop=${scrollState.scrollTop})`);
+    assert.ok(scrollState.ariaLabel.includes('showing back face'), 'Card remains on back face');
+    assert.strictEqual(scrollState.learned.length, 0, 'No progress written during vertical scroll');
+
+    // 2. Dispatch horizontal touch swipe right (+140px) after scrolling
+    await dispatchTouchDrag(answerMetrics.cx, answerMetrics.cy, 140, 0, 5, 20);
+
+    // Advances to card 2 (八)
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+
+    const learnedAfter = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learnedAfter.length, 1);
+    assert.strictEqual(learnedAfter[0].character, '爱');
+    assert.strictEqual(learnedAfter[0].last_action, 'learned');
+  });
+
+  it('25. Curricula and Session Modes: Japanese JLPT N5, Review mode, and Saved mode cleanly support revealed back-face touch swiping', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    // A. Japanese JLPT N5 Learn mode
+    await cdp.eval(`window.mountSession({
+      courseId: "ja-n5",
+      cards: window.testCardsJa
+    })`);
+    const jaCard = await getCardCenter();
+    assert.strictEqual(jaCard.char, 'あそこ', 'Starts on Japanese N5 card 1');
+
+    // Reveal back face
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: jaCard.cx, y: jaCard.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: jaCard.cx, y: jaCard.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    await new Promise((r) => setTimeout(r, 350));
+
+    // Touch swipe right (+140px)
+    await dispatchTouchDrag(jaCard.cx, jaCard.cy, 140, 0, 5, 20);
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === 'あちら';
+    })()`);
+    const jaLearned = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(jaLearned.length, 1);
+    assert.strictEqual(jaLearned[0].character, 'あそこ');
+
+    // B. Review mode (/learn/review/session)
+    await cdp.eval(`window.mountSession({
+      initialEntry: '/learn/review/session',
+      sessionProps: { isReview: true },
+      reviewCards: window.testCardsZh
+    })`);
+    const revCard = await getCardCenter();
+    assert.strictEqual(revCard.char, '爱', 'Starts on review card 1');
+
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: revCard.cx, y: revCard.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: revCard.cx, y: revCard.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    await new Promise((r) => setTimeout(r, 350));
+
+    await dispatchTouchDrag(revCard.cx, revCard.cy, 140, 0, 5, 20);
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+    const revQueue = await cdp.eval(`window.db.get('review_cards') || []`);
+    assert.strictEqual(revQueue.length, 1, 'Card 爱 removed from review queue');
+    assert.strictEqual(revQueue[0].character, '八');
+
+    // C. Saved mode (/saved/session)
+    await cdp.eval(`window.mountSession({
+      initialEntry: '/saved/session',
+      sessionProps: { isSaved: true },
+      savedWords: window.testCardsZh
+    })`);
+    const savedCard = await getCardCenter();
+    assert.strictEqual(savedCard.char, '爱', 'Starts on saved card 1');
+
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: savedCard.cx, y: savedCard.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: savedCard.cx, y: savedCard.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    await new Promise((r) => setTimeout(r, 350));
+
+    await dispatchTouchDrag(savedCard.cx, savedCard.cy, 140, 0, 5, 20);
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+    const nextSavedCard = await getCardCenter();
+    assert.strictEqual(nextSavedCard.char, '八', 'Advances to next saved card');
+  });
+
+  it('26. Interaction isolation preserved: child controls (audio, bookmark) on revealed face isolate touch without triggering card flip or horizontal drag', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    await cdp.eval('window.mountSession()');
+    const card = await getCardCenter();
+
+    // Tap to reveal
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('showing back face')`);
+    await new Promise((r) => setTimeout(r, 350));
+
+    // Get bookmark button position on back face
+    const bmPos = await cdp.eval(`(() => {
+      const btn = document.querySelector('.swipe-card--active .swipe-card__back .swipe-bookmark');
+      const r = btn.getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    })()`);
+
+    // Touch tap on bookmark button
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: bmPos.x, y: bmPos.y, id: 0 }] });
+    await new Promise((r) => setTimeout(r, 50));
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Verify: saved words has 1 word, card is STILL on back face, active card is STILL 爱
+    const savedAfter = await cdp.eval(`window.db.get('saved_words') || []`);
+    assert.strictEqual(savedAfter.length, 1, 'Bookmark toggled to saved');
+    const stateAfterBm = await getCardCenter();
+    assert.strictEqual(stateAfterBm.char, '爱', 'Card character remains 爱');
+    assert.ok(stateAfterBm.ariaLabel.includes('showing back face'), 'Card face preserved on back face');
+
+    // Get audio button position on back face
+    const audioPos = await cdp.eval(`(() => {
+      const btn = document.querySelector('.swipe-card--active .swipe-card__back .swipe-audio');
+      const r = btn.getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    })()`);
+
+    // Touch tap on audio button
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: audioPos.x, y: audioPos.y, id: 0 }] });
+    await new Promise((r) => setTimeout(r, 50));
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await new Promise((r) => setTimeout(r, 300));
+
+    const stateAfterAudio = await getCardCenter();
+    assert.strictEqual(stateAfterAudio.char, '爱', 'Card character still remains 爱');
+    assert.ok(stateAfterAudio.ariaLabel.includes('showing back face'), 'Card face preserved on back face');
+    const learnedAfter = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learnedAfter.length, 0, 'No progress written during child control activation');
+  });
+
+  it('27. Measured investigation of commit sensitivity vs exit animation: 36px/50ms flick commits while slow 36px/200ms drag cancels', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    // Measure A: Slow drag (+36px over 200ms) cancels and springs back to center
+    await cdp.eval('window.mountSession()');
+    const initA = await getCardCenter();
+    const restingLeft = await cdp.eval(`document.querySelector('.swipe-card--active').getBoundingClientRect().left`);
+
+    // Drag +36px slowly in 4 steps of 50ms each (total 200ms, velocity = 36/0.2 = 180 px/s)
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: initA.cx, y: initA.cy, button: 'left', buttons: 1, clickCount: 1 });
+    for (let s = 1; s <= 4; s++) {
+      await new Promise((r) => setTimeout(r, 50));
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: initA.cx + s * 9, y: initA.cy, button: 'left', buttons: 1 });
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: initA.cx + 36, y: initA.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+    // Measure spring return time
+    const springStart = Date.now();
+    await waitForCondition(`(() => {
+      const el = document.querySelector('.swipe-card--active');
+      if (!el) return false;
+      const l = el.getBoundingClientRect().left;
+      return Math.abs(l - ${restingLeft}) < 3;
+    })()`);
+    const springDurationMs = Date.now() - springStart;
+
+    const stateAfterSlow = await getCardCenter();
+    assert.strictEqual(stateAfterSlow.char, '爱', 'Slow 36px drag cancels; card remains 爱');
+    const learnedSlow = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learnedSlow.length, 0, 'No progress written for slow 36px drag');
+
+    // Measure B: Fast flick (+36px in ~20ms, velocity > 500) commits!
+    await cdp.eval('window.mountSession()');
+    const initB = await getCardCenter();
+
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: initB.cx, y: initB.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await new Promise((r) => setTimeout(r, 10));
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: initB.cx + 36, y: initB.cy, button: 'left', buttons: 1 });
+    await new Promise((r) => setTimeout(r, 10));
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: initB.cx + 36, y: initB.cy, button: 'left', buttons: 0, clickCount: 1 });
+
+    const exitStart = Date.now();
+    await waitForCondition(`(() => {
+      const c = document.querySelector('.swipe-card--active .swipe-card__character');
+      return c && c.textContent.trim() === '八';
+    })()`);
+    const exitDurationMs = Date.now() - exitStart;
+
+    const learnedFlick = await cdp.eval(`window.db.get('learned_words') || []`);
+    assert.strictEqual(learnedFlick.length, 1, 'Fast 36px flick commits swipe');
+    assert.strictEqual(learnedFlick[0].character, '爱');
+
+    // Telemetry log for report
+    console.log(`[MEASUREMENT_TELEMETRY] SlowDrag(36px/200ms): CANCELLED -> spring return = ${springDurationMs}ms; FastFlick(36px/50ms): COMMITTED -> exit transit = ${exitDurationMs}ms`);
   });
 });

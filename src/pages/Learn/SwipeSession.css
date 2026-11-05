@@ -170,7 +170,7 @@
 .swipe-session--phrases .swipe-card__word { overflow-y: auto; overscroll-behavior-y: contain; }
 /* Scrollable faces must declare their own gesture policy: the browser stops
    inspecting touch-action at the first scroll container. */
-.swipe-card__word, .swipe-card__answer { touch-action: pan-y; }
+.swipe-card__word, .swipe-card__answer { touch-action: pan-y pinch-zoom; }
 .swipe-empty { width: min(100%, 440px); padding: 32px 20px; border: 1px solid var(--color-border); border-radius: 24px; background: white; box-shadow: var(--shadow-soft); text-align: center; }
 .swipe-empty > svg { color: var(--color-link); margin-bottom: 16px; }
 .swipe-empty h1 { color: var(--color-text-heading); font-size: 1.5rem; margin-bottom: 8px; }

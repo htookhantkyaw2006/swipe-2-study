@@ -291,7 +291,7 @@ const Flashcard = ({
         boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)', overflow: 'hidden'
       }}
     >
-      <div className="swipe-card__answer" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+      <div className="swipe-card__answer" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto', touchAction: 'pan-y pinch-zoom' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', padding: '24px 24px 0 24px', boxSizing: 'border-box' }}>
           <div style={{
             backgroundColor: '#0C4A6E', color: '#FFFFFF', padding: '4px 12px',
