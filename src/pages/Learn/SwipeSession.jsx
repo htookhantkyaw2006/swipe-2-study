@@ -113,7 +113,7 @@ const Flashcard = ({
 
   const glowShadow = useTransform(x, [-200, 0, 200], [
     '0 4px 32px rgba(239, 68, 68, 0.5)',
-    '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)',
+    '0 4px 16px rgba(3, 105, 161, 0.1)',
     '0 4px 32px rgba(34, 197, 94, 0.5)'
   ]);
 
