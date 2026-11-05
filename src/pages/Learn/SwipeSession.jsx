@@ -52,6 +52,13 @@ const ShuffleDeck = () => {
   );
 };
 
+const calculateExitDuration = (velocity, reducedMotion = false) => {
+  if (reducedMotion) return 0;
+  const v = Math.abs(velocity || 0);
+  const transitDistance = typeof window !== 'undefined' ? window.innerWidth * 0.8 : 320;
+  return v > 0 ? Math.min(Math.max(transitDistance / v, 0.2), 0.85) : 0.4;
+};
+
 const Flashcard = ({
   card,
   isActive,
@@ -76,12 +83,17 @@ const Flashcard = ({
 
   useEffect(() => {
     if (!isPresent) {
+      const v = Math.abs(exitData?.velocity || 0);
+      const calculatedDuration = exitData?.duration != null
+        ? exitData.duration
+        : calculateExitDuration(v, reducedMotion);
+      const timerMs = reducedMotion ? 10 : Math.round(Math.max(calculatedDuration * 1000 + 100, 450));
       const timer = setTimeout(() => {
         safeToRemove?.();
-      }, reducedMotion ? 10 : 450);
+      }, timerMs);
       return () => clearTimeout(timer);
     }
-  }, [isPresent, safeToRemove, reducedMotion]);
+  }, [isPresent, safeToRemove, reducedMotion, exitData]);
 
   const wantEnglish = prefs.translationLanguage !== 'burmese';
   const wantBurmese = prefs.translationLanguage !== 'english' && prefs.showBurmese;
@@ -113,8 +125,9 @@ const Flashcard = ({
     }
   }, [isActive, isPresent, x, dragOffset]);
 
-  const nextScale = useTransform(dragOffset, [0, 100], [0.95, 1]);
-  const nextOpacity = useTransform(dragOffset, [0, 100], [0.5, 1]);
+  const maxDragRange = typeof window !== 'undefined' ? window.innerWidth * 0.3 : 100;
+  const nextScale = useTransform(dragOffset, [0, maxDragRange], [0.95, 1]);
+  const nextOpacity = useTransform(dragOffset, [0, maxDragRange], [0.5, 1]);
 
   const handleDragEnd = (event, info) => {
     dragEndTimeRef.current = performance.now();
@@ -136,31 +149,31 @@ const Flashcard = ({
       return;
     }
 
-    const width = cardRef.current?.offsetWidth ?? 320;
-    const threshold = Math.min(100, Math.max(48, width * 0.25));
+    const threshold = typeof window !== 'undefined' ? window.innerWidth * 0.1 : 40;
+    const velocityThreshold = 800;
     const offset = info.offset.x;
     const velocity = info.velocity.x;
 
     // Displacement and velocity must agree; velocity alone with opposing displacement must not swipe.
-    const isDragRight = offset > threshold && velocity > -250;
-    const isFlickRight = offset > 18 && velocity > 500;
-    const isDragLeft = offset < -threshold && velocity < 250;
-    const isFlickLeft = offset < -18 && velocity < -500;
+    const isDragRight = offset > 0 && (offset > threshold && velocity > -250 || velocity > velocityThreshold);
+    const isDragLeft = offset < 0 && (offset < -threshold && velocity < 250 || velocity < -velocityThreshold);
 
-    if (isFlickRight || isDragRight) {
-      const accepted = onSwipe ? onSwipe('right', card) : false;
+    if (isDragRight) {
+      const duration = calculateExitDuration(velocity, reducedMotion);
+      const accepted = onSwipe ? onSwipe('right', card, velocity) : false;
       if (accepted) {
         x.stop();
-        animate(x, window.innerWidth + 100, { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" });
+        animate(x, (typeof window !== 'undefined' ? window.innerWidth : 400) + 100, { duration, ease: "easeOut" });
       } else {
         x.stop();
         animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
       }
-    } else if (isFlickLeft || isDragLeft) {
-      const accepted = onSwipe ? onSwipe('left', card) : false;
+    } else if (isDragLeft) {
+      const duration = calculateExitDuration(velocity, reducedMotion);
+      const accepted = onSwipe ? onSwipe('left', card, velocity) : false;
       if (accepted) {
         x.stop();
-        animate(x, -window.innerWidth - 100, { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" });
+        animate(x, -(typeof window !== 'undefined' ? window.innerWidth : 400) - 100, { duration, ease: "easeOut" });
       } else {
         x.stop();
         animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
@@ -426,13 +439,18 @@ const Flashcard = ({
         variants: {
           enter: { scale: reducedMotion ? 1 : 0.95, opacity: 0.4 },
           center: { x: 0, scale: 1, opacity: 1, zIndex: 10, transition: { duration: reducedMotion ? 0 : 0.4, ease: "easeOut" } },
-          exit: ({ direction }) => ({
-            x: reducedMotion ? 0 : (direction === 'right' ? window.innerWidth + 100 : -window.innerWidth - 100),
-            opacity: 1,
-            scale: 1,
-            zIndex: 20,
-            transition: { duration: reducedMotion ? 0 : 0.35, ease: "easeOut" }
-          })
+          exit: ({ direction, velocity, duration }) => {
+            const calculatedDuration = duration != null
+              ? duration
+              : calculateExitDuration(velocity, reducedMotion);
+            return {
+              x: reducedMotion ? 0 : (direction === 'right' ? window.innerWidth + 100 : -window.innerWidth - 100),
+              opacity: 1,
+              scale: 1,
+              zIndex: 20,
+              transition: { duration: calculatedDuration, ease: "easeOut" }
+            };
+          }
         },
         initial: "enter",
         animate: "center",
@@ -444,7 +462,7 @@ const Flashcard = ({
         },
         drag: !locked ? "x" : false,
         dragConstraints: { left: 0, right: 0 },
-        dragElastic: 1,
+        dragElastic: 0.7,
         onDragStart: () => {
           isDraggingRef.current = true;
         },
@@ -780,10 +798,18 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
     }
   };
 
-  const triggerSwipe = (direction, swipedCard = null) => {
+  const triggerSwipe = (direction, swipedCard = null, velocity = 0) => {
     if (actionLocked.current || advancing) return false;
     actionLocked.current = true;
-    const activeCard = swipedCard || cards[currentIndex];
+
+    let targetCard = swipedCard;
+    let targetVelocity = velocity;
+    if (typeof swipedCard === 'number') {
+      targetVelocity = swipedCard;
+      targetCard = velocity && typeof velocity === 'object' ? velocity : null;
+    }
+
+    const activeCard = targetCard || cards[currentIndex];
     if (!activeCard) {
       actionLocked.current = false;
       return false;
@@ -824,18 +850,21 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
       sessionStatsRef.current.review += 1;
     }
 
+    const calculatedDuration = calculateExitDuration(targetVelocity, reducedMotion);
+    const durationMs = Math.round(calculatedDuration * 1000);
+
     setAdvancing(true);
-    setExitData({ direction });
+    setExitData({ direction, velocity: targetVelocity, duration: calculatedDuration });
     setFlipped(false);
     setHasFlippedOnce(false);
 
     if (currentIndex < cards.length - 1) {
       setCurrentIndex(curr => curr + 1);
-      animate(dragOffset, 0, { duration: reducedMotion ? 0 : 0.35 });
+      animate(dragOffset, 0, { duration: calculatedDuration, ease: "easeOut" });
       setTimeout(() => {
         actionLocked.current = false;
         setAdvancing(false);
-      }, reducedMotion ? 0 : 350);
+      }, durationMs);
     } else {
       if (!isPhrases) {
         trackEvent('study:session_complete', {
@@ -849,7 +878,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
         actionLocked.current = false;
         setAdvancing(false);
         navigate(backTo);
-      }, reducedMotion ? 0 : 350);
+      }, durationMs);
     }
     return true;
   };

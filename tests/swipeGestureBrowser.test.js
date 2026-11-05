@@ -504,7 +504,7 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
       button: 'left',
       buttons: 1,
     });
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 2));
     await cdp.send('Input.dispatchMouseEvent', {
       type: 'mouseReleased',
       x: card.cx + 35,
@@ -2109,14 +2109,13 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     const learnedSlow = await cdp.eval(`window.db.get('learned_words') || []`);
     assert.strictEqual(learnedSlow.length, 0, 'No progress written for slow 36px drag');
 
-    // Measure B: Fast flick (+36px in ~20ms, velocity > 500) commits!
+    // Measure B: Fast flick (+36px in ~15ms, velocity > 800) commits!
     await cdp.eval('window.mountSession()');
     const initB = await getCardCenter();
 
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: initB.cx, y: initB.cy, button: 'left', buttons: 1, clickCount: 1 });
     await new Promise((r) => setTimeout(r, 10));
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: initB.cx + 36, y: initB.cy, button: 'left', buttons: 1 });
-    await new Promise((r) => setTimeout(r, 10));
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: initB.cx + 36, y: initB.cy, button: 'left', buttons: 0, clickCount: 1 });
 
     const exitStart = Date.now();
