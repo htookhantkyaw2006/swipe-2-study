@@ -287,7 +287,7 @@ export default function SettingsSubpage() {
           icon={Languages} iconGradient={GRADIENTS.blue}
           title="Learning language"
           subtitle={`${language.levelSystem} levels`}
-          value={<span className="settings-language-value"><LanguageFlag id={language.id} size={22} /><span>{language.name}</span></span>}
+          value={<span className="settings-language-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}><LanguageFlag id={language.id} size={22} /><span>{language.name}</span></span>}
           onClick={() => setSheet('language')}
         />
         <SettingsRow
