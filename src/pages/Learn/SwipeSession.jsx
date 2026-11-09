@@ -75,7 +75,8 @@ const Flashcard = ({
   locked,
   isPhrases,
   isSaved,
-  onToggleSave
+  onToggleSave,
+  onGestureDiagnostic
 }) => {
   const { prefs } = usePreferences();
   const course = useCourse();
@@ -106,6 +107,24 @@ const Flashcard = ({
   const isCancelledRef = useRef(false);
   const dragEndTimeRef = useRef(0);
   const lastFlipTimeRef = useRef(0);
+  const lastDragInfoRef = useRef(null);
+
+  // Opt-in, screen-only diagnostics. Never record card text, account data or tokens.
+  const reportGesture = (reason, event, info = lastDragInfoRef.current) => {
+    if (!onGestureDiagnostic) return;
+    const round = (value) => Math.round(Number(value) || 0);
+    onGestureDiagnostic({
+      reason,
+      face: flipped ? 'back' : 'front',
+      event: event?.type || 'unknown',
+      dx: round(info?.offset?.x),
+      dy: round(info?.offset?.y),
+      vx: round(info?.velocity?.x),
+      threshold: round(window.innerWidth * 0.1),
+      viewport: round(window.innerWidth),
+      cardWidth: round(cardRef.current?.offsetWidth),
+    });
+  };
 
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], reducedMotion ? [0, 0] : [-15, 15]);
@@ -144,6 +163,7 @@ const Flashcard = ({
     isCancelledRef.current = false;
 
     if (isCancelled || !isActive || locked) {
+      reportGesture(isCancelled ? 'cancelled' : !isActive ? 'inactive' : 'locked', event, info);
       x.stop();
       animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
       return;
@@ -161,6 +181,7 @@ const Flashcard = ({
     if (isDragRight) {
       const duration = calculateExitDuration(velocity, reducedMotion);
       const accepted = onSwipe ? onSwipe('right', card, velocity) : false;
+      reportGesture(accepted ? 'accepted-right' : 'commit-rejected', event, info);
       if (accepted) {
         x.stop();
         animate(x, (typeof window !== 'undefined' ? window.innerWidth : 400) + 100, { duration, ease: "easeOut" });
@@ -171,6 +192,7 @@ const Flashcard = ({
     } else if (isDragLeft) {
       const duration = calculateExitDuration(velocity, reducedMotion);
       const accepted = onSwipe ? onSwipe('left', card, velocity) : false;
+      reportGesture(accepted ? 'accepted-left' : 'commit-rejected', event, info);
       if (accepted) {
         x.stop();
         animate(x, -(typeof window !== 'undefined' ? window.innerWidth : 400) - 100, { duration, ease: "easeOut" });
@@ -178,6 +200,9 @@ const Flashcard = ({
         x.stop();
         animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
       }
+    } else {
+      reportGesture(Math.abs(offset) <= threshold && Math.abs(velocity) <= velocityThreshold
+        ? 'below-threshold' : 'direction-conflict', event, info);
     }
   };
 
@@ -466,8 +491,9 @@ const Flashcard = ({
         onDragStart: () => {
           isDraggingRef.current = true;
         },
-        onDrag: () => {
+        onDrag: (_event, info) => {
           isDraggingRef.current = true;
+          if (onGestureDiagnostic) lastDragInfoRef.current = info;
         },
         onDragEnd: handleDragEnd,
         whileTap: { cursor: 'grabbing' }
@@ -538,17 +564,20 @@ const Flashcard = ({
         ...motionProps.style
       }}
       onPointerDown={(e) => {
+        lastDragInfoRef.current = null;
         pointerStartRef.current = { x: e.clientX, y: e.clientY, time: performance.now() };
         isDraggingRef.current = false;
         isCancelledRef.current = false;
       }}
-      onPointerCancel={() => {
+      onPointerCancel={(e) => {
+        reportGesture('cancelled', e);
         isCancelledRef.current = true;
         pointerStartRef.current = null;
         isDraggingRef.current = false;
         dragEndTimeRef.current = performance.now();
       }}
-      onTouchCancel={() => {
+      onTouchCancel={(e) => {
+        reportGesture('cancelled', e);
         isCancelledRef.current = true;
         pointerStartRef.current = null;
         isDraggingRef.current = false;
@@ -609,6 +638,8 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const levelId = searchParams.get('level');
+  const gestureDebug = searchParams.get('gestureDebug') === '1';
+  const [gestureDiagnostic, setGestureDiagnostic] = useState(null);
   const activeCourse = useCourse();
   const { prefs } = usePreferences();
   const reducedMotion = useReducedMotion();
@@ -1015,6 +1046,24 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   return (
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: 'var(--color-page-bg)', maxWidth: '500px', margin: '0 auto', position: 'relative' }}>
 
+      {gestureDebug && (
+        <output
+          data-testid="swipe-diagnostic"
+          aria-label="Swipe diagnostic"
+          style={{ position: 'fixed', top: '8px', left: '8px', right: '8px', zIndex: 10000,
+            maxWidth: '440px', margin: '0 auto', padding: '8px', borderRadius: '8px',
+            background: '#0C4A6E', color: '#FFFFFF', font: '12px/1.5 monospace',
+            pointerEvents: 'none', overflowWrap: 'anywhere' }}
+        >
+          <strong>Swipe diagnostic — local screen only</strong><br />
+          {gestureDiagnostic ? <>
+            {gestureDiagnostic.reason} | {gestureDiagnostic.face} | {gestureDiagnostic.event}<br />
+            dx {gestureDiagnostic.dx}px / dy {gestureDiagnostic.dy}px | vx {gestureDiagnostic.vx}px/s<br />
+            limit {gestureDiagnostic.threshold}px | viewport {gestureDiagnostic.viewport}px | card {gestureDiagnostic.cardWidth}px
+          </> : 'Waiting for a swipe…'}
+        </output>
+      )}
+
       {/* Top Header */}
       <header className="flex items-center justify-between" style={{ marginBottom: '32px', zIndex: 10 }}>
         <button
@@ -1092,6 +1141,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
                 isPhrases={isPhrases}
                 isSaved={!isPhrases ? (savedWords === null ? null : Boolean(findSavedWord(savedWords, card))) : false}
                 onToggleSave={handleToggleSave}
+                onGestureDiagnostic={gestureDebug && isTop ? setGestureDiagnostic : undefined}
               />
             );
           })}

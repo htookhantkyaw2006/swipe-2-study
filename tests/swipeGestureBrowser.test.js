@@ -2077,6 +2077,53 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     assert.strictEqual(learnedAfter.length, 0, 'No progress written during child control activation');
   });
 
+  it('28. Opt-in diagnostics distinguish a short drag, native cancellation and a successful N5 revealed swipe without altering progress rules', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+
+    await cdp.eval('window.mountSession()');
+    await getCardCenter();
+    assert.equal(await cdp.eval('document.querySelector("[data-testid=swipe-diagnostic]") !== null'), false);
+
+    await cdp.eval(`window.mountSession({ courseId: 'ja-n5', initialEntry: '/learn/session?level=N5&gestureDebug=1' })`);
+    let card = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('back face')`);
+    await new Promise((r) => setTimeout(r, 450));
+
+    await dispatchTouchDrag(card.cx, card.cy, 30, 0, 6, 50);
+    await waitForCondition(`document.querySelector('[data-testid=swipe-diagnostic]')?.textContent.includes('below-threshold')`);
+    let report = await cdp.eval(`document.querySelector('[data-testid=swipe-diagnostic]').textContent`);
+    assert.match(report, /back.*pointerup/);
+    assert.match(report, /dx 30px/);
+    assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 0);
+    await new Promise((r) => setTimeout(r, 450));
+
+    card = await getCardCenter();
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: card.cx, y: card.cy, id: 0 }] });
+    for (let i = 1; i <= 6; i++) {
+      await new Promise((r) => setTimeout(r, 25));
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: card.cx + i * 20, y: card.cy, id: 0 }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+    await waitForCondition(`document.querySelector('[data-testid=swipe-diagnostic]')?.textContent.includes('cancelled')`);
+    assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 0);
+    await new Promise((r) => setTimeout(r, 450));
+    assert.equal((await getCardCenter()).char, 'あそこ');
+
+    card = await getCardCenter();
+    await dispatchTouchDrag(card.cx, card.cy, 120, 0, 6, 25);
+    await waitForCondition(`document.querySelector('.swipe-card--active .swipe-card__character')?.textContent === 'あちら'`);
+    report = await cdp.eval(`document.querySelector('[data-testid=swipe-diagnostic]').textContent`);
+    assert.match(report, /accepted-right.*back.*pointerup/);
+    assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 1);
+    assert.equal(await cdp.eval(`getComputedStyle(document.querySelector('[data-testid=swipe-diagnostic]')).pointerEvents`), 'none');
+
+    await cdp.eval(`window.mountSession({ initialEntry: '/learn/session?level=HSK1&gestureDebug=0' })`);
+    await getCardCenter();
+    assert.equal(await cdp.eval('document.querySelector("[data-testid=swipe-diagnostic]") !== null'), false);
+  });
+
   it('27. Measured investigation of commit sensitivity vs exit animation: 36px/50ms flick commits while slow 36px/200ms drag cancels', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
