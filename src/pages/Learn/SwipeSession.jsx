@@ -76,7 +76,9 @@ const Flashcard = ({
   isPhrases,
   isSaved,
   onToggleSave,
-  onGestureDiagnostic
+  onGestureDiagnostic,
+  onScrollDiagnostic,
+  scrollOnly = false
 }) => {
   const { prefs } = usePreferences();
   const course = useCourse();
@@ -109,12 +111,13 @@ const Flashcard = ({
   const lastFlipTimeRef = useRef(0);
   const lastDragInfoRef = useRef(null);
   const suppressTouchClickRef = useRef(false);
+  const touchIntentRef = useRef({ axis: 'pending', prevented: 0 });
   const dragControls = useDragControls();
   const x = useMotionValue(0);
 
   useEffect(() => {
     const element = cardRef.current;
-    if (!element || !isActive || !isPresent || locked) return;
+    if (!element || !isActive || !isPresent || locked || scrollOnly) return;
 
     // iOS can take over a pan-y gesture after horizontal dragging has started.
     // Claim horizontal touches before native scrolling cancels Motion's pointer
@@ -124,6 +127,7 @@ const Flashcard = ({
     const reset = () => { gesture = null; };
     const start = (event) => {
       reset();
+      touchIntentRef.current = { axis: 'pending', prevented: 0 };
       if (event.touches.length !== 1 || event.target.closest?.('button, a, input, select, textarea, [contenteditable="true"]')) return;
       const touch = event.touches[0];
       gesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, axis: null };
@@ -141,6 +145,7 @@ const Flashcard = ({
       if (!gesture.axis) {
         if (Math.max(dx, dy) < 6 || dx === dy) return;
         gesture.axis = dx > dy ? 'x' : 'y';
+        touchIntentRef.current.axis = gesture.axis;
         if (gesture.axis === 'y') {
           // Motion otherwise follows horizontal jitter during a native scroll.
           // Cancel without onDragEnd: scrolling must never commit a card.
@@ -150,7 +155,10 @@ const Flashcard = ({
           isDraggingRef.current = false;
         }
       }
-      if (gesture.axis === 'x' && event.cancelable) event.preventDefault();
+      if (gesture.axis === 'x' && event.cancelable) {
+        event.preventDefault();
+        if (event.defaultPrevented) touchIntentRef.current.prevented += 1;
+      }
     };
     element.addEventListener('touchstart', start, { capture: true, passive: true });
     element.addEventListener('touchmove', move, { capture: true, passive: false });
@@ -165,7 +173,75 @@ const Flashcard = ({
       element.removeEventListener('touchcancel', reset, true);
       element.removeEventListener('pointercancel', reset, true);
     };
-  }, [isActive, isPresent, locked, dragControls, x]);
+  }, [isActive, isPresent, locked, scrollOnly, dragControls, x]);
+
+  // Observe raw touch/scroll data without rendering on moves or scroll frames.
+  // pointercancel is recorded, not treated as touchend: native scrolling may continue.
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!onScrollDiagnostic || !element || !isActive || !isPresent || locked) return;
+    let trace = null;
+    let settleTimer;
+    const start = (event) => {
+      clearTimeout(settleTimer);
+      trace = null;
+      if (event.touches.length !== 1 || event.target.closest?.('button, a, input, select, textarea, [contenteditable="true"]')) return;
+      const answer = event.target.closest?.('.swipe-card__answer');
+      if (!answer) return;
+      const touch = event.touches[0];
+      trace = { answer, id: touch.identifier, x: touch.clientX, y: touch.clientY,
+        intent: scrollOnly ? { axis: 'scroll-only', prevented: 0 } : touchIntentRef.current,
+        firstMoves: [], dx: 0, dy: 0, pointerCancelled: false,
+        scrollStart: answer.scrollTop, scrollMin: answer.scrollTop, scrollMax: answer.scrollTop,
+        scrollEvents: 0 };
+    };
+    const move = (event) => {
+      if (!trace) return;
+      const touch = Array.from(event.touches).find(point => point.identifier === trace.id);
+      if (!touch) return;
+      trace.dx = Math.round(touch.clientX - trace.x);
+      trace.dy = Math.round(touch.clientY - trace.y);
+      if (trace.firstMoves.length < 4) trace.firstMoves.push(`${trace.dx}/${trace.dy}`);
+    };
+    const scroll = (event) => {
+      if (!trace || event.target !== trace.answer) return;
+      trace.scrollEvents += 1;
+      trace.scrollMin = Math.min(trace.scrollMin, trace.answer.scrollTop);
+      trace.scrollMax = Math.max(trace.scrollMax, trace.answer.scrollTop);
+    };
+    const cancel = () => { if (trace) trace.pointerCancelled = true; };
+    const finish = (event) => {
+      if (!trace || Array.from(event.touches).some(point => point.identifier === trace.id)) return;
+      const completed = trace;
+      // One summary after release, including a short native momentum window.
+      settleTimer = setTimeout(() => {
+        if (trace !== completed) return;
+        onScrollDiagnostic({ axis: completed.intent.axis, prevented: completed.intent.prevented,
+          firstMoves: completed.firstMoves.join(' '), dx: completed.dx, dy: completed.dy,
+          pointerCancelled: completed.pointerCancelled,
+          scrollStart: Math.round(completed.scrollStart), scrollEnd: Math.round(completed.answer.scrollTop),
+          scrollRange: Math.round(completed.scrollMax - completed.scrollMin),
+          scrollLimit: Math.max(0, completed.answer.scrollHeight - completed.answer.clientHeight),
+          scrollEvents: completed.scrollEvents });
+        trace = null;
+      }, 250);
+    };
+    element.addEventListener('touchstart', start, { capture: true, passive: true });
+    element.addEventListener('touchmove', move, { capture: true, passive: true });
+    element.addEventListener('touchend', finish, { capture: true, passive: true });
+    element.addEventListener('touchcancel', finish, { capture: true, passive: true });
+    element.addEventListener('pointercancel', cancel, true);
+    element.addEventListener('scroll', scroll, true);
+    return () => {
+      clearTimeout(settleTimer);
+      element.removeEventListener('touchstart', start, true);
+      element.removeEventListener('touchmove', move, true);
+      element.removeEventListener('touchend', finish, true);
+      element.removeEventListener('touchcancel', finish, true);
+      element.removeEventListener('pointercancel', cancel, true);
+      element.removeEventListener('scroll', scroll, true);
+    };
+  }, [isActive, isPresent, locked, onScrollDiagnostic, scrollOnly]);
 
   // Opt-in, screen-only diagnostics. Never record card text, account data or tokens.
   const reportGesture = (reason, event, info = lastDragInfoRef.current) => {
@@ -542,7 +618,7 @@ const Flashcard = ({
           boxShadow: glowShadow,
           cursor: 'grab'
         },
-        drag: !locked ? "x" : false,
+        drag: !locked && !scrollOnly ? "x" : false,
         dragControls,
         dragConstraints: { left: 0, right: 0 },
         dragElastic: 0.7,
@@ -625,7 +701,7 @@ const Flashcard = ({
         if (e.isPrimary !== false) suppressTouchClickRef.current = false;
         // Keep the pointer on the non-rotating card throughout a flip, even
         // when the original face moves away or becomes inert underneath it.
-        if (e.pointerType === 'touch' && e.isPrimary !== false) {
+        if (!scrollOnly && e.pointerType === 'touch' && e.isPrimary !== false) {
           try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* Pointer already ended. */ }
         }
         lastDragInfoRef.current = null;
@@ -706,6 +782,8 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const levelId = searchParams.get('level');
   const gestureDebug = searchParams.get('gestureDebug') === '1';
   const [gestureDiagnostic, setGestureDiagnostic] = useState(null);
+  const [scrollDiagnostic, setScrollDiagnostic] = useState(null);
+  const scrollOnly = gestureDebug && searchParams.get('gestureScrollOnly') === '1';
   const activeCourse = useCourse();
   const { prefs } = usePreferences();
   const reducedMotion = useReducedMotion();
@@ -1122,11 +1200,19 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
             pointerEvents: 'none', overflowWrap: 'anywhere' }}
         >
           <strong>Swipe diagnostic — local screen only</strong><br />
+          {scrollOnly && <><strong>SCROLL ONLY — horizontal drag disabled</strong><br /></>}
           {gestureDiagnostic ? <>
             {gestureDiagnostic.reason} | {gestureDiagnostic.face} | {gestureDiagnostic.event}<br />
             dx {gestureDiagnostic.dx}px / dy {gestureDiagnostic.dy}px | vx {gestureDiagnostic.vx}px/s<br />
             limit {gestureDiagnostic.threshold}px | viewport {gestureDiagnostic.viewport}px | card {gestureDiagnostic.cardWidth}px
           </> : 'Waiting for a swipe…'}
+          {scrollDiagnostic && <><br /><span data-testid="scroll-diagnostic">
+            axis {scrollDiagnostic.axis} | blocked {scrollDiagnostic.prevented} | cancel {scrollDiagnostic.pointerCancelled ? 'yes' : 'no'}<br />
+            first dx/dy: {scrollDiagnostic.firstMoves || 'none'}<br />
+            final {scrollDiagnostic.dx}/{scrollDiagnostic.dy} | scroll {scrollDiagnostic.scrollStart}→{scrollDiagnostic.scrollEnd}/{scrollDiagnostic.scrollLimit}<br />
+            travel {scrollDiagnostic.scrollRange}px | scroll events {scrollDiagnostic.scrollEvents}
+          </span></>}
+
         </output>
       )}
 
@@ -1208,6 +1294,8 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
                 isSaved={!isPhrases ? (savedWords === null ? null : Boolean(findSavedWord(savedWords, card))) : false}
                 onToggleSave={handleToggleSave}
                 onGestureDiagnostic={gestureDebug && isTop ? setGestureDiagnostic : undefined}
+                onScrollDiagnostic={gestureDebug && isTop ? setScrollDiagnostic : undefined}
+                scrollOnly={scrollOnly}
               />
             );
           })}

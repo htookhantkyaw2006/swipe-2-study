@@ -2245,6 +2245,70 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     }
   });
 
+  it('33. Scroll diagnostics summarize native vertical scrolling after release and expose an ambiguous horizontal lock without changing it', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+    await cdp.eval(`window.mountSession({ courseId: 'ja-n5', initialEntry: '/learn/session?level=N5&gestureDebug=1',
+      cards: window.testCardsJa.map(card => ({ ...card, examples: Array.from({length: 12}, () => card.examples[0]) })) })`);
+    const card = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await new Promise(r => setTimeout(r, 450));
+    await dispatchTouchDrag(card.cx, card.cy, 0, -120, 6, 25);
+    await waitForCondition(`document.querySelector('[data-testid=scroll-diagnostic]')?.textContent.includes('axis y')`);
+    let report = await cdp.eval(`document.querySelector('[data-testid=scroll-diagnostic]').textContent`);
+    assert.match(report, /blocked 0/);
+    assert.match(report, /first dx\/dy: 0\/-/);
+    assert.ok(await cdp.eval(`document.querySelector('.swipe-card--active .swipe-card__answer').scrollTop > 0`));
+    assert.ok((await getCardCenter()).ariaLabel.includes('back face'));
+    assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 0);
+    // Expose the actual existing rule (x=10,y=9 wins x) without tuning it blindly.
+    const results = await cdp.eval(`(() => {
+      const answer = document.querySelector('.swipe-card--active .swipe-card__answer');
+      const emit = (type, dx, dy) => {
+        const touches = type === 'touchend' ? [] : [new Touch({identifier: 81, target: answer, clientX: 100 + dx, clientY: 200 + dy})];
+        const e = new TouchEvent(type, {bubbles: true, cancelable: true, touches, changedTouches: touches});
+        answer.dispatchEvent(e); return e.defaultPrevented;
+      };
+      emit('touchstart', 0, 0);
+      const first = emit('touchmove', 10, 9);
+      const later = emit('touchmove', 12, 80);
+      emit('touchend', 12, 80);
+      return {first, later};
+    })()`);
+    assert.deepEqual(results, {first: true, later: true});
+    await waitForCondition(`document.querySelector('[data-testid=scroll-diagnostic]')?.textContent.includes('axis x')`);
+    report = await cdp.eval(`document.querySelector('[data-testid=scroll-diagnostic]').textContent`);
+    assert.match(report, /blocked 2/);
+    assert.match(report, /first dx\/dy: 10\/9 12\/80/);
+    assert.match(report, /final 12\/80/);
+  });
+
+  it('34. Scroll-only comparison requires gestureDebug, disables horizontal drag, preserves reveal and native answer scrolling', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+    await cdp.eval(`window.mountSession({ initialEntry: '/learn/session?level=HSK1&gestureScrollOnly=1' })`);
+    let card = await getCardCenter();
+    assert.equal(await cdp.eval(`document.querySelector('[data-testid=swipe-diagnostic]') !== null`), false);
+    await dispatchTouchDrag(card.cx, card.cy, 120, 0, 6, 25);
+    await waitForCondition(`document.querySelector('.swipe-card--active .swipe-card__character')?.textContent === '八'`);
+
+    await cdp.eval(`window.mountSession({ initialEntry: '/learn/session?level=HSK1&gestureDebug=1&gestureScrollOnly=1',
+      cards: window.testCardsZh.map(card => ({ ...card, examples: Array.from({length: 12}, () => card.examples[0]) })) })`);
+    card = await getCardCenter();
+    assert.match(await cdp.eval(`document.querySelector('[data-testid=swipe-diagnostic]').textContent`), /SCROLL ONLY/);
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await new Promise(r => setTimeout(r, 450));
+    await dispatchTouchDrag(card.cx, card.cy, 0, -120, 6, 25);
+    await waitForCondition(`document.querySelector('[data-testid=scroll-diagnostic]')?.textContent.includes('axis scroll-only')`);
+    assert.ok(await cdp.eval(`document.querySelector('.swipe-card--active .swipe-card__answer').scrollTop > 0`));
+    assert.match(await cdp.eval(`document.querySelector('[data-testid=scroll-diagnostic]').textContent`), /blocked 0/);
+    await dispatchTouchDrag(card.cx, card.cy, 120, 0, 6, 25);
+    await new Promise(r => setTimeout(r, 350));
+    assert.equal((await getCardCenter()).char, card.char);
+    assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 0);
+    assert.ok(Math.abs(await cdp.eval(`new DOMMatrixReadOnly(getComputedStyle(document.querySelector('.swipe-card--active')).transform).m41`)) < 0.5);
+  });
+
   it('28. Opt-in diagnostics distinguish a short drag, native cancellation and a successful N5 revealed swipe without altering progress rules', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
