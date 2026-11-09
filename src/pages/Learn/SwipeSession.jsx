@@ -78,7 +78,8 @@ const Flashcard = ({
   onToggleSave,
   onGestureDiagnostic,
   onScrollDiagnostic,
-  scrollOnly = false
+  scrollOnly = false,
+  flatReveal = false
 }) => {
   const { prefs } = usePreferences();
   const course = useCourse();
@@ -363,8 +364,8 @@ const Flashcard = ({
       inert={flipped}
       style={{
         position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(0deg)',
-        display: 'flex', flexDirection: 'column', padding: '24px',
+        WebkitBackfaceVisibility: 'hidden', transform: flatReveal ? 'none' : 'rotateY(0deg)',
+        display: flatReveal && flipped ? 'none' : 'flex', flexDirection: 'column', padding: '24px',
         backgroundColor: isActive ? backgroundColor : '#FFFFFF',
         borderRadius: '24px',
         boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)'
@@ -454,9 +455,11 @@ const Flashcard = ({
       className="swipe-card__back"
       inert={!flipped}
       style={{
-        position: 'absolute', width: '100%', height: '100%', backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden',
-        transform: 'rotateY(180deg)',
+        position: 'absolute', width: '100%', height: '100%',
+        backfaceVisibility: flatReveal ? 'visible' : 'hidden',
+        WebkitBackfaceVisibility: flatReveal ? 'visible' : 'hidden',
+        transform: flatReveal ? 'none' : 'rotateY(180deg)',
+        display: flatReveal && !flipped ? 'none' : undefined,
         backgroundColor: isActive ? backgroundColor : '#FFFFFF',
         borderRadius: '24px',
         boxShadow: '0 8px 32px rgba(12, 74, 110, 0.08), 0 2px 8px rgba(12, 74, 110, 0.04)', overflow: 'hidden'
@@ -694,7 +697,7 @@ const Flashcard = ({
         aspectRatio: '2/3',
         left: 0, right: 0, top: 0, bottom: 0, margin: 'auto',
         borderRadius: '20px',
-        perspective: '1000px',
+        perspective: flatReveal ? 'none' : '1000px',
         ...motionProps.style
       }}
       onPointerDown={(e) => {
@@ -738,11 +741,13 @@ const Flashcard = ({
     >
       <motion.div
         initial={false}
-        animate={{ rotateY: flipped ? 180 : 0 }}
+        animate={flatReveal ? undefined : { rotateY: flipped ? 180 : 0 }}
         transition={{ duration: reducedMotion ? 0 : 0.4, ease: "easeInOut" }}
         style={{
           width: '100%', height: '100%', position: 'relative',
-          transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d'
+          transform: flatReveal ? 'none' : undefined,
+          transformStyle: flatReveal ? 'flat' : 'preserve-3d',
+          WebkitTransformStyle: flatReveal ? 'flat' : 'preserve-3d'
         }}
       >
         {frontContent}
@@ -784,6 +789,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
   const [gestureDiagnostic, setGestureDiagnostic] = useState(null);
   const [scrollDiagnostic, setScrollDiagnostic] = useState(null);
   const scrollOnly = gestureDebug && searchParams.get('gestureScrollOnly') === '1';
+  const flatReveal = searchParams.get('gestureFlatReveal') === '1';
   const activeCourse = useCourse();
   const { prefs } = usePreferences();
   const reducedMotion = useReducedMotion();
@@ -1296,6 +1302,7 @@ export default function SwipeSession({ isReview = false, isSaved = false, isPhra
                 onGestureDiagnostic={gestureDebug && isTop ? setGestureDiagnostic : undefined}
                 onScrollDiagnostic={gestureDebug && isTop ? setScrollDiagnostic : undefined}
                 scrollOnly={scrollOnly}
+                flatReveal={flatReveal}
               />
             );
           })}
