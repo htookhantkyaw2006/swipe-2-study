@@ -109,6 +109,52 @@ const Flashcard = ({
   const lastFlipTimeRef = useRef(0);
   const lastDragInfoRef = useRef(null);
 
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element || !isActive || !isPresent || locked) return;
+
+    // iOS can take over a pan-y gesture after horizontal dragging has started.
+    // Claim horizontal touches before native scrolling cancels Motion's pointer
+    // stream, while leaving vertical-first scrolling and multi-touch native.
+    // The stable outer card keeps these listeners intact throughout a flip.
+    let gesture = null;
+    const reset = () => { gesture = null; };
+    const start = (event) => {
+      reset();
+      if (event.touches.length !== 1 || event.target.closest?.('button, a, input, select, textarea, [contenteditable="true"]')) return;
+      const touch = event.touches[0];
+      gesture = { id: touch.identifier, x: touch.clientX, y: touch.clientY, axis: null };
+    };
+    const move = (event) => {
+      if (!gesture) return;
+      if (event.touches.length !== 1 || event.touches[0].identifier !== gesture.id) {
+        reset();
+        return;
+      }
+      const touch = event.touches[0];
+      const dx = Math.abs(touch.clientX - gesture.x);
+      const dy = Math.abs(touch.clientY - gesture.y);
+      if (!gesture.axis) {
+        if (Math.max(dx, dy) < 6 || dx === dy) return;
+        gesture.axis = dx > dy ? 'x' : 'y';
+      }
+      if (gesture.axis === 'x' && event.cancelable) event.preventDefault();
+    };
+    element.addEventListener('touchstart', start, { capture: true, passive: true });
+    element.addEventListener('touchmove', move, { capture: true, passive: false });
+    element.addEventListener('touchend', reset, { capture: true, passive: true });
+    element.addEventListener('touchcancel', reset, { capture: true, passive: true });
+    element.addEventListener('pointercancel', reset, true);
+    return () => {
+      reset();
+      element.removeEventListener('touchstart', start, true);
+      element.removeEventListener('touchmove', move, true);
+      element.removeEventListener('touchend', reset, true);
+      element.removeEventListener('touchcancel', reset, true);
+      element.removeEventListener('pointercancel', reset, true);
+    };
+  }, [isActive, isPresent, locked]);
+
   // Opt-in, screen-only diagnostics. Never record card text, account data or tokens.
   const reportGesture = (reason, event, info = lastDragInfoRef.current) => {
     if (!onGestureDiagnostic) return;
@@ -564,6 +610,11 @@ const Flashcard = ({
         ...motionProps.style
       }}
       onPointerDown={(e) => {
+        // Keep the pointer on the non-rotating card throughout a flip, even
+        // when the original face moves away or becomes inert underneath it.
+        if (e.pointerType === 'touch' && e.isPrimary !== false) {
+          try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* Pointer already ended. */ }
+        }
         lastDragInfoRef.current = null;
         pointerStartRef.current = { x: e.clientX, y: e.clientY, time: performance.now() };
         isDraggingRef.current = false;

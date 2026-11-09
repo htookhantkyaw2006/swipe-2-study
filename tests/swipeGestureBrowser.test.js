@@ -2077,6 +2077,122 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     assert.strictEqual(learnedAfter.length, 0, 'No progress written during child control activation');
   });
 
+  it('31. A touch during the flip is captured by the stable outer card and commits exactly once', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+    await cdp.eval(`window.mountSession({ courseId: 'ja-n5' })`);
+    const card = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await new Promise((r) => setTimeout(r, 120));
+    await cdp.eval(`(() => {
+      window.__captureChecks = [];
+      window.__checkCapture = (event) => {
+        if (event.pointerType !== 'touch') return;
+        const el = document.querySelector('.swipe-card--active');
+        window.__captureChecks.push(el?.hasPointerCapture(event.pointerId) === true);
+      };
+      window.addEventListener('pointermove', window.__checkCapture, true);
+    })()`);
+    try {
+      await dispatchTouchDrag(card.cx, card.cy, 120, 0, 6, 25);
+      await waitForCondition(`document.querySelector('.swipe-card--active .swipe-card__character')?.textContent === 'あちら'`);
+      const captures = await cdp.eval('window.__captureChecks');
+      assert.ok(captures.length > 0 && captures.every(Boolean), 'Capture must remain on the stable card while its faces rotate');
+      assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 1);
+    } finally {
+      await cdp.eval('window.removeEventListener("pointermove", window.__checkCapture, true)');
+    }
+  });
+
+  it('29. Horizontal touch ownership survives vertical drift on revealed HSK1/N5 cards while vertical-first gestures keep native scrolling', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+    await cdp.eval(`(() => {
+      window.__guardMoves = [];
+      window.__observeGuardMove = (event) => window.__guardMoves.push(event.defaultPrevented);
+      window.addEventListener('touchmove', window.__observeGuardMove, { passive: true });
+    })()`);
+    try {
+      for (const courseId of ['zh-hsk1', 'ja-n5']) {
+        const japanese = courseId === 'ja-n5';
+        await cdp.eval(`window.mountSession({ courseId: '${courseId}', cards:
+          window.${japanese ? 'testCardsJa' : 'testCardsZh'}.map(card => ({
+            ...card, examples: Array.from({ length: 12 }, () => card.examples[0])
+          })) })`);
+        const card = await getCardCenter();
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+        await new Promise((r) => setTimeout(r, 450));
+        await cdp.eval('window.__guardMoves = []');
+        await dispatchTouchDrag(card.cx, card.cy, 0, -120, 6, 25);
+        await new Promise((r) => setTimeout(r, 350));
+        assert.ok(await cdp.eval(`document.querySelector('.swipe-card--active .swipe-card__answer').scrollTop > 0`));
+        assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 0);
+        assert.ok((await cdp.eval('window.__guardMoves')).every(value => value === false));
+        assert.ok((await getCardCenter()).ariaLabel.includes('back face'));
+        await cdp.eval('window.__guardMoves = []');
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: card.cx, y: card.cy, id: 0 }] });
+        for (const [dx, dy] of [[20, 2], [40, 8], [60, 24], [80, 45], [100, 70], [120, 100]]) {
+          await new Promise((r) => setTimeout(r, 25));
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: card.cx + dx, y: card.cy + dy, id: 0 }] });
+        }
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await waitForCondition(`document.querySelector('.swipe-card--active .swipe-card__character')?.textContent === '${japanese ? 'あちら' : '八'}'`);
+        const prevented = await cdp.eval('window.__guardMoves');
+        assert.ok(prevented.length > 0 && prevented.every(Boolean), 'Horizontal gesture must retain ownership through vertical drift');
+        assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 1);
+      }
+    } finally {
+      await cdp.eval(`window.removeEventListener('touchmove', window.__observeGuardMove)`);
+    }
+  });
+
+  it('30. Touch ownership excludes controls and multi-touch, resets after cancellation, and leaves taps and vertical-first drags alone', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+    await cdp.eval(`window.mountSession({ courseId: 'ja-n5' })`);
+    const card = await getCardCenter();
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+    await new Promise((r) => setTimeout(r, 450));
+    const result = await cdp.eval(`(() => {
+      const back = document.querySelector('.swipe-card--active .swipe-card__back');
+      const answer = back.querySelector('.swipe-card__answer');
+      const emit = (target, type, coords) => {
+        const touches = coords.map(([clientX, clientY], identifier) => new Touch({ identifier, target, clientX, clientY }));
+        const event = new TouchEvent(type, { touches, targetTouches: touches, changedTouches: touches, bubbles: true, cancelable: true });
+        target.dispatchEvent(event);
+        return event.defaultPrevented;
+      };
+      const values = {};
+      emit(answer, 'touchstart', [[100, 100]]);
+      values.tap = emit(answer, 'touchmove', [[102, 101]]);
+      emit(answer, 'touchend', []);
+      emit(answer, 'touchstart', [[100, 100]]);
+      values.vertical = emit(answer, 'touchmove', [[101, 120]]);
+      values.verticalThenHorizontal = emit(answer, 'touchmove', [[200, 120]]);
+      emit(answer, 'touchend', []);
+      emit(answer, 'touchstart', [[100, 100]]);
+      values.horizontal = emit(answer, 'touchmove', [[120, 101]]);
+      values.horizontalThenVertical = emit(answer, 'touchmove', [[125, 180]]);
+      emit(answer, 'touchcancel', []);
+      values.afterCancel = emit(answer, 'touchmove', [[200, 101]]);
+      emit(answer, 'touchstart', [[100, 100], [150, 100]]);
+      values.pinch = emit(answer, 'touchmove', [[70, 100], [180, 100]]);
+      values.remainingFinger = emit(answer, 'touchmove', [[200, 100]]);
+      emit(answer, 'touchend', []);
+      for (const [name, target] of [['bookmark', back.querySelector('.swipe-bookmark svg')], ['audio', back.querySelector('button[aria-label^="Play"] svg')]]) {
+        emit(target, 'touchstart', [[100, 100]]);
+        values[name] = emit(target, 'touchmove', [[220, 100]]);
+        emit(target, 'touchend', []);
+      }
+      return values;
+    })()`);
+    assert.deepEqual(result, { tap: false, vertical: false, verticalThenHorizontal: false,
+      horizontal: true, horizontalThenVertical: true, afterCancel: false,
+      pinch: false, remainingFinger: false, bookmark: false, audio: false });
+    assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 0);
+    assert.ok((await getCardCenter()).ariaLabel.includes('back face'));
+  });
+
   it('28. Opt-in diagnostics distinguish a short drag, native cancellation and a successful N5 revealed swipe without altering progress rules', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
