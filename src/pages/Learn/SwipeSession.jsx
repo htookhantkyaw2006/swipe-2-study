@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePresence, useReducedMotion } from 'framer-motion';
+import { motion, useMotionValue, useTransform, AnimatePresence, animate, usePresence, useReducedMotion, useDragControls } from 'framer-motion';
 import { ChevronLeft, Check, X, Hand, Shuffle, Volume2, Bookmark, BookmarkMinus } from 'lucide-react';
 import ProgressBar from '../../components/ui/ProgressBar';
 import { db } from '../../lib/db';
@@ -108,6 +108,9 @@ const Flashcard = ({
   const dragEndTimeRef = useRef(0);
   const lastFlipTimeRef = useRef(0);
   const lastDragInfoRef = useRef(null);
+  const suppressTouchClickRef = useRef(false);
+  const dragControls = useDragControls();
+  const x = useMotionValue(0);
 
   useEffect(() => {
     const element = cardRef.current;
@@ -134,9 +137,18 @@ const Flashcard = ({
       const touch = event.touches[0];
       const dx = Math.abs(touch.clientX - gesture.x);
       const dy = Math.abs(touch.clientY - gesture.y);
+      if (Math.hypot(dx, dy) > 6) suppressTouchClickRef.current = true;
       if (!gesture.axis) {
         if (Math.max(dx, dy) < 6 || dx === dy) return;
         gesture.axis = dx > dy ? 'x' : 'y';
+        if (gesture.axis === 'y') {
+          // Motion otherwise follows horizontal jitter during a native scroll.
+          // Cancel without onDragEnd: scrolling must never commit a card.
+          dragControls.cancel();
+          x.stop();
+          x.set(0);
+          isDraggingRef.current = false;
+        }
       }
       if (gesture.axis === 'x' && event.cancelable) event.preventDefault();
     };
@@ -153,7 +165,7 @@ const Flashcard = ({
       element.removeEventListener('touchcancel', reset, true);
       element.removeEventListener('pointercancel', reset, true);
     };
-  }, [isActive, isPresent, locked]);
+  }, [isActive, isPresent, locked, dragControls, x]);
 
   // Opt-in, screen-only diagnostics. Never record card text, account data or tokens.
   const reportGesture = (reason, event, info = lastDragInfoRef.current) => {
@@ -172,7 +184,6 @@ const Flashcard = ({
     });
   };
 
-  const x = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], reducedMotion ? [0, 0] : [-15, 15]);
   const backgroundColor = useTransform(x, [-100, 0, 100], ['#FEE2E2', '#FFFFFF', '#DCFCE7']);
 
@@ -532,6 +543,7 @@ const Flashcard = ({
           cursor: 'grab'
         },
         drag: !locked ? "x" : false,
+        dragControls,
         dragConstraints: { left: 0, right: 0 },
         dragElastic: 0.7,
         onDragStart: () => {
@@ -564,7 +576,7 @@ const Flashcard = ({
     if (pointerStartRef.current && e.clientX != null && e.clientX !== 0 && pointerStartRef.current.x != null) {
       movedDistance = Math.hypot(e.clientX - pointerStartRef.current.x, e.clientY - pointerStartRef.current.y);
     }
-    if (wasRecentDrag || movedDistance > 6) {
+    if (suppressTouchClickRef.current || wasRecentDrag || movedDistance > 6) {
       return;
     }
     if (now - lastFlipTimeRef.current < 100) {
@@ -610,6 +622,7 @@ const Flashcard = ({
         ...motionProps.style
       }}
       onPointerDown={(e) => {
+        if (e.isPrimary !== false) suppressTouchClickRef.current = false;
         // Keep the pointer on the non-rotating card throughout a flip, even
         // when the original face moves away or becomes inert underneath it.
         if (e.pointerType === 'touch' && e.isPrimary !== false) {
@@ -622,6 +635,7 @@ const Flashcard = ({
       }}
       onPointerCancel={(e) => {
         reportGesture('cancelled', e);
+        suppressTouchClickRef.current = true;
         isCancelledRef.current = true;
         pointerStartRef.current = null;
         isDraggingRef.current = false;
@@ -629,6 +643,7 @@ const Flashcard = ({
       }}
       onTouchCancel={(e) => {
         reportGesture('cancelled', e);
+        suppressTouchClickRef.current = true;
         isCancelledRef.current = true;
         pointerStartRef.current = null;
         isDraggingRef.current = false;

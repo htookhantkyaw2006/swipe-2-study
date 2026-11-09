@@ -2193,6 +2193,58 @@ describe('Swipe Gesture & Interaction Responsiveness (Real Browser Pointer Verif
     assert.ok((await getCardCenter()).ariaLabel.includes('back face'));
   });
 
+  it('32. Vertical-first touches cannot drift or commit a card even without browser pointercancel; delayed clicks cannot flip it', async (t) => {
+    if (!browserPath) return t.skip('No real browser executable');
+    for (const courseId of ['zh-hsk1', 'ja-n5']) {
+      await cdp.eval(`window.mountSession({ courseId: '${courseId}' })`);
+      const card = await getCardCenter();
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: card.cx, y: card.cy, button: 'left', buttons: 1, clickCount: 1 });
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: card.cx, y: card.cy, button: 'left', buttons: 0, clickCount: 1 });
+      await new Promise(r => setTimeout(r, 450));
+      // Synthetic streams deliberately omit native pointercancel, to cover engines
+      // that keep delivering pointers while a nested answer is being scrolled.
+      const samples = await cdp.eval(`(async () => {
+        const outer = document.querySelector('.swipe-card--active');
+        const answer = outer.querySelector('.swipe-card__answer');
+        const pointer = (type, dx, dy) => answer.dispatchEvent(new PointerEvent(type, {
+          bubbles: true, pointerId: 71, pointerType: 'touch', isPrimary: true,
+          clientX: ${card.cx} + dx, clientY: ${card.cy} + dy, button: 0, buttons: type === 'pointerup' ? 0 : 1
+        }));
+        const touch = (type, dx, dy) => {
+          const points = type === 'touchend' ? [] : [new Touch({ identifier: 71, target: answer,
+            clientX: ${card.cx} + dx, clientY: ${card.cy} + dy })];
+          const e = new TouchEvent(type, { bubbles: true, cancelable: true, touches: points, changedTouches: points });
+          answer.dispatchEvent(e);
+          return e.defaultPrevented;
+        };
+        pointer('pointerdown', 0, 0);
+        touch('touchstart', 0, 0);
+        const samples = [];
+        for (const [dx, dy] of [[1, -20], [8, -45], [50, -60], [100, -80]]) {
+          pointer('pointermove', dx, dy);
+          const prevented = touch('touchmove', dx, dy);
+          await new Promise(requestAnimationFrame);
+          await new Promise(requestAnimationFrame);
+          samples.push({ x: new DOMMatrixReadOnly(getComputedStyle(outer).transform).m41, prevented });
+        }
+        pointer('pointerup', 100, -80);
+        touch('touchend', 100, -80);
+        // A trailing click may arrive well after the old 150ms drag timer.
+        await new Promise(r => setTimeout(r, 350));
+        outer.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: ${card.cx}, clientY: ${card.cy} }));
+        return samples;
+      })()`);
+      assert.ok(samples.every(s => Math.abs(s.x) < 0.5), 'Vertical scroll must keep the outer card centered, including later horizontal drift');
+      assert.ok(samples.every(s => !s.prevented), 'Vertical ownership must leave native scrolling enabled');
+      assert.equal((await cdp.eval(`window.db.get('learned_words') || []`)).length, 0);
+      assert.equal((await getCardCenter()).char, card.char);
+      assert.ok((await getCardCenter()).ariaLabel.includes('back face'), 'A delayed scroll click must not flip the card');
+      // A new real touch clears scroll suppression and still reveals/flips normally.
+      await dispatchTouchDrag(card.cx, card.cy, 0, 0, 1, 20);
+      await waitForCondition(`document.querySelector('.swipe-card--active')?.getAttribute('aria-label')?.includes('front face')`);
+    }
+  });
+
   it('28. Opt-in diagnostics distinguish a short drag, native cancellation and a successful N5 revealed swipe without altering progress rules', async (t) => {
     if (!browserPath) return t.skip('No real browser executable');
 
