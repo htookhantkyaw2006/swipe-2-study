@@ -117,7 +117,7 @@ export default function Library() {
   // Dictionary tool (lives in Explore & Practise)
   const dictionaryTool = { title: 'Dictionary', subtitle: course.copy?.dictionarySubtitle || 'Look up words', icon: BookOpen, gradient: 'linear-gradient(135deg, #7DD3FC 0%, #0284C7 100%)', shadow: 'rgba(2, 132, 199, 0.4)', path: '/dictionary', char: chars.dictionary || '典', charColor: 'var(--color-ghost-blue)' };
 
-  // Explore & Practise tools
+  // Explore & Practise tools. "Coming soon" tiles (no path) are moved to the bottom.
   const exploreAndPractiseTools = [
     dictionaryTool,
     ...(course.exploreTools || []).map((tool) => ({
@@ -125,7 +125,7 @@ export default function Library() {
       ...tool,
       path: tool.path || '#'
     }))
-  ];
+  ].sort((a, b) => (a.path === '#' ? 1 : 0) - (b.path === '#' ? 1 : 0));
 
   const filterTools = (tools) => {
     if (!searchQuery.trim()) return tools;
