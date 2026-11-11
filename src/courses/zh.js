@@ -194,9 +194,9 @@ export default {
   /* Explore & Practise tiles. A null path renders as "Soon". */
   exploreTools: [
     { key: 'scriptDictionary', title: 'Hanzi Dictionary', subtitle: 'Look up any character', path: null, char: '汉' },
-    { key: 'radicals', title: 'Learn Radicals', subtitle: '氵 water, 木 tree, 心 heart...', path: '/radicals', char: '部' },
     { key: 'interest', title: 'Study by Interest', subtitle: 'Food, travel, people, work...', path: '/interest', char: '类' },
     { key: 'writing', title: 'Practise Writing', subtitle: 'Trace characters by hand', path: '/writing', char: '写' },
+    { key: 'radicals', title: 'Learn Radicals', subtitle: '氵 water, 木 tree, 心 heart...', path: '/radicals', char: '部' },
     { key: 'twisters', title: 'Tongue Twisters', subtitle: '20 drills with voice', path: null, char: '绕' }
   ],
 
