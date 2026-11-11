@@ -115,7 +115,7 @@ export default function Library() {
         : (isLoaded ? `${availableCards} cards available` : 'Catalog disabled');
 
   // Dictionary tool (lives in Explore & Practise)
-  const dictionaryTool = { title: 'Dictionary', subtitle: course.copy?.dictionarySubtitle || 'Look up words', icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: chars.dictionary || '典', charColor: '#FFEDD5' };
+  const dictionaryTool = { title: 'Dictionary', subtitle: course.copy?.dictionarySubtitle || 'Look up words', icon: BookOpen, gradient: 'linear-gradient(135deg, #7DD3FC 0%, #0284C7 100%)', shadow: 'rgba(2, 132, 199, 0.4)', path: '/dictionary', char: chars.dictionary || '典', charColor: 'var(--color-ghost-blue)' };
 
   // Explore & Practise tools
   const exploreAndPractiseTools = [
