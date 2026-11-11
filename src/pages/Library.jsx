@@ -114,23 +114,18 @@ export default function Library() {
         ? 'No cards available'
         : (isLoaded ? `${availableCards} cards available` : 'Catalog disabled');
 
-  const flashcardsSubtitle = learnedCount > 0 ? `${learnedCount} ${learnedCount === 1 ? 'word' : 'words'} learned` : 'Build your vocabulary';
-
-  // Learn & Review tools
-  const learnAndReviewTools = [
-    { title: 'Flashcards', subtitle: flashcardsSubtitle, icon: Layers, gradient: 'linear-gradient(135deg, #7DD3FC 0%, #0284C7 100%)', shadow: 'rgba(2, 132, 199, 0.4)', path: '/learn', char: chars.flashcards || '卡', charColor: 'var(--color-ghost-blue)' },
-    { title: 'Review', subtitle: `${reviewCount} words due`, icon: RotateCw, gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', shadow: 'rgba(220, 38, 38, 0.4)', path: '/learn/review', char: chars.review || '复', charColor: '#FEE2E2' },
-    { title: 'Saved Words', subtitle: `${savedCount} bookmarked words`, icon: Bookmark, gradient: 'linear-gradient(135deg, #86EFAC 0%, #16A34A 100%)', shadow: 'rgba(220, 38, 38, 0.4)', path: '/saved', char: chars.saved || '藏', charColor: '#DCFCE7' },
-    { title: 'Dictionary', subtitle: course.copy?.dictionarySubtitle || 'Look up words', icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: chars.dictionary || '典', charColor: '#FFEDD5' },
-    { title: 'Learn Phrases', subtitle: 'Master common expressions', icon: MessageCircle, gradient: 'linear-gradient(135deg, #93C5FD 0%, #2563EB 100%)', shadow: 'rgba(37, 99, 235, 0.4)', path: '/flashcards', char: chars.phrases || '话', charColor: '#DBEAFE' }
-  ];
+  // Dictionary tool (lives in Explore & Practise)
+  const dictionaryTool = { title: 'Dictionary', subtitle: course.copy?.dictionarySubtitle || 'Look up words', icon: BookOpen, gradient: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)', shadow: 'rgba(234, 88, 12, 0.4)', path: '/dictionary', char: chars.dictionary || '典', charColor: '#FFEDD5' };
 
   // Explore & Practise tools
-  const exploreAndPractiseTools = (course.exploreTools || []).map((tool) => ({
-    ...(EXPLORE_STYLE[tool.key] || {}),
-    ...tool,
-    path: tool.path || '#'
-  }));
+  const exploreAndPractiseTools = [
+    dictionaryTool,
+    ...(course.exploreTools || []).map((tool) => ({
+      ...(EXPLORE_STYLE[tool.key] || {}),
+      ...tool,
+      path: tool.path || '#'
+    }))
+  ];
 
   const filterTools = (tools) => {
     if (!searchQuery.trim()) return tools;
@@ -138,7 +133,6 @@ export default function Library() {
     return tools.filter(t => t.title.toLowerCase().includes(q) || t.subtitle.toLowerCase().includes(q));
   };
 
-  const filteredLearn = filterTools(learnAndReviewTools);
   const filteredExplore = filterTools(exploreAndPractiseTools);
 
   return (
@@ -313,10 +307,10 @@ export default function Library() {
             </div>
           </div>
 
-          {/* Learn & Review Section */}
+          {/* Explore & Practise Section */}
           <div style={{ marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Learn &amp; Review</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: 0 }}>Explore &amp; Practise</h2>
               <button
                 onClick={() => setIsGridView(!isGridView)}
                 aria-label={isGridView ? 'Switch to list view' : 'Switch to grid view'}
@@ -325,22 +319,6 @@ export default function Library() {
                 {isGridView ? <List size={20} strokeWidth={2.5} /> : <LayoutGrid size={20} strokeWidth={2.5} />}
               </button>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: isGridView ? 'repeat(2, 1fr)' : '1fr', gap: '12px' }}>
-              {filteredLearn.map((tool, idx) => (
-                <ToolCard
-                  key={idx}
-                  tool={tool}
-                  isGridView={isGridView}
-                  onClick={() => { if (tool.path !== '#') navigate(tool.path); }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Explore & Practise Section */}
-          <div style={{ marginBottom: '32px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-navy)', margin: '0 0 16px 0' }}>Explore &amp; Practise</h2>
 
             <div style={{ display: 'grid', gridTemplateColumns: isGridView ? 'repeat(2, 1fr)' : '1fr', gap: '12px' }}>
               {filteredExplore.map((tool, idx) => (
