@@ -59,8 +59,8 @@ const EXPLORE_STYLE = {
   scriptDictionary: { icon: Languages, gradient: 'linear-gradient(135deg, #FCD34D 0%, #B45309 100%)', shadow: 'rgba(180, 83, 9, 0.4)', charColor: '#FEF3C7' },
   sounds:           { icon: AudioLines, gradient: 'linear-gradient(135deg, #67E8F9 0%, #0891B2 100%)', shadow: 'rgba(8, 145, 178, 0.4)', charColor: '#CFFAFE' },
   kana:             { icon: Type,      gradient: 'linear-gradient(135deg, #F9A8D4 0%, #DB2777 100%)', shadow: 'rgba(219, 39, 119, 0.4)', charColor: '#FCE7F3' },
-  radicals:         { icon: Blocks,    gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', shadow: 'rgba(220, 38, 38, 0.4)', charColor: '#FEE2E2' },
-  interest:         { icon: Layers,    gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', charColor: '#F3E8FF' },
+  radicals:         { icon: Blocks,    gradient: 'linear-gradient(135deg, #D8B4FE 0%, #9333EA 100%)', shadow: 'rgba(147, 51, 234, 0.4)', charColor: '#F3E8FF' },
+  interest:         { icon: Layers,    gradient: 'linear-gradient(135deg, #FCA5A5 0%, #DC2626 100%)', shadow: 'rgba(220, 38, 38, 0.4)', charColor: '#FEE2E2' },
   writing:          { icon: PenLine,   gradient: 'linear-gradient(135deg, #5EEAD4 0%, #0F766E 100%)', shadow: 'rgba(15, 118, 110, 0.4)', charColor: '#CCFBF1' },
   twisters:         { icon: Mic,       gradient: 'linear-gradient(135deg, #FDA4AF 0%, #E11D48 100%)', shadow: 'rgba(225, 29, 72, 0.4)', charColor: '#FFE4E6' }
 };
